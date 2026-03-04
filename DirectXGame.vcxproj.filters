@@ -1222,5 +1222,12 @@
     <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS_cs40.inc">
       <Filter>ヘッダー ファイル</Filter>
     </None>
+    <None Include="externals\assimp\lib\Debug\assimp-vc143-mtd.pdb" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="externals\assimp\lib\Release\assimp-vc143-md.lib" />
+    <Library Include="externals\assimp\lib\Release\assimp-vc143-mt.lib" />
+    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mdd.lib" />
+    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mtd.lib" />
   </ItemGroup>
 </Project>
