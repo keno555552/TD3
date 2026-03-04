@@ -1,0 +1,815 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Development|Win32">
+      <Configuration>Development</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Development|x64">
+      <Configuration>Development</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{7346180e-0026-4381-bda5-6e97a6fcaa8b}</ProjectGuid>
+    <RootNamespace>DirectXGame</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Development|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IncludePath>$(IncludePath);C:\Users\yuuta\source\repos\GJ_noname\kEngine</IncludePath>
+    <PublicIncludeDirectories>$(PublicIncludeDirectories)</PublicIncludeDirectories>
+    <PublicModuleDirectories>
+    </PublicModuleDirectories>
+    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <IncludePath>$(IncludePath);C:\Users\yuuta\source\repos\GJ_noname\kEngine</IncludePath>
+    <PublicIncludeDirectories>$(PublicIncludeDirectories)</PublicIncludeDirectories>
+    <PublicModuleDirectories />
+    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);;C:\Users\yuuta\source\repos\GJ_noname\kEngine</IncludePath>
+    <OutDir>$(SolutionDir)..\generated\output\$(Configuration)\</OutDir>
+    <IntDir>$(SolutionDir)..\generated\obj\$(ProjectName)\$(Configuration)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_WINDOWS;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\kEngine\Manager\;$(MSBuildProjectDirectory)\kEngine\pso\;$(MSBuildProjectDirectory)\kEngine\;$(MSBuildProjectDirectory)\kEngine\core\;$(MSBuildProjectDirectory)\kEngine\core\driver\;$(MSBuildProjectDirectory)\kEngine\core\pso\;$(MSBuildProjectDirectory)\kEngine\core\Input\;$(MSBuildProjectDirectory)\kEngine\GameObject\;$(MSBuildProjectDirectory)\kEngine\drawEngine\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\InstanceManager;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\ObjectResource\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\TextureManager\;$(MSBuildProjectDirectory)\kEngine\Lighting\;$(MSBuildProjectDirectory)\kEngine\material\;$(MSBuildProjectDirectory)\kEngine\Sound\;$(MSBuildProjectDirectory)\kEngine\Shader\;$(MSBuildProjectDirectory)\kEngine\tool\;$(MSBuildProjectDirectory)\kEngine\tool\Camera;$(MSBuildProjectDirectory)\kEngine\tool\StringManage;$(MSBuildProjectDirectory)\kEngine\tool\DebugTool;$(MSBuildProjectDirectory)\kEngine\tool\StageManager;$(MSBuildProjectDirectory)\kEngine\tool\DebugCamera\;$(MSBuildProjectDirectory)\kEngine\tool\StageMananger\;$(MSBuildProjectDirectory)\kEngine\tool\mathsUnit\;$(MSBuildProjectDirectory)\kEngine\Collector\;$(MSBuildProjectDirectory)\kEngine\Collector\DrawData\;$(MSBuildProjectDirectory)\kEngine\Data\;$(MSBuildProjectDirectory)\kEngine\Data\Render;$(MSBuildProjectDirectory)\kEngine\Data\Render\Queue;$(MSBuildProjectDirectory)\;S(MSBuildProjectDirectory)\..\scenes;$(ProjectDir)externals\assimp\include;$(ProjectDir)externals\DirectXTex\Shaders;$(ProjectDir)externals\DirectXTex\Shaders\Compiled</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)externals\assimp\lib\Debug</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <Optimization>MaxSpeed</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\kEngine\core\;$(MSBuildProjectDirectory)\kEngine\Manager\;$(MSBuildProjectDirectory)\kEngine\pso\;$(MSBuildProjectDirectory)\kEngine\;$(MSBuildProjectDirectory)\kEngine\core\;$(MSBuildProjectDirectory)\kEngine\core\driver\;$(MSBuildProjectDirectory)\kEngine\core\pso\;$(MSBuildProjectDirectory)\kEngine\core\Input\;$(MSBuildProjectDirectory)\kEngine\GameObject\;$(MSBuildProjectDirectory)\kEngine\drawEngine\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\InstanceManager;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\ObjectResource\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\TextureManager\;$(MSBuildProjectDirectory)\kEngine\Lighting\;$(MSBuildProjectDirectory)\kEngine\material\;$(MSBuildProjectDirectory)\kEngine\Sound\;$(MSBuildProjectDirectory)\kEngine\Shader\;$(MSBuildProjectDirectory)\kEngine\tool\;$(MSBuildProjectDirectory)\kEngine\tool\Camera;$(MSBuildProjectDirectory)\kEngine\tool\StringManage;$(MSBuildProjectDirectory)\kEngine\tool\DebugTool;$(MSBuildProjectDirectory)\kEngine\tool\StageManager;$(MSBuildProjectDirectory)\kEngine\tool\DebugCamera\;$(MSBuildProjectDirectory)\kEngine\tool\StageMananger\;$(MSBuildProjectDirectory)\kEngine\tool\mathsUnit\;$(MSBuildProjectDirectory)\kEngine\Collector\;$(MSBuildProjectDirectory)\kEngine\Collector\DrawData\;$(MSBuildProjectDirectory)\kEngine\Data\;$(MSBuildProjectDirectory)\kEngine\Data\Render;$(MSBuildProjectDirectory)\kEngine\Data\Render\Queue;$(MSBuildProjectDirectory)\;S(MSBuildProjectDirectory)\..\scenes;$(ProjectDir)externals\assimp\include;$(ProjectDir)externals\DirectXTex\Shaders;$(ProjectDir)externals\DirectXTex\Shaders\Compiled</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LinkTimeCodeGeneration>UseFastLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <AdditionalLibraryDirectories>$(ProjectDir)externals\assimp\lib\Release</AdditionalLibraryDirectories>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Development|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_WINDOWS;USE_IMGUI;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <AdditionalIncludeDirectories>$(MSBuildProjectDirectory)\kEngine\core\;$(MSBuildProjectDirectory)\kEngine\Collector\;$(MSBuildProjectDirectory)\kEngine\Collector\DrawData\;$(MSBuildProjectDirectory)\kEngine\Data\Render\;$(MSBuildProjectDirectory)\kEngine\Data\Render\Queue\;$(MSBuildProjectDirectory)\kEngine\tool;$(MSBuildProjectDirectory)\kEngine\Manager\;$(MSBuildProjectDirectory)\kEngine\Data\;$(MSBuildProjectDirectory)\kEngine\pso\;$(MSBuildProjectDirectory)\kEngine\;$(MSBuildProjectDirectory)\kEngine\tool\StageManager;$(MSBuildProjectDirectory)\kEngine\tool\StringManage;$(MSBuildProjectDirectory)\kEngine\tool\DebugTool;$(MSBuildProjectDirectory)\kEngine\tool\Camera;$(MSBuildProjectDirectory)\kEngine\core\driver\;$(MSBuildProjectDirectory)\kEngine\core\pso\;$(MSBuildProjectDirectory)\kEngine\GameObject\;$(MSBuildProjectDirectory)\kEngine\drawEngine\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\InstanceManager;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\TextureManager;S(MSBuildProjectDirectory)\..\scenes;$(MSBuildProjectDirectory)\kEngine\drawEngine\DrawData;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager;$(MSBuildProjectDirectory)\kEngine\drawEngine\ResourceManager\ObjectResource\;$(MSBuildProjectDirectory)\kEngine\drawEngine\InstandManager;$(MSBuildProjectDirectory)\kEngine\Lighting\;$(MSBuildProjectDirectory)\kEngine\material\;$(MSBuildProjectDirectory)\kEngine\Sound\;$(MSBuildProjectDirectory)\kEngine\core\Input\;$(MSBuildProjectDirectory)\kEngine\tool\ConvertString\;$(MSBuildProjectDirectory)\kEngine\tool\DebugCamera\;$(MSBuildProjectDirectory)\kEngine\tool\StageMananger\;$(MSBuildProjectDirectory)\kEngine\tool\mathsUnit\;$(MSBuildProjectDirectory)\resources\Shader\;$(MSBuildProjectDirectory)\;S(MSBuildProjectDirectory)\kEngine\ResourceManager;$(ProjectDir)externals\assimp\include;$(ProjectDir)externals\DirectXTex\Shaders;$(ProjectDir)externals\DirectXTex\Shaders\Compiled</AdditionalIncludeDirectories>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LinkTimeCodeGeneration />
+    </Link>
+    <PostBuildEvent>
+      <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
+copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="externals\DirectXTex\BC.cpp" />
+    <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
+    <ClCompile Include="externals\DirectXTex\BC6HBC7.cpp" />
+    <ClCompile Include="externals\DirectXTex\BCDirectCompute.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexCompress.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexCompressGPU.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexConvert.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexD3D11.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexD3D12.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexDDS.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexFlipRotate.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexHDR.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexImage.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexMipmaps.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexMisc.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexNormalMaps.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexPMAlpha.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexResize.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexTGA.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexUtil.cpp" />
+    <ClCompile Include="externals\DirectXTex\DirectXTexWIC.cpp" />
+    <ClCompile Include="externals\imgui\imgui.cpp" />
+    <ClCompile Include="externals\imgui\imgui_demo.cpp" />
+    <ClCompile Include="externals\imgui\imgui_draw.cpp" />
+    <ClCompile Include="externals\imgui\imgui_impl_dx12.cpp" />
+    <ClCompile Include="externals\imgui\imgui_impl_win32.cpp" />
+    <ClCompile Include="externals\imgui\imgui_stdlib.cpp" />
+    <ClCompile Include="externals\imgui\imgui_tables.cpp" />
+    <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="kEngine\GameObject\CountdownTimer\CountdownTimer.cpp" />
+    <ClCompile Include="kEngine\Lighting\AeraLight.cpp" />
+    <ClCompile Include="kEngine\Lighting\DirectionalLight.cpp" />
+    <ClCompile Include="kEngine\Data\BlendModeType.cpp" />
+    <ClCompile Include="kEngine\tool\DebugTool\DebugObject.cpp" />
+    <ClCompile Include="kEngine\Manager\CameraManager\CameraManager.cpp" />
+    <ClCompile Include="kEngine\Collector\DrawData\DrawDataCollector.cpp" />
+    <ClCompile Include="kEngine\drawEngine\DrawData\CameraData.cpp" />
+    <ClCompile Include="kEngine\drawEngine\DrawData\CameraForGPU.cpp" />
+    <ClCompile Include="kEngine\core\driver\IDManager.cpp" />
+    <ClCompile Include="kEngine\core\driver\ImGuiManager.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\CubeMesh.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\SphereMesh.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\Sprite2DMesh.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\TriangleMesh.cpp" />
+    <ClCompile Include="kEngine\GameObject\Object\Corner.cpp" />
+    <ClCompile Include="kEngine\drawEngine\DrawData\CornerData.cpp" />
+    <ClCompile Include="kEngine\core\driver\FrameRateLimiter.cpp" />
+    <ClCompile Include="kEngine\core\driver\WinAPI.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\SimpleSpriteMesh.cpp" />
+    <ClCompile Include="kEngine\tool\AnimationSystem\AnimationEditor.cpp" />
+    <ClCompile Include="kEngine\tool\AnimationSystem\AnimationSystem.cpp" />
+    <ClCompile Include="kEngine\tool\AnimationSystem\AnimationUnit.cpp" />
+    <ClCompile Include="kEngine\tool\Camera\Camera.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\InstanceManager\InstanceManager.cpp" />
+    <ClCompile Include="kEngine\GameObject\Button\button.cpp" />
+    <ClCompile Include="kEngine\tool\Camera\DebugCamera.cpp" />
+    <ClCompile Include="kEngine\core\Input\inputManager.cpp" />
+    <ClCompile Include="kEngine\core\driver\config.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\BasicResource.cpp" />
+    <ClCompile Include="kEngine\tool\crashDecision\crashData.cpp" />
+    <ClCompile Include="kEngine\tool\crashDecision\crashDecision.cpp" />
+    <ClCompile Include="kEngine\tool\DefaultMenu\DefaultMenu.cpp" />
+    <ClCompile Include="kEngine\tool\MapChip\MapChipField.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Vector4.cpp" />
+    <ClCompile Include="kEngine\tool\PerlinNoise\PerlinNoise.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\randomMaker.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\Model.cpp" />
+    <ClCompile Include="kEngine\Data\LightModelType.cpp" />
+    <ClCompile Include="kEngine\material\MaterialConfig.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ObjectResource\ModelGroup.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\MathsIncluder.cpp" />
+    <ClCompile Include="kEngine\Sound\soundUnit.cpp" />
+    <ClCompile Include="kEngine\Sound\soundManager.cpp" />
+    <ClCompile Include="kEngine\tool\StageManager\BaseScene.cpp" />
+    <ClCompile Include="kEngine\tool\StageManager\SceneElement.cpp" />
+    <ClCompile Include="kEngine\tool\StringManage\ConvertString.cpp" />
+    <ClCompile Include="kEngine\core\DirectXCore.cpp" />
+    <ClCompile Include="kEngine\core\DirectXController.cpp" />
+    <ClCompile Include="kEngine\Data\Render\Data\DirectionalLightGPU.cpp" />
+    <ClCompile Include="kEngine\drawEngine\drawEngine.cpp" />
+    <ClCompile Include="kEngine\core\kEngine.cpp" />
+    <ClCompile Include="kEngine\tool\DebugTool\Logger.cpp" />
+    <ClCompile Include="kEngine\Manager\LightManager\LightManager.cpp" />
+    <ClCompile Include="kEngine\Lighting\Light.cpp" />
+    <ClCompile Include="kEngine\Data\Render\Data\LightGPU.cpp" />
+    <ClCompile Include="kEngine\Data\LightingType.cpp" />
+    <ClCompile Include="main.cpp">
+      <Optimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">MaxSpeed</Optimization>
+      <WholeProgramOptimization Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</WholeProgramOptimization>
+    </ClCompile>
+    <ClCompile Include="kEngine\material\Material.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Matrix3x3.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Matrix4x4.cpp" />
+    <ClCompile Include="kEngine\core\pso\PSO.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\ResourceManager.cpp" />
+    <ClCompile Include="kEngine\tool\StageManager\SceneManager.cpp" />
+    <ClCompile Include="kEngine\core\pso\shader_compile.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Transform.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Vector2.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\Vector3.cpp" />
+    <ClCompile Include="kEngine\tool\mathsUnit\TransformationMatrix.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\VertexData.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\VertexResource.cpp" />
+    <ClCompile Include="kEngine\tool\TimeManager\TimeManager.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\InstanceManager\ModelInstance.cpp" />
+    <ClCompile Include="kEngine\GameObject\Object\Object.cpp" />
+    <ClCompile Include="kEngine\GameObject\Player\Player.cpp" />
+    <ClCompile Include="kEngine\drawEngine\DrawData\ObjectData.cpp" />
+    <ClCompile Include="kEngine\GameObject\Particle\Particle.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\InstanceManager\SpriteInstance.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\WVPResource.cpp" />
+    <ClCompile Include="kEngine\tool\MapChip\MapChipData.cpp" />
+    <ClCompile Include="kEngine\GameObject\Particle\P_Ball\P_Ball.cpp" />
+    <ClCompile Include="kEngine\Data\Render\Queue\RenderData.cpp" />
+    <ClCompile Include="kEngine\Data\PSOType.cpp" />
+    <ClCompile Include="kEngine\Lighting\PointLight.cpp" />
+    <ClCompile Include="ResourceLoader.cpp" />
+    <ClCompile Include="kEngine\tool\StageManager\BaseSceneFactory.cpp" />
+    <ClCompile Include="scenes\CG3_HK_2\SceneCGHK2.cpp" />
+    <ClCompile Include="scenes\CG4_HK_1\menu.cpp" />
+    <ClCompile Include="scenes\CG4_HK_1\Effect1.cpp" />
+    <ClCompile Include="scenes\CG4_HK_1\Effect2.cpp" />
+    <ClCompile Include="kEngine\GameObject\Object\Sprite.cpp" />
+    <ClCompile Include="kEngine\drawEngine\DrawData\SpriteData.cpp" />
+    <ClCompile Include="kEngine\drawEngine\ResourceManager\TextureManager\TextureManager.cpp" />
+    <ClCompile Include="kEngine\core\driver\SrvManager.cpp" />
+    <ClCompile Include="kEngine\Lighting\SpotLight.cpp" />
+    <ClCompile Include="kEngine\GameObject\StartTimer\StartTimer.cpp" />
+    <ClCompile Include="kEngine\tool\StageManager\SceneFactory.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
+    <ClInclude Include="externals\assimp\include\assimp\anim.h" />
+    <ClInclude Include="externals\assimp\include\assimp\AssertHandler.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Base64.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\BaseImporter.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Bitmap.h" />
+    <ClInclude Include="externals\assimp\include\assimp\BlobIOSystem.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ByteSwapper.h" />
+    <ClInclude Include="externals\assimp\include\assimp\camera.h" />
+    <ClInclude Include="externals\assimp\include\assimp\cexport.h" />
+    <ClInclude Include="externals\assimp\include\assimp\cfileio.h" />
+    <ClInclude Include="externals\assimp\include\assimp\cimport.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ColladaMetaData.h" />
+    <ClInclude Include="externals\assimp\include\assimp\color4.h" />
+    <ClInclude Include="externals\assimp\include\assimp\commonMetaData.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Compiler\poppack1.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Compiler\pstdint.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Compiler\pushpack1.h" />
+    <ClInclude Include="externals\assimp\include\assimp\config.h" />
+    <ClInclude Include="externals\assimp\include\assimp\CreateAnimMesh.h" />
+    <ClInclude Include="externals\assimp\include\assimp\DefaultIOStream.h" />
+    <ClInclude Include="externals\assimp\include\assimp\DefaultIOSystem.h" />
+    <ClInclude Include="externals\assimp\include\assimp\DefaultLogger.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\defs.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Exceptional.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Exporter.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\fast_atof.h" />
+    <ClInclude Include="externals\assimp\include\assimp\GenericProperty.h" />
+    <ClInclude Include="externals\assimp\include\assimp\GltfMaterial.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Hash.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Importer.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\importerdesc.h" />
+    <ClInclude Include="externals\assimp\include\assimp\IOStream.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\IOStreamBuffer.h" />
+    <ClInclude Include="externals\assimp\include\assimp\IOSystem.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\light.h" />
+    <ClInclude Include="externals\assimp\include\assimp\LineSplitter.h" />
+    <ClInclude Include="externals\assimp\include\assimp\LogAux.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Logger.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\LogStream.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\material.h" />
+    <ClInclude Include="externals\assimp\include\assimp\MathFunctions.h" />
+    <ClInclude Include="externals\assimp\include\assimp\matrix3x3.h" />
+    <ClInclude Include="externals\assimp\include\assimp\matrix4x4.h" />
+    <ClInclude Include="externals\assimp\include\assimp\MemoryIOWrapper.h" />
+    <ClInclude Include="externals\assimp\include\assimp\mesh.h" />
+    <ClInclude Include="externals\assimp\include\assimp\metadata.h" />
+    <ClInclude Include="externals\assimp\include\assimp\NullLogger.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\ObjMaterial.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ParsingUtils.h" />
+    <ClInclude Include="externals\assimp\include\assimp\pbrmaterial.h" />
+    <ClInclude Include="externals\assimp\include\assimp\port\AndroidJNI\AndroidJNIIOSystem.h" />
+    <ClInclude Include="externals\assimp\include\assimp\port\AndroidJNI\BundledAssetIOSystem.h" />
+    <ClInclude Include="externals\assimp\include\assimp\postprocess.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Profiler.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ProgressHandler.hpp" />
+    <ClInclude Include="externals\assimp\include\assimp\qnan.h" />
+    <ClInclude Include="externals\assimp\include\assimp\quaternion.h" />
+    <ClInclude Include="externals\assimp\include\assimp\RemoveComments.h" />
+    <ClInclude Include="externals\assimp\include\assimp\scene.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SceneCombiner.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SGSpatialSort.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SkeletonMeshBuilder.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SmallVector.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SmoothingGroups.h" />
+    <ClInclude Include="externals\assimp\include\assimp\SpatialSort.h" />
+    <ClInclude Include="externals\assimp\include\assimp\StandardShapes.h" />
+    <ClInclude Include="externals\assimp\include\assimp\StreamReader.h" />
+    <ClInclude Include="externals\assimp\include\assimp\StreamWriter.h" />
+    <ClInclude Include="externals\assimp\include\assimp\StringComparison.h" />
+    <ClInclude Include="externals\assimp\include\assimp\StringUtils.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Subdivision.h" />
+    <ClInclude Include="externals\assimp\include\assimp\texture.h" />
+    <ClInclude Include="externals\assimp\include\assimp\TinyFormatter.h" />
+    <ClInclude Include="externals\assimp\include\assimp\types.h" />
+    <ClInclude Include="externals\assimp\include\assimp\vector2.h" />
+    <ClInclude Include="externals\assimp\include\assimp\vector3.h" />
+    <ClInclude Include="externals\assimp\include\assimp\version.h" />
+    <ClInclude Include="externals\assimp\include\assimp\Vertex.h" />
+    <ClInclude Include="externals\assimp\include\assimp\XmlParser.h" />
+    <ClInclude Include="externals\assimp\include\assimp\XMLTools.h" />
+    <ClInclude Include="externals\assimp\include\assimp\ZipArchiveIOSystem.h" />
+    <ClInclude Include="externals\DirectXTex\BC.h" />
+    <ClInclude Include="externals\DirectXTex\BCDirectCompute.h" />
+    <ClInclude Include="externals\DirectXTex\d3dx12.h" />
+    <ClInclude Include="externals\DirectXTex\DDS.h" />
+    <ClInclude Include="externals\DirectXTex\DirectXTex.h" />
+    <ClInclude Include="externals\DirectXTex\DirectXTexP.h" />
+    <ClInclude Include="externals\DirectXTex\filters.h" />
+    <ClInclude Include="externals\DirectXTex\scoped.h" />
+    <ClInclude Include="externals\imgui\imconfig.h" />
+    <ClInclude Include="externals\imgui\imgui.h" />
+    <ClInclude Include="externals\imgui\imgui_impl_dx12.h" />
+    <ClInclude Include="externals\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="externals\imgui\imgui_internal.h" />
+    <ClInclude Include="externals\imgui\imgui_stdlib.h" />
+    <ClInclude Include="externals\imgui\imstb_rectpack.h" />
+    <ClInclude Include="externals\imgui\imstb_textedit.h" />
+    <ClInclude Include="externals\imgui\imstb_truetype.h" />
+    <ClInclude Include="externals\nlohmann\json.hpp" />
+    <ClInclude Include="externals\nlohmann\json_fwd.hpp" />
+    <ClInclude Include="kEngine\GameObject\CountdownTimer\CountdownTimer.h" />
+    <ClInclude Include="kEngine\Lighting\AeraLight.h" />
+    <ClInclude Include="kEngine\Lighting\DirectionalLight.h" />
+    <ClInclude Include="kEngine\Data\BlendModeType.h" />
+    <ClInclude Include="kEngine\tool\DebugTool\DebugObject.h" />
+    <ClInclude Include="kEngine\Manager\CameraManager\CameraManager.h" />
+    <ClInclude Include="kEngine\Collector\DrawData\DrawDataCollector.h" />
+    <ClInclude Include="kEngine\drawEngine\DrawData\CameraData.h" />
+    <ClInclude Include="kEngine\drawEngine\DrawData\CameraForGPU.h" />
+    <ClInclude Include="kEngine\core\driver\IDManager.h" />
+    <ClInclude Include="kEngine\core\driver\ImGuiManager.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\CubeMesh.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\SphereMesh.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\Sprite2DMesh.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\TriangleMesh.h" />
+    <ClInclude Include="kEngine\GameObject\Object\Corner.h" />
+    <ClInclude Include="kEngine\drawEngine\DrawData\CornerData.h" />
+    <ClInclude Include="kEngine\core\driver\FrameRateLimiter.h" />
+    <ClInclude Include="kEngine\core\driver\WinAPI.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\SimpleSpriteMesh.h" />
+    <ClInclude Include="kEngine\tool\AnimationSystem\AnimationEditor.h" />
+    <ClInclude Include="kEngine\tool\AnimationSystem\AnimationSystem.h" />
+    <ClInclude Include="kEngine\tool\AnimationSystem\AnimationUnit.h" />
+    <ClInclude Include="kEngine\tool\Camera\Camera.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\InstanceManager\InstanceManager.h" />
+    <ClInclude Include="kEngine\GameObject\Button\button.h" />
+    <ClInclude Include="kEngine\tool\Camera\DebugCamera.h" />
+    <ClInclude Include="kEngine\core\Input\inputManager.h" />
+    <ClInclude Include="kEngine\core\driver\config.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\BasicResource.h" />
+    <ClInclude Include="kEngine\tool\crashDecision\crashData.h" />
+    <ClInclude Include="kEngine\tool\crashDecision\crashDecision.h" />
+    <ClInclude Include="kEngine\tool\DefaultMenu\DefaultMenu.h" />
+    <ClInclude Include="kEngine\tool\MapChip\MapChipField.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Vector4.h" />
+    <ClInclude Include="kEngine\tool\PerlinNoise\PerlinNoise.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\VertexIndex.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\randomMaker.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\Model.h" />
+    <ClInclude Include="kEngine\Data\LightModelType.h" />
+    <ClInclude Include="kEngine\material\MaterialConfig.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ObjectResource\ModelGroup.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\MathsIncluder.h" />
+    <ClInclude Include="kEngine\Sound\soundUnit.h" />
+    <ClInclude Include="kEngine\Sound\soundManager.h" />
+    <ClInclude Include="kEngine\tool\StageManager\BaseScene.h" />
+    <ClInclude Include="kEngine\tool\StageManager\SceneElement.h" />
+    <ClInclude Include="kEngine\tool\StringManage\ConvertString.h" />
+    <ClInclude Include="kEngine\core\DirectXController.h" />
+    <ClInclude Include="kEngine\Data\Render\Data\DirectionalLightGPU.h" />
+    <ClInclude Include="kEngine\drawEngine\drawEngine.h" />
+    <ClInclude Include="kEngine\material\Material.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Matrix3x3.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Matrix4x4.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\ResourceManager.h" />
+    <ClInclude Include="kEngine\tool\StageManager\SceneManager.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Transform.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Vector2.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\Vector3.h" />
+    <ClInclude Include="kEngine\core\kEngine.h" />
+    <ClInclude Include="kEngine\core\pso\PSO.h" />
+    <ClInclude Include="kEngine\core\pso\shader_compile.h" />
+    <ClInclude Include="kEngine\core\DirectXCore.h" />
+    <ClInclude Include="kEngine\tool\mathsUnit\TransformationMatrix.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\VertexData.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\VertexResource.h" />
+    <ClInclude Include="kEngine\tool\TimeManager\TimeManager.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\InstanceManager\ModelInstance.h" />
+    <ClInclude Include="kEngine\GameObject\Object\Object.h" />
+    <ClInclude Include="kEngine\tool\DebugTool\Logger.h" />
+    <ClInclude Include="kEngine\GameObject\Player\Player.h" />
+    <ClInclude Include="kEngine\drawEngine\DrawData\ObjectData.h" />
+    <ClInclude Include="kEngine\GameObject\Particle\Particle.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\InstanceManager\SpriteInstance.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\WVPResource.h" />
+    <ClInclude Include="kEngine\tool\MapChip\MapChipData.h" />
+    <ClInclude Include="kEngine\GameObject\Particle\P_Ball\P_Ball.h" />
+    <ClInclude Include="kEngine\Data\Render\Queue\RenderData.h" />
+    <ClInclude Include="kEngine\Data\PSOType.h" />
+    <ClInclude Include="kEngine\Manager\LightManager\LightManager.h" />
+    <ClInclude Include="kEngine\Lighting\Light.h" />
+    <ClInclude Include="kEngine\Data\Render\Data\LightGPU.h" />
+    <ClInclude Include="kEngine\Data\LightingType.h" />
+    <ClInclude Include="kEngine\Lighting\PointLight.h" />
+    <ClInclude Include="ResourceLoader.h" />
+    <ClInclude Include="kEngine\tool\StageManager\BaseSceneFactory.h" />
+    <ClInclude Include="scenes\CG3_HK_2\SceneCGHK2.h" />
+    <ClInclude Include="scenes\CG4_HK_1\menu.h" />
+    <ClInclude Include="scenes\CG4_HK_1\Effect1.h" />
+    <ClInclude Include="scenes\CG4_HK_1\Effect2.h" />
+    <ClInclude Include="kEngine\GameObject\Object\Sprite.h" />
+    <ClInclude Include="kEngine\drawEngine\DrawData\SpriteData.h" />
+    <ClInclude Include="kEngine\drawEngine\ResourceManager\TextureManager\TextureManager.h" />
+    <ClInclude Include="kEngine\core\driver\SrvManager.h" />
+    <ClInclude Include="kEngine\Lighting\SpotLight.h" />
+    <ClInclude Include="kEngine\GameObject\StartTimer\StartTimer.h" />
+    <ClInclude Include="kEngine\tool\StageManager\SceneFactory.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="externals\DirectXTex\Shaders\BC6HEncode.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="externals\DirectXTex\Shaders\BC7Encode.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\FlameNeonGlow.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\FlameNeonGlow.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\GlowSphere.PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\LightingLambert\BlinnPhongReflection.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">4.0</ShaderModel>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Compute</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Development|x64'">4.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\GlowSphere.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\LightingLambert\HalfLambert.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\LightingLambert\Lambert.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\LightingLambert\PhongReflection.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\Object3d.PS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Pixel</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <SuppressStartupBanner Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</SuppressStartupBanner>
+      <SuppressStartupBanner Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</SuppressStartupBanner>
+      <SuppressStartupBanner Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</SuppressStartupBanner>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(OutDir)%(Filename).cso</ObjectFileOutput>
+      <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Development|x64'">$(OutDir)%(Filename).cso</ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\Object3d.VS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Development|x64'">Vertex</ShaderType>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\Tile2D.PS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+    <FxCompile Include="resources\Shader\Tile2D.VS.hlsl">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </FxCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="externals\DirectXTex\DirectXTex_Desktop_2022_Win10.vcxproj">
+      <Project>{371b9fa9-4c90-4ac6-a123-aced756d6c77}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="externals\assimp\include\assimp\color4.inl" />
+    <None Include="externals\assimp\include\assimp\material.inl" />
+    <None Include="externals\assimp\include\assimp\matrix3x3.inl" />
+    <None Include="externals\assimp\include\assimp\matrix4x4.inl" />
+    <None Include="externals\assimp\include\assimp\quaternion.inl" />
+    <None Include="externals\assimp\include\assimp\SmoothingGroups.inl" />
+    <None Include="externals\assimp\include\assimp\vector2.inl" />
+    <None Include="externals\assimp\include\assimp\vector3.inl" />
+    <None Include="externals\DirectXTex\DirectXTex.inl" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeG10CS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeG10CS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeLE10CS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeLE10CS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_EncodeBlockCS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_EncodeBlockCS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode02CS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode02CS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode137CS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode137CS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS_cs40.inc">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="externals\DirectXTex\Shaders\CompileShaders.cmd">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="packages.config" />
+    <None Include="resources\map\map.csv" />
+    <None Include="resources\map\map1.csv" />
+    <None Include="resources\map\map2.csv" />
+    <None Include="resources\map\map3.csv">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="resources\Shader\Tile2D.hlsli">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </None>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>
