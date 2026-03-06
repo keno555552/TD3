@@ -369,6 +369,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Render\Queue\RenderData.cpp" />
     <ClCompile Include="kEngine\Data\PSOType.cpp" />
     <ClCompile Include="kEngine\Lighting\PointLight.cpp" />
+    <ClCompile Include="GAME\actor\ModBody.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\tool\StageManager\BaseSceneFactory.cpp" />
     <ClCompile Include="GAME\scenes\scene1.cpp" />
@@ -571,6 +572,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Data\Render\Data\LightGPU.h" />
     <ClInclude Include="kEngine\Data\LightingType.h" />
     <ClInclude Include="kEngine\Lighting\PointLight.h" />
+    <ClInclude Include="GAME\actor\ModBody.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\tool\StageManager\BaseSceneFactory.h" />
     <ClInclude Include="GAME\scenes\scene1.h" />
