@@ -5,15 +5,15 @@ SceneManager* SceneManager::sceneManager_ = nullptr;
 SceneManager::SceneManager(kEngine* system)
 	: system_(system),
 	sceneFactory_(new SceneFactory(system)) {
-	sceneUsingNameHandle_ = "CGHK2";
+	sceneUsingNameHandle_ = "TITLE";
 
-	helperTextureHandle_ = system_->LoadTexture("resources/texture/helper.png");
-	helperSprite_ = new SimpleSprite;
-	helperSprite_->IntObject(system_);
-	helperSprite_->CreateDefaultData();
-	helperSprite_->mainPosition.transform.scale = { 0.5f,0.5f,1.0f };
-	helperSprite_->mainPosition.transform.translate = { 0.0f,550.0f,0.0f };
-	helperSprite_->objectParts_[0].materialConfig->textureHandle = helperTextureHandle_;
+	//helperTextureHandle_ = system_->LoadTexture("resources/texture/helper.png");
+	//helperSprite_ = new SimpleSprite;
+	//helperSprite_->IntObject(system_);
+	//helperSprite_->CreateDefaultData();
+	//helperSprite_->mainPosition.transform.scale = { 0.5f,0.5f,1.0f };
+	//helperSprite_->mainPosition.transform.translate = { 0.0f,550.0f,0.0f };
+	//helperSprite_->objectParts_[0].materialConfig->textureHandle = helperTextureHandle_;
 
 	defaultMenu_ = new DefaultMenu(system_);
 }

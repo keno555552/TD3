@@ -251,6 +251,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="externals\DirectXTex\BC.cpp" />
     <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
     <ClCompile Include="externals\DirectXTex\BC6HBC7.cpp" />
@@ -369,6 +370,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Render\Queue\RenderData.cpp" />
     <ClCompile Include="kEngine\Data\PSOType.cpp" />
     <ClCompile Include="kEngine\Lighting\PointLight.cpp" />
+    <ClCompile Include="GAME\scenes\ModScene.cpp" />
+    <ClCompile Include="GAME\scenes\PromptScene.cpp" />
     <ClCompile Include="GAME\actor\ModBody.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\tool\StageManager\BaseSceneFactory.cpp" />
@@ -384,8 +387,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Lighting\SpotLight.cpp" />
     <ClCompile Include="kEngine\GameObject\StartTimer\StartTimer.cpp" />
     <ClCompile Include="kEngine\tool\StageManager\SceneFactory.cpp" />
+    <ClCompile Include="GAME\scenes\TitleScene.cpp" />
+    <ClCompile Include="GAME\scenes\TravelScene.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
     <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
     <ClInclude Include="externals\assimp\include\assimp\anim.h" />
@@ -572,6 +578,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Data\Render\Data\LightGPU.h" />
     <ClInclude Include="kEngine\Data\LightingType.h" />
     <ClInclude Include="kEngine\Lighting\PointLight.h" />
+    <ClInclude Include="GAME\scenes\ModScene.h" />
+    <ClInclude Include="GAME\scenes\PromptScene.h" />
     <ClInclude Include="GAME\actor\ModBody.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\tool\StageManager\BaseSceneFactory.h" />
@@ -587,6 +595,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Lighting\SpotLight.h" />
     <ClInclude Include="kEngine\GameObject\StartTimer\StartTimer.h" />
     <ClInclude Include="kEngine\tool\StageManager\SceneFactory.h" />
+    <ClInclude Include="GAME\scenes\TitleScene.h" />
+    <ClInclude Include="GAME\scenes\TravelScene.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="externals\DirectXTex\Shaders\BC6HEncode.hlsl">
