@@ -364,3 +364,11 @@ FodyWeavers.xsd
 
 # Imgui
 imgui.ini
+
+# --- Allow assimp libs ---
+!externals/assimp/lib/
+!externals/assimp/lib/Debug/
+!externals/assimp/lib/Release/
+!externals/assimp/lib/Debug/*.lib
+!externals/assimp/lib/Debug/*.pdb
+!externals/assimp/lib/Release/*.lib
