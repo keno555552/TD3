@@ -29,11 +29,8 @@ public:
 
 private:
   std::map<std::string, std::string> sceneFlow_ = {
-      {"TITLE", "PROMPT"},
-      {"PROMPT", "MOD"},
-      {"MOD", "TRAVEL"},
-      {"TRAVEL", "CONTEST"},
-      {"CONTEST", "PROMPT"},
+      {"TITLE", "PROMPT"},   {"PROMPT", "MOD"},     {"MOD", "TRAVEL"},
+      {"TRAVEL", "CONTEST"}, {"CONTEST", "PROMPT"},
   };
 
 private:
@@ -55,13 +52,13 @@ private:
 
   /// ========= リソースハンドル ========= ///
 
- // int helperTextureHandle_ = 0;
+  // int helperTextureHandle_ = 0;
 
   /// ============ オブジェクト =========== ///
 
-  //SimpleSprite *helperSprite_ = nullptr;
-  //Vector2 helperSpriteScale_ = {1.0f, 1.0f};
-  //Vector2 helperSpritePos_ = {50.0f, 50.0f};
+  // SimpleSprite *helperSprite_ = nullptr;
+  // Vector2 helperSpriteScale_ = {1.0f, 1.0f};
+  // Vector2 helperSpritePos_ = {50.0f, 50.0f};
 
   /// =============== ステージ管理 ===============///
 
