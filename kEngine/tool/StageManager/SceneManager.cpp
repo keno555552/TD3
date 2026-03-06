@@ -3,17 +3,17 @@
 SceneManager* SceneManager::sceneManager_ = nullptr;
 
 SceneManager::SceneManager(kEngine* system)
-	: system_(system),
-	sceneFactory_(new SceneFactory(system)) {
+	: system_(system), sceneFactory_(new SceneFactory(system)) {
 	sceneUsingNameHandle_ = "TITLE";
 
-	//helperTextureHandle_ = system_->LoadTexture("resources/texture/helper.png");
-	//helperSprite_ = new SimpleSprite;
-	//helperSprite_->IntObject(system_);
-	//helperSprite_->CreateDefaultData();
-	//helperSprite_->mainPosition.transform.scale = { 0.5f,0.5f,1.0f };
-	//helperSprite_->mainPosition.transform.translate = { 0.0f,550.0f,0.0f };
-	//helperSprite_->objectParts_[0].materialConfig->textureHandle = helperTextureHandle_;
+	// helperTextureHandle_ =
+	// system_->LoadTexture("resources/texture/helper.png"); helperSprite_ = new
+	// SimpleSprite; helperSprite_->IntObject(system_);
+	// helperSprite_->CreateDefaultData();
+	// helperSprite_->mainPosition.transform.scale = { 0.5f,0.5f,1.0f };
+	// helperSprite_->mainPosition.transform.translate = { 0.0f,550.0f,0.0f };
+	// helperSprite_->objectParts_[0].materialConfig->textureHandle =
+	// helperTextureHandle_;
 
 	defaultMenu_ = new DefaultMenu(system_);
 }
@@ -30,12 +30,9 @@ void SceneManager::Initialize(kEngine* system) {
 	if (!sceneManager_) {
 		sceneManager_ = new SceneManager(system);
 	}
-
 }
 
-SceneManager& SceneManager::GetInstance() {
-	return *sceneManager_;
-}
+SceneManager& SceneManager::GetInstance() { return *sceneManager_; }
 
 void SceneManager::SceneChanger() {
 
@@ -44,17 +41,17 @@ void SceneManager::SceneChanger() {
 
 		switch (sceneUsing_->GetOutcome()) {
 
-		case SceneOutcome::NEXT:
-		{
+		case SceneOutcome::NEXT: {
 			auto targetScene = sceneFlow_.find(sceneUsingNameHandle_);
 			if (targetScene != sceneFlow_.end()) {
 				sceneUsingNameHandle_ = targetScene->second;
 				isSceneChange = true;
 			} else {
-				Logger::Log("[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " + sceneUsingNameHandle_);
+				Logger::Log(
+					"[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " +
+					sceneUsingNameHandle_);
 			}
-		}
-		break;
+		} break;
 
 		case SceneOutcome::RETRY:
 			isSceneChange = true;
@@ -67,7 +64,6 @@ void SceneManager::SceneChanger() {
 		case SceneOutcome::EXIT:
 			kEngine::EndGame();
 			break;
-
 		}
 
 		if (defaultMenu_->IsBack()) {
@@ -79,7 +75,8 @@ void SceneManager::SceneChanger() {
 			isSceneChange = true;
 		}
 
-		if (!isSceneChange)return;
+		if (!isSceneChange)
+			return;
 
 		delete sceneUsing_, sceneUsing_ = nullptr;
 	}
@@ -87,20 +84,17 @@ void SceneManager::SceneChanger() {
 	sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
 }
 
-
 void SceneManager::Update() {
-
 
 	SceneChanger();
 
-	//defaultMenu_->Update();
+	// defaultMenu_->Update();
 
 	if (!defaultMenu_->GetIsPause()) {
 		if (sceneUsing_ != nullptr) {
 			sceneUsing_->Update();
 		}
 	}
-
 }
 
 void SceneManager::Render() {
@@ -110,7 +104,7 @@ void SceneManager::Render() {
 	} else {
 	}
 
-	//defaultMenu_->Draw();
+	// defaultMenu_->Draw();
 
 #ifdef USE_IMGUI
 	ImGuiPart();
