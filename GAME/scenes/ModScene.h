@@ -1,5 +1,8 @@
 #pragma once
 #include "BaseScene.h"
+#include "Object/Object.h"
+#include "GAME/actor/ModBody.h"
+#include <array>
 
 class ModScene : public BaseScene {
 public:
@@ -18,8 +21,25 @@ private:
   DebugCamera *debugCamera_ = nullptr;
   Camera *usingCamera_ = nullptr;
 
-  bool useDebugCamera_ = false;
+  bool useDebugCamera_ = true;
+
+  //int modModelHandle_ = 0;
+  //Object *modObject_ = nullptr;
+  //ModBody modBody_{};
+  std::array<int, static_cast<size_t>(ModBodyPart::Count)> modModelHandles_{};
+  std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects_{};
 
 private:
   void CameraPart();
+  //void SetupModObject();
+  void SetupModObjects();
+  void SetupPartObject(ModBodyPart part, const std::string &path);
+  void SetupHierarchy();
+  void SetupInitialLayout();
+  void UpdateModObjects();
+  void DrawModObjects();
+
+#ifdef USE_IMGUI
+  void DrawModGui();
+#endif
 };
