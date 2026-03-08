@@ -14,14 +14,14 @@ size_t ToIndex(ModBodyPart part) { return static_cast<size_t>(part); }
 ModScene::ModScene(kEngine *system) {
   system_ = system;
 
-  // ライト生成
+  // ライト
   light1_ = new Light;
   light1_->direction = {-0.5f, -1.0f, -0.3f};
   light1_->color = {1.0f, 1.0f, 1.0f};
   light1_->intensity = 1.0f;
   system_->AddLight(light1_);
 
-  // 通常カメラとデバッグカメラを生成
+  // カメラ
   debugCamera_ = system_->CreateDebugCamera();
   camera_ = system_->CreateCamera();
 
@@ -43,6 +43,10 @@ ModScene::ModScene(kEngine *system) {
 
   // 改造用の各部位オブジェクトをセットアップ
   SetupModObjects();
+
+  // フェード
+  fade_.Initialize(system_);
+  fade_.StartFadeIn();
 }
 
 /*   デストラクタ   */
@@ -78,8 +82,17 @@ void ModScene::Update() {
     useDebugCamera_ = !useDebugCamera_;
   }
 
-  // Spaceキーで次のシーンへ
-  if (system_->GetTriggerOn(DIK_SPACE)) {
+  // スペースキーで移動シーンへ
+  if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+  }
+
+  // フェード更新
+  fade_.Update(usingCamera_);
+
+  // フェード終了後にシーン移行
+  if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = SceneOutcome::NEXT;
   }
 }
@@ -94,6 +107,7 @@ void ModScene::Draw() {
   }*/
 
 #ifdef USE_IMGUI
+  // 現在シーン表示
   ImGui::Begin("Scene");
   ImGui::Text("ModScene");
   ImGui::End();
@@ -101,6 +115,9 @@ void ModScene::Draw() {
   // 部位ごとのTransform調整GUI
   DrawModGui();
 #endif
+
+  // フェード描画
+  fade_.Draw();
 }
 
 /*   使用カメラの切り替えと更新   */

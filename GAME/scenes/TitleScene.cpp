@@ -15,6 +15,10 @@ TitleScene::TitleScene(kEngine *system) {
   camera_ = system_->CreateCamera();
   usingCamera_ = camera_;
   system_->SetCamera(usingCamera_);
+
+  // フェード
+  fade_.Initialize(system_);
+  fade_.StartFadeIn();
 }
 
 TitleScene::~TitleScene() {
@@ -27,15 +31,29 @@ TitleScene::~TitleScene() {
 void TitleScene::Update() {
   system_->SetCamera(usingCamera_);
 
-  if (system_->GetTriggerOn(DIK_SPACE)) {
+  // スペースキーでお題発表シーンへ
+  if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+  }
+
+  // フェード更新
+  fade_.Update(usingCamera_);
+
+  // フェード終了後にシーン移行
+  if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = SceneOutcome::NEXT;
   }
 }
 
 void TitleScene::Draw() {
 #ifdef USE_IMGUI
+  // 現在シーン表示
   ImGui::Begin("Scene");
   ImGui::Text("TitleScene");
   ImGui::End();
 #endif
+
+  // フェード描画
+  fade_.Draw();
 }

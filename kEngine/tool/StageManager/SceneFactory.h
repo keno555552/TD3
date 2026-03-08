@@ -18,17 +18,17 @@
 // このゲーム用のシーン工場
 class SceneFactory : public BaseSceneFactory {
 public:
-  SceneFactory(kEngine *system);
-  ~SceneFactory() override = default;
+	SceneFactory(kEngine* system);
+	~SceneFactory() override = default;
 
-  /// <summary>
-  /// シーン生成
-  /// </summary>
-  /// <param name="sceneName">シーン名</param>
-  /// <returns>生成したシーン</returns>
-  BaseScene *CreateScene(const std::string &sceneName) override;
+	/// <summary>
+	/// シーン生成
+	/// </summary>
+	/// <param name="sceneName">シーン名</param>
+	/// <returns>生成したシーン</returns>
+	BaseScene* CreateScene(const std::string& sceneName) override;
 
 private:
-  kEngine *system_ = nullptr;
-  std::unordered_map<std::string, std::function<BaseScene *()>> sceneRegistry_;
+	kEngine* system_ = nullptr;
+	std::unordered_map<std::string, std::function<BaseScene* ()>> sceneRegistry_;
 };

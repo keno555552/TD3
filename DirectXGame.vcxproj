@@ -251,6 +251,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="externals\DirectXTex\BC.cpp" />
     <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
@@ -391,6 +392,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
     <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
