@@ -1,9 +1,10 @@
 #pragma once
 #include "../effect/Fade.h"
 #include "BaseScene.h"
-#include "Object/Object.h"
 #include "GAME/actor/ModBody.h"
+#include "Object/Object.h"
 #include <array>
+#include <string>
 
 class ModScene : public BaseScene {
 public:
@@ -24,25 +25,31 @@ private:
 
   bool useDebugCamera_ = true;
 
-  //int modModelHandle_ = 0;
-  //Object *modObject_ = nullptr;
-  //ModBody modBody_{};
   std::array<int, static_cast<size_t>(ModBodyPart::Count)> modModelHandles_{};
   std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects_{};
+  std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies_{};
+
+  // Body root 基準の各 joint 位置
+  std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
+      bodyJointOffsets_{};
 
   Fade fade_;
   bool isStartTransition_ = false;
 
 private:
-  /// <summary>
-  /// 使用するカメラを設定・更新する
-  /// </summary>
   void CameraPart();
-  //void SetupModObject();
+
   void SetupModObjects();
   void SetupPartObject(ModBodyPart part, const std::string &path);
   void SetupHierarchy();
   void SetupInitialLayout();
+  void SetupBodyJointOffsets();
+
+  void UpdateChildRootsFromBody();
+
+  void ApplyModBodies();
+  void ResetModBodies();
+
   void UpdateModObjects();
   void DrawModObjects();
 

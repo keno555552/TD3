@@ -1,205 +1,124 @@
 #include "ModBody.h"
 
-/*   「キャラクターの体の改造処理」を行うクラス   */
+/*   1部位1Object 用の改造処理クラス   */
 
 namespace {
-/*   各パーツのスケールを計算する関数   */
+
+/*   各パーツの見た目スケールを計算する   */
 Vector3 MakePartScale(const Vector3 &baseScale, const ModBodyPartParam &param) {
   Vector3 scale = baseScale;
   scale.x *= param.scale.x;
   scale.y *= param.scale.y * param.length;
   scale.z *= param.scale.z;
+
   if (!param.enabled) {
     scale = {0.0f, 0.0f, 0.0f};
   }
+
   return scale;
 }
 
-/*   Bodyのスケール変化に合わせて
-各パーツのオフセットをスケールする   */
-Vector3 ScaleOffsetByBody(const Vector3 &offset, const Vector3 &bodyScale) {
-  return {
-      offset.x * bodyScale.x,
-      offset.y * bodyScale.y,
-      offset.z * bodyScale.z,
-  };
-}
-
-/*   length変更による位置補正   */
-Vector3 GetLengthAnchorOffset(ModBodyPart part, const Vector3 &baseScale,
-                              const Vector3 &newScale) {
-
-  // スケール差分
-  float diffY = newScale.y - baseScale.y;
-
+/*   root 基準で mesh の中心位置補正を返す
+----------------------------------------
+前提:
+- Head の root は首元(下端)
+- Arm / Leg の root は肩・股関節(上端)
+- Body の root は中心
+----------------------------------------*/
+Vector3 GetAnchorOffset(ModBodyPart part, const Vector3 &newScale) {
   switch (part) {
-    // 頭は上方向へ補正
   case ModBodyPart::Head:
-    return {0.0f, diffY * 0.5f, 0.0f};
-  // 腕脚は下方向へ補正
+    return {0.0f, newScale.y * 0.5f, 0.0f};
+
   case ModBodyPart::LeftArm:
   case ModBodyPart::RightArm:
   case ModBodyPart::LeftLeg:
   case ModBodyPart::RightLeg:
-    return {0.0f, -diffY * 0.5f, 0.0f};
-  // Bodyは補正なし
+    return {0.0f, -newScale.y * 0.5f, 0.0f};
+
   case ModBodyPart::Body:
   case ModBodyPart::Count:
   default:
     return {0.0f, 0.0f, 0.0f};
   }
 }
+
 } // namespace
 
 /*   初期化   */
-void ModBody::Initialize(Object *target) {
+void ModBody::Initialize(Object *target, ModBodyPart part) {
+  part_ = part;
   CacheBaseTransforms(target);
   Reset();
 }
 
-/*   改造をObjectへ適用する   */
-void ModBody::Apply(Object *target) {
-  if (target == nullptr) {
-    return;
-  }
-
-  CacheBaseTransforms(target);
-
-  // パーツ数が変わっていたら処理しない
-  if (basePartTransforms_.size() != target->objectParts_.size()) {
-    return;
-  }
-
-  // 一度すべて元のTransformへ戻す
-  for (size_t i = 0; i < target->objectParts_.size(); ++i) {
-    target->objectParts_[i].transform = basePartTransforms_[i];
-  }
-
-  // Bodyを先に適用
-  ApplyBody(target);
-
-  // 子パーツを順番に適用
-  for (size_t i = 0; i < static_cast<size_t>(ModBodyPart::Count); ++i) {
-    ModBodyPart part = static_cast<ModBodyPart>(i);
-    if (part == ModBodyPart::Body) {
-      continue;
-    }
-    ApplyChildPart(target, part);
-  }
-}
-
-/*   各パーツとObjectPartのインデックスを対応させる   */
-void ModBody::SetPartIndex(ModBodyPart part, int index) {
-  partIndexMap_.indices[static_cast<size_t>(part)] = index;
-}
-
-/*   パーツのインデックスを取得   */
-int ModBody::GetPartIndex(ModBodyPart part) const {
-  return partIndexMap_.indices[static_cast<size_t>(part)];
-}
-
 /*   改造パラメータを初期値へ戻す   */
 void ModBody::Reset() {
-  for (auto &part : data_.parts) {
-    part.scale = {1.0f, 1.0f, 1.0f};
-    part.length = 1.0f;
-    part.count = 1;
-    part.enabled = true;
-  }
+  param_.scale = {1.0f, 1.0f, 1.0f};
+  param_.length = 1.0f;
+  param_.count = 1;
+  param_.enabled = true;
 }
 
-/*
-Objectの元Transformを保存する
+Vector3 ModBody::GetVisualScaleRatio() const {
+  Vector3 ratio = {param_.scale.x, param_.scale.y * param_.length,
+                   param_.scale.z};
 
-初回のみ保存して、パーツ数が変わったら再保存
-*/
+  if (!param_.enabled) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  return ratio;
+}
+
+/*   初期 transform 保存   */
 void ModBody::CacheBaseTransforms(Object *target) {
   if (target == nullptr) {
     return;
   }
 
-  if (!isBaseCached_ ||
-      basePartTransforms_.size() != target->objectParts_.size()) {
-    // メインTransform保存
+  if (target->objectParts_.empty()) {
+    return;
+  }
+
+  if (!isBaseCached_) {
     baseMainTransform_ = target->mainPosition.transform;
-
-    // 各パーツのTransform保存
-    basePartTransforms_.clear();
-    basePartTransforms_.reserve(target->objectParts_.size());
-
-    for (auto &part : target->objectParts_) {
-      basePartTransforms_.push_back(part.transform);
-    }
-
-    /*
-    Bodyから各パーツまでの距離を保存
-
-    改造時にBody基準で再配置するため
-    */
-    baseOffsetsFromBody_.clear();
-    baseOffsetsFromBody_.resize(target->objectParts_.size(),
-                                Vector3{0.0f, 0.0f, 0.0f});
-
-    int bodyIndex = GetPartIndex(ModBodyPart::Body);
-    if (bodyIndex >= 0 &&
-        bodyIndex < static_cast<int>(basePartTransforms_.size())) {
-      Vector3 bodyTranslate = basePartTransforms_[bodyIndex].translate;
-      for (size_t i = 0; i < basePartTransforms_.size(); ++i) {
-        baseOffsetsFromBody_[i] =
-            basePartTransforms_[i].translate - bodyTranslate;
-      }
-    }
-
+    baseMeshTransform_ = target->objectParts_[0].transform;
     isBaseCached_ = true;
   }
 }
 
-/*   Bodyパーツを適用   */
-void ModBody::ApplyBody(Object *target) {
-  int bodyIndex = GetPartIndex(ModBodyPart::Body);
-  if (bodyIndex < 0 ||
-      bodyIndex >= static_cast<int>(target->objectParts_.size())) {
+/*   改造を適用   */
+void ModBody::Apply(Object *target) {
+  if (target == nullptr) {
+    return;
+  }
+  if (target->objectParts_.empty()) {
     return;
   }
 
-  const ModBodyPartParam &param =
-      data_.parts[static_cast<size_t>(ModBodyPart::Body)];
-  Transform bodyTransform = basePartTransforms_[bodyIndex];
-  bodyTransform.scale = MakePartScale(bodyTransform.scale, param);
-  target->objectParts_[bodyIndex].transform = bodyTransform;
-}
+  CacheBaseTransforms(target);
 
-/*   Body以外のパーツを適用   */
-void ModBody::ApplyChildPart(Object *target, ModBodyPart part) {
-  int bodyIndex = GetPartIndex(ModBodyPart::Body);
-  int index = GetPartIndex(part);
+  /* root 側
+  ------------------------------------------------
+  mainPosition は接続点として使う。
+  位置と回転はシーンや ImGui 側で触る。
+  scale は root に持たせず、初期値へ戻す。
+  ------------------------------------------------*/
+  Transform root = target->mainPosition.transform;
+  root.scale = baseMainTransform_.scale;
+  target->mainPosition.transform = root;
 
-  if (bodyIndex < 0 ||
-      bodyIndex >= static_cast<int>(target->objectParts_.size())) {
-    return;
-  }
-  if (index < 0 || index >= static_cast<int>(target->objectParts_.size())) {
-    return;
-  }
+  /* mesh 側
+  ------------------------------------------------
+  見た目の translate / scale を root 基準で再計算する。
+  ------------------------------------------------*/
+  Transform mesh = baseMeshTransform_;
+  Vector3 newScale = MakePartScale(baseMeshTransform_.scale, param_);
 
-  const ModBodyPartParam &param = data_.parts[static_cast<size_t>(part)];
+  mesh.scale = newScale;
+  mesh.translate =
+      Add(baseMeshTransform_.translate, GetAnchorOffset(part_, newScale));
 
-  Transform transform = basePartTransforms_[index];
-
-  // Body基準で配置
-  const Transform &bodyTransform = target->objectParts_[bodyIndex].transform;
-  transform.translate =
-      Add(bodyTransform.translate,
-          ScaleOffsetByBody(baseOffsetsFromBody_[index], bodyTransform.scale));
-
-  // 新しいスケール計算
-  Vector3 newScale = MakePartScale(basePartTransforms_[index].scale, param);
-
-  // pivot補正
-  transform.translate = Add(
-      transform.translate,
-      GetLengthAnchorOffset(part, basePartTransforms_[index].scale, newScale));
-  transform.scale = newScale;
-
-  target->objectParts_[index].transform = transform;
+  target->objectParts_[0].transform = mesh;
 }

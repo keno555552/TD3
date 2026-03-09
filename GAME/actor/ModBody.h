@@ -1,10 +1,8 @@
 #pragma once
 #include "Object/Object.h"
-#include <array>
-#include <vector>
 
-/* ModBody: Object の各部位のスケールや長さを変更するためのクラス
---------------------------------------------------------------*/
+/* ModBodyPart: 改造対象の部位種別
+--------------------------------*/
 enum class ModBodyPart {
   Body = 0,
   Head,
@@ -15,7 +13,7 @@ enum class ModBodyPart {
   Count
 };
 
-/* 各部位のパラメータ
+/* 各部位の改造パラメータ
 --------------------------------*/
 struct ModBodyPartParam {
   Vector3 scale{1.0f, 1.0f, 1.0f};
@@ -24,92 +22,67 @@ struct ModBodyPartParam {
   bool enabled = true;
 };
 
-/* ModBody の全体のデータ
----------------------------------*/
-struct ModBodyData {
-  std::array<ModBodyPartParam, static_cast<size_t>(ModBodyPart::Count)> parts;
-};
+/* ModBody: 1部位 = 1Object の改造制御クラス
+--------------------------------------------------------------
+役割:
+- mainPosition.transform      : 接続点(root)
+- objectParts_[0].transform   : 見た目(mesh)
 
-/* ModBodyPart と Objectの部位のインデックスを対応させるためのマップ
-------------------------------------------------------------------*/
-struct ModBodyPartIndexMap {
-  std::array<int, static_cast<size_t>(ModBodyPart::Count)> indices{0, 1, 2,
-                                                                   3, 4, 5};
-};
-
+このクラスは objectParts_[0] の見た目側 transform を
+部位ごとの anchor 方針に従って再計算する。
+--------------------------------------------------------------*/
 class ModBody {
 public:
   /// <summary>
-  /// オブジェクトの初期化
+  /// 初期化
   /// </summary>
-  /// <param name="target">初期化するオブジェクトへのポインタ</param>
-  void Initialize(Object *target);
+  /// <param name="target">対象 Object</param>
+  /// <param name="part">この Object が表す部位</param>
+  void Initialize(Object *target, ModBodyPart part);
 
   /// <summary>
-  /// オブジェクトに適用
+  /// 改造を対象 Object に適用
   /// </summary>
-  /// <param name="target">適用対象のオブジェクトへのポインタ</param>
+  /// <param name="target">対象 Object</param>
   void Apply(Object *target);
 
   /// <summary>
-  /// データを取得
+  /// 改造パラメータ取得
   /// </summary>
-  /// <returns>ModBodyData オブジェクトへの参照</returns>
-  ModBodyData &GetData() { return data_; }
+  ModBodyPartParam &GetParam() { return param_; }
 
   /// <summary>
-  /// モッドボディのデータを取得。
+  /// 改造パラメータ取得 const
   /// </summary>
-  /// <returns>モッドボディデータへの定数参照</returns>
-  const ModBodyData &GetData() const { return data_; }
+  const ModBodyPartParam &GetParam() const { return param_; }
 
   /// <summary>
-  /// ボディパーツのインデックスを設定
+  /// この ModBody が担当する部位
   /// </summary>
-  /// <param name="part">設定対象のボディパーツ</param>
-  /// <param name="index">設定するインデックス値</param>
-  void SetPartIndex(ModBodyPart part, int index);
+  ModBodyPart GetPart() const { return part_; }
 
   /// <summary>
-  /// ボディパーツのインデックスを取得
-  /// </summary>
-  /// <param name="part">インデックスを取得するボディパーツ</param>
-  /// <returns>指定されたボディパーツのインデックス</returns>
-  int GetPartIndex(ModBodyPart part) const;
-
-  /// <summary>
-  /// リセット
+  /// パラメータを初期化
   /// </summary>
   void Reset();
 
+    /// <summary>
+  /// root ではなく mesh 側に適用される見た目スケール倍率を取得
+  /// </summary>
+  Vector3 GetVisualScaleRatio() const;
+
 private:
   /// <summary>
-  /// オブジェクトの基本トランスフォームをキャッシュ
+  /// 初期 transform を保存
   /// </summary>
-  /// <param
-  /// name="target">基本トランスフォームをキャッシュする対象のオブジェクト</param>
   void CacheBaseTransforms(Object *target);
 
-  /// <summary>
-  /// オブジェクトに本体を適用
-  /// </summary>
-  /// <param name="target">本体を適用する対象のオブジェクト</param>
-  void ApplyBody(Object *target);
-
-  /// <summary>
-  /// 子パーツをオブジェクトに適用
-  /// </summary>
-  /// <param name="target">パーツを適用する対象のオブジェクト</param>
-  /// <param name="part">適用する子ボディパーツ</param>
-  void ApplyChildPart(Object *target, ModBodyPart part);
-
 private:
-  ModBodyData data_{}; // データ
-  ModBodyPartIndexMap partIndexMap_{}; // 各部位のスケールや長さを保持するデータ
+  ModBodyPart part_ = ModBodyPart::Body;
+  ModBodyPartParam param_{};
 
-  std::vector<Transform> basePartTransforms_{}; // 基本部位のトランスフォーム
-  std::vector<Vector3> baseOffsetsFromBody_{}; // ボディからの基本オフセット
-  Transform baseMainTransform_{}; // オブジェクトの基本トランスフォームをキャッシュするための変数
-  
-  bool isBaseCached_ = false; // 基本トランスフォームがキャッシュできているかフラグ
+  Transform baseMainTransform_{};
+  Transform baseMeshTransform_{};
+
+  bool isBaseCached_ = false;
 };
