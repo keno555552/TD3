@@ -23,6 +23,7 @@ ContestScene::ContestScene(kEngine *system) {
 ContestScene::~ContestScene() {
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
+  system_->RemoveLight(light1_);
 
   delete light1_;
 }

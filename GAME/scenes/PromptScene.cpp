@@ -24,6 +24,7 @@ PromptScene::PromptScene(kEngine *system) {
 PromptScene::~PromptScene() {
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
+  system_->RemoveLight(light1_);
 
   delete light1_;
 }
