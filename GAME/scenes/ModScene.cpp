@@ -56,10 +56,17 @@ ModScene::ModScene(kEngine *system) {
 
   // 各部位のハンドルと配列初期化
   modModelHandles_.fill(0);
-  modObjects_.fill(nullptr);
+
+  customizeData_ = ModBody::CopySharedCustomizeData();
+  if (customizeData_ == nullptr) {
+    customizeData_ = ModBody::CreateDefaultCustomizeData();
+  }
 
   // 部位生成
   SetupModObjects();
+
+  // 共有データから部位へ初期値を反映
+  LoadCustomizeData();
 
   // フェード
   fade_.Initialize(system_);
@@ -71,13 +78,7 @@ ModScene::~ModScene() {
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
 
-  for (auto &object : modObjects_) {
-    delete object;
-    object = nullptr;
-  }
-
   system_->RemoveLight(light1_);
-
   delete light1_;
 }
 
@@ -85,6 +86,7 @@ ModScene::~ModScene() {
 void ModScene::Update() {
   CameraPart();
   UpdateModObjects();
+  SyncCustomizeDataFromScene();
 
   if (system_->GetTriggerOn(DIK_0)) {
     useDebugCamera_ = !useDebugCamera_;
@@ -98,6 +100,9 @@ void ModScene::Update() {
   fade_.Update(usingCamera_);
 
   if (isStartTransition_ && fade_.IsFinished()) {
+    if (customizeData_ != nullptr) {
+      ModBody::SetSharedCustomizeData(*customizeData_);
+    }
     outcome_ = SceneOutcome::NEXT;
   }
 }
@@ -171,23 +176,23 @@ void ModScene::SetupPartObject(ModBodyPart part, const std::string &path) {
 
   modModelHandles_[index] = system_->SetModelObj(path);
 
-  modObjects_[index] = new Object;
+  modObjects_[index] = std::make_unique<Object>();
   modObjects_[index]->IntObject(system_);
   modObjects_[index]->CreateModelData(modModelHandles_[index]);
-
   modObjects_[index]->mainPosition.transform = CreateDefaultTransform();
 
-  modBodies_[index].Initialize(modObjects_[index], part);
+  modBodies_[index].Initialize(modObjects_[index].get(), part);
 }
 
 /*   部位同士の親子関係設定   */
 void ModScene::SetupHierarchy() {
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
-  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
-  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
-  Object *rightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
-  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
-  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object *body = modObjects_[ToIndex(ModBodyPart::Body)].get();
+  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)].get();
+  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)].get();
+  Object *rightUpperArm =
+      modObjects_[ToIndex(ModBodyPart::RightUpperArm)].get();
+  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)].get();
+  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)].get();
 
   if (body == nullptr || neck == nullptr || leftUpperArm == nullptr ||
       rightUpperArm == nullptr || leftThigh == nullptr ||
@@ -226,23 +231,29 @@ void ModScene::SetupInitialLayout() {
     object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   };
 
-  setRoot(modObjects_[ToIndex(ModBodyPart::Body)], {0.0f, 0.0f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::Neck)], {0.0f, 1.0f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::Head)], {0.0f, 1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::Body)].get(), {0.0f, 0.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::Neck)].get(), {0.0f, 1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::Head)].get(), {0.0f, 1.0f, 0.0f});
 
-  setRoot(modObjects_[ToIndex(ModBodyPart::LeftUpperArm)],
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftUpperArm)].get(),
           {-1.25f, 1.0f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::LeftForeArm)], {0.0f, -1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftForeArm)].get(),
+          {0.0f, -1.0f, 0.0f});
 
-  setRoot(modObjects_[ToIndex(ModBodyPart::RightUpperArm)],
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightUpperArm)].get(),
           {1.25f, 1.0f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::RightForeArm)], {0.0f, -1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightForeArm)].get(),
+          {0.0f, -1.0f, 0.0f});
 
-  setRoot(modObjects_[ToIndex(ModBodyPart::LeftThigh)], {-0.5f, -1.25f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::LeftShin)], {0.0f, -1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftThigh)].get(),
+          {-0.5f, -1.25f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftShin)].get(),
+          {0.0f, -1.0f, 0.0f});
 
-  setRoot(modObjects_[ToIndex(ModBodyPart::RightThigh)], {0.5f, -1.25f, 0.0f});
-  setRoot(modObjects_[ToIndex(ModBodyPart::RightShin)], {0.0f, -1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightThigh)].get(),
+          {0.5f, -1.25f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightShin)].get(),
+          {0.0f, -1.0f, 0.0f});
 }
 
 /*   Body root 基準の各 joint 初期位置を設定する   */
@@ -260,13 +271,38 @@ void ModScene::SetupBodyJointOffsets() {
   bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)] = {0.5f, -1.25f, 0.0f};
 }
 
+/*   共有改造データから部位へ値を反映する   */
+void ModScene::LoadCustomizeData() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  bodyJointOffsets_ = customizeData_->bodyJointOffsets;
+
+  for (size_t i = 0; i < modBodies_.size(); ++i) {
+    modBodies_[i].SetParam(customizeData_->partParams[i]);
+  }
+}
+
+void ModScene::SyncCustomizeDataFromScene() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  customizeData_->bodyJointOffsets = bodyJointOffsets_;
+
+  for (size_t i = 0; i < modBodies_.size(); ++i) {
+    customizeData_->partParams[i] = modBodies_[i].GetParam();
+  }
+}
+
 /*   Body の現在サイズから joint を再計算して子 root を置く   */
 void ModScene::UpdateChildRootsFromBody() {
   const Vector3 bodyScale =
       modBodies_[ToIndex(ModBodyPart::Body)].GetVisualScaleRatio();
 
   auto setRootFromBody = [&](ModBodyPart childPart) {
-    Object *child = modObjects_[ToIndex(childPart)];
+    Object *child = modObjects_[ToIndex(childPart)].get();
     if (child == nullptr) {
       return;
     }
@@ -283,7 +319,7 @@ void ModScene::UpdateChildRootsFromBody() {
 
   auto setRootFromParentUp = [&](ModBodyPart parentPart,
                                  ModBodyPart childPart) {
-    Object *child = modObjects_[ToIndex(childPart)];
+    Object *child = modObjects_[ToIndex(childPart)].get();
     if (child == nullptr) {
       return;
     }
@@ -296,7 +332,7 @@ void ModScene::UpdateChildRootsFromBody() {
 
   auto setRootFromParentDown = [&](ModBodyPart parentPart,
                                    ModBodyPart childPart) {
-    Object *child = modObjects_[ToIndex(childPart)];
+    Object *child = modObjects_[ToIndex(childPart)].get();
     if (child == nullptr) {
       return;
     }
@@ -319,7 +355,7 @@ void ModScene::UpdateChildRootsFromBody() {
 void ModScene::ApplyModBodies() {
   for (size_t i = 0; i < modObjects_.size(); ++i) {
     if (modObjects_[i] != nullptr) {
-      modBodies_[i].Apply(modObjects_[i]);
+      modBodies_[i].Apply(modObjects_[i].get());
     }
   }
 }
@@ -333,7 +369,7 @@ void ModScene::ResetModBodies() {
 
 /*   各部位 Object 更新   */
 void ModScene::UpdateModObjects() {
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *body = modObjects_[ToIndex(ModBodyPart::Body)].get();
   if (body != nullptr) {
     modBodies_[ToIndex(ModBodyPart::Body)].Apply(body);
   }
@@ -346,7 +382,7 @@ void ModScene::UpdateModObjects() {
     }
 
     if (modObjects_[i] != nullptr) {
-      modBodies_[i].Apply(modObjects_[i]);
+      modBodies_[i].Apply(modObjects_[i].get());
     }
   }
 
@@ -396,7 +432,7 @@ void ModScene::DrawModGui() {
   }
 
   for (int i = 0; i < static_cast<int>(ModBodyPart::Count); ++i) {
-    Object *object = modObjects_[static_cast<size_t>(i)];
+    Object *object = modObjects_[static_cast<size_t>(i)].get();
     if (object == nullptr) {
       continue;
     }

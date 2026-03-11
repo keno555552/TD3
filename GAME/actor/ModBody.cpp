@@ -4,6 +4,9 @@
 
 namespace {
 
+/*   enum class を配列添字へ変換   */
+size_t ToIndex(ModBodyPart part) { return static_cast<size_t>(part); }
+
 /*   各パーツの見た目スケールを計算する   */
 Vector3 MakePartScale(const Vector3 &baseScale, const ModBodyPartParam &param) {
   Vector3 scale = baseScale;
@@ -18,13 +21,7 @@ Vector3 MakePartScale(const Vector3 &baseScale, const ModBodyPartParam &param) {
   return scale;
 }
 
-/*   root 基準で mesh の中心位置補正を返す
-----------------------------------------
-前提:
-- Head の root は首元(下端)
-- Arm / Leg の root は肩・股関節(上端)
-- Body の root は中心
-----------------------------------------*/
+/*   root 基準で mesh の中心位置補正を返す   */
 Vector3 GetAnchorOffset(ModBodyPart part, const Vector3 &newScale) {
   switch (part) {
   case ModBodyPart::Neck:
@@ -46,6 +43,38 @@ Vector3 GetAnchorOffset(ModBodyPart part, const Vector3 &newScale) {
   default:
     return {0.0f, 0.0f, 0.0f};
   }
+}
+
+ModBodyCustomizeData MakeDefaultCustomizeData() {
+  ModBodyCustomizeData data{};
+
+  for (auto &param : data.partParams) {
+    param.scale = {1.0f, 1.0f, 1.0f};
+    param.length = 1.0f;
+    param.count = 1;
+    param.enabled = true;
+  }
+
+  for (auto &offset : data.bodyJointOffsets) {
+    offset = {0.0f, 0.0f, 0.0f};
+  }
+
+  data.bodyJointOffsets[ToIndex(ModBodyPart::Neck)] = {0.0f, 1.0f, 0.0f};
+  data.bodyJointOffsets[ToIndex(ModBodyPart::LeftUpperArm)] =
+      {-1.25f, 1.0f, 0.0f};
+  data.bodyJointOffsets[ToIndex(ModBodyPart::RightUpperArm)] =
+      {1.25f, 1.0f, 0.0f};
+  data.bodyJointOffsets[ToIndex(ModBodyPart::LeftThigh)] =
+      {-0.5f, -1.25f, 0.0f};
+  data.bodyJointOffsets[ToIndex(ModBodyPart::RightThigh)] =
+      {0.5f, -1.25f, 0.0f};
+
+  return data;
+}
+
+std::unique_ptr<ModBodyCustomizeData> &SharedCustomizeDataStorage() {
+  static std::unique_ptr<ModBodyCustomizeData> sharedData = nullptr;
+  return sharedData;
 }
 
 } // namespace
@@ -74,6 +103,30 @@ Vector3 ModBody::GetVisualScaleRatio() const {
   }
 
   return ratio;
+}
+
+std::unique_ptr<ModBodyCustomizeData> ModBody::CreateDefaultCustomizeData() {
+  return std::make_unique<ModBodyCustomizeData>(MakeDefaultCustomizeData());
+}
+
+std::unique_ptr<ModBodyCustomizeData> ModBody::CopySharedCustomizeData() {
+  const std::unique_ptr<ModBodyCustomizeData> &sharedData =
+      SharedCustomizeDataStorage();
+
+  if (sharedData == nullptr) {
+    return nullptr;
+  }
+
+  return std::make_unique<ModBodyCustomizeData>(*sharedData);
+}
+
+void ModBody::SetSharedCustomizeData(const ModBodyCustomizeData &data) {
+  SharedCustomizeDataStorage() =
+      std::make_unique<ModBodyCustomizeData>(data);
+}
+
+const ModBodyCustomizeData *ModBody::GetSharedCustomizeData() {
+  return SharedCustomizeDataStorage().get();
 }
 
 /*   初期 transform 保存   */
