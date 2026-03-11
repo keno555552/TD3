@@ -1,5 +1,7 @@
 #pragma once
 #include "Object/Object.h"
+#include <array>
+#include <memory>
 
 /* ModBodyPart: 改造対象の部位種別
 --------------------------------*/
@@ -34,6 +36,15 @@ struct ModBodyPartParam {
   float length = 1.0f;
   int count = 1;
   bool enabled = true;
+};
+
+/* Scene 間で共有する改造結果
+--------------------------------*/
+struct ModBodyCustomizeData {
+  std::array<ModBodyPartParam, static_cast<size_t>(ModBodyPart::Count)>
+      partParams{};
+  std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
+      bodyJointOffsets{};
 };
 
 /* ModBody: 1部位 = 1Object の改造制御クラス
@@ -71,6 +82,12 @@ public:
   const ModBodyPartParam &GetParam() const { return param_; }
 
   /// <summary>
+  /// 改造パラメータ設定
+  /// </summary>
+  /// <param name="param">設定するパラメータ</param>
+  void SetParam(const ModBodyPartParam &param) { param_ = param; }
+
+  /// <summary>
   /// この ModBody が担当する部位
   /// </summary>
   ModBodyPart GetPart() const { return part_; }
@@ -84,6 +101,27 @@ public:
   /// root ではなく mesh 側に適用される見た目スケール倍率を取得
   /// </summary>
   Vector3 GetVisualScaleRatio() const;
+
+  /// <summary>
+  /// デフォルトの改造データ生成
+  /// </summary>
+  static std::unique_ptr<ModBodyCustomizeData> CreateDefaultCustomizeData();
+
+  /// <summary>
+  /// 共有改造データのコピー
+  /// </summary>
+  static std::unique_ptr<ModBodyCustomizeData> CopySharedCustomizeData();
+
+  /// <summary>
+  /// 共有改造データの設定
+  /// </summary>
+  /// <param name="data">設定するデータ</param>
+  static void SetSharedCustomizeData(const ModBodyCustomizeData &data);
+
+  /// <summary>
+  /// 共有改造データの取得
+  /// </summary>
+  static const ModBodyCustomizeData *GetSharedCustomizeData();
 
 private:
   /// <summary>
