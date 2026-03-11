@@ -4,7 +4,17 @@ namespace {
 
 /*   GUI表示用の部位名テーブル   */
 const char *kModPartNames[] = {
-    "Body", "Head", "LeftArm", "RightArm", "LeftLeg", "RightLeg",
+    "Body",
+    "Neck",
+    "Head",
+    "LeftUpperArm",
+    "LeftForeArm",
+    "RightUpperArm",
+    "RightForeArm",
+    "LeftThigh",
+    "LeftShin",
+    "RightThigh",
+    "RightShin",
 };
 
 /*   enum class を配列添字へ変換   */
@@ -128,15 +138,26 @@ void ModScene::CameraPart() {
 /*   改造用の各部位 Object を生成する   */
 void ModScene::SetupModObjects() {
   SetupPartObject(ModBodyPart::Body, "GAME/resources/modBody/body/body.obj");
+  SetupPartObject(ModBodyPart::Neck, "GAME/resources/modBody/neck/neck.obj");
   SetupPartObject(ModBodyPart::Head, "GAME/resources/modBody/head/head.obj");
-  SetupPartObject(ModBodyPart::LeftArm,
-                  "GAME/resources/modBody/leftArm/leftArm.obj");
-  SetupPartObject(ModBodyPart::RightArm,
-                  "GAME/resources/modBody/rightArm/rightArm.obj");
-  SetupPartObject(ModBodyPart::LeftLeg,
-                  "GAME/resources/modBody/leftLeg/leftLeg.obj");
-  SetupPartObject(ModBodyPart::RightLeg,
-                  "GAME/resources/modBody/rightLeg/rightLeg.obj");
+
+  SetupPartObject(ModBodyPart::LeftUpperArm,
+                  "GAME/resources/modBody/leftUpperArm/leftUpperArm.obj");
+  SetupPartObject(ModBodyPart::LeftForeArm,
+                  "GAME/resources/modBody/leftForeArm/leftForeArm.obj");
+  SetupPartObject(ModBodyPart::RightUpperArm,
+                  "GAME/resources/modBody/rightUpperArm/rightUpperArm.obj");
+  SetupPartObject(ModBodyPart::RightForeArm,
+                  "GAME/resources/modBody/rightForeArm/rightForeArm.obj");
+
+  SetupPartObject(ModBodyPart::LeftThigh,
+                  "GAME/resources/modBody/leftThighs/leftThighs.obj");
+  SetupPartObject(ModBodyPart::LeftShin,
+                  "GAME/resources/modBody/leftShin/leftShin.obj");
+  SetupPartObject(ModBodyPart::RightThigh,
+                  "GAME/resources/modBody/rightThighs/rightThighs.obj");
+  SetupPartObject(ModBodyPart::RightShin,
+                  "GAME/resources/modBody/rightShin/rightShin.obj");
 
   SetupHierarchy();
   SetupInitialLayout();
@@ -162,66 +183,81 @@ void ModScene::SetupPartObject(ModBodyPart part, const std::string &path) {
 /*   部位同士の親子関係設定   */
 void ModScene::SetupHierarchy() {
   Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
-  if (body == nullptr) {
+  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
+  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object *rightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+
+  if (body == nullptr || neck == nullptr || leftUpperArm == nullptr ||
+      rightUpperArm == nullptr || leftThigh == nullptr ||
+      rightThigh == nullptr) {
     return;
   }
 
   ObjectPart *bodyRoot = &body->mainPosition;
 
-  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftArm)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::RightArm)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftLeg)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::RightLeg)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::Neck)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightThigh)]->followObject_ = bodyRoot;
+
+  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = &neck->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ =
+      &leftUpperArm->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ =
+      &rightUpperArm->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ =
+      &leftThigh->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ =
+      &rightThigh->mainPosition;
 }
 
 /*   各部位の root 初期配置設定   */
 void ModScene::SetupInitialLayout() {
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
-  Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
-  Object *leftArm = modObjects_[ToIndex(ModBodyPart::LeftArm)];
-  Object *rightArm = modObjects_[ToIndex(ModBodyPart::RightArm)];
-  Object *leftLeg = modObjects_[ToIndex(ModBodyPart::LeftLeg)];
-  Object *rightLeg = modObjects_[ToIndex(ModBodyPart::RightLeg)];
+  auto setRoot = [](Object *object, const Vector3 &translate) {
+    if (object == nullptr) {
+      return;
+    }
 
-  if (body == nullptr || head == nullptr || leftArm == nullptr ||
-      rightArm == nullptr || leftLeg == nullptr || rightLeg == nullptr) {
-    return;
-  }
+    object->mainPosition.transform.translate = translate;
+    object->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+    object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  };
 
-  body->mainPosition.transform.translate = {0.0f, 0.0f, 0.0f};
-  body->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  body->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  setRoot(modObjects_[ToIndex(ModBodyPart::Body)], {0.0f, 0.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::Neck)], {0.0f, 1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::Head)], {0.0f, 1.0f, 0.0f});
 
-  head->mainPosition.transform.translate = {0.0f, 1.0f, 0.0f};
-  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  head->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftUpperArm)],
+          {-1.25f, 1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftForeArm)], {0.0f, -1.0f, 0.0f});
 
-  leftArm->mainPosition.transform.translate = {-1.25f, 1.0f, 0.0f};
-  leftArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  leftArm->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightUpperArm)],
+          {1.25f, 1.0f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightForeArm)], {0.0f, -1.0f, 0.0f});
 
-  rightArm->mainPosition.transform.translate = {1.25f, 1.0f, 0.0f};
-  rightArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  rightArm->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftThigh)], {-0.5f, -1.25f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::LeftShin)], {0.0f, -1.0f, 0.0f});
 
-  leftLeg->mainPosition.transform.translate = {-0.5f, -1.25f, 0.0f};
-  leftLeg->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  leftLeg->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
-
-  rightLeg->mainPosition.transform.translate = {0.5f, -1.25f, 0.0f};
-  rightLeg->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  rightLeg->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightThigh)], {0.5f, -1.25f, 0.0f});
+  setRoot(modObjects_[ToIndex(ModBodyPart::RightShin)], {0.0f, -1.0f, 0.0f});
 }
 
 /*   Body root 基準の各 joint 初期位置を設定する   */
 void ModScene::SetupBodyJointOffsets() {
-  bodyJointOffsets_[ToIndex(ModBodyPart::Body)] = {0.0f, 0.0f, 0.0f};
-  bodyJointOffsets_[ToIndex(ModBodyPart::Head)] = {0.0f, 1.0f, 0.0f};
-  bodyJointOffsets_[ToIndex(ModBodyPart::LeftArm)] = {-1.25f, 1.0f, 0.0f};
-  bodyJointOffsets_[ToIndex(ModBodyPart::RightArm)] = {1.25f, 1.0f, 0.0f};
-  bodyJointOffsets_[ToIndex(ModBodyPart::LeftLeg)] = {-0.5f, -1.25f, 0.0f};
-  bodyJointOffsets_[ToIndex(ModBodyPart::RightLeg)] = {0.5f, -1.25f, 0.0f};
+  for (auto &offset : bodyJointOffsets_) {
+    offset = {0.0f, 0.0f, 0.0f};
+  }
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::Neck)] = {0.0f, 1.0f, 0.0f};
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::LeftUpperArm)] = {-1.25f, 1.0f, 0.0f};
+  bodyJointOffsets_[ToIndex(ModBodyPart::RightUpperArm)] = {1.25f, 1.0f, 0.0f};
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::LeftThigh)] = {-0.5f, -1.25f, 0.0f};
+  bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)] = {0.5f, -1.25f, 0.0f};
 }
 
 /*   Body の現在サイズから joint を再計算して子 root を置く   */
@@ -229,21 +265,54 @@ void ModScene::UpdateChildRootsFromBody() {
   const Vector3 bodyScale =
       modBodies_[ToIndex(ModBodyPart::Body)].GetVisualScaleRatio();
 
-  auto updateChildRoot = [&](ModBodyPart part) {
-    Object *child = modObjects_[ToIndex(part)];
+  auto setRootFromBody = [&](ModBodyPart childPart) {
+    Object *child = modObjects_[ToIndex(childPart)];
     if (child == nullptr) {
       return;
     }
 
-    const Vector3 &joint = bodyJointOffsets_[ToIndex(part)];
+    const Vector3 &joint = bodyJointOffsets_[ToIndex(childPart)];
     child->mainPosition.transform.translate = ScaleByRatio(joint, bodyScale);
   };
 
-  updateChildRoot(ModBodyPart::Head);
-  updateChildRoot(ModBodyPart::LeftArm);
-  updateChildRoot(ModBodyPart::RightArm);
-  updateChildRoot(ModBodyPart::LeftLeg);
-  updateChildRoot(ModBodyPart::RightLeg);
+  setRootFromBody(ModBodyPart::Neck);
+  setRootFromBody(ModBodyPart::LeftUpperArm);
+  setRootFromBody(ModBodyPart::RightUpperArm);
+  setRootFromBody(ModBodyPart::LeftThigh);
+  setRootFromBody(ModBodyPart::RightThigh);
+
+  auto setRootFromParentUp = [&](ModBodyPart parentPart,
+                                 ModBodyPart childPart) {
+    Object *child = modObjects_[ToIndex(childPart)];
+    if (child == nullptr) {
+      return;
+    }
+
+    const Vector3 parentScale =
+        modBodies_[ToIndex(parentPart)].GetVisualScaleRatio();
+
+    child->mainPosition.transform.translate = {0.0f, parentScale.y, 0.0f};
+  };
+
+  auto setRootFromParentDown = [&](ModBodyPart parentPart,
+                                   ModBodyPart childPart) {
+    Object *child = modObjects_[ToIndex(childPart)];
+    if (child == nullptr) {
+      return;
+    }
+
+    const Vector3 parentScale =
+        modBodies_[ToIndex(parentPart)].GetVisualScaleRatio();
+
+    child->mainPosition.transform.translate = {0.0f, -parentScale.y, 0.0f};
+  };
+
+  setRootFromParentUp(ModBodyPart::Neck, ModBodyPart::Head);
+
+  setRootFromParentDown(ModBodyPart::LeftUpperArm, ModBodyPart::LeftForeArm);
+  setRootFromParentDown(ModBodyPart::RightUpperArm, ModBodyPart::RightForeArm);
+  setRootFromParentDown(ModBodyPart::LeftThigh, ModBodyPart::LeftShin);
+  setRootFromParentDown(ModBodyPart::RightThigh, ModBodyPart::RightShin);
 }
 
 /*   全部位へ ModBody を適用   */
@@ -308,20 +377,20 @@ void ModScene::DrawModGui() {
   ImGui::Separator();
 
   if (ImGui::TreeNode("Body Joints")) {
-    ImGui::SliderFloat3("Head Joint",
-                        &bodyJointOffsets_[ToIndex(ModBodyPart::Head)].x, -5.0f,
+    ImGui::SliderFloat3("Neck Joint",
+                        &bodyJointOffsets_[ToIndex(ModBodyPart::Neck)].x, -5.0f,
                         5.0f);
-    ImGui::SliderFloat3("LeftArm Joint",
-                        &bodyJointOffsets_[ToIndex(ModBodyPart::LeftArm)].x,
+    ImGui::SliderFloat3(
+        "LeftUpperArm Joint",
+        &bodyJointOffsets_[ToIndex(ModBodyPart::LeftUpperArm)].x, -5.0f, 5.0f);
+    ImGui::SliderFloat3(
+        "RightUpperArm Joint",
+        &bodyJointOffsets_[ToIndex(ModBodyPart::RightUpperArm)].x, -5.0f, 5.0f);
+    ImGui::SliderFloat3("LeftThigh Joint",
+                        &bodyJointOffsets_[ToIndex(ModBodyPart::LeftThigh)].x,
                         -5.0f, 5.0f);
-    ImGui::SliderFloat3("RightArm Joint",
-                        &bodyJointOffsets_[ToIndex(ModBodyPart::RightArm)].x,
-                        -5.0f, 5.0f);
-    ImGui::SliderFloat3("LeftLeg Joint",
-                        &bodyJointOffsets_[ToIndex(ModBodyPart::LeftLeg)].x,
-                        -5.0f, 5.0f);
-    ImGui::SliderFloat3("RightLeg Joint",
-                        &bodyJointOffsets_[ToIndex(ModBodyPart::RightLeg)].x,
+    ImGui::SliderFloat3("RightThigh Joint",
+                        &bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)].x,
                         -5.0f, 5.0f);
     ImGui::TreePop();
   }
