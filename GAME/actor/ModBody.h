@@ -5,12 +5,26 @@
 --------------------------------*/
 enum class ModBodyPart {
   Body = 0,
-  Head,
-  LeftArm,
-  RightArm,
-  LeftLeg,
-  RightLeg,
-  Count
+  Neck = 1,
+  Head = 2,
+
+  LeftUpperArm = 3,
+  LeftForeArm = 4,
+  RightUpperArm = 5,
+  RightForeArm = 6,
+
+  LeftThigh = 7,
+  LeftShin = 8,
+  RightThigh = 9,
+  RightShin = 10,
+
+  // 既存コード互換用
+  LeftArm = LeftUpperArm,
+  RightArm = RightUpperArm,
+  LeftLeg = LeftThigh,
+  RightLeg = RightThigh,
+
+  Count = 11
 };
 
 /* 各部位の改造パラメータ
@@ -66,7 +80,7 @@ public:
   /// </summary>
   void Reset();
 
-    /// <summary>
+  /// <summary>
   /// root ではなく mesh 側に適用される見た目スケール倍率を取得
   /// </summary>
   Vector3 GetVisualScaleRatio() const;

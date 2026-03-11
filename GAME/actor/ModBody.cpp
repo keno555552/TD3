@@ -27,13 +27,18 @@ Vector3 MakePartScale(const Vector3 &baseScale, const ModBodyPartParam &param) {
 ----------------------------------------*/
 Vector3 GetAnchorOffset(ModBodyPart part, const Vector3 &newScale) {
   switch (part) {
+  case ModBodyPart::Neck:
   case ModBodyPart::Head:
     return {0.0f, newScale.y * 0.5f, 0.0f};
 
-  case ModBodyPart::LeftArm:
-  case ModBodyPart::RightArm:
-  case ModBodyPart::LeftLeg:
-  case ModBodyPart::RightLeg:
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::RightShin:
     return {0.0f, -newScale.y * 0.5f, 0.0f};
 
   case ModBodyPart::Body:
