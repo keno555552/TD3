@@ -507,30 +507,6 @@
     <ClCompile Include="kEngine\Math\Matrix3x3Math.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
-    <ClCompile Include="GAME\scenes\scene1.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\scenes\TitleScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\scenes\ModScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\scenes\ContestScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\scenes\TravelScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\scenes\PromptScene.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\actor\ModBody.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
-    <ClCompile Include="GAME\effect\Fade.cpp">
-      <Filter>ソース ファイル</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="kEngine\Math\Vector2.h">
@@ -1124,30 +1100,6 @@
     <ClInclude Include="kEngine\Math\Matrix3x3Math.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
-    <ClInclude Include="GAME\scenes\scene1.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\scenes\TitleScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\scenes\ModScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\scenes\ContestScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\scenes\TravelScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\scenes\PromptScene.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\actor\ModBody.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
-    <ClInclude Include="GAME\effect\Fade.h">
-      <Filter>ヘッダー ファイル</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="resources\Shader\LightingLambert\HalfLambert.hlsl">
@@ -1258,12 +1210,5 @@
     <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS_cs40.inc">
       <Filter>ヘッダー ファイル</Filter>
     </None>
-    <None Include="externals\assimp\lib\Debug\assimp-vc143-mtd.pdb" />
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="externals\assimp\lib\Release\assimp-vc143-md.lib" />
-    <Library Include="externals\assimp\lib\Release\assimp-vc143-mt.lib" />
-    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mdd.lib" />
-    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mtd.lib" />
   </ItemGroup>
 </Project>

@@ -25,7 +25,6 @@ SceneManager::~SceneManager() {
 	sceneOld_.reset();
 	sceneFactory_.reset();
 	defaultMenu_.reset();
-	helperSprite_.reset();
 }
 
 void SceneManager::Initialize(kEngine* system) {

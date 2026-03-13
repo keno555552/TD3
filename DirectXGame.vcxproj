@@ -216,8 +216,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <PostBuildEvent>
       <Command>copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxcompiler.dll" "$(TargetDir)dxcompiler.dll"
 copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dxil.dll"
-xcopy "$(MSBuildProjectDirectory)\resources" "$(TargetDir)resources" /E /Y /I
-xcopy "$(MSBuildProjectDirectory)\GAME\resources" "$(TargetDir)GAME\resources" /E /Y /I</Command>
 xcopy "$(ProjectDir)\kEngine\EngineAssets" "$(OutDir)kEngine\EngineAssets" /E /Y /I
 xcopy "$(ProjectDir)\GAME\resources" "$(OutDir)GAME\resources" /E /Y /I
 </Command>
@@ -254,8 +252,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="GAME\effect\Fade.cpp" />
-    <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="externals\DirectXTex\BC.cpp" />
     <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
     <ClCompile Include="externals\DirectXTex\BC6HBC7.cpp" />
@@ -369,21 +365,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Game\MapChip\MapChipData.cpp" />
     <ClCompile Include="kEngine\GameObject\Particle\P_Ball\P_Ball.cpp" />
     <ClCompile Include="kEngine\Data\Render\Queue\RenderData.cpp" />
-    <ClCompile Include="kEngine\Data\PSOType.cpp" />
-    <ClCompile Include="kEngine\Lighting\PointLight.cpp" />
-    <ClCompile Include="GAME\scenes\ModScene.cpp" />
-    <ClCompile Include="GAME\scenes\PromptScene.cpp" />
-    <ClCompile Include="GAME\actor\ModBody.cpp" />
     <ClCompile Include="kEngine\Data\Render\Types\PSOType.cpp" />
     <ClCompile Include="kEngine\Renderer\Lighting\PointLight.cpp" />
     <ClCompile Include="kEngine\Math\Matrix3x3Math.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
-    <ClCompile Include="kEngine\tool\StageManager\BaseSceneFactory.cpp" />
-    <ClCompile Include="GAME\scenes\scene1.cpp" />
-    <ClCompile Include="scenes\CG3_HK_2\SceneCGHK2.cpp" />
-    <ClCompile Include="scenes\CG4_HK_1\menu.cpp" />
-    <ClCompile Include="scenes\CG4_HK_1\Effect1.cpp" />
-    <ClCompile Include="scenes\CG4_HK_1\Effect2.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
     <ClCompile Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.cpp" />
     <ClCompile Include="kEngine\Scenes\CG4_HK_1\menu.cpp" />
@@ -395,14 +380,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Renderer\SrvManager\SrvManager.cpp" />
     <ClCompile Include="kEngine\Renderer\Lighting\SpotLight.cpp" />
     <ClCompile Include="kEngine\GameObject\StartTimer\StartTimer.cpp" />
-    <ClCompile Include="kEngine\tool\StageManager\SceneFactory.cpp" />
-    <ClCompile Include="GAME\scenes\TitleScene.cpp" />
-    <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="kEngine\Scenes\SceneFactory.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="GAME\effect\Fade.h" />
-    <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
     <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
     <ClInclude Include="externals\assimp\include\assimp\anim.h" />
@@ -580,15 +560,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Data\Game\MapChip\MapChipData.h" />
     <ClInclude Include="kEngine\GameObject\Particle\P_Ball\P_Ball.h" />
     <ClInclude Include="kEngine\Data\Render\Queue\RenderData.h" />
-    <ClInclude Include="kEngine\Data\PSOType.h" />
-    <ClInclude Include="kEngine\Manager\LightManager\LightManager.h" />
-    <ClInclude Include="kEngine\Lighting\Light.h" />
-    <ClInclude Include="kEngine\Data\Render\Data\LightGPU.h" />
-    <ClInclude Include="kEngine\Data\LightingType.h" />
-    <ClInclude Include="kEngine\Lighting\PointLight.h" />
-    <ClInclude Include="GAME\scenes\ModScene.h" />
-    <ClInclude Include="GAME\scenes\PromptScene.h" />
-    <ClInclude Include="GAME\actor\ModBody.h" />
     <ClInclude Include="kEngine\Data\Render\Types\PSOType.h" />
     <ClInclude Include="kEngine\Renderer\LightManager\LightManager.h" />
     <ClInclude Include="kEngine\Renderer\Lighting\Light.h" />
@@ -597,12 +568,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Renderer\Lighting\PointLight.h" />
     <ClInclude Include="kEngine\Math\Matrix3x3Math.h" />
     <ClInclude Include="ResourceLoader.h" />
-    <ClInclude Include="kEngine\tool\StageManager\BaseSceneFactory.h" />
-    <ClInclude Include="GAME\scenes\scene1.h" />
-    <ClInclude Include="scenes\CG3_HK_2\SceneCGHK2.h" />
-    <ClInclude Include="scenes\CG4_HK_1\menu.h" />
-    <ClInclude Include="scenes\CG4_HK_1\Effect1.h" />
-    <ClInclude Include="scenes\CG4_HK_1\Effect2.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />
     <ClInclude Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.h" />
     <ClInclude Include="kEngine\Scenes\CG4_HK_1\menu.h" />
@@ -614,9 +579,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Renderer\SrvManager\SrvManager.h" />
     <ClInclude Include="kEngine\Renderer\Lighting\SpotLight.h" />
     <ClInclude Include="kEngine\GameObject\StartTimer\StartTimer.h" />
-    <ClInclude Include="kEngine\tool\StageManager\SceneFactory.h" />
-    <ClInclude Include="GAME\scenes\TitleScene.h" />
-    <ClInclude Include="GAME\scenes\TravelScene.h" />
     <ClInclude Include="kEngine\Scenes\SceneFactory.h" />
   </ItemGroup>
   <ItemGroup>
@@ -758,11 +720,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <None Include="externals\assimp\include\assimp\SmoothingGroups.inl" />
     <None Include="externals\assimp\include\assimp\vector2.inl" />
     <None Include="externals\assimp\include\assimp\vector3.inl" />
-    <None Include="externals\assimp\lib\Debug\assimp-vc143-mtd.pdb">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </None>
     <None Include="externals\DirectXTex\DirectXTex.inl" />
     <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS.inc">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
@@ -851,28 +808,6 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mdd.lib">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </Library>
-    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mtd.lib">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </Library>
-    <Library Include="externals\assimp\lib\Release\assimp-vc143-md.lib">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </Library>
-    <Library Include="externals\assimp\lib\Release\assimp-vc143-mt.lib">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Development|x64'">true</ExcludedFromBuild>
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
-    </Library>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
