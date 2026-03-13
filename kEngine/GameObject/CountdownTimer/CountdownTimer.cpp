@@ -2,7 +2,7 @@
 
 CountdownTimer::CountdownTimer(kEngine* kEngine) {
 	SimpleSprite::IntObject(kEngine);
-	timer_ = new Timer();
+	timer_ = std::make_unique<Timer>();
 	timer_->InitM(maxTime_, kEngine->GetTimeManager());
 
 	lessTimeColor = { 255.0f / 255.0f,36.0f / 255.0f,29.0f / 255.0f ,255.0f / 255.0f };
@@ -104,6 +104,7 @@ CountdownTimer::~CountdownTimer() {
 	if (numberSprites_)delete numberSprites_, numberSprites_ = nullptr;
 	if (pointSprite_)delete pointSprite_, pointSprite_ = nullptr;
 	if (leftTimeSprite_)delete leftTimeSprite_, leftTimeSprite_ = nullptr;
+	timer_.reset();
 }
 
 void CountdownTimer::Update(Camera* camera) {

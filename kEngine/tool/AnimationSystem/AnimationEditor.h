@@ -1,11 +1,11 @@
 #pragma once
 #include "externals/nlohmann/json.hpp"
-#include "../StageManager/BaseScene.h"
+#include "BaseScene.h"
 #include "config.h"
 #include "Object/Sprite.h"
 #include "Object/Object.h"
-#include "tool/crashDecision/crashDecision.h"
-#include "DebugCamera.h"
+#include "Geometry/Collision/crashDecision.h"
+#include "Camera/DebugCamera.h"
 #include "AnimationSystem.h"
 #include "AnimationUnit.h"
 
@@ -43,18 +43,18 @@ private:
 	int Skydome_modelHandle_{};
 
 	/// スカイドームオブジェクト
-	Object* skydome_{};	
+	std::unique_ptr <Object> skydome_{};
 
 	/// Time Bar関連スプライト
-	SimpleSprite* mainNeedle_{ new SimpleSprite };
-	SimpleSprite* mainTimeBar_{ new SimpleSprite };
-	SimpleSprite* markerStartEnd_{ new SimpleSprite };
-	SimpleSprite* marker10_{ new SimpleSprite };
-	SimpleSprite* marker02_{ new SimpleSprite };
-	SimpleSprite* ping_{ new SimpleSprite };
+	std::unique_ptr<SimpleSprite> mainNeedle_		= std::make_unique<SimpleSprite>();
+	std::unique_ptr<SimpleSprite> mainTimeBar_		= std::make_unique<SimpleSprite>();
+	std::unique_ptr<SimpleSprite> markerStartEnd_	= std::make_unique<SimpleSprite>();
+	std::unique_ptr<SimpleSprite> marker10_			= std::make_unique<SimpleSprite>();
+	std::unique_ptr<SimpleSprite> marker02_			= std::make_unique<SimpleSprite>();
+	std::unique_ptr<SimpleSprite> ping_				= std::make_unique<SimpleSprite>();
 
 	/// ============= 選んでるモデル =============///
-	Object* instanceModel_{};	/// インスタンスモデル
+	std::unique_ptr <Object> instanceModel_{};	/// インスタンスモデル
 	Object* keyFrameModel_{};	/// キーフレームモデル // 借り
 	Object* choosingModel_{};	/// 選んでるモデル　　 // 借り
 
@@ -74,7 +74,7 @@ private:
 	Vector4 saveMarkerColor_{ 0.0f,0.0f,0.0f,1.0f };
 	Vector4 saveMarkerColor2_{ 0.2f,0.2f,0.2f,1.0f };
 	/// ============== タイマー ===============///
-	Timer* mainTimer_{};
+	std::unique_ptr <Timer> mainTimer_{};
 	float saveMaxTime_{};
 
 	/// =============== フラグ ===============///
@@ -108,10 +108,10 @@ private:
 	/// =============== モデル ==============///
 
 	/// 3Dオブジェク
-	Object* targetModel_{};
+	std::unique_ptr<Object> targetModel_{};
 
 	/// ============ アニメーションユニット ==========///
-	AnimationUnit* animationUnit_{};
+	std::unique_ptr <AnimationUnit> animationUnit_{};
 
 
 	///////////////// 使うどころ /////////////////

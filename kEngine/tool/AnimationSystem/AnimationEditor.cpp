@@ -8,11 +8,11 @@ AnimationEditor::AnimationEditor(kEngine* system) {
 	std::string modelPath = "resources/TemplateResource/object/";
 	targetModelHandle_ = system_->SetModelObj(modelPath + "player/player.obj");
 
-	targetModel_ = new Object();
+	targetModel_ = std::make_unique<Object>();
 	targetModel_->IntObject(system_);
 	targetModel_->CreateModelData(targetModelHandle_);
 	targetModel_->objectParts_[2].parentPart = &targetModel_->objectParts_[1];
-	SetUsingModel(targetModel_);
+	SetUsingModel(targetModel_.get());
 
 
 	/// ================= Test ================///
@@ -20,13 +20,24 @@ AnimationEditor::AnimationEditor(kEngine* system) {
 	/// ================ システム最終設定 ================///
 	SetupAnimationEditorEnd();
 	animationUnit_->ReadAnimationData(&animationList_[0]);
-	animationUnit_->TakeControlObject(targetModel_);
+	animationUnit_->TakeControlObject(targetModel_.get());
 }
 
 AnimationEditor::~AnimationEditor() {
 	system_->DestroyCamera(camera_);
-	delete mainTimer_;
-	delete skydome_;
+
+	mainNeedle_.reset();
+	mainTimeBar_.reset();
+	markerStartEnd_.reset();
+	marker10_.reset();
+	marker02_.reset();
+	ping_.reset();
+	instanceModel_.reset();
+
+	mainTimer_.reset();
+	skydome_.reset();
+
+	animationUnit_.reset();
 }
 
 void AnimationEditor::Update() {
@@ -57,8 +68,7 @@ void AnimationEditor::Draw() {
 void AnimationEditor::SetUsingModel(Object* model) {
 	if (model == nullptr)return;
 	choosingModel_ = model;
-	if (instanceModel_ != nullptr)delete instanceModel_;
-	instanceModel_ = new Object();
+	instanceModel_ = std::make_unique<Object>();
 	instanceModel_->IntObject(system_);
 	instanceModel_->CopyObject(choosingModel_);
 }
@@ -87,7 +97,7 @@ void AnimationEditor::SetupAnimationEditor() {
 	camera_->SetDefaultTransform(camera_->GetTransform());
 
 	/// ======= タイマー設定 =======///
-	mainTimer_ = new Timer();
+	mainTimer_ = std::make_unique<Timer>();
 	mainTimer_->Init0(startMaxTime_, system_->GetTimeManager());
 	mainTimer_->parameter_ = startMinTime_;
 
@@ -105,7 +115,7 @@ void AnimationEditor::SetupAnimationEditor() {
 	Skydome_modelHandle_ = system_->SetModelObj(modelPath + "animationEditor/studioBG/studioBG.obj");
 
 	/// ========= skydome設定 ========///
-	skydome_ = new Object();
+	skydome_ = std::make_unique<Object>();
 	skydome_->IntObject(system_);
 	skydome_->CreateModelData(Skydome_modelHandle_);
 	skydome_->objectParts_[0].materialConfig->enableLighting = false;
@@ -155,7 +165,7 @@ void AnimationEditor::SetupAnimationEditorEnd() {
 	AnimationObjectData testData{};
 	testData.SetSimpleObject(*targetModel_);
 	animationList_.push_back({ testData });
-	animationUnit_ = new AnimationUnit(system_);
+	animationUnit_ = std::make_unique<AnimationUnit>(system_);
 
 
 	/// ======= 最初のピン設定 =======///

@@ -50,8 +50,8 @@ private:
 
 
 	/// ============= デバッグ用パーツ ============= ///
-	SimpleSprite* centerPoint_ = nullptr;
-	SimpleSprite* centerNumberSprite_ = nullptr;
+	std::unique_ptr<SimpleSprite> centerPoint_ = nullptr;
+	std::unique_ptr<SimpleSprite> centerNumberSprite_ = nullptr;
 
 	/// ============= フラグ ============= ///
 	bool isShowCenterPoint_ = false;

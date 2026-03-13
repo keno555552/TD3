@@ -2,11 +2,12 @@
 #include "DrawDataCollector.h"
 #include "CameraManager/CameraManager.h"
 #include "LightManager/LightManager.h"
-#include "ResourceManager.h"
+#include "Resource/ResourceManager.h"
 
 
 void DrawDataCollector::Initialize(CameraManager * cm, LightManager * lm) {
-	cameraManager_ = cm, lightManager_ = lm;
+	cameraManager_ = cm;
+	lightManager_ = lm;
 }
 
 void DrawDataCollector::Finalize() {
@@ -15,6 +16,15 @@ void DrawDataCollector::Finalize() {
 	transparentBucket2D_.clear();
 	opaqueBuckets3D_.clear();
 	transparentBucket3D_.clear();
+	bucketParticleC_.clear();
+
+	instanceCounter2D_ = 0;
+	instanceCounter3D_ = 0;
+	instanceCounterParticleC_ = 0;
+
+	instancingList2D_ = nullptr;
+	instancingList3D_ = nullptr;
+	instancingListParticleC_ = nullptr;
 }
 
 void DrawDataCollector::PreCollect() {
@@ -74,7 +84,7 @@ void DrawDataCollector::Collect2D(SpriteData* sprite) {
 		RenderData renderData;
 
 		/// メッシュ設定
-		renderData.mesh = ResourceManager::GetInstance()->simpleSpriteMeshList_[simpleSpriteCounter_];
+		renderData.mesh = ResourceManager::GetInstance()->simpleSpriteMeshList_[simpleSpriteCounter_].get();
 
 		/// マテリアル設定
 		object.materialConfig->MakeUVMatrix();
@@ -190,7 +200,7 @@ void DrawDataCollector::AddSpriteToBucket2D(RenderData& renderData, int meshID) 
 		Logger::Log("[kError]DDC:MaterialID not found in ResourceManager!");
 		return;
 	} else {
-		Material* material = ResourceManager::GetInstance()->materialList_[checker->second].cpuMaterial.get();
+		MaterialForGPU* material = ResourceManager::GetInstance()->materialList_[checker->second].cpuMaterial.get();
 
 		if (material->color.w < 1.0f) {
 
@@ -322,7 +332,7 @@ void DrawDataCollector::AddObjectToBucket3D(RenderData& renderData,int meshID) {
 		Logger::Log("[kError]DDC:MaterialID not found in ResourceManager!");
 		return;
 	} else {
-		Material* material = ResourceManager::GetInstance()->materialList_[checker->second].cpuMaterial.get();
+		MaterialForGPU* material = ResourceManager::GetInstance()->materialList_[checker->second].cpuMaterial.get();
 
 		if (material->color.w < 1.0f) {
 
@@ -348,8 +358,6 @@ void DrawDataCollector::AddObjectToBucket3D(RenderData& renderData,int meshID) {
 			opaqueBuckets3D_[static_cast<PSOType>(renderData.psoID)][renderData.materialID][meshID].emplace_back(renderData);
 		}
 	}
-
-	auto& t = renderData.transformData;
 }
 
 #pragma endregion

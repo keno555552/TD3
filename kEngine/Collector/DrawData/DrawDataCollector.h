@@ -3,16 +3,16 @@
 #include <memory>
 #include <map>
 #include <unordered_map>
-#include "materialConfig.h"
-#include "DrawData/ObjectData.h"
-#include "DrawData/SpriteData.h"
-#include "PSOType.h"
+#include "Data/Render/CPUData/materialConfig.h"
+#include "Data/Render/CPUData/ObjectData.h"
+#include "Data/Render/CPUData/SpriteData.h"
+#include "Data/Render/Types/PSOType.h"
 #include "Camera/Camera.h"
-#include "VertexResource.h"
-#include "Render/Queue/RenderData.h"
-#include "Data/LightGPU.h"
+#include "Mesh/VertexResource.h"
+#include "Data/Render/Queue/RenderData.h"
+#include "GPUData/LightGPU.h"
 #include <cstdint>
-#include "Model.h"
+#include "Mesh/Model.h"
 using ModelID = int;
 
 inline const float layerDepth_Sprite = 0.0001f;

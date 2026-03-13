@@ -4,7 +4,7 @@
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
 
-#include "ConvertString.h"
+#include "StringManage/ConvertString.h"
 
 #pragma region Input
 
@@ -140,11 +140,11 @@ ID3D12Device* DirectXCore::CreateDevice(IDXGIAdapter4* adapter) {
 	ID3D12InfoQueue* infoQueue = nullptr;
 	if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&infoQueue)))) {
 		// ヤバイエラー時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
+		//infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true);
 		// エラー時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
+		//infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true);
 		// 警告時に止まる
-		infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
+		//infoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true);
 
 		// 抑制するメッセージのID
 		D3D12_MESSAGE_ID denyIds[] = {
@@ -439,71 +439,63 @@ bool DirectXCore::ProcessMessage() {
 void DirectXCore::Finalize() {
 
 	// --- GPU objects (must release before device) ---
-	if (commandList) { commandList.Reset(); }
-	if (commandAllocator) { commandAllocator.Reset(); }
-	if (commandQueue) { commandQueue.Reset(); }
+	commandList.Reset();
+	commandAllocator.Reset();
+	commandQueue.Reset();
 
-	if (SwapChain) { SwapChain.Reset(); }
-	if (swapChainResources[0]) { swapChainResources[0].Reset(); }
-	if (swapChainResources[1]) { swapChainResources[1].Reset(); }
+	SwapChain.Reset();
+	swapChainResources[0].Reset();
+	swapChainResources[1].Reset();
 
-	if (rtvDescriptorHeap) { rtvDescriptorHeap.Reset(); }
-	if (dsvDescriptorHeap) { dsvDescriptorHeap.Reset(); }
+	rtvDescriptorHeap.Reset();
+	dsvDescriptorHeap.Reset();
 
 	// --- DirectInput devices ---
-	if (keyBoardDevice) {
-		keyBoardDevice->Unacquire();
-		keyBoardDevice.Reset();
-	}
+	if (keyBoardDevice)keyBoardDevice->Unacquire();
+	keyBoardDevice.Reset();
 
-	if (mouseDevice) {
-		mouseDevice->Unacquire();
-		mouseDevice.Reset();
-	}
+	if (mouseDevice)mouseDevice->Unacquire();
+	mouseDevice.Reset();
 
-	if (gamepadDevice) {
-		gamepadDevice->Unacquire();
-		gamepadDevice.Reset();
-	}
+	if (gamepadDevice)gamepadDevice->Unacquire();
+	gamepadDevice.Reset();
 
-	if (directInput) {
-		directInput.Reset();
-	}
+	directInput.Reset();
 
 	// --- Fence & event ---
-	if (fence) {
-		fence.Reset();
-	}
+	fence.Reset();
 
-	if (fenceEvent) {
-		CloseHandle(fenceEvent);
-		fenceEvent = nullptr;
-	}
+	CloseHandle(fenceEvent);
+	fenceEvent = nullptr;
 
 	// --- Device & DXGI objects (must be last) ---
-	/// リソースリークチェック
-	//ID3D12DebugDevice* debugDevice;
-	//if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&debugDevice)))) {
-	//	debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_DETAIL);
-	//}
 
-	if (device) { device.Reset(); }
-	if (useAdapter) { useAdapter.Reset(); }
-	if (dxgiFactory) { dxgiFactory.Reset(); }
-
+	device.Reset();
+	useAdapter.Reset();
+	dxgiFactory.Reset();
 
 #ifdef _DEBUG
 
-	//IDXGIDebug1* debug;
-	////if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+	Logger::Log("device = %p\n", device.Get());
+	Logger::Log("commandQueue = %p\n", commandQueue.Get());
+	Logger::Log("commandAllocator = %p\n", commandAllocator.Get());
+	Logger::Log("commandList = %p\n", commandList.Get());
+	Logger::Log("swapChain = %p\n", SwapChain.Get());
+	Logger::Log("rtvDescriptorHeap = %p\n", rtvDescriptorHeap.Get());
+	Logger::Log("dsvDescriptorHeap = %p\n", dsvDescriptorHeap.Get());
+	Logger::Log("fence = %p\n", fence.Get());
+	Logger::Log("fenceEvent = %p\n", fenceEvent);
+
+	IDXGIDebug1* debug;
 	//if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-	//	//debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);///また未解放要素がある
-	//	debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
-	//	debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
-	//	debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
-	//
-	//	debug->Release();
-	//}
+	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
+		//debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);///また未解放要素がある
+		//debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
+		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+		//debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
+
+		debug->Release();
+	}
 	/// デバッグレイヤーの解放
 	if (debugController)		debugController.Reset();
 #endif
@@ -514,3 +506,5 @@ void DirectXCore::Finalize() {
 }
 #pragma endregion
 
+//ULONG count = commandList->AddRef();
+//commandList->Release();

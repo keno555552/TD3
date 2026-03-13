@@ -3,12 +3,12 @@
 #include <memory>
 #include "Transform.h"
 #include "TransformationMatrix.h"
-#include "MaterialConfig.h"
+#include "Data/Render/CPUData/MaterialConfig.h"
 #include "MathsIncluder.h"
 #include "kEngine.h"
-#include "Camera.h"
-#include "DrawData/ObjectData.h"
-#include <crashdecision/crashDecision.h>
+#include "Camera/Camera.h"
+#include "Data/Render/CPUData/ObjectData.h"
+#include "Geometry/Collision/crashDecision.h"
 
 class Object : public ObjectData {
 public:

@@ -3,11 +3,11 @@
 #include <memory>
 #include "Transform.h"
 #include "TransformationMatrix.h"
-#include "MaterialConfig.h"
+#include "Data/Render/CPUData/MaterialConfig.h"
 #include "MathsIncluder.h"
 #include "kEngine.h"
-#include "Camera.h"
-#include "DrawData/SpriteData.h"
+#include "Camera/Camera.h"
+#include "Data/Render/CPUData/SpriteData.h"
 
 class SimpleSprite : public SimpleSpriteData {
 public:
