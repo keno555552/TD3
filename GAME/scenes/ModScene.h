@@ -40,6 +40,8 @@ private:
   Fade fade_;
   bool isStartTransition_ = false;
 
+  std::string selectedPrompt_;
+
 private:
   void CameraPart();
 

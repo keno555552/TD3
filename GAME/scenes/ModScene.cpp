@@ -1,4 +1,5 @@
 #include "ModScene.h"
+#include "GAME/actor/prompt/PromptData.h"
 
 namespace {
 
@@ -53,6 +54,9 @@ ModScene::ModScene(kEngine *system) {
   // 初期状態ではデバッグカメラを使用
   usingCamera_ = debugCamera_;
   system_->SetCamera(usingCamera_);
+
+  // お題を受け取る
+  selectedPrompt_ = PromptData::GetSelectedPrompt();
 
   // 各部位のハンドルと配列初期化
   modModelHandles_.fill(0);
@@ -114,6 +118,8 @@ void ModScene::Draw() {
 #ifdef USE_IMGUI
   ImGui::Begin("Scene");
   ImGui::Text("ModScene");
+  ImGui::Text("Selected Prompt:");
+  ImGui::Text("%s", selectedPrompt_.c_str());
   ImGui::End();
 
   DrawModGui();
