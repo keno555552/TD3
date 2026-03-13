@@ -3,17 +3,17 @@
 AnimationUnit::AnimationUnit(kEngine* system) {
 	system_ = system;
 
-	time_ = new Timer();
+	time_ = std::make_unique<Timer>();
 	time_->Init0(1.0f, system_->GetTimeManager());
 
-	instanceObject_ = new Object();
+	instanceObject_ = std::make_unique<Object>();
 	instanceObject_->IntObject(system_);
 
 }
 
 AnimationUnit::~AnimationUnit() {
-	time_ = nullptr;
-	delete instanceObject_;
+	time_.reset();
+	instanceObject_.reset();
 }
 
 void AnimationUnit::ReadAnimationData(AnimationObjectData* animationData) {

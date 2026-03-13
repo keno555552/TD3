@@ -2,7 +2,7 @@
 #include <vector>
 #include "kEngine.h"
 #include "Transform.h"
-#include "tool/crashDecision/crashDecision.h"
+#include "Geometry/Collision/crashDecision.h"
 #include "Object/Object.h"
 
 
@@ -59,14 +59,14 @@ private:
 	float allMaxTime_{};
 	float allStartTime_{};
 
-	Object* controlledObject_{};
-	Object* instanceObject_{};
+	Object* controlledObject_{};             // 借り
+	std::unique_ptr<Object> instanceObject_{};
 
 	int usingKeyFrameIndex_{};
 	float usingStartTime_{};
 	float usingEndTime_{};
 	float nowTime_{};
-	Timer* time_{};
+	std::unique_ptr <Timer> time_{};
 
 private:
 	bool CheckObjectNumMeet(Object* target);

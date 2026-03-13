@@ -62,7 +62,7 @@ private:
 	Microsoft::WRL::ComPtr<IXAudio2> xAudio2 = nullptr;
 	IXAudio2MasteringVoice* masterVoice = nullptr;
 
-	std::vector<SoundUnit*> sounds_;
+	std::vector<std::unique_ptr<SoundUnit>> sounds_;
 	int resourceCounter = 0;
 };
 

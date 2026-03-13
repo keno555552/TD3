@@ -1,9 +1,10 @@
 #include "soundUnit.h"
-#include "ConvertString.h"
+#include "StringManage\ConvertString.h"
 #include <algorithm>
 
 SoundUnit::SoundUnit() {
-
+	soundData = std::make_unique<SoundData>();
+	voiceCallBack_ = std::make_unique<VoiceCallback>();
 }
 
 SoundUnit::~SoundUnit() {
@@ -32,7 +33,7 @@ SoundData SoundUnit::SoundLoadWave(const std::string& filename) {
 	pPCMType->SetGUID(MF_MT_SUBTYPE, MFAudioFormat_PCM);
 	result = pReader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, pPCMType.Get());
 	assert(SUCCEEDED(result));
-	
+
 	/// Waveフォーマットの取得
 	// 実際にセットされたメディアタイプを取得する
 	Microsoft::WRL::ComPtr<IMFMediaType> pOutype;
@@ -45,7 +46,8 @@ SoundData SoundUnit::SoundLoadWave(const std::string& filename) {
 
 	/// 音声データに格納
 	//　コンテナに格納する音声データ
-	if (soundData)delete soundData, soundData = nullptr, soundData = new SoundData;
+	soundData = std::make_unique<SoundData>();
+
 	memcpy(&soundData->wfex, waveFormat, waveFormat->cbSize + sizeof(WAVEFORMATEX));
 
 	// 生成したWaveフォーマットを解放
@@ -107,28 +109,24 @@ SoundData SoundUnit::SoundLoad(const std::string& filename) {
 }
 
 void SoundUnit::SoundUnload() {
-	///// バッファのメモリを解放
-	//if (pSourceVoice_) {
-	//	pSourceVoice_->Stop();
-	//	pSourceVoice_->FlushSourceBuffers();
-	//	pSourceVoice_->DestroyVoice();
-	//	pSourceVoice_ = nullptr;
-	//}
-	//if (!pSourceVoiceGroup.empty()) {
-	//	for (auto ptr : pSourceVoiceGroup) {
-	//		if (ptr) {
-	//			ptr->Stop();
-	//			ptr->FlushSourceBuffers();
-	//			ptr->DestroyVoice();
-	//		}
-	//	}
-	//	pSourceVoiceGroup.clear();
-	//}
-	//
-	//delete[] soundData->pBuffer;
-	//
-	//soundData->pBuffer = 0;
-	//soundData->bufferSize = 0;
+	/// バッファのメモリを解放
+	if (pSourceVoice_) {
+		pSourceVoice_->Stop();
+		pSourceVoice_->FlushSourceBuffers();
+		pSourceVoice_->DestroyVoice();
+		pSourceVoice_ = nullptr;
+	}
+	if (!pSourceVoiceGroup.empty()) {
+		for (auto ptr : pSourceVoiceGroup) {
+			if (ptr) {
+				ptr->Stop();
+				ptr->FlushSourceBuffers();
+				ptr->DestroyVoice();
+			}
+		}
+	}
+	pSourceVoiceGroup.clear();
+
 	soundData->buffer.clear();
 	soundData->wfex = {};
 }
@@ -139,15 +137,15 @@ void SoundUnit::SoundPlaySE(IXAudio2* xAudio2, float cVolume, float volume) {
 	HRESULT result;
 
 	/// 波形フォーマットを元にSourceVoiceの生成（SE は再生中フラグ不要なので callback なし）
- 
+
 	IXAudio2SourceVoice* pSourceVoice = nullptr;
-	result = xAudio2->CreateSourceVoice(&pSourceVoice, 
-										reinterpret_cast<WAVEFORMATEX*>(&soundData->wfex),
-										0, 
-										XAUDIO2_DEFAULT_FREQ_RATIO, 
-										nullptr);
+	result = xAudio2->CreateSourceVoice(&pSourceVoice,
+		reinterpret_cast<WAVEFORMATEX*>(&soundData->wfex),
+		0,
+		XAUDIO2_DEFAULT_FREQ_RATIO,
+		nullptr);
 	pSourceVoiceGroup.push_back(pSourceVoice);
- 
+
 	assert(SUCCEEDED(result));
 
 	soundType = Type::SE;
@@ -179,13 +177,20 @@ void SoundUnit::SoundPlaySE(IXAudio2* xAudio2, float cVolume, float volume) {
 void SoundUnit::SoundPlayBGM(IXAudio2* xAudio2, float cVolume, float volume) {
 	HRESULT result;
 
+	/// すでにSourceVoiceが存在する場合は停止して破棄
+	if (pSourceVoice_) {
+		pSourceVoice_->Stop();
+		pSourceVoice_->FlushSourceBuffers();
+		pSourceVoice_->DestroyVoice();
+		pSourceVoice_ = nullptr;
+	}
+
 	/// 波形フォーマットを元にSourceVoiceの生成
-	pSourceVoice_ = nullptr;
 	result = xAudio2->CreateSourceVoice(&pSourceVoice_,
-										reinterpret_cast<WAVEFORMATEX*>(&soundData->wfex),
-										0,
-										XAUDIO2_DEFAULT_FREQ_RATIO,
-										voiceCallBack_);
+		reinterpret_cast<WAVEFORMATEX*>(&soundData->wfex),
+		0,
+		XAUDIO2_DEFAULT_FREQ_RATIO,
+		voiceCallBack_.get());
 	assert(SUCCEEDED(result));
 
 	soundType = Type::BGM;
@@ -199,6 +204,7 @@ void SoundUnit::SoundPlayBGM(IXAudio2* xAudio2, float cVolume, float volume) {
 
 	/// 波形データの再生
 	result = pSourceVoice_->SubmitSourceBuffer(&buf);
+	assert(SUCCEEDED(result));
 	result = pSourceVoice_->Start();
 	assert(SUCCEEDED(result));
 
@@ -313,7 +319,7 @@ void SoundUnit::SoundSetMute(bool isMute) {
 	if (!isMute)fVolume = fVolume_;
 
 	if (pSourceVoice_) {
-			pSourceVoice_->SetVolume(fVolume);
+		pSourceVoice_->SetVolume(fVolume);
 	}
 	if (!pSourceVoiceGroup.empty()) {
 		for (auto ptr : pSourceVoiceGroup) {

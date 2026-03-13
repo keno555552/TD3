@@ -4,7 +4,7 @@
 #pragma comment(lib,"winmm.lib")
 
 #ifdef USE_IMGUI
-#include "ImGuiManager.h"
+#include "ImGuiManager/ImGuiManager.h"
 #endif
 
 class DirectXController :public DirectXCore

@@ -5,7 +5,7 @@
 #include "Vector3.h"
 #include "kEngine.h"
 #include "BaseScene.h"
-#include "GameObject/Object/Corner.h"
+#include "Corner/Corner.h"
 
 
 /// 移動速度

@@ -1,6 +1,6 @@
 #pragma once
 #include "MathsIncluder.h"
-#include "materialconfig.h"
+#include "Data/Render/CPUData/materialconfig.h"
 #include "kEngine.h"
 
 //enum {

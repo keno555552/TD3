@@ -38,8 +38,9 @@ void kEngine::Initialize(const char* kClientTitle, int kClientWidth, int kClient
 
 	timeManager = std::make_unique<TimeManager>();
 
-	inputManager = std::make_unique<InputManager>();
+	inputManager = std::make_unique<InputCore>();
 	inputManager->Initialize(dxComm.get(), timeManager.get());
+
 }
 
 void kEngine::Finalize() {
@@ -446,7 +447,7 @@ SoundManager* kEngine::GetSoundManager() const {
 	return soundManager.get();
 }
 
-InputManager* kEngine::GetInputManager() const {
+InputCore* kEngine::GetInputManager() const {
 	return inputManager.get();
 }
 

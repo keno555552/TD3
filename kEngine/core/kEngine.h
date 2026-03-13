@@ -1,28 +1,28 @@
 #pragma once
 #include "DirectXController.h"
-#include "inputManager.h"
+#include "inputCore.h"
 #include "soundManager.h"
-#include "SrvManager.h"
-#include "drawEngine.h"
+#include "SrvManager/SrvManager.h"
+#include "drawEngine/drawEngine.h"
 #include "TransformationMatrix.h"
 #include "Vector2.h"
-#include "materialconfig.h"
-#include "tool/TimeManager/TimeManager.h"
-#include "DrawDataCollector.h"
+#include "Data/Render/CPUData/materialconfig.h"
+#include "TimeManager/TimeManager.h"
+#include "DrawData/DrawDataCollector.h"
 #include "CameraManager/CameraManager.h"
 
 #ifdef USE_IMGUI
 #include "ImGuiManager.h"
 #endif // USE_IMGUI
 #include <string>
-#include "DrawData/ObjectData.h"
-#include "DrawData/SpriteData.h"
-#include "InstanceManager.h"
-#include "ResourceManager/ResourceManager.h"
-#include "TextureManager/TextureManager.h"
+#include "Data/Render/CPUData/ObjectData.h"
+#include "Data/Render/CPUData/SpriteData.h"
+//#include "InstanceManager.h"
+#include "Resource/ResourceManager.h"
+#include "Resource/TextureManager.h"
 #include "LightManager/LightManager.h"
-#include "Data/DirectionalLightGPU.h"
-#include "Camera.h"
+#include "GPUData/DirectionalLightGPU.h"
+#include "Camera/Camera.h"
 
 
 class kEngine
@@ -188,7 +188,7 @@ public:
 	DrawDataCollector* GetDrawDataCollector() const;
 	DrawEngine* GetDrawEngine() const;
 	SoundManager* GetSoundManager() const;
-	InputManager* GetInputManager() const;
+	InputCore* GetInputManager() const;
 	TimeManager* GetTimeManager()const;
 
 #pragma endregion
@@ -219,7 +219,7 @@ private:
 	std::unique_ptr <DrawEngine> drawEngine{};
 
 	/// ============ 入力関連 ============///
-	std::unique_ptr <InputManager> inputManager{};
+	std::unique_ptr <InputCore> inputManager{};
 
 	/// ============ 音関連 ============///
 	std::unique_ptr <SoundManager> soundManager{};

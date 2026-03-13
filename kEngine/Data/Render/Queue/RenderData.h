@@ -1,7 +1,7 @@
 #pragma once
 #include "TransformationMatrix.h"
-#include "VertexResource.h"
-#include "material.h"
+#include "Mesh/VertexResource.h"
+#include "Data/Render/GPUData/MaterialForGPU.h"
 using MaterialID = int;
 
 struct RenderData

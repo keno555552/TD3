@@ -24,7 +24,7 @@
 #include <format>
 
 #include <vector>
-#include "LightModelType.h"
+#include "Data/Render/Types/LightModelType.h"
 #include "config.h"
 
 #include <dxgidebug.h>

@@ -12,7 +12,7 @@ void SoundManager::Initialize() {
 
 void SoundManager::Finalize() {
 	for(auto& ptr:sounds_){
-		delete ptr;
+		ptr.reset();
 	}
 	sounds_.clear();
 	resourceCounter = 0;
@@ -32,9 +32,9 @@ int SoundManager::SoundLoadFile(const std::string& filename) {
 		}
 	}
 
-	SoundUnit* sound = new SoundUnit;
+	auto sound = std::make_unique<SoundUnit>();
 	sound->SoundLoad(filename);
-	sounds_.push_back(sound);
+	sounds_.push_back(std::move(sound));
 	resourceCounter = static_cast<int>(sounds_.size());
 	return resourceCounter - 1; // new 0-based handle
 }
@@ -63,7 +63,7 @@ void SoundManager::SoundPlayBGM(int Handle, float volume) {
 
 
 void SoundManager::SoundSetVolume(int Handle, float volume) {
-	auto* sound = sounds_[Handle];
+	auto sound = sounds_[Handle].get();
 	SoundUnit::Type type = sound->GetSoundType();
 
 	float finalVolume = 0.0f;
@@ -108,7 +108,7 @@ void SoundManager::SoundSetMasterVolume(float volume) {
 	nBGMVolume_ = std::clamp(cMasterVolume_ * cBgmVolume_, 0.0f, 2.0f);
 
 	if (masterMute_) return;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::SE) {
 			if (!seMute_) {
 				ptr->SoundSetMasterVolume(nSeVolume_);
@@ -130,7 +130,7 @@ void SoundManager::SoundSetMasterSEVolume(float volume) {
 	nSeVolume_ = std::clamp(cMasterVolume_ * cSeVolume_, 0.0f, 2.0f);
 
 	if (masterMute_ || seMute_) return;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::SE) {
 			ptr->SoundSetMasterVolume(nSeVolume_);
 		}
@@ -145,7 +145,7 @@ void SoundManager::SoundSetMasterBGMVolume(float volume) {
 	nBGMVolume_ = std::clamp(cMasterVolume_ * cBgmVolume_, 0.0f, 2.0f);
 
 	if (masterMute_ || bgmMute_) return;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::BGM) {
 			ptr->SoundSetMasterVolume(nBGMVolume_);
 		}
@@ -173,7 +173,7 @@ void SoundManager::SoundSetMute(int Handle, bool isMute) {
 void SoundManager::SoundSetMasterMute(bool isMute) {
 	if (isMute == masterMute_) return;
 	masterMute_ = isMute;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::SE) {
 			if (isMute) {
 				ptr->SoundSetMasterVolume(0.0f);
@@ -195,7 +195,7 @@ void SoundManager::SoundSetBGMMute(bool isMute) {
 	if (isMute == bgmMute_) return;
 	bgmMute_ = isMute;
 	if (masterMute_) return;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::BGM) {
 			if (isMute) {
 				ptr->SoundSetMasterVolume(0.0f);
@@ -210,7 +210,7 @@ void SoundManager::SoundSetSEMute(bool isMute) {
 	if (isMute == seMute_) return;
 	seMute_ = isMute;
 	if (masterMute_) return;
-	for (auto ptr : sounds_) {
+	for (auto& ptr : sounds_) {
 		if (ptr->GetSoundType() == SoundUnit::Type::SE) {
 			if (isMute) {
 				ptr->SoundSetMasterVolume(0.0f);

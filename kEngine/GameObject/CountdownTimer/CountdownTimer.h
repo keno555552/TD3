@@ -1,4 +1,5 @@
 #pragma once
+#include <memory>
 #include "Object/Object.h"
 #include "Object/Sprite.h"
 
@@ -40,7 +41,7 @@ private:
 
 	/// =========== フラク、内部変数 ===========///
 	Vector4 lessTimeColor = { 1.0f,0.0f,0.0f,1.0f };
-	Timer* timer_ = nullptr;
+	std::unique_ptr<Timer> timer_;
 	float maxTime_ = 15.0f;
 	float lessTime_ = 10.0f;
 	bool isStart_ = false;

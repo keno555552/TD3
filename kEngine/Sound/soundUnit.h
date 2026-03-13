@@ -106,8 +106,8 @@ public:
 	void SoundUnload();
 
 private:
-	SoundData* soundData = new SoundData;
-	VoiceCallback* voiceCallBack_ = new VoiceCallback;
+	std::unique_ptr<SoundData> soundData;
+	std::unique_ptr <VoiceCallback> voiceCallBack_;
 	std::string filename_{};
 
 	/// やむ操作
