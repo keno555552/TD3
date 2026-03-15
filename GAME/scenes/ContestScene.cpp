@@ -18,6 +18,14 @@ ContestScene::ContestScene(kEngine *system) {
 
   fade_.Initialize(system_);
   fade_.StartFadeIn();
+
+  // PromptDataからお題を取得してスコア計算
+  const ThemeData* theme = PromptData::GetThemeData();
+  const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
+  if (theme != nullptr && playerData != nullptr) {
+      scoreResult_ = ScoreCalculator::Calculate(*theme, *playerData);
+      isScoreCalculated_ = true;
+  }
 }
 
 ContestScene::~ContestScene() {

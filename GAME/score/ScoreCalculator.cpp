@@ -1,3 +1,7 @@
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "ScoreCalculator.h"
 #include "Logger.h"
 #include <algorithm>
