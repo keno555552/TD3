@@ -544,6 +544,10 @@
       <Filter>ソース ファイル</Filter>
     </ClCompile>
     <ClCompile Include="GAME\score\ScoreCalculator.cpp">
+    <ClCompile Include="GAME\actor\prompt\PromptData.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
   </ItemGroup>
@@ -1179,6 +1183,10 @@
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
     <ClInclude Include="GAME\score\ScoreCalculator.h">
+    <ClInclude Include="GAME\actor\prompt\PromptData.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\actor\prompt\PromptBoard.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
   </ItemGroup>
