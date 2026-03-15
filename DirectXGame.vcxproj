@@ -252,6 +252,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="GAME\effect\Fade.cpp" />
+    <ClCompile Include="GAME\json\JsonManager.cpp" />
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="externals\DirectXTex\BC.cpp" />
     <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
@@ -282,6 +283,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="externals\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
+    <ClCompile Include="GAME\theme\ThemeManager.cpp" />
     <ClCompile Include="kEngine\GameObject\CountdownTimer\CountdownTimer.cpp" />
     <ClCompile Include="kEngine\Lighting\AeraLight.cpp" />
     <ClCompile Include="kEngine\Lighting\DirectionalLight.cpp" />
@@ -393,6 +396,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\effect\Fade.h" />
+    <ClInclude Include="GAME\json\JsonManager.h" />
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
     <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
@@ -496,6 +500,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="externals\imgui\imstb_truetype.h" />
     <ClInclude Include="externals\nlohmann\json.hpp" />
     <ClInclude Include="externals\nlohmann\json_fwd.hpp" />
+    <ClInclude Include="GAME\score\ScoreCalculator.h" />
+    <ClInclude Include="GAME\theme\ThemeData.h" />
+    <ClInclude Include="GAME\theme\ThemeManager.h" />
     <ClInclude Include="kEngine\GameObject\CountdownTimer\CountdownTimer.h" />
     <ClInclude Include="kEngine\Lighting\AeraLight.h" />
     <ClInclude Include="kEngine\Lighting\DirectionalLight.h" />

@@ -16,6 +16,9 @@ PromptScene::PromptScene(kEngine *system) {
   usingCamera_ = camera_;
   system_->SetCamera(usingCamera_);
 
+  // お題マネージャー生成・全お題読み込み
+  themeManager_ = new ThemeManager("GAME/resources/themes/");
+
   // フェード
   fade_.Initialize(system_);
   fade_.StartFadeIn();
@@ -27,6 +30,8 @@ PromptScene::~PromptScene() {
   system_->RemoveLight(light1_);
 
   delete light1_;
+  delete themeManager_;
+  themeManager_ = nullptr;
 }
 
 void PromptScene::Update() {
@@ -36,6 +41,11 @@ void PromptScene::Update() {
   if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
+  }
+
+  // T キーでお題選出
+  if (system_->GetTriggerOn(DIK_T)) {
+      selectedTheme_ = themeManager_->SelectRandom();
   }
 
   // フェード更新
@@ -52,6 +62,13 @@ void PromptScene::Draw() {
   // 現在シーン表示
   ImGui::Begin("Scene");
   ImGui::Text("PromptScene");
+  if (selectedTheme_ != nullptr) {
+      ImGui::Text("Theme: %s", selectedTheme_->themeName.c_str());
+      ImGui::Text("ID: %s", selectedTheme_->themeId.c_str());
+      ImGui::Text("Category: %s", selectedTheme_->category.c_str());
+  } else {
+      ImGui::Text("Theme: not selected (press T)");
+  }
   ImGui::End();
 #endif
 
