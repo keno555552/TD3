@@ -7,6 +7,10 @@
 
 class PromptBoard;
 
+// お題
+#include "GAME/theme/ThemeManager.h"
+#include "GAME/theme/ThemeData.h"
+
 class PromptScene : public BaseScene {
 public:
   PromptScene(kEngine *system);
@@ -33,6 +37,9 @@ private:
   Fade fade_;
   bool isStartTransition_ = false;
 
+  // お題選出
+  ThemeManager* themeManager_ = nullptr;
+  ThemeData* selectedTheme_ = nullptr;
   // お題関連
   std::unique_ptr<PromptBoard> promptBoard_ = nullptr;
   std::vector<std::string> prompts_;

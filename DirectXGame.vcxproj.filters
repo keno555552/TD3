@@ -537,6 +537,13 @@
     <ClCompile Include="GAME\effect\Fade.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
+    <ClCompile Include="GAME\json\JsonManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="GAME\theme\ThemeManager.cpp">
+      <Filter>ソース ファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="GAME\score\ScoreCalculator.cpp">
     <ClCompile Include="GAME\actor\prompt\PromptData.cpp">
       <Filter>ソース ファイル</Filter>
     </ClCompile>
@@ -1166,6 +1173,16 @@
     <ClInclude Include="GAME\effect\Fade.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
+    <ClInclude Include="GAME\theme\ThemeData.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\json\JsonManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\theme\ThemeManager.h">
+      <Filter>ヘッダー ファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\score\ScoreCalculator.h">
     <ClInclude Include="GAME\actor\prompt\PromptData.h">
       <Filter>ヘッダー ファイル</Filter>
     </ClInclude>
