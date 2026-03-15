@@ -2,6 +2,7 @@
   "theme_id": "giraffe_love",
   "theme_name": "キリンに好かれろ",
   "category": "animal",
+  "texture_path": "GAME/resources/texture/prompt.png",
 
   "score_sets": [
     {

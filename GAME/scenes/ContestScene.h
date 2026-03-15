@@ -1,6 +1,10 @@
 #pragma once
 #include "../effect/Fade.h"
 #include "BaseScene.h"
+#include "GAME/actor/prompt/PromptData.h"
+#include "GAME/score/ScoreCalculator.h"
+#include "GAME/score/ScoreResult.h"
+#include "GAME/actor/ModBody.h"
 
 class ContestScene : public BaseScene {
 public:
@@ -27,6 +31,9 @@ private:
 
   // フェードアウト完了後の遷移先
   SceneOutcome nextOutcome_ = SceneOutcome::NONE;
+
+  ScoreResult scoreResult_{};
+  bool isScoreCalculated_ = false;
 
 private:
   /// <summary>

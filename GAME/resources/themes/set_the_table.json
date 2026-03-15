@@ -2,37 +2,109 @@
   "theme_id": "set_the_table",
   "theme_name": "お皿を並べて",
   "category": "abstract",
+  "texture_path": "GAME/resources/texture/prompt.png",
 
   "score_sets": [
     {
       "set_name": "default",
       "parts": {
-        "Body":          { "scale_x": 5.0,  "scale_y": -3.0, "scale_z": 5.0 },
-        "Neck":          { "scale_x": -3.0, "scale_y": -3.0, "scale_z": -3.0 },
-        "Head":          { "scale_x": -3.0, "scale_y": -3.0, "scale_z": -3.0 },
-        "LeftUpperArm":  { "scale_x": 0.0,  "scale_y": 0.0,  "scale_z": 0.0 },
-        "LeftForeArm":   { "scale_x": 0.0,  "scale_y": 0.0,  "scale_z": 0.0 },
-        "RightUpperArm": { "scale_x": 0.0,  "scale_y": 0.0,  "scale_z": 0.0 },
-        "RightForeArm":  { "scale_x": 0.0,  "scale_y": 0.0,  "scale_z": 0.0 },
-        "LeftThigh":     { "scale_x": 4.0,  "scale_y": 4.0,  "scale_z": 4.0 },
-        "LeftShin":      { "scale_x": 4.0,  "scale_y": 4.0,  "scale_z": 4.0 },
-        "RightThigh":    { "scale_x": 4.0,  "scale_y": 4.0,  "scale_z": 4.0 },
-        "RightShin":     { "scale_x": 4.0,  "scale_y": 4.0,  "scale_z": 4.0 }
+        "Body": {
+          "scale_x": 5.0,
+          "scale_y": -3.0,
+          "scale_z": 5.0
+        },
+        "Neck": {
+          "scale_x": -3.0,
+          "scale_y": -3.0,
+          "scale_z": -3.0
+        },
+        "Head": {
+          "scale_x": -3.0,
+          "scale_y": -3.0,
+          "scale_z": -3.0
+        },
+        "LeftUpperArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "LeftForeArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "RightUpperArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "RightForeArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "LeftThigh": {
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "scale_z": 4.0
+        },
+        "LeftShin": {
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "scale_z": 4.0
+        },
+        "RightThigh": {
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "scale_z": 4.0
+        },
+        "RightShin": {
+          "scale_x": 4.0,
+          "scale_y": 4.0,
+          "scale_z": 4.0
+        }
       },
       "counts": {
-        "left_arm":  { "weight": 0.0, "invert": false },
-        "right_arm": { "weight": 0.0, "invert": false },
-        "left_leg":  { "weight": 2.0, "invert": false },
-        "right_leg": { "weight": 2.0, "invert": false }
+        "left_arm": {
+          "weight": 0.0,
+          "invert": false
+        },
+        "right_arm": {
+          "weight": 0.0,
+          "invert": false
+        },
+        "left_leg": {
+          "weight": 2.0,
+          "invert": false
+        },
+        "right_leg": {
+          "weight": 2.0,
+          "invert": false
+        }
       }
     }
   ],
 
   "bonuses": {
-    "symmetry":        { "weight": 3.0, "invert": false },
-    "cost_efficiency": { "weight": 2.0, "invert": false },
-    "minimalist":      { "weight": 1.0, "invert": false },
-    "wildcard":        { "weight": 1.0, "invert": false },
-    "balance":         { "weight": 1.0, "invert": false }
+    "symmetry": {
+      "weight": 3.0,
+      "invert": false
+    },
+    "cost_efficiency": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "minimalist": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "wildcard": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "balance": {
+      "weight": 1.0,
+      "invert": false
+    }
   }
 }

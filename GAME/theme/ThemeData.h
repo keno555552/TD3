@@ -60,6 +60,7 @@ struct ThemeData {
   std::string themeId;
   std::string themeName;
   std::string category;
+  std::string texturePath;
 
   // スコアセット（通常は 1 つ、抽象お題では複数）
   std::vector<ScoreSet> scoreSets;
