@@ -4,6 +4,8 @@
 #include "GAME/actor/ModBody.h"
 #include "Object/Object.h"
 #include <array>
+#include <memory>
+#include <string>
 
 class TravelScene : public BaseScene {
 public:
@@ -41,12 +43,22 @@ private:
   // 各部位オブジェクト
   std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects_{};
 
+  std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies_{};
+
+  std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
+      bodyJointOffsets_{};
+
+  std::unique_ptr<ModBodyCustomizeData> customizeData_ = nullptr;
+
   void SetupModObjects();
   void SetupPartObject(ModBodyPart part, const std::string &path);
   void SetupHierarchy();
   void SetupInitialLayout();
   void UpdateModObjects();
   void DrawModObjects();
+  void SetupBodyJointOffsets();
+  void LoadCustomizeData();
+  void UpdateChildRootsFromBody();
 
   /* プレイヤー移動用変数
   ------------------------------*/
