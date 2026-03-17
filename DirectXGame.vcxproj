@@ -251,6 +251,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\actor\ModAssemblyGraph.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\json\JsonManager.cpp" />
@@ -397,6 +398,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\actor\ModAssemblyGraph.h" />
     <ClInclude Include="GAME\actor\prompt\PromptBoard.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\json\JsonManager.h" />
