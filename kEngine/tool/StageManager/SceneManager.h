@@ -29,7 +29,7 @@ public:
 
 private:
   std::map<std::string, std::string> sceneFlow_ = {
-      {"TITLE", "PROMPT"},   {"PROMPT", "MOD"},     {"MOD", "TRAVEL"},
+      {"TITLE", "MOD"},   {"PROMPT", "MOD"},     {"MOD", "CONTEST"},
       {"TRAVEL", "CONTEST"}, {"CONTEST", "PROMPT"},
   };
 
