@@ -1,8 +1,16 @@
 #include "TravelScene.h"
+#include <cmath>
 
 namespace {
 /*    enum class を配列添字に変換するための補助関数   */
 size_t ToIndex(ModBodyPart part) { return static_cast<size_t>(part); }
+
+/*   成分ごとのスケール適用   */
+Vector3 ScaleByRatio(const Vector3 &base, const Vector3 &ratio) {
+  return {base.x * ratio.x, base.y * ratio.y, base.z * ratio.z};
+}
+
+constexpr float kFaceRightY = 1.57f;
 } // namespace
 
 TravelScene::TravelScene(kEngine *system) {
@@ -45,6 +53,27 @@ TravelScene::TravelScene(kEngine *system) {
   // 改造用の各部位オブジェクトをセットアップ
   SetupModObjects();
 
+  customizeData_ = ModBody::CopySharedCustomizeData();
+  if (customizeData_ == nullptr) {
+    customizeData_ = ModBody::CreateDefaultCustomizeData();
+  }
+
+  LoadCustomizeData();
+
+  modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam().length = 1.25f;
+  modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetParam().length = 1.25f;
+
+  modBodies_[ToIndex(ModBodyPart::LeftForeArm)].GetParam().length = 1.20f;
+  modBodies_[ToIndex(ModBodyPart::RightForeArm)].GetParam().length = 1.20f;
+
+  modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam().length = 1.65f;
+  modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam().length = 1.65f;
+
+  modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam().length = 1.55f;
+  modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam().length = 1.55f;
+
+  UpdateChildRootsFromBody();
+
   //===============================
   // 2D
   //===============================
@@ -83,14 +112,24 @@ void TravelScene::Update() {
   // 疑似ラグドール移動テスト
   //===============================
   Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
-  Object *leftArm = modObjects_[ToIndex(ModBodyPart::LeftArm)];
-  Object *rightArm = modObjects_[ToIndex(ModBodyPart::RightArm)];
-  Object *leftLeg = modObjects_[ToIndex(ModBodyPart::LeftLeg)];
-  Object *rightLeg = modObjects_[ToIndex(ModBodyPart::RightLeg)];
 
-  if (body == nullptr || head == nullptr || leftArm == nullptr ||
-      rightArm == nullptr || leftLeg == nullptr || rightLeg == nullptr) {
+  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object *leftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
+  Object *rightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object *rightForeArm = modObjects_[ToIndex(ModBodyPart::RightForeArm)];
+
+  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object *leftShin = modObjects_[ToIndex(ModBodyPart::LeftShin)];
+  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
+
+  if (body == nullptr || neck == nullptr || head == nullptr ||
+      leftUpperArm == nullptr || leftForeArm == nullptr ||
+      rightUpperArm == nullptr || rightForeArm == nullptr ||
+      leftThigh == nullptr || leftShin == nullptr || rightThigh == nullptr ||
+      rightShin == nullptr) {
     return;
   }
 
@@ -620,25 +659,89 @@ void TravelScene::Update() {
   body->mainPosition.transform.translate.x = moveX_;
   body->mainPosition.transform.translate.y = moveY_;
 
-  // 胴体は少し前傾・上下に潰す
+  body->mainPosition.transform.rotate.x = 0.0f;
+  body->mainPosition.transform.rotate.y = 1.57f;
   body->mainPosition.transform.rotate.z = bodyTilt_;
-
+  body->mainPosition.transform.scale.x = 1.0f;
   body->mainPosition.transform.scale.y =
       (std::max)(0.65f, 1.0f - bodyStretch_ * 0.2f);
+  body->mainPosition.transform.scale.z = 1.0f;
 
-  // 頭は少し遅れて揺れる
+  // まず全部リセット
+  neck->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  leftUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  leftForeArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  rightUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  rightForeArm->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  leftThigh->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  leftShin->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  rightShin->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  // 頭
   head->mainPosition.transform.rotate.x =
       (leftLegBend_ - rightLegBend_) * -0.15f;
 
-  // 脚：曲げる
-  leftLeg->mainPosition.transform.rotate.x = leftLegBend_;
-  rightLeg->mainPosition.transform.rotate.x = rightLegBend_;
+  // 腕
+  leftUpperArm->mainPosition.transform.rotate.x = -rightLegBend_ * 0.6f;
+  rightUpperArm->mainPosition.transform.rotate.x = -leftLegBend_ * 0.6f;
 
-  // 腕：逆側に少し振る
-  leftArm->mainPosition.transform.rotate.x = -rightLegBend_ * 0.6f;
-  rightArm->mainPosition.transform.rotate.x = -leftLegBend_ * 0.6f;
+  leftForeArm->mainPosition.transform.rotate.x =
+      leftUpperArm->mainPosition.transform.rotate.x - 0.45f;
+  rightForeArm->mainPosition.transform.rotate.x =
+      rightUpperArm->mainPosition.transform.rotate.x - 0.45f;
 
-  // 各部位オブジェクトを更新
+  const float thighBase = 0.10f;
+  const float shinBase = -0.05f;
+
+  leftThigh->mainPosition.transform.rotate.x = thighBase - leftLegBend_ * 0.70f;
+  rightThigh->mainPosition.transform.rotate.x =
+      thighBase - rightLegBend_ * 0.70f;
+
+leftShin->mainPosition.transform.rotate.x =
+      leftThigh->mainPosition.transform.rotate.x + 0.45f;
+  rightShin->mainPosition.transform.rotate.x =
+      rightThigh->mainPosition.transform.rotate.x + 0.45f;
+
+  UpdateChildRootsFromBody();
+
+  // mesh側の回転は使わない
+  if (!neck->objectParts_.empty()) {
+    neck->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!head->objectParts_.empty()) {
+    head->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!leftUpperArm->objectParts_.empty()) {
+    leftUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!leftForeArm->objectParts_.empty()) {
+    leftForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!rightUpperArm->objectParts_.empty()) {
+    rightUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!rightForeArm->objectParts_.empty()) {
+    rightForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!leftThigh->objectParts_.empty()) {
+    leftThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!leftShin->objectParts_.empty()) {
+    leftShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!rightThigh->objectParts_.empty()) {
+    rightThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+  if (!rightShin->objectParts_.empty()) {
+    rightShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  }
+
   UpdateModObjects();
 
   //--------------------------------
@@ -752,36 +855,44 @@ void TravelScene::CameraPart() {
 
 void TravelScene::SetupModObjects() {
   SetupPartObject(ModBodyPart::Body, "GAME/resources/modBody/body/body.obj");
+  SetupPartObject(ModBodyPart::Neck, "GAME/resources/modBody/neck/neck.obj");
   SetupPartObject(ModBodyPart::Head, "GAME/resources/modBody/head/head.obj");
-  SetupPartObject(ModBodyPart::LeftArm,
-                  "GAME/resources/modBody/leftArm/leftArm.obj");
-  SetupPartObject(ModBodyPart::RightArm,
-                  "GAME/resources/modBody/rightArm/rightArm.obj");
-  SetupPartObject(ModBodyPart::LeftLeg,
-                  "GAME/resources/modBody/leftLeg/leftLeg.obj");
-  SetupPartObject(ModBodyPart::RightLeg,
-                  "GAME/resources/modBody/rightLeg/rightLeg.obj");
-  // 親子関係設定
-  SetupHierarchy();
 
-  // 初期配置設定
+  SetupPartObject(ModBodyPart::LeftUpperArm,
+                  "GAME/resources/modBody/leftUpperArm/leftUpperArm.obj");
+  SetupPartObject(ModBodyPart::LeftForeArm,
+                  "GAME/resources/modBody/leftForeArm/leftForeArm.obj");
+  SetupPartObject(ModBodyPart::RightUpperArm,
+                  "GAME/resources/modBody/rightUpperArm/rightUpperArm.obj");
+  SetupPartObject(ModBodyPart::RightForeArm,
+                  "GAME/resources/modBody/rightForeArm/rightForeArm.obj");
+
+  SetupPartObject(ModBodyPart::LeftThigh,
+                  "GAME/resources/modBody/leftThighs/leftThighs.obj");
+  SetupPartObject(ModBodyPart::LeftShin,
+                  "GAME/resources/modBody/leftShin/leftShin.obj");
+  SetupPartObject(ModBodyPart::RightThigh,
+                  "GAME/resources/modBody/rightThighs/rightThighs.obj");
+  SetupPartObject(ModBodyPart::RightShin,
+                  "GAME/resources/modBody/rightShin/rightShin.obj");
+
+  SetupHierarchy();
   SetupInitialLayout();
+  SetupBodyJointOffsets();
 }
 
 /*   指定した部位のObjectを1つ生成する   */
 void TravelScene::SetupPartObject(ModBodyPart part, const std::string &path) {
-  size_t index = ToIndex(part);
+  const size_t index = ToIndex(part);
 
-  // モデル読み込み
   modModelHandles_[index] = system_->SetModelObj(path);
 
-  // Object生成
   modObjects_[index] = new Object;
   modObjects_[index]->IntObject(system_);
   modObjects_[index]->CreateModelData(modModelHandles_[index]);
-
-  // 初期Transform設定
   modObjects_[index]->mainPosition.transform = CreateDefaultTransform();
+
+  modBodies_[index].Initialize(modObjects_[index], part);
 }
 
 /*   部位同士の親子関係を設定する   */
@@ -791,50 +902,84 @@ void TravelScene::SetupHierarchy() {
     return;
   }
 
-  // BodyのmainPositionを親として使う
   ObjectPart *bodyRoot = &body->mainPosition;
 
+  modObjects_[ToIndex(ModBodyPart::Neck)]->followObject_ = bodyRoot;
   modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftArm)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::RightArm)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftLeg)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::RightLeg)]->followObject_ = bodyRoot;
+
+  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = bodyRoot;
+
+  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = bodyRoot;
+
+  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = bodyRoot;
+
+  modObjects_[ToIndex(ModBodyPart::RightThigh)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = bodyRoot;
 }
 
 /*   各部位の初期配置を設定する   */
 void TravelScene::SetupInitialLayout() {
   Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
-  Object *leftArm = modObjects_[ToIndex(ModBodyPart::LeftArm)];
-  Object *rightArm = modObjects_[ToIndex(ModBodyPart::RightArm)];
-  Object *leftLeg = modObjects_[ToIndex(ModBodyPart::LeftLeg)];
-  Object *rightLeg = modObjects_[ToIndex(ModBodyPart::RightLeg)];
 
-  // 胴体を基準位置へ配置
+  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object *leftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
+  Object *rightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object *rightForeArm = modObjects_[ToIndex(ModBodyPart::RightForeArm)];
+
+  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object *leftShin = modObjects_[ToIndex(ModBodyPart::LeftShin)];
+  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
+
+  const Vector3 baseRotate = {0.0f, 0.0f, 0.0f};
+
   body->mainPosition.transform.translate = {0.0f, 0.0f, 0.0f};
-  body->mainPosition.transform.rotate = {0.0f, 1.5f, 0.0f};
+  body->mainPosition.transform.rotate = baseRotate;
 
-  // 頭を胴体の上に配置
-  head->mainPosition.transform.translate = {0.0f, 1.5f, 0.0f};
+  neck->mainPosition.transform.translate = {0.0f, 1.0f, 0.0f};
+  neck->mainPosition.transform.rotate = baseRotate;
 
-  // 仮
-  head->mainPosition.transform.translate = {0.0f, 1.8f, 0.0f};
-  head->mainPosition.transform.scale = {1.8f, 1.8f, 1.8f};
+  head->mainPosition.transform.translate = {0.0f, 1.0f, 0.0f};
+  head->mainPosition.transform.rotate = baseRotate;
 
-  // 腕を左右に配置
-  leftArm->mainPosition.transform.translate = {-1.25f, 0.5f, 0.0f};
-  rightArm->mainPosition.transform.translate = {1.25f, 0.5f, 0.0f};
+  leftUpperArm->mainPosition.transform.translate = {-1.25f, 1.0f, 0.0f};
+  leftUpperArm->mainPosition.transform.rotate = baseRotate;
 
-  leftLeg->mainPosition.transform.scale.y = 1.4f;
-  rightLeg->mainPosition.transform.scale.y = 1.4f;
+  leftForeArm->mainPosition.transform.translate = {0.0f, -1.0f, 0.0f};
+  leftForeArm->mainPosition.transform.rotate = baseRotate;
 
-  // 脚を下に配置
-  leftLeg->mainPosition.transform.translate = {-0.5f, -1.75f, 0.0f};
-  rightLeg->mainPosition.transform.translate = {0.5f, -1.75f, 0.0f};
+  rightUpperArm->mainPosition.transform.translate = {1.25f, 1.0f, 0.0f};
+  rightUpperArm->mainPosition.transform.rotate = baseRotate;
+
+  rightForeArm->mainPosition.transform.translate = {0.0f, -1.0f, 0.0f};
+  rightForeArm->mainPosition.transform.rotate = baseRotate;
+
+  leftThigh->mainPosition.transform.translate = {-0.5f, -1.25f, 0.0f};
+  leftThigh->mainPosition.transform.rotate = baseRotate;
+
+  leftShin->mainPosition.transform.translate = {0.0f, -1.0f, 0.0f};
+  leftShin->mainPosition.transform.rotate = baseRotate;
+
+  rightThigh->mainPosition.transform.translate = {0.5f, -1.25f, 0.0f};
+  rightThigh->mainPosition.transform.rotate = baseRotate;
+
+  rightShin->mainPosition.transform.translate = {0.0f, -1.0f, 0.0f};
+  rightShin->mainPosition.transform.rotate = baseRotate;
 }
 
 /*   各部位Objectの更新をまとめて行う   */
 void TravelScene::UpdateModObjects() {
+  for (size_t i = 0; i < modObjects_.size(); ++i) {
+    if (modObjects_[i] != nullptr) {
+      modBodies_[i].Apply(modObjects_[i]);
+    }
+  }
+
   for (auto &object : modObjects_) {
     if (object != nullptr) {
       object->Update(usingCamera_);
@@ -848,4 +993,189 @@ void TravelScene::DrawModObjects() {
       object->Draw();
     }
   }
+}
+
+void TravelScene::SetupBodyJointOffsets() {
+  for (auto &offset : bodyJointOffsets_) {
+    offset = {0.0f, 0.0f, 0.0f};
+  }
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::Neck)] = {0.0f, 1.0f, 0.0f};
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::LeftUpperArm)] = {-1.25f, 1.0f, 0.0f};
+  bodyJointOffsets_[ToIndex(ModBodyPart::RightUpperArm)] = {1.25f, 1.0f, 0.0f};
+
+  bodyJointOffsets_[ToIndex(ModBodyPart::LeftThigh)] = {-0.5f, -1.25f, 0.0f};
+  bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)] = {0.5f, -1.25f, 0.0f};
+}
+
+void TravelScene::LoadCustomizeData() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  bodyJointOffsets_ = customizeData_->bodyJointOffsets;
+
+  for (size_t i = 0; i < modBodies_.size(); ++i) {
+    modBodies_[i].SetParam(customizeData_->partParams[i]);
+  }
+}
+
+// void TravelScene::UpdateChildRootsFromBody() {
+//   const Vector3 bodyScale =
+//       modBodies_[ToIndex(ModBodyPart::Body)].GetVisualScaleRatio();
+//
+//   const Vector3 neckJoint =
+//       ScaleByRatio(bodyJointOffsets_[ToIndex(ModBodyPart::Neck)], bodyScale);
+//
+//   const Vector3 leftUpperArmJoint = ScaleByRatio(
+//       bodyJointOffsets_[ToIndex(ModBodyPart::LeftUpperArm)], bodyScale);
+//
+//   const Vector3 rightUpperArmJoint = ScaleByRatio(
+//       bodyJointOffsets_[ToIndex(ModBodyPart::RightUpperArm)], bodyScale);
+//
+//   const Vector3 leftThighJoint = ScaleByRatio(
+//       bodyJointOffsets_[ToIndex(ModBodyPart::LeftThigh)], bodyScale);
+//
+//   const Vector3 rightThighJoint = ScaleByRatio(
+//       bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)], bodyScale);
+//
+//   const Vector3 neckScale =
+//       modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
+//   const Vector3 leftUpperArmScale =
+//       modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetVisualScaleRatio();
+//   const Vector3 rightUpperArmScale =
+//       modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetVisualScaleRatio();
+//   const Vector3 leftThighScale =
+//       modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetVisualScaleRatio();
+//   const Vector3 rightThighScale =
+//       modBodies_[ToIndex(ModBodyPart::RightThigh)].GetVisualScaleRatio();
+//
+//   // 1段目
+//   modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition.transform.translate =
+//       neckJoint;
+//
+//   modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
+//       ->mainPosition.transform.translate = leftUpperArmJoint;
+//
+//   modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
+//       ->mainPosition.transform.translate = rightUpperArmJoint;
+//
+//   modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+//       ->mainPosition.transform.translate = leftThighJoint;
+//
+//   modObjects_[ToIndex(ModBodyPart::RightThigh)]
+//       ->mainPosition.transform.translate = rightThighJoint;
+//
+//   // 2段目も body 基準で直接置く
+//   modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.transform.translate =
+//   {
+//       neckJoint.x, neckJoint.y + neckScale.y, neckJoint.z};
+//
+//   modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
+//       ->mainPosition.transform.translate = {
+//       leftUpperArmJoint.x, leftUpperArmJoint.y - leftUpperArmScale.y,
+//       leftUpperArmJoint.z};
+//
+//   modObjects_[ToIndex(ModBodyPart::RightForeArm)]
+//       ->mainPosition.transform.translate = {
+//       rightUpperArmJoint.x, rightUpperArmJoint.y - rightUpperArmScale.y,
+//       rightUpperArmJoint.z};
+//
+//   modObjects_[ToIndex(ModBodyPart::LeftShin)]
+//       ->mainPosition.transform.translate = {
+//       leftThighJoint.x, leftThighJoint.y - leftThighScale.y,
+//       leftThighJoint.z};
+//
+//   modObjects_[ToIndex(ModBodyPart::RightShin)]
+//       ->mainPosition.transform.translate = {
+//       rightThighJoint.x, rightThighJoint.y - rightThighScale.y,
+//       rightThighJoint.z};
+// }
+
+void TravelScene::UpdateChildRootsFromBody() {
+  const Vector3 bodyScale =
+      modBodies_[ToIndex(ModBodyPart::Body)].GetVisualScaleRatio();
+
+  const Vector3 neckJoint =
+      ScaleByRatio(bodyJointOffsets_[ToIndex(ModBodyPart::Neck)], bodyScale);
+
+  const Vector3 leftUpperArmJoint = ScaleByRatio(
+      bodyJointOffsets_[ToIndex(ModBodyPart::LeftUpperArm)], bodyScale);
+
+  const Vector3 rightUpperArmJoint = ScaleByRatio(
+      bodyJointOffsets_[ToIndex(ModBodyPart::RightUpperArm)], bodyScale);
+
+  const Vector3 leftThighJoint = ScaleByRatio(
+      bodyJointOffsets_[ToIndex(ModBodyPart::LeftThigh)], bodyScale);
+
+  const Vector3 rightThighJoint = ScaleByRatio(
+      bodyJointOffsets_[ToIndex(ModBodyPart::RightThigh)], bodyScale);
+
+  const Vector3 neckScale =
+      modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
+  const Vector3 leftUpperArmScale =
+      modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetVisualScaleRatio();
+  const Vector3 rightUpperArmScale =
+      modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetVisualScaleRatio();
+  const Vector3 leftThighScale =
+      modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetVisualScaleRatio();
+  const Vector3 rightThighScale =
+      modBodies_[ToIndex(ModBodyPart::RightThigh)].GetVisualScaleRatio();
+
+  // 1段目
+  modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition.transform.translate =
+      neckJoint;
+
+  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
+      ->mainPosition.transform.translate = leftUpperArmJoint;
+
+  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
+      ->mainPosition.transform.translate = rightUpperArmJoint;
+
+  modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+      ->mainPosition.transform.translate = leftThighJoint;
+
+  modObjects_[ToIndex(ModBodyPart::RightThigh)]
+      ->mainPosition.transform.translate = rightThighJoint;
+
+  // 頭
+  modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.transform.translate = {
+      neckJoint.x, neckJoint.y + neckScale.y, neckJoint.z};
+
+  // 上腕・腿の現在回転を使って、肘・膝の位置を計算
+  const float leftUpperArmRotX = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
+                                     ->mainPosition.transform.rotate.x;
+  const float rightUpperArmRotX =
+      modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
+          ->mainPosition.transform.rotate.x;
+  const float leftThighRotX = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+                                  ->mainPosition.transform.rotate.x;
+  const float rightThighRotX = modObjects_[ToIndex(ModBodyPart::RightThigh)]
+                                   ->mainPosition.transform.rotate.x;
+
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
+      ->mainPosition.transform.translate = {
+      leftUpperArmJoint.x,
+      leftUpperArmJoint.y - std::cos(leftUpperArmRotX) * leftUpperArmScale.y,
+      leftUpperArmJoint.z - std::sin(leftUpperArmRotX) * leftUpperArmScale.y};
+
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]
+      ->mainPosition.transform.translate = {
+      rightUpperArmJoint.x,
+      rightUpperArmJoint.y - std::cos(rightUpperArmRotX) * rightUpperArmScale.y,
+      rightUpperArmJoint.z -
+          std::sin(rightUpperArmRotX) * rightUpperArmScale.y};
+
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]
+      ->mainPosition.transform.translate = {
+      leftThighJoint.x,
+      leftThighJoint.y - std::cos(leftThighRotX) * leftThighScale.y,
+      leftThighJoint.z - std::sin(leftThighRotX) * leftThighScale.y};
+
+  modObjects_[ToIndex(ModBodyPart::RightShin)]
+      ->mainPosition.transform.translate = {
+      rightThighJoint.x,
+      rightThighJoint.y - std::cos(rightThighRotX) * rightThighScale.y,
+      rightThighJoint.z - std::sin(rightThighRotX) * rightThighScale.y};
 }
