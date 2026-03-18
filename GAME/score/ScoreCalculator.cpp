@@ -366,7 +366,7 @@ float ScoreCalculator::CalcBalanceRaw(const ModBodyCustomizeData &playerData) {
 void ScoreCalculator::LogScoreDetails(const ThemeData &theme,
                                       const ScoreResult &result) {
   Logger::Log("========================================");
-  Logger::Log("[ScoreCalculator] Theme: %s", theme.themeName.c_str());
+  Logger::Log("[ScoreCalculator] Theme: %s (%s)", theme.themeName.c_str(), theme.themeId.c_str());
   Logger::Log("========================================");
 
   // パーツスコア
