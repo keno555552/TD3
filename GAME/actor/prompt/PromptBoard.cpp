@@ -76,8 +76,8 @@ void PromptBoard::Update() {
 }
 
 void PromptBoard::Draw() {
-  if (promptSprite_ != nullptr) {
-    promptSprite_->Draw();
+  if (hingeSprite_ != nullptr) {
+    hingeSprite_->Draw();
   }
 
   if (topFlapSprite_ != nullptr) {
@@ -88,8 +88,8 @@ void PromptBoard::Draw() {
     bottomFlapSprite_->Draw();
   }
 
-  if (hingeSprite_ != nullptr) {
-    hingeSprite_->Draw();
+  if (promptSprite_ != nullptr) {
+    promptSprite_->Draw();
   }
 
   if (frameSprite_ != nullptr) {
