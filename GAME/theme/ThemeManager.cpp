@@ -49,8 +49,8 @@ ThemeManager::ThemeManager(const std::string &themesDirectory) {
     ThemeData data;
     if (ParseThemeData(json.value(), data)) {
         themes_.push_back(std::move(data));
-        Logger::Log("[ThemeManager] Loaded theme: %s (%s)",
-            themes_.back().themeName.c_str(), themes_.back().themeId.c_str());
+        Logger::LogUtf8("[ThemeManager] Loaded theme: " + themes_.back().themeName +
+            " (" + themes_.back().themeId + ")");
     } else {
       Logger::Log("[ThemeManager] Failed to parse: %s", filePath.c_str());
     }
