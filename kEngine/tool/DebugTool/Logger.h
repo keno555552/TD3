@@ -41,4 +41,9 @@ public:
 		OutputDebugStringA(buf.data());
 		OutputDebugStringA("\n");
 	}
+
+	/// <summary>
+    /// UTF-8 の std::string をワイド文字列に変換して出力
+    /// </summary>
+	static void LogUtf8(const std::string& message);
 };
