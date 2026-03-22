@@ -59,6 +59,8 @@ private:
   void SetupBodyJointOffsets();
   void LoadCustomizeData();
   void UpdateChildRootsFromBody();
+  void ApplyCustomizeToMovementParam();
+  float ComputeLegHeightOffset() const;
 
   /* プレイヤー移動用変数
   ------------------------------*/
@@ -192,6 +194,28 @@ private:
   //===============================
   float goalX_ = 20.0f;
   bool isGoalReached_ = false;
+
+  struct TravelTuning {
+    float runPower = 1.0f;
+    float maxSpeed = 1.0f;
+    float stability = 1.0f;
+    float lift = 1.0f;
+    float turnResponse = 1.0f;
+    float strideScale = 1.0f;
+  };
+
+  TravelTuning tuning_;
+
+  bool useCustomizeMove_ = true;
+
+  bool requireReleaseAfterLandLeft_ = false;
+  bool requireReleaseAfterLandRight_ = false;
+
+  Object *ground_ = nullptr;
+  uint32_t groundModelHandle_ = 0;
+
+  float timeLimit_ = 30.0f;
+  bool isTimeUp_ = false;
 
 private:
   /// <summary>
