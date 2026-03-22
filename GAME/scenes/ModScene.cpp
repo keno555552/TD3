@@ -158,12 +158,15 @@ void ModScene::Update() {
     assemblyChanged |= assembly_.AddLegAssembly(PartSide::Right);
   }
 
-  // キー入力で首と胴体を追加する
+  // キー入力で首と胴体と頭を追加する
   if (system_->GetTriggerOn(DIK_5)) {
     assemblyChanged |= assembly_.AddNeckPart();
   }
   if (system_->GetTriggerOn(DIK_6)) {
     assemblyChanged |= assembly_.AddBodyPart();
+  }
+  if (system_->GetTriggerOn(DIK_7)) {
+    assemblyChanged |= assembly_.AddHeadPart();
   }
 
   // Delete キーで選択部位を削除する
@@ -237,6 +240,7 @@ void ModScene::Draw() {
   ImGui::Text("DIK_3/4 : Add Leg Assembly");
   ImGui::Text("DIK_5   : Add Neck");
   ImGui::Text("DIK_6   : Add Body");
+  ImGui::Text("DIK_7   : Add Head");
   ImGui::Text("Delete  : Remove Selected Part");
   ImGui::Text("Arrow   : Move Selected Part");
   ImGui::End();
@@ -1011,17 +1015,15 @@ void ModScene::DrawSelectedPartGui() {
 }
 
 void ModScene::DrawModGui() {
-  // 改造シーン全体の編集UIを表示する
   ImGui::Begin("ModScene");
 
-  // カメラ操作方法を表示する
   ImGui::Text("MouseMiddleDrag : Move Camera");
   ImGui::Text("MouseRightDrag  : Rotate Camera");
   ImGui::Text("DIK_0           : Toggle DebugCamera");
 
-  // 部位追加ボタンを表示する
   ImGui::Separator();
   ImGui::Text("Add Parts");
+
   if (ImGui::Button("Add Left Arm")) {
     if (assembly_.AddArmAssembly(PartSide::Left)) {
       SyncObjectsWithAssembly();
@@ -1063,12 +1065,17 @@ void ModScene::DrawModGui() {
       EnsureValidSelection();
     }
   }
+  ImGui::SameLine();
+  if (ImGui::Button("Add Head")) {
+    if (assembly_.AddHeadPart()) {
+      SyncObjectsWithAssembly();
+      EnsureValidSelection();
+    }
+  }
 
-  // 部位一覧と選択部位編集UIを表示する
   DrawAssemblyGui();
   DrawSelectedPartGui();
 
-  // 全体リセット系ボタンを表示する
   ImGui::Separator();
   ImGui::Text("Global Reset");
   if (ImGui::Button("Reset All Part Params")) {

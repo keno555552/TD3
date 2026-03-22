@@ -175,6 +175,12 @@ public:
   bool AddNeckPart();
 
   /// <summary>
+  /// Head 部位を1つ追加する
+  /// </summary>
+  /// <returns>追加できたら true</returns>
+  bool AddHeadPart();
+
+  /// <summary>
   /// Body 部位を1つ追加する
   /// 既に Body が存在しない場合のみ追加でき、Head の下へ接続する
   /// </summary>
@@ -282,6 +288,12 @@ private:
   int CountLegRoots() const;
 
   /// <summary>
+  /// 現在存在している腕根元の数を数える
+  /// </summary>
+  /// <returns>腕根元数</returns>
+  int CountHeads() const;
+
+  /// <summary>
   /// 指定部位が脚根元かどうかを判定する
   /// 腿部位を脚の開始点として扱う
   /// </summary>
@@ -330,6 +342,13 @@ private:
   bool IsHead(ModBodyPart part) const;
 
   /// <summary>
+  /// 指定部位が削除の際に子もまとめて消すべきかを判定する
+  /// </summary>
+  /// <param name="part">判定対象部位</param>
+  /// <returns>子も連鎖削除すべきなら true</returns>
+  bool ShouldCascadeDeleteChildren(ModBodyPart part) const;
+
+  /// <summary>
   /// 指定した子部位が親に求める接続点役割を返す
   /// 最適な親コネクタ選択に使う
   /// </summary>
@@ -357,12 +376,9 @@ private:
   bool RemoveChildrenRecursive(int partId);
 
   /// <summary>
-  /// 指定部位を削除するとき、子もまとめて消すべきかを判定する
-  /// 上腕や腿など、セットで扱う部位に対して使う
+  /// Body や Head の管理IDを必要に応じて無効化する
   /// </summary>
-  /// <param name="part">判定対象部位</param>
-  /// <returns>子も連鎖削除すべきなら true</returns>
-  bool ShouldCascadeDeleteChildren(ModBodyPart part) const;
+  void RefreshManagedPartIds();
 
 private:
   std::unordered_map<int, PartNode> nodes_; // 全部位ノード一覧
