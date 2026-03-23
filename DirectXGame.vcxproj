@@ -252,7 +252,18 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\actor\ModAssemblyGraph.cpp" />
+    <ClCompile Include="GAME\actor\ModBody.cpp" />
+    <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp" />
+    <ClCompile Include="GAME\actor\prompt\PromptData.cpp" />
+    <ClCompile Include="GAME\json\JsonManager.cpp" />
     <ClCompile Include="GAME\Object\Panel\Panel.cpp" />
+    <ClCompile Include="GAME\scenes\ContestScene.cpp" />
+    <ClCompile Include="GAME\scenes\ModScene.cpp" />
+    <ClCompile Include="GAME\scenes\PromptScene.cpp" />
+    <ClCompile Include="GAME\scenes\TravelScene.cpp" />
+    <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
+    <ClCompile Include="GAME\theme\ThemeManager.cpp" />
     <ClCompile Include="kEngine\Data\Render\CPUData\DebugLine.cpp" />
     <ClCompile Include="kEngine\Data\Render\GPUData\DebugLineGPU.cpp" />
     <ClCompile Include="kEngine\Tool\DebugTool\DebugLineTool.cpp" />
@@ -396,7 +407,20 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\actor\ModAssemblyGraph.h" />
+    <ClInclude Include="GAME\actor\ModBody.h" />
+    <ClInclude Include="GAME\actor\prompt\PromptBoard.h" />
+    <ClInclude Include="GAME\actor\prompt\PromptData.h" />
+    <ClInclude Include="GAME\json\JsonManager.h" />
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
+    <ClInclude Include="GAME\scenes\ContestScene.h" />
+    <ClInclude Include="GAME\scenes\ModScene.h" />
+    <ClInclude Include="GAME\scenes\PromptScene.h" />
+    <ClInclude Include="GAME\scenes\TravelScene.h" />
+    <ClInclude Include="GAME\score\ScoreCalculator.h" />
+    <ClInclude Include="GAME\score\ScoreResult.h" />
+    <ClInclude Include="GAME\theme\ThemeData.h" />
+    <ClInclude Include="GAME\theme\ThemeManager.h" />
     <ClInclude Include="kEngine\Data\Render\CPUData\DebugLine.h" />
     <ClInclude Include="kEngine\Data\Render\GPUData\DebugLineGPU.h" />
     <ClInclude Include="kEngine\Tool\DebugTool\DebugLineTool.h" />
