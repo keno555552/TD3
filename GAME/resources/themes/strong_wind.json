@@ -1,0 +1,110 @@
+{
+  "theme_id": "strong_wind",
+  "theme_name": "強風注意",
+  "category": "body_trait",
+  "texture_path": "GAME/resources/texture/prompt.png",
+
+  "score_sets": [
+    {
+      "set_name": "default",
+      "parts": {
+        "Body": {
+          "scale_x": -4.0,
+          "scale_y": -3.0,
+          "scale_z": 0.0
+        },
+        "Neck": {
+          "scale_x": -3.0,
+          "scale_y": -2.0,
+          "scale_z": 0.0
+        },
+        "Head": {
+          "scale_x": -3.0,
+          "scale_y": -3.0,
+          "scale_z": 0.0
+        },
+        "LeftUpperArm": {
+          "scale_x": -2.0,
+          "scale_y": -1.0,
+          "scale_z": 0.0
+        },
+        "LeftForeArm": {
+          "scale_x": -2.0,
+          "scale_y": -1.0,
+          "scale_z": 0.0
+        },
+        "RightUpperArm": {
+          "scale_x": -2.0,
+          "scale_y": -1.0,
+          "scale_z": 0.0
+        },
+        "RightForeArm": {
+          "scale_x": -2.0,
+          "scale_y": -1.0,
+          "scale_z": 0.0
+        },
+        "LeftThigh": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": 2.0
+        },
+        "LeftShin": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": 2.0
+        },
+        "RightThigh": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": 2.0
+        },
+        "RightShin": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": 2.0
+        }
+      },
+      "counts": {
+        "left_arm": {
+          "weight": 2.0,
+          "invert": true
+        },
+        "right_arm": {
+          "weight": 2.0,
+          "invert": true
+        },
+        "left_leg": {
+          "weight": 2.0,
+          "invert": false
+        },
+        "right_leg": {
+          "weight": 2.0,
+          "invert": false
+        }
+      }
+    }
+  ],
+
+  "bonuses": {
+    "symmetry": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "cost_efficiency": {
+      "weight": 5.0,
+      "invert": false
+    },
+    "minimalist": {
+      "weight": 3.0,
+      "invert": false
+    },
+    "wildcard": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "balance": {
+      "weight": 2.0,
+      "invert": false
+    }
+  }
+}

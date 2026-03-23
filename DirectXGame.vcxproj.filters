@@ -1,138 +1,20 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="ソース ファイル">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="ヘッダー ファイル">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
-    </Filter>
-    <Filter Include="リソース ファイル">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
-    </Filter>
-    <Filter Include="imgui">
-      <UniqueIdentifier>{85249e34-772f-4a17-bbe3-6cc714dc2f91}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine">
-      <UniqueIdentifier>{9be101dc-0334-4cce-889c-6c686d556044}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\tool">
-      <UniqueIdentifier>{b3f5dee4-cd6a-4811-aae0-51ac380ab53d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\tool\mathsUnit">
-      <UniqueIdentifier>{29a6c1c5-6ab0-4593-be9f-b711c650a2cd}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\tool\StageManager">
-      <UniqueIdentifier>{dfcf36a5-9933-4a30-a395-fbc208f0eda8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\core">
-      <UniqueIdentifier>{8c326b72-6cc2-41f1-8ec4-dfbbd117ce54}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\core\driver">
-      <UniqueIdentifier>{5caaa8ba-08a9-49e8-a5b0-55efb8e6789f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\core\Input">
-      <UniqueIdentifier>{89b6680d-aefd-47dd-aa36-1800658b1b11}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\core\pso">
-      <UniqueIdentifier>{f3508acb-40bf-43c7-93f2-aa1a17b3e3fb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\DrawEngine">
-      <UniqueIdentifier>{f5f0ade5-3ec7-411e-8403-91792796663e}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\DrawEngine\ResourceManager">
-      <UniqueIdentifier>{7498b527-fa66-4124-8b5a-93c531d63688}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\DrawEngine\ResourceManager\ObjectResource">
-      <UniqueIdentifier>{18208b75-d299-4f10-9139-f2d9007eb4ec}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\DrawEngine\DrawData">
-      <UniqueIdentifier>{7f7c3545-1c26-4e64-9fee-0ebee7f58f80}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\DrawEngine\InstanceManager">
-      <UniqueIdentifier>{0bfba050-6a9e-479b-a60f-00bdfaf12606}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\Lighting">
-      <UniqueIdentifier>{3a0c0cbe-df6f-41b0-a0c2-d54b646e71a4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\material">
-      <UniqueIdentifier>{5519dc4e-41ce-4c6a-ad8f-8b34f9cc63c5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\kEngine\Sound">
-      <UniqueIdentifier>{a0b0bb0a-1b71-4d75-956e-037322fbed53}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine">
-      <UniqueIdentifier>{ef0fc76f-4ae7-42d6-b9be-3edbb4d31b57}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\tool">
-      <UniqueIdentifier>{cc8f6001-c61b-4d66-ba77-038d2a25b337}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\tool\mathsUnit">
-      <UniqueIdentifier>{d0cbdeeb-4dc0-44cd-869d-b96d9cbbece3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\tool\StageManager">
-      <UniqueIdentifier>{9fca9167-013d-4a4f-bd27-f5f5c1856df2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\material">
-      <UniqueIdentifier>{a2043b59-5c6e-4708-979c-2243a607d6da}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\Lighting">
-      <UniqueIdentifier>{0bba1cf5-1a32-40ca-a156-05791f152c2a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\DrawEngine">
-      <UniqueIdentifier>{fe6b4033-c804-4a7c-b299-c02b57cae554}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\DrawEngine\InstanceManager">
-      <UniqueIdentifier>{5c8f8443-dc0d-4473-8d52-852a84eaada2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\DrawEngine\DrawData">
-      <UniqueIdentifier>{50383e7d-4fe9-4a54-ae15-7363410d6412}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\DrawEngine\ResourceManager">
-      <UniqueIdentifier>{f5a8ea42-56e4-4517-8443-205267dd3b2f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\DrawEngine\ResourceManager\ObjectResource">
-      <UniqueIdentifier>{d4d661d6-ff3a-4494-bdcd-33e77162a5ef}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\core">
-      <UniqueIdentifier>{49e68e62-2275-4787-9b20-f7117c435599}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\core\driver">
-      <UniqueIdentifier>{d60c9300-8209-475e-a5cf-af691f196ead}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\core\Input">
-      <UniqueIdentifier>{e6d4151c-a377-4a6d-b7b7-200d1e8e0fa4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\core\pso">
-      <UniqueIdentifier>{9839f65d-eae4-4458-9344-39f7f40927d3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\kEngine\Sound">
-      <UniqueIdentifier>{f7a59acd-ca10-420e-9724-9a5f2141e9f1}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\New">
-      <UniqueIdentifier>{8648b78d-3a7a-44b7-957d-7ed2e1d77cf6}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\New">
-      <UniqueIdentifier>{12d97853-4318-434e-9811-5b183537b7df}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\Effect">
-      <UniqueIdentifier>{2c4cc008-cf1b-40de-a895-f5c2f012227b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\Effect">
-      <UniqueIdentifier>{7d8bc408-2b78-43ea-8f62-b2421ae4ed44}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ソース ファイル\Shader">
-      <UniqueIdentifier>{7401b172-ae10-4ad9-89bb-0279e09e4e74}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ヘッダー ファイル\Shader">
-      <UniqueIdentifier>{593ae479-0340-4cae-b587-3c305d4db232}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="リソース ファイル\Map">
-      <UniqueIdentifier>{49131cbd-9e04-46e9-ab0b-c43f35dd7b9f}</UniqueIdentifier>
-    </Filter>
+    <FxCompile Include="externals\DirectXTex\Shaders\BC6HEncode.hlsl" />
+    <FxCompile Include="externals\DirectXTex\Shaders\BC7Encode.hlsl" />
+    <FxCompile Include="resources\Shader\FlameNeonGlow.PS.hlsl" />
+    <FxCompile Include="resources\Shader\FlameNeonGlow.VS.hlsl" />
+    <FxCompile Include="resources\Shader\GlowSphere.PS.hlsl" />
+    <FxCompile Include="resources\Shader\LightingLambert\BlinnPhongReflection.hlsl" />
+    <FxCompile Include="resources\Shader\GlowSphere.VS.hlsl" />
+    <FxCompile Include="resources\Shader\LightingLambert\HalfLambert.hlsl" />
+    <FxCompile Include="resources\Shader\LightingLambert\Lambert.hlsl" />
+    <FxCompile Include="resources\Shader\LightingLambert\PhongReflection.hlsl" />
+    <FxCompile Include="resources\Shader\Object3d.PS.hlsl" />
+    <FxCompile Include="resources\Shader\Object3d.VS.hlsl" />
+    <FxCompile Include="resources\Shader\Tile2D.PS.hlsl" />
+    <FxCompile Include="resources\Shader\Tile2D.VS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
@@ -1180,43 +1062,42 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="resources\Shader\LightingLambert\HalfLambert.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="resources\Shader\LightingLambert\Lambert.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="resources\Shader\Object3d.PS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="resources\Shader\Object3d.VS.hlsl">
-      <Filter>リソース ファイル</Filter>
-    </FxCompile>
-    <FxCompile Include="resources\Shader\Tile2D.PS.hlsl" />
-    <FxCompile Include="resources\Shader\Tile2D.VS.hlsl" />
-    <FxCompile Include="resources\Shader\LightingLambert\PhongReflection.hlsl" />
-    <FxCompile Include="resources\Shader\LightingLambert\BlinnPhongReflection.hlsl" />
-    <FxCompile Include="resources\Shader\FlameNeonGlow.PS.hlsl" />
-    <FxCompile Include="resources\Shader\FlameNeonGlow.VS.hlsl" />
-    <FxCompile Include="resources\Shader\GlowSphere.PS.hlsl" />
-    <FxCompile Include="resources\Shader\GlowSphere.VS.hlsl" />
-    <FxCompile Include="externals\DirectXTex\Shaders\BC6HEncode.hlsl" />
-    <FxCompile Include="externals\DirectXTex\Shaders\BC7Encode.hlsl" />
+    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mdd.lib" />
+    <Library Include="externals\assimp\lib\Debug\assimp-vc143-mtd.lib" />
+    <Library Include="externals\assimp\lib\Release\assimp-vc143-md.lib" />
+    <Library Include="externals\assimp\lib\Release\assimp-vc143-mt.lib" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="externals\assimp\include\assimp\color4.inl" />
+    <None Include="externals\assimp\include\assimp\material.inl" />
+    <None Include="externals\assimp\include\assimp\matrix3x3.inl" />
+    <None Include="externals\assimp\include\assimp\matrix4x4.inl" />
+    <None Include="externals\assimp\include\assimp\quaternion.inl" />
+    <None Include="externals\assimp\include\assimp\SmoothingGroups.inl" />
+    <None Include="externals\assimp\include\assimp\vector2.inl" />
+    <None Include="externals\assimp\include\assimp\vector3.inl" />
+    <None Include="externals\assimp\lib\Debug\assimp-vc143-mtd.pdb" />
+    <None Include="externals\DirectXTex\DirectXTex.inl" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_EncodeBlockCS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeG10CS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeG10CS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeLE10CS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC6HEncode_TryModeLE10CS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_EncodeBlockCS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_EncodeBlockCS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode02CS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode02CS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode137CS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode137CS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS.inc" />
+    <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS_cs40.inc" />
+    <None Include="externals\DirectXTex\Shaders\CompileShaders.cmd" />
     <None Include="packages.config" />
-    <None Include="resources\map\map.csv">
-      <Filter>リソース ファイル\Map</Filter>
-    </None>
-    <None Include="resources\map\map1.csv">
-      <Filter>リソース ファイル\Map</Filter>
-    </None>
-    <None Include="resources\map\map2.csv">
-      <Filter>リソース ファイル\Map</Filter>
-    </None>
-    <None Include="resources\map\map3.csv">
-      <Filter>リソース ファイル\Map</Filter>
-    </None>
+    <None Include="resources\map\map.csv" />
+    <None Include="resources\map\map1.csv" />
+    <None Include="resources\map\map2.csv" />
+    <None Include="resources\map\map3.csv" />
     <None Include="resources\Shader\Tile2D.hlsli" />
     <None Include="externals\DirectXTex\DirectXTex.inl">
       <Filter>ヘッダー ファイル</Filter>
