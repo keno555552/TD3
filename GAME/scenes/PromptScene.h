@@ -3,6 +3,7 @@
 #include "BaseScene.h"
 #include "GAME/theme/ThemeManager.h"
 #include "GAME/theme/ThemeData.h"
+#include "GAME/judges/JudgeManager.h"
 #include <memory>
 
 class PromptBoard;
@@ -36,6 +37,9 @@ private:
 	// お題管理
 	ThemeManager* themeManager_ = nullptr;
 	ThemeData* selectedTheme_ = nullptr;
+
+	// 審査員管理
+	JudgeManager* judgeManager_ = nullptr;
 
 	// お題演出
 	std::unique_ptr<PromptBoard> promptBoard_ = nullptr;

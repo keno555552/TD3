@@ -1,0 +1,13 @@
+{
+  "judge_id": "ono",
+  "judge_name": "小野",
+  "judge_title": "繊細さを愛するミニマリスト",
+  "texture_path": "GAME/resources/texture/judge_default.png",
+  "favorite_parts": {
+    "Head":       1.0,
+    "Neck":       1.0,
+    "Body":       -2.0,
+    "LeftThigh":  -1.5,
+    "RightThigh": -1.5
+  }
+}
