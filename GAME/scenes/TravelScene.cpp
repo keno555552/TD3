@@ -62,18 +62,6 @@ TravelScene::TravelScene(kEngine *system) {
 
   ApplyCustomizeToMovementParam();
 
-  // modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam().length = 1.25f;
-  // modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetParam().length = 1.25f;
-
-  // modBodies_[ToIndex(ModBodyPart::LeftForeArm)].GetParam().length = 1.20f;
-  // modBodies_[ToIndex(ModBodyPart::RightForeArm)].GetParam().length = 1.20f;
-
-  // modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam().length = 1.65f;
-  // modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam().length = 1.65f;
-
-  // modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam().length = 1.55f;
-  // modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam().length = 1.55f;
-
   UpdateChildRootsFromBody();
 
   leftLegBend_ = legRecoverAngle_;
@@ -102,7 +90,7 @@ TravelScene::TravelScene(kEngine *system) {
   groundModelHandle_ =
       system_->SetModelObj("GAME/resources/modBody/body/body.obj");
 
-  ground_ = new Object;
+  ground_ = std::make_unique<Object>();
   ground_->IntObject(system_);
   ground_->CreateModelData(groundModelHandle_);
   ground_->mainPosition.transform = CreateDefaultTransform();
@@ -127,9 +115,6 @@ TravelScene::~TravelScene() {
     delete object;
     object = nullptr;
   }
-
-  delete ground_;
-  ground_ = nullptr;
 
   system_->RemoveLight(light1_);
 
@@ -288,7 +273,7 @@ void TravelScene::Update() {
     float leftRecoveryAccel = leftLegBendSpeed_ - leftLegPrevBendSpeed_;
 
     if (leftRecoveryAccel > 0.0f) {
-      float torque = leftRecoveryAccel * 0.35f / stability;
+      float torque = leftRecoveryAccel * 0.6f / stability;
       backwardTorque += torque;
     }
   }
@@ -297,7 +282,7 @@ void TravelScene::Update() {
     float rightRecoveryAccel = rightLegBendSpeed_ - rightLegPrevBendSpeed_;
 
     if (rightRecoveryAccel > 0.0f) {
-      float torque = rightRecoveryAccel * 0.35f / stability;
+      float torque = rightRecoveryAccel * 0.6f / stability;
       backwardTorque += torque;
     }
   }
@@ -310,7 +295,7 @@ void TravelScene::Update() {
   }
 
   float tiltError = targetTilt - bodyTilt_;
-  bodyTiltVelocity_ += tiltError * 0.2f * turnResponse;
+  bodyTiltVelocity_ += tiltError * 0.1f * turnResponse;
 
   float restoreTorque = -bodyTilt_ * 0.01f * stability;
   bodyTiltVelocity_ += restoreTorque;
@@ -472,10 +457,26 @@ void TravelScene::Update() {
 
     // pushTorque = pushTiltKick_ * adoptedDriveUse * 2.0f;
 
+    //if (bothInput) {
+    //  pushTorque = pushTiltKick_ * adoptedDriveUse * 2.0f;
+    //} else {
+    //  pushTorque = 0.0f;
+    //}
+
+    // 押した瞬間にも反動を入れる
+    // 片足押しでも揺れるようにする
+    pushTorque = pushTiltKick_ * adoptedDriveUse * 1.2f;
+
+    // 両押しはさらに強く揺らす
     if (bothInput) {
-      pushTorque = pushTiltKick_ * adoptedDriveUse * 2.0f;
-    } else {
-      pushTorque = 0.0f;
+      pushTorque *= 1.5f;
+    }
+
+    // どっちの脚で蹴ったかで少し差をつけたいならここで補正
+    if (useLeftPush) {
+      pushTorque *= 1.0f;
+    } else if (useRightPush) {
+      pushTorque *= 1.0f;
     }
 
     // Logger::Log("---- HOLD DRIVE ----");
@@ -1403,7 +1404,9 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   float thicknessPenalty = thicknessDiff * thicknessDiff;
 
   tuning_.runPower =
-      (std::max)(0.5f, 1.0f - lengthPenalty * 0.25f - thicknessPenalty * 0.35f);
+      (std::max)(0.5f, 1.0f - lengthPenalty * 0.4f - thicknessPenalty * 0.55f);
+
+  tuning_.runPower -= (bodyScaleAvg - 1.0f) * 0.25f;
 
   // 最高速度
   // 長いとちょっと速い（歩幅）
