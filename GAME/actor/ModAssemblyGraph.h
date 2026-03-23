@@ -380,6 +380,46 @@ private:
   /// </summary>
   void RefreshManagedPartIds();
 
+  bool IsBodyChildPart(ModBodyPart part) const;
+  bool IsHeadAttachableToBody(ModBodyPart part) const;
+  /// <summary>
+  /// 指定種類の最初の部位IDを返す
+  /// 首や頭の代表ノードを探すときに使う
+  /// </summary>
+  /// <param name="part">探したい部位種類</param>
+  /// <param name="excludeId">除外したい部位ID</param>
+  /// <returns>見つかった部位ID。無ければ -1</returns>
+  int FindFirstPartId(ModBodyPart part, int excludeId = -1) const;
+  int FindPreferredParentForChild(int childId, int removedPartId = -1) const;
+  void ReattachPartsForBodyRestore(int newBodyId);
+
+  /// <summary>
+  /// Head の親子関係を正規化する
+  /// Neck があれば Neck、無ければ Body、どちらも無ければ親なしにする
+  /// </summary>
+  void NormalizeHeadLinks();
+
+  /// <summary>
+  /// Body 配下に置くべき部位を Body へ戻す
+  /// Body 復帰時に首・腕・脚を体へ戻すために使う
+  /// </summary>
+  void NormalizeBodyChildLinks();
+
+  /// <summary>
+  /// 指定部位を親なし状態にする
+  /// ルート部位として残したいときに使う
+  /// </summary>
+  /// <param name="childId">親を外す部位ID</param>
+  void DetachPartFromParent(int childId);
+
+  /// <summary>
+  /// 指定部位を親へ接続する
+  /// 親IDと親コネクタIDをまとめて更新するときに使う
+  /// </summary>
+  /// <param name="childId">接続する子部位ID</param>
+  /// <param name="parentId">接続先親部位ID</param>
+  void AttachPartToParent(int childId, int parentId);
+
 private:
   std::unordered_map<int, PartNode> nodes_; // 全部位ノード一覧
   int nextPartId_ = 1;                      // 次に発行する部位ID
