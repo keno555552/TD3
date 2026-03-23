@@ -1,5 +1,5 @@
 #pragma once
-#include "../effect/Fade.h"
+#include "GAME/effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/prompt/PromptData.h"
 #include "GAME/score/ScoreCalculator.h"
