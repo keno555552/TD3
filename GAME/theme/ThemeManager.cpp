@@ -105,9 +105,9 @@ ThemeData *ThemeManager::SelectRandom() {
   // セーブファイルに記録
   SaveLastThemeId(themes_[currentIndex_].themeId);
 
-  Logger::Log("[ThemeManager] Selected theme: %s (%s)",
-              themes_[currentIndex_].themeName.c_str(),
-              themes_[currentIndex_].themeId.c_str());
+  Logger::LogUtf8("[ThemeManager] Selected theme: " +
+      themes_[currentIndex_].themeName + " (" +
+      themes_[currentIndex_].themeId + ")");
 
   return &themes_[currentIndex_];
 }

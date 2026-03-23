@@ -1,0 +1,13 @@
+{
+  "judge_id": "takeda",
+  "judge_name": "武田",
+  "judge_title": "腕にしか興味がない元格闘家",
+  "texture_path": "GAME/resources/texture/judge_default.png",
+  "favorite_parts": {
+    "LeftUpperArm":  2.0,
+    "LeftForeArm":   2.0,
+    "RightUpperArm": 2.0,
+    "RightForeArm":  2.0,
+    "Neck":          -1.0
+  }
+}
