@@ -64,14 +64,75 @@ void ContestScene::Update() {
 
 void ContestScene::Draw() {
 #ifdef USE_IMGUI
-  // 現在シーン表示
-  ImGui::Begin("Scene");
-  ImGui::Text("ContestScene");
-  ImGui::End();
+    // 現在シーン表示
+    ImGui::Begin("Scene");
+    ImGui::Text("ContestScene");
+    ImGui::End();
+
+    // スコア内訳ウィンドウ
+    ImGui::Begin("Score Result");
+
+    const ThemeData* theme = PromptData::GetThemeData();
+    if (theme != nullptr) {
+        ImGui::Text("Theme: %s", theme->themeId.c_str());
+    }
+
+    ImGui::Separator();
+
+    if (!isScoreCalculated_) {
+        ImGui::Text("Score not calculated");
+    } else {
+        const char* partNames[] = {
+            "Body",         "Neck",          "Head",
+            "LeftUpperArm", "LeftForeArm",   "RightUpperArm",
+            "RightForeArm", "LeftThigh",     "LeftShin",
+            "RightThigh",   "RightShin",
+        };
+        const char* countNames[] = {
+            "LeftArm", "RightArm", "LeftLeg", "RightLeg",
+        };
+        const char* bonusNames[] = {
+            "Symmetry", "CostEfficiency", "Minimalist",
+            "Wildcard", "Balance",
+        };
+
+        if (ImGui::TreeNodeEx("Part Scores", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (int i = 0; i < 11; ++i) {
+                ImGui::Text("  %s = %.1f", partNames[i], scoreResult_.partScores[i]);
+            }
+            ImGui::Separator();
+            ImGui::Text("  Total = %.1f", scoreResult_.totalPartScore);
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNodeEx("Count Scores", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (int i = 0; i < 4; ++i) {
+                ImGui::Text("  %s = %.1f", countNames[i], scoreResult_.countScores[i]);
+            }
+            ImGui::Separator();
+            ImGui::Text("  Total = %.1f", scoreResult_.totalCountScore);
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNodeEx("Bonus Scores", ImGuiTreeNodeFlags_DefaultOpen)) {
+            for (int i = 0; i < 5; ++i) {
+                ImGui::Text("  %s = %.1f", bonusNames[i], scoreResult_.bonusScores[i]);
+            }
+            ImGui::Separator();
+            ImGui::Text("  Total = %.1f", scoreResult_.totalBonusScore);
+            ImGui::TreePop();
+        }
+
+        ImGui::Separator();
+        ImGui::Spacing();
+        ImGui::Text("Final Score = %.1f", scoreResult_.finalScore);
+    }
+
+    ImGui::End();
 #endif
 
-  // フェード描画
-  fade_.Draw();
+    // フェード描画
+    fade_.Draw();
 }
 
 void ContestScene::CameraPart() {
