@@ -211,7 +211,7 @@ private:
   bool requireReleaseAfterLandLeft_ = false;
   bool requireReleaseAfterLandRight_ = false;
 
-  Object *ground_ = nullptr;
+  std::unique_ptr<Object> ground_ = nullptr;
   uint32_t groundModelHandle_ = 0;
 
   float timeLimit_ = 30.0f;
