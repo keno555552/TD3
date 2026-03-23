@@ -3,21 +3,22 @@
 
 SceneFactory::SceneFactory(kEngine* system)
 	: system_(system) {
-	sceneRegistry_["ANIMATIONEDITOR"] = [this]() { return new AnimationEditor(system_); };
-	sceneRegistry_["EFFECT2"] = [this]() { return new Effect2(system_); };
-	sceneRegistry_["CGHK2"] = [this]() { return new SceneCGHK2(system_); };
-	sceneRegistry_["TITLE"] = [this]() { return new TitleScene(system_); };
-	sceneRegistry_["PROMPT"] = [this]() { return new PromptScene(system_); };
-	sceneRegistry_["MOD"] = [this]() { return new ModScene(system_); };
-	sceneRegistry_["TRAVEL"] = [this]() { return new TravelScene(system_); };
-	sceneRegistry_["CONTEST"] = [this]() { return new ContestScene(system_); };
+	sceneRegistry_["ANIMATIONEDITOR"] = [this]() { return std::make_unique <AnimationEditor>(system_); };
+	sceneRegistry_["EFFECT2"] = [this]() { return std::make_unique <Effect2>(system_); };
+	sceneRegistry_["CGHK2"] = [this]() { return	std::make_unique <SceneCGHK2>(system_); };
+	sceneRegistry_["TITLE"] = [this]() { return	std::make_unique <TitleScene>(system_); };
+	sceneRegistry_["PROMPT"] = [this]() { return std::make_unique <PromptScene>(system_); };
+	sceneRegistry_["MOD"] = [this]() { return std::make_unique <ModScene>(system_); };
+	sceneRegistry_["TRAVEL"] = [this]() { return std::make_unique <TravelScene>(system_); };
+	sceneRegistry_["CONTEST"] = [this]() { return std::make_unique <ContestScene>(system_); };
 }
 
-BaseScene* SceneFactory::CreateScene(const std::string& sceneName) {
+std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName) {
 	auto it = sceneRegistry_.find(sceneName);
 	if (it != sceneRegistry_.end()) {
-		return it->second();
+		return std::move(it->second());
 	}
 	Logger::Log("[kError] SF ::CreateScene: Scene not found: " + sceneName);
 	return nullptr;
 }
+

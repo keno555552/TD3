@@ -7,7 +7,7 @@ void Fade::Initialize(kEngine *system) {
   system_ = system;
 
   textureHandle_ =
-      system_->LoadTexture("resources/TemplateResource/texture/white5x5.png");
+      system_->LoadTexture("./kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
 
   sprite_ = new SimpleSprite;
   sprite_->IntObject(system_);

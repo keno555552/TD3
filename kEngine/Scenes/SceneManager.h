@@ -1,5 +1,6 @@
 #pragma once
 #include "AnimationSystem/AnimationEditor.h"
+#include <memory>
 #include "BaseScene.h"
 #include "CG3_HK_2/SceneCGHK2.h"
 #include "CG4_HK_1/Effect2.h"
@@ -9,8 +10,12 @@
 
 class SceneManager {
 public:
-  static void Initialize(kEngine *system);
-  static SceneManager &GetInstance();
+
+	static SceneManager& GetInstance();
+	~SceneManager() = default;
+
+	void Initialize(kEngine* system);
+	void Finalize();
 
   /// 複製禁止
   SceneManager(const SceneManager &) = delete;
@@ -34,21 +39,19 @@ private:
   };
 
 private:
-  static SceneManager *sceneManager_;
+	static std::unique_ptr <SceneManager> sceneManager_;
 
-  SceneManager(kEngine *system);
-  ~SceneManager();
-
+	SceneManager() = default;
 private:
-  BaseScene *sceneUsing_ = nullptr;
-  BaseScene *sceneOld_ = nullptr;
+	std::unique_ptr <BaseScene> sceneUsing_ = nullptr;
+	std::unique_ptr <BaseScene> sceneOld_ = nullptr;
 
 private:
   kEngine *system_ = nullptr; // 借り
 
-  SceneFactory *sceneFactory_ = nullptr;
+  std::unique_ptr <SceneFactory> sceneFactory_ = nullptr;
 
-  DefaultMenu *defaultMenu_ = nullptr;
+  std::unique_ptr <DefaultMenu> defaultMenu_ = nullptr;
 
   /// ========= リソースハンドル ========= ///
 

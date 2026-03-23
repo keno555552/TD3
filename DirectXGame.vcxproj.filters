@@ -165,6 +165,8 @@
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
     <ClCompile Include="GAME\theme\ThemeManager.cpp" />
+    <ClCompile Include="GAME\effect\Fade.cpp" />
+    <ClCompile Include="GAME\scenes\TitleScene.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
@@ -390,6 +392,8 @@
     <ClInclude Include="GAME\score\ScoreResult.h" />
     <ClInclude Include="GAME\theme\ThemeData.h" />
     <ClInclude Include="GAME\theme\ThemeManager.h" />
+    <ClInclude Include="GAME\effect\Fade.h" />
+    <ClInclude Include="GAME\scenes\TitleScene.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />

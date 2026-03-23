@@ -1,38 +1,30 @@
 #include "SceneManager.h"
 
-SceneManager* SceneManager::sceneManager_ = nullptr;
+std::unique_ptr <SceneManager> SceneManager::sceneManager_ = nullptr;
 
-SceneManager::SceneManager(kEngine* system)
-	: system_(system), sceneFactory_(new SceneFactory(system)) {
-	sceneUsingNameHandle_ = "TITLE";
-
-	// helperTextureHandle_ =
-	// system_->LoadTexture("resources/texture/helper.png"); helperSprite_ = new
-	// SimpleSprite; helperSprite_->IntObject(system_);
-	// helperSprite_->CreateDefaultData();
-	// helperSprite_->mainPosition.transform.scale = { 0.5f,0.5f,1.0f };
-	// helperSprite_->mainPosition.transform.translate = { 0.0f,550.0f,0.0f };
-	// helperSprite_->objectParts_[0].materialConfig->textureHandle =
-	// helperTextureHandle_;
-
-	defaultMenu_ = new DefaultMenu(system_);
-}
-
-SceneManager::~SceneManager() {
-	if (sceneUsing_ != nullptr)
-		delete sceneUsing_, sceneUsing_ = nullptr;
-	if (sceneOld_ != nullptr)
-		delete sceneOld_, sceneOld_ = nullptr;
-}
 
 void SceneManager::Initialize(kEngine* system) {
+	system_ = system;
+	sceneFactory_ = std::make_unique<SceneFactory>(system);
+	//sceneUsingNameHandle_ = "CGHK2";
+	sceneUsingNameHandle_ = "TITLE";
 
-	if (!sceneManager_) {
-		sceneManager_ = new SceneManager(system);
-	}
+	defaultMenu_ = std::make_unique <DefaultMenu>(system_);
 }
 
-SceneManager& SceneManager::GetInstance() { return *sceneManager_; }
+void SceneManager::Finalize() {
+	sceneUsing_.reset();
+	sceneOld_.reset();
+	sceneFactory_.reset();
+	defaultMenu_.reset();
+}
+
+SceneManager& SceneManager::GetInstance() {
+	if (!sceneManager_) {
+		sceneManager_.reset(new SceneManager);
+	}
+	return *sceneManager_;
+}
 
 void SceneManager::SceneChanger() {
 
@@ -77,8 +69,6 @@ void SceneManager::SceneChanger() {
 
 		if (!isSceneChange)
 			return;
-
-		delete sceneUsing_, sceneUsing_ = nullptr;
 	}
 
 	sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
@@ -115,7 +105,7 @@ void SceneManager::ClearStage() {
 	for (auto& ptr : stage) {
 		ptr = false;
 	}
-	delete sceneUsing_, sceneUsing_ = nullptr;
+	sceneUsing_.reset();
 }
 
 #ifdef USE_IMGUI

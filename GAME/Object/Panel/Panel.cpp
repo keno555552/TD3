@@ -256,7 +256,7 @@ void Panel::OpenPanel() {
 
 	float t = animationTimer_.linearity();
 
-	float scale = 0.8 + 0.2f * t;
+	float scale = 0.8f + 0.2f * t;
 
 	mainPosition.transform.scale.x = scale;
 	mainPosition.transform.scale.y = scale;

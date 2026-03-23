@@ -256,11 +256,13 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\actor\ModBody.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptData.cpp" />
+    <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\json\JsonManager.cpp" />
     <ClCompile Include="GAME\Object\Panel\Panel.cpp" />
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="GAME\scenes\ModScene.cpp" />
     <ClCompile Include="GAME\scenes\PromptScene.cpp" />
+    <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
     <ClCompile Include="GAME\theme\ThemeManager.cpp" />
@@ -411,11 +413,13 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModBody.h" />
     <ClInclude Include="GAME\actor\prompt\PromptBoard.h" />
     <ClInclude Include="GAME\actor\prompt\PromptData.h" />
+    <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\json\JsonManager.h" />
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="GAME\scenes\ModScene.h" />
     <ClInclude Include="GAME\scenes\PromptScene.h" />
+    <ClInclude Include="GAME\scenes\TitleScene.h" />
     <ClInclude Include="GAME\scenes\TravelScene.h" />
     <ClInclude Include="GAME\score\ScoreCalculator.h" />
     <ClInclude Include="GAME\score\ScoreResult.h" />
