@@ -12,6 +12,16 @@ Button::Button(kEngine* system) {
 	textureP_ = {};
 	textureC_ = {};
 
+	texture1_ = {};
+	texture2_ = {};
+	texture3_ = {};
+	texture4_ = {};
+	texture5_ = {};
+	texture6_ = {};
+	texture7_ = {};
+	texture8_ = {};
+	texture9_ = {};
+
 	click1_ = {};
 	click2_ = {};
 
@@ -21,26 +31,6 @@ Button::Button(kEngine* system) {
 	canPress_ = true;
 }
 
-bool Button::GetPress()
-{
-	if (isPress_) { return true; }
-	return false;
-}
-
-bool Button::GetCanPress()
-{
-	if (canPress_) { return true; }
-	return false;
-}
-
-bool Button::GetOnOff()
-{
-	if (on_) {
-		return true;
-	}
-	return false;
-}
-
 bool Button::GetResetOnOff()
 {
 	if (on_) {
@@ -48,31 +38,6 @@ bool Button::GetResetOnOff()
 		return true;
 	}
 	return false;
-}
-
-void Button::SetPos(Vector2 pos)
-{
-	pos_ = pos;
-}
-
-void Button::SetWidth(float width)
-{
-	width_ = width;
-}
-
-void Button::SetHeight(float height)
-{
-	height_ = height;
-}
-
-void Button::SetCanPress()
-{
-	canPress_ = true;
-}
-
-void Button::SetCantPress()
-{
-	canPress_ = false;
 }
 
 bool Button::CheckIsSelect(Vector2 TPos, float width, float height)

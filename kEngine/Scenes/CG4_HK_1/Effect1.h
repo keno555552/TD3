@@ -36,8 +36,8 @@ private:
 	int boxTextureHandle_ = 0;
 
 	/// =========== ゲームオブジェクト ==========///
-	Object* skydome_ = nullptr;
-	Object* plane_[200];
+	std::unique_ptr<Object> skydome_ = nullptr;
+	std::unique_ptr<Object> plane_[200];
 
 
 	/// =============== フラグ ===============///

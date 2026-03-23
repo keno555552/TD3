@@ -218,8 +218,10 @@ public:
 
 	bool GetIsZero() const;
 
+	/// 時計をTimeScaleの影響を受けるかどうか取得する。trueならTimeScaleの影響を受ける、falseなら受けない
 	bool GetInfluenceByTimeScale() const { return isInfluenceByTimeScale_; }
 
+	/// 時計をTimeScaleの影響を受けるかどうか設定する。trueならTimeScaleの影響を受ける、falseなら受けない
 	void SetInfluenceByTimeScale(bool isInfluence) { isInfluenceByTimeScale_ = isInfluence; }
 
 public:

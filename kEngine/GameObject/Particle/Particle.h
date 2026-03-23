@@ -45,12 +45,12 @@ protected:
 		Object* part{};
 		bool isAlive = true;
 	};
+	std::vector<ParticleData*> particleObjectList_{};
 
 	/// ========= 共通変数 ==========///
 	kEngine* system_ = nullptr;				// 借り
 
 	float defaultParticleInterval_ = 0.5f;
-	std::vector<ParticleData*> particleObjectList_{};
 
 	ObjectPart anchorPart_;
 
@@ -63,7 +63,7 @@ protected:
 	std::shared_ptr<MaterialConfig>commonMaterialConfig;
 
 	/// =========== ランダム関連 ===========///
-	RandomMaker* randomMaker_ = new RandomMaker();
+	std::shared_ptr<RandomMaker> randomMaker_ = std::make_unique<RandomMaker>();
 	Timer createTimer{};
 
 };

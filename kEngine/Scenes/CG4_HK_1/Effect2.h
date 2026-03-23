@@ -37,9 +37,9 @@ private:
 	int boxTextureHandle_ = 0;
 
 	/// =========== ゲームオブジェクト =========///
-	Object* skydome_ = nullptr;
-	P_Ball* ball_ = nullptr;
-	Object* plane_ = nullptr;
+	std::unique_ptr<Object> skydome_ = nullptr;
+	std::unique_ptr<P_Ball> ball_ = nullptr;
+	std::unique_ptr<Object> plane_ = nullptr;
 
 	/// ============= ゲーム内データ ===========///
 	std::random_device seedGenerator;

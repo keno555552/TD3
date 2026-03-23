@@ -20,7 +20,7 @@ Particle::~Particle() {
 		delete object, object = nullptr;
 	}
 
-	delete randomMaker_, randomMaker_ = nullptr;
+	randomMaker_.reset();
 
 }
 

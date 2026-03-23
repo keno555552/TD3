@@ -19,7 +19,7 @@ CountdownTimer::CountdownTimer(kEngine* kEngine) {
 
 	mainPosition.transform.translate = { 640.0f,50.0f,0.0f };
 
-	leftTimeSprite_ = new SimpleSprite();
+	leftTimeSprite_ = std::make_unique<SimpleSprite>();
 	leftTimeSprite_->IntObject(kEngine);
 	leftTimeSprite_->CreateDefaultData();
 	leftTimeSprite_->mainPosition.transform.scale = { scale_,scale_,1.0f };
@@ -27,12 +27,12 @@ CountdownTimer::CountdownTimer(kEngine* kEngine) {
 	leftTimeSprite_->objectParts_[0].anchorPoint = leftTimeSpriteSize / 2;
 	leftTimeSprite_->followObject_ = this;
 
-	numberSprites_ = new SimpleSprite();
+	numberSprites_ = std::make_unique <SimpleSprite>();
 	numberSprites_->IntObject(kEngine);
 	NumberSpritesInit();
 	numberSprites_->followObject_ = this;
 
-	pointSprite_ = new SimpleSprite();
+	pointSprite_ = std::make_unique <SimpleSprite>();
 	pointSprite_->IntObject(kEngine);
 	pointSprite_->CreateDefaultData();
 	pointSprite_->mainPosition.transform.scale = { scale_,scale_,1.0f };
@@ -101,9 +101,11 @@ void CountdownTimer::PositionSetting() {
 }
 
 CountdownTimer::~CountdownTimer() {
-	if (numberSprites_)delete numberSprites_, numberSprites_ = nullptr;
-	if (pointSprite_)delete pointSprite_, pointSprite_ = nullptr;
-	if (leftTimeSprite_)delete leftTimeSprite_, leftTimeSprite_ = nullptr;
+
+	numberSprites_.reset();
+	pointSprite_.reset();
+	leftTimeSprite_.reset();
+
 	timer_.reset();
 }
 

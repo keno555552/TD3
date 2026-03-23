@@ -22,11 +22,11 @@ private:
 	kEngine* system_ = nullptr;				// 借り
 
 	/// ============= ライト関連 ==============///
-	Light* light1_ = nullptr;
-	Light* light2_ = nullptr;
-	Light* light3_ = nullptr;
-	AreaLight* areaLight_ = nullptr;
-	AreaLight* areaLight2_ = nullptr;
+	std::unique_ptr<Light> light1_ = nullptr;
+	std::unique_ptr<Light> light2_ = nullptr;
+	std::unique_ptr<Light> light3_ = nullptr;
+	std::unique_ptr<AreaLight> areaLight_ = nullptr;
+	std::unique_ptr<AreaLight> areaLight2_ = nullptr;
 
 
 	/// ============== カメラ関連 ==============///
@@ -48,13 +48,16 @@ private:
 	int uvTextureHandle_ = 0;
 	int whiteTextureHandle_ = 0;
 
+	/// サントラハンドル
+	int soundHandle_ = 0;
+
 	/// =========== ゲームオブジェクト ==========///
-	Object* skydome_ = nullptr;
-	Object* ground_ = nullptr;
-	Player* player_ = nullptr;
-	DebugObject* debugObject_ = nullptr;
-	SimpleSprite* sprite_ = nullptr;
-	SimpleSprite* sprite2_ = nullptr;
+	std::unique_ptr<Object> skydome_ = nullptr;
+	std::unique_ptr<Object> ground_ = nullptr;
+	std::unique_ptr<Player> player_ = nullptr;
+	std::unique_ptr<DebugObject> debugObject_ = nullptr;
+	std::unique_ptr<SimpleSprite> sprite_ = nullptr;
+	std::unique_ptr<SimpleSprite> sprite2_ = nullptr;
 
 
 	/// =============== フラグ ================///

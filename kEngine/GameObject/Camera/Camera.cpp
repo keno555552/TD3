@@ -145,6 +145,33 @@ bool Camera::isObjectFaceCamera(const Vector3& objectForward, const Vector3& obj
 	return dot < thresholdDot;
 }
 
+Ray Camera::ScreenPointToRay(const Vector2& screenPos) {
+	float w = (float)config::GetClientWidth();
+	float h = (float)config::GetClientHeight();
+
+	/// カメラスクリーン座標系をNDCに変換
+	float ndcX = (screenPos.x / w) * 2.0f - 1.0f;
+	float ndcY = 1.0f - (screenPos.y / h) * 2.0f;
+
+	/// NDC座標をクリップ空間に変換
+	Vector4 clip = { ndcX, ndcY, 1.0f, 1.0f };
+
+	/// クリップ空間をビュー空間に変換
+	Matrix4x4 invProj = Inverse(GetProjectionMatrix());
+	Vector4 view =  clip * invProj;
+	view /= view.w; // perspective divide
+
+	/// ビュー空間をワールド空間に変換
+	Matrix4x4 invView = Inverse(GetViewMatrix());
+	Vector4 worldDir4 = Vector4{ view.x, view.y, view.z, 0.0f } * invView;
+
+	Vector3 worldDir = Normalize(Vector3{ worldDir4.x, worldDir4.y, worldDir4.z });
+
+	/// カメラの位置を取得
+	Vector3 origin = cameraTransform_.translate;
+
+	return Ray{ origin, worldDir };
+}
 
 void Camera::ResetCamera() {
 	cameraTransform_ = defaultTransform_;

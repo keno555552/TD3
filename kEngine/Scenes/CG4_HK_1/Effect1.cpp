@@ -14,14 +14,14 @@ Effect1::Effect1(kEngine* system) {
 
 	boxTextureHandle_ = system_->LoadTexture("resources/texture/testBox.png");
 
-	skydome_ = new Object;
+	skydome_ = std::make_unique<Object>();
 	skydome_->IntObject(system_);
 	skydome_->CreateModelData(skydomeModelHandle_);
 	skydome_->objectParts_[0].materialConfig->enableLighting = false;
 
 	int i = 0;
 	for (auto& ptr : plane_) {
-		ptr = new Object;
+		ptr = std::make_unique<Object>();
 		ptr->IntObject(system_);
 		ptr->CreateModelData(sphereModelHandle_);
 		ptr->mainPosition.transform.translate = Vector3(0.2f * i, 0.2f * i, 0.2f * i);
@@ -33,9 +33,9 @@ Effect1::~Effect1() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 
-	delete skydome_;
+	skydome_.reset();
 	for (auto& ptr : plane_) {
-		delete ptr;
+		ptr.reset();
 	}
 }
 

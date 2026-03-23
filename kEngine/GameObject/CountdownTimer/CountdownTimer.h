@@ -35,9 +35,9 @@ private:
 
 	/// ============ オブジェクト =============///
 
-	SimpleSprite* numberSprites_{};
-	SimpleSprite* pointSprite_{};
-	SimpleSprite* leftTimeSprite_{};
+	std::unique_ptr <SimpleSprite> numberSprites_{};
+	std::unique_ptr <SimpleSprite> pointSprite_{};
+	std::unique_ptr <SimpleSprite> leftTimeSprite_{};
 
 	/// =========== フラク、内部変数 ===========///
 	Vector4 lessTimeColor = { 1.0f,0.0f,0.0f,1.0f };

@@ -24,7 +24,7 @@ void DirectXController::InitializeDrive(const char* kClientTitle, int kClientWid
 
 void DirectXController::Finalize() {
 	timeEndPeriod(1);
-	DirectXCore::Finalize();
+	DirectXCore::Finalize();	
 }
 
 void DirectXController::StartFrame() {

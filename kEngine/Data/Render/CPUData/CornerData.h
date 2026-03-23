@@ -16,7 +16,7 @@ struct CornerData{
 						 CreateDefaultCornerData().coner[1],
 						 CreateDefaultCornerData().coner[2],
 						 CreateDefaultCornerData().coner[3], };
-
+		
 	bool CheckSame(const CornerData target);
 };
 

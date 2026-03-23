@@ -419,7 +419,6 @@ void AnimationEditor::KeyFrameTurnning() {
 	}
 }
 
-
 void AnimationEditor::CreateKeyFrame(float time_) {
 	if (time_ == -1) {
 		ping_->CreateDefaultData();

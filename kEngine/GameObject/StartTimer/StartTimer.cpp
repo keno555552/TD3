@@ -2,7 +2,7 @@
 
 StartTimer::StartTimer(kEngine* kEngine) {
 	SimpleSprite::IntObject(kEngine);
-	timer_ = new Timer();
+	timer_ = std::make_unique<Timer>();
 	timer_->Init0(1.0f, kEngine->GetTimeManager());
 	timer_->SetInfluenceByTimeScale(true);
 
@@ -18,7 +18,7 @@ StartTimer::StartTimer(kEngine* kEngine) {
 	/// ============ オブジェクト =============///
 
 	for (int i = 0; i < 3; i++) {
-		numberSprites_[i] = new SimpleSprite();
+		numberSprites_[i] = std::make_unique<SimpleSprite>();
 		numberSprites_[i]->IntObject(kEngine);
 		numberSprites_[i]->CreateDefaultData();
 		numberSprites_[i]->mainPosition.transform.scale = { startScale_,startScale_,1.0f };
@@ -27,7 +27,7 @@ StartTimer::StartTimer(kEngine* kEngine) {
 		numberSprites_[i]->objectParts_[0].materialConfig->textureColor = usingColor;
 		numberSprites_[i]->objectParts_[0].anchorPoint = { 422.0f,178.0f };
 	}
-	startSprite_ = new SimpleSprite();
+	startSprite_ = std::make_unique<SimpleSprite>();
 	startSprite_->IntObject(kEngine);
 	startSprite_->CreateDefaultData();
 	startSprite_->mainPosition.transform.scale = { startScale_,startScale_,1.0f };
@@ -35,6 +35,17 @@ StartTimer::StartTimer(kEngine* kEngine) {
 	startSprite_->objectParts_[0].materialConfig->textureHandle = startTextureHandle_;
 	startSprite_->objectParts_[0].materialConfig->textureColor = usingColor;
 	startSprite_->objectParts_[0].anchorPoint = { 422.0f,178.0f };
+}
+
+StartTimer::~StartTimer() {
+
+	numberSprites_[0].reset();
+	numberSprites_[1].reset();
+	numberSprites_[2].reset();
+
+	startSprite_.reset();
+
+	timer_.reset();
 }
 
 void StartTimer::Update(Camera* camera) {

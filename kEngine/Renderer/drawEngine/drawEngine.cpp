@@ -27,7 +27,7 @@ void DrawEngine::Initialize
 
 		//auto pso = std::make_unique<PSO>();
 		//pso->Initialize(directXDriver_);
-		
+
 		psoList_.push_back(pso_->createPSO((LightModelType)i));
 	}
 
@@ -53,7 +53,7 @@ void DrawEngine::Initialize
 	tile2DWVPResource_->CreateResourceClass_(directXDriver_->GetDevice(), sizeof(TransformationMatrix) * config::Get2DTileNumInstance());
 	tile2DWVPResource_->GetResource()->Map(0, nullptr, reinterpret_cast<void**>(&instanceListPtr2D));
 	drawDataCollector_->SetInstanceList2D(instanceListPtr2D);
-	
+
 	for (int index = 0; index < config::Get2DTileNumInstance(); ++index) {
 		instanceListPtr2D[index].WVP = Identity();
 		instanceListPtr2D[index].world = Identity();
@@ -105,10 +105,12 @@ void DrawEngine::Initialize
 
 void DrawEngine::Finalize() {
 
+	resourceManager_->CreateTurnResource();
+
 	psoList_.clear();
 
 	pso_->Finalize();
-	delete pso_;
+	pso_.reset();
 
 	tile2DWVPResource_->ClearResource();
 	tile3DWVPResource_->ClearResource();
@@ -123,10 +125,8 @@ void DrawEngine::Finalize() {
 	}
 	instanceOffsetData_.clear();
 
-	if (depthStencilResource) {
-		depthStencilResource->Release();
-		depthStencilResource = nullptr;
-	}
+	//if (depthStencilResource) depthStencilResource->Release();
+	depthStencilResource.Reset();
 
 	lightBuffer_->ClearResource();
 	lightBuffer_.reset();
@@ -669,7 +669,7 @@ void DrawEngine::MakeDepthStencilView() {
 	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 	// DSVHeap先頭にDSVをつくる
 	directXDriver_->GetDevice()->CreateDepthStencilView(
-		depthStencilResource, &dsvDesc, directXDriver_->GetDsvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart()
+		depthStencilResource.Get(), &dsvDesc, directXDriver_->GetDsvDescriptorHeap()->GetCPUDescriptorHandleForHeapStart()
 	);
 }
 

@@ -2,6 +2,7 @@
 #include "Transform.h"
 #include "TransformationMatrix.h"
 #include "MathsIncluder.h"
+#include "CrashData/Ray.h"
 #include "config.h"
 
 
@@ -53,7 +54,7 @@ public:
 
 	/// カメラツール
 	bool isObjectFaceCamera(const Vector3& objectForward,const Vector3& objectPos, const float& thresholdDegree = 90.0f);
-
+	Ray ScreenPointToRay(const Vector2& screenPos);
 
 	void ResetCamera(); 
 

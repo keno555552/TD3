@@ -13,14 +13,14 @@ Effect2::Effect2(kEngine* system) {
 
 	boxTextureHandle_ = system_->LoadTexture("resources/texture/testBox.png");
 
-	skydome_ = new Object;
+	skydome_ = std::make_unique<Object>();
 	skydome_->IntObject(system_);
 	skydome_->CreateModelData(skydomeModelHandle_);
 	skydome_->objectParts_[0].materialConfig->enableLighting = false;
 
-	ball_ = new P_Ball(system_);
+	ball_ = std::make_unique<P_Ball>(system_);
 
-	plane_ = new Object;
+	plane_ = std::make_unique<Object>();
 	plane_->IntObject(system_);
 	plane_->CreateModelData(planeModelHandle_);
 }
@@ -29,9 +29,9 @@ Effect2::~Effect2() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 
-	delete skydome_;
-	delete ball_;
-	delete plane_;
+	skydome_.reset();
+	ball_.reset();
+	plane_.reset();
 	//delete fire_;
 }
 

@@ -4,21 +4,21 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	/// =========== システム初期化 ============///
 	system_ = system;
 
-	light1_ = new Light;
+	light1_ = std::make_unique<Light>();
 	light1_->direction = { -0.5f, -1.0f, -0.3f };
 	light1_->color = { 1.0f, 1.0f, 1.0f };
 	light1_->intensity = 1.0f;
-	system_->AddLight(light1_);
+	system_->AddLight(light1_.get());
 
-	light2_ = new Light;
+	light2_ = std::make_unique<Light>();
 	light2_->lightingType = LightingType::PointLight;
 	light2_->position = { 3.0f, 1.0f, 0.0f };
 	light2_->range = 10.0f;
 	light2_->color = { 1.0f, 0.2f, 0.2f };
 	light2_->intensity = 2.0f;
-	system_->AddLight(light2_);
+	system_->AddLight(light2_.get());
 
-	light3_ = new Light;
+	light3_ = std::make_unique<Light>();
 	light3_->lightingType = LightingType::SpotLight;
 	light3_->position = { 0.0f, 4.0f, 0.0f };   // 在物體正上方
 	light3_->direction = { 0.0f, -1.0f, 0.0f };  // 往下照
@@ -26,9 +26,9 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	light3_->range = 12.0f;
 	light3_->color = { 0.3f, 0.3f, 1.0f };   // 藍光
 	light3_->intensity = 3.0f;
-	system_->AddLight(light3_);
+	system_->AddLight(light3_.get());
 
-	areaLight_ = new AreaLight;
+	areaLight_ = std::make_unique<AreaLight>();
 	areaLight_->lightingType = LightingType::AreaLight;
 	areaLight_->position = { 0.0f, 2.0f, 0.0f };
 	areaLight_->right = { 1.0f, 0.0f, 0.0f };
@@ -38,9 +38,9 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	areaLight_->color = { 1.0f, 0.9f, 0.7f }; // 暖色光
 	areaLight_->intensity = 5.0f;
 	areaLight_->range = 10.0f;
-	system_->AddLight(areaLight_);
+	system_->AddLight(areaLight_.get());
 
-	areaLight2_ = new AreaLight;
+	areaLight2_ = std::make_unique<AreaLight>();
 	areaLight2_->ableLight = false;
 	areaLight2_->lightingType = LightingType::AreaLight;
 	areaLight2_->position = { 0.0f, 2.0f, 0.0f };
@@ -51,7 +51,7 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	areaLight2_->color = { 1.0f, 0.9f, 0.7f }; // 暖色光
 	areaLight2_->intensity = 5.0f;
 	areaLight2_->range = 10.0f;
-	system_->AddLight(areaLight2_);
+	system_->AddLight(areaLight2_.get());
 
 
 
@@ -72,13 +72,14 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	uvTextureHandle_ = system_->LoadTexture("./kEngine/EngineAssets/TemplateResource/texture/uvChecker.png");
 	whiteTextureHandle_ = system_->LoadTexture("./kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
 
+	soundHandle_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/take.mp3");
 
-	skydome_ = new Object;
+	skydome_ = std::make_unique <Object>();
 	skydome_->IntObject(system_);
 	skydome_->CreateModelData(skydomeModelHandle_);
 	//skydome_->objectParts_[0].materialConfig->enableLighting = false;
 
-	player_ = new Player(system, Vector3(0.0f, 0.0f, 0));
+	player_ = std::make_unique<Player>(system, Vector3(0.0f, 0.0f, 0));
 	player_->CreateModelData(playerModelHandle_);
 	player_->mainPosition.transform.scale = Vector3(0.5f, 0.5f, 0.5f);
 	player_->mainPosition.transform.rotate.y = 3.14f;
@@ -88,14 +89,14 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 
 	//player_->CreateDefaultData();
 	//player_->modelHandle_ = playerModelHandle_;
-	debugObject_ = new DebugObject(system_);
+	debugObject_ = std::make_unique<DebugObject>(system_);
 	debugObject_->SetFollowObject(&player_->mainPosition);
 	//debugObject_->SetShowCenterPoint(true);
 	debugObject_->SetShowNumber(true);
 	//debugObject_->UpdateShowNumber(92);
 	debugObject_->UpdateShowNumber(1234567890);
 
-	ground_ = new Object;
+	ground_ = std::make_unique<Object>();
 	ground_->IntObject(system_);
 	ground_->CreateDefaultData();
 	ground_->modelHandle_ = config::default_Cube_MeshBufferHandle_;
@@ -103,12 +104,12 @@ SceneCGHK2::SceneCGHK2(kEngine* system) {
 	ground_->mainPosition.transform.scale = Vector3(50.0f, 0.1f, 50.0f);
 	ground_->mainPosition.transform.translate = Vector3(0.0f, -1.0f, 0.0f);
 
-	sprite_ = new SimpleSprite;
+	sprite_ = std::make_unique<SimpleSprite>();
 	sprite_->IntObject(system_);
 	sprite_->CreateDefaultData();
 	sprite_->objectParts_[0].materialConfig->textureHandle = uvTextureHandle_;
 
-	sprite2_ = new SimpleSprite;
+	sprite2_ = std::make_unique<SimpleSprite>();
 	sprite2_->IntObject(system_);
 	sprite2_->CreateDefaultData();
 	sprite2_->objectParts_[0].materialConfig->textureHandle = uvTextureHandle_;
@@ -120,16 +121,18 @@ SceneCGHK2::~SceneCGHK2() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 
-	delete light1_;
-	delete light2_;
-	delete light3_;
+	light1_.reset();
+	light2_.reset();
+	light3_.reset();
+	areaLight_.reset();
+	areaLight2_.reset();
 
-	delete ground_;
-	delete debugObject_;
-	delete player_;
-	delete skydome_;
-	delete sprite_;
-	delete sprite2_;
+	ground_.reset();
+	debugObject_.reset();
+	player_.reset();
+	skydome_.reset();
+	sprite_.reset();
+	sprite2_.reset();
 }
 
 void SceneCGHK2::Update() {
@@ -159,6 +162,10 @@ void SceneCGHK2::Update() {
 
 	if (system_->GetTriggerOn(DIK_SPACE)) {
 		outcome_ = SceneOutcome::NEXT;
+	}
+
+	if (system_->GetTriggerOn(DIK_Q)) {
+		system_->SoundPlaySE(soundHandle_, 0.5f);
 	}
 
 }

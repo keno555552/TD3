@@ -450,6 +450,7 @@ void DirectXCore::Finalize() {
 	rtvDescriptorHeap.Reset();
 	dsvDescriptorHeap.Reset();
 
+
 	// --- DirectInput devices ---
 	if (keyBoardDevice)keyBoardDevice->Unacquire();
 	keyBoardDevice.Reset();
@@ -466,6 +467,7 @@ void DirectXCore::Finalize() {
 	fence.Reset();
 
 	CloseHandle(fenceEvent);
+	fenceValue = 0;
 	fenceEvent = nullptr;
 
 	// --- Device & DXGI objects (must be last) ---
@@ -498,6 +500,8 @@ void DirectXCore::Finalize() {
 	}
 	/// デバッグレイヤーの解放
 	if (debugController)		debugController.Reset();
+
+	Logger::Log("139\n");
 #endif
 
 	/// WindowAPIを消す

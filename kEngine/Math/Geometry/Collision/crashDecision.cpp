@@ -264,55 +264,141 @@ bool crashDecision(const Sphere& s1, const Sphere& s2) {
 //	return false;
 //}
 //
-//bool crashDecision(const AABB& a, const Segment& segment) {
-//	float tNearX, tFarX, tNearY, tFarY, tNearZ, tFarZ;
-//
-//	///まず距離が0どうかを判断
-//	if (segment.diff.x != 0) {
-//		///線分のtを見つかる(主に使う判断材料)
-//		tNearX = (a.min.x - segment.origin.x) / segment.diff.x;
-//		tFarX = (a.max.x - segment.origin.x) / segment.diff.x;
-//		if (segment.diff.x < 0) { std::swap(tNearX, tFarX); }
-//	} else {
-//		///もし距離が0になると、線は平面的に、上の計算が０除算になると
-//		///それを避けるには、まず線がAABBの中にあるかどうかを判断
-//		/// なければfalseを返す、あると-INFINITYで、他の判断に回る
-//		if (segment.origin.x < a.min.x || segment.origin.x > a.max.x) return false;
-//		tNearX = -INFINITY;
-//		tFarX = INFINITY;
-//	}
-//
-//	if (segment.diff.y != 0) {
-//		tNearY = (a.min.y - segment.origin.y) / segment.diff.y;
-//		tFarY = (a.max.y - segment.origin.y) / segment.diff.y;
-//		if (segment.diff.y < 0) { std::swap(tNearY, tFarY); }
-//	} else {
-//		if (segment.origin.y < a.min.y || segment.origin.y > a.max.y) return false;
-//		tNearY = -INFINITY;
-//		tFarY = INFINITY;
-//	}
-//
-//	if (segment.diff.z != 0) {
-//		tNearZ = (a.min.z - segment.origin.z) / segment.diff.z;
-//		tFarZ = (a.max.z - segment.origin.z) / segment.diff.z;
-//		if (segment.diff.z < 0) { std::swap(tNearZ, tFarZ); }
-//	} else {
-//		if (segment.origin.z < a.min.z || segment.origin.z > a.max.z) return false;
-//		tNearZ = -INFINITY;
-//		tFarZ = INFINITY;
-//	}
-//
-//	/// AABBに入る点を探す
-//	float tmin = max(max(tNearX, tNearY), tNearZ);
-//	/// AABBに出る点を探す
-//	float tmax = min(min(tFarX, tFarY), tFarZ);
-//
-//	/// 点が線の長さ外になるとfalse
-//	if (tmax < 0 || tmin > 1) return false;
-//
-//	/// 判定基準は2_7 p.5参考
-//	return tmin <= tmax;
-//}
+bool crashDecision(const AABB& a, const Segment& segment) {
+	float tNearX, tFarX, tNearY, tFarY, tNearZ, tFarZ;
+
+	///まず距離が0どうかを判断
+	if (segment.diff.x != 0) {
+		///線分のtを見つかる(主に使う判断材料)
+		tNearX = (a.min.x - segment.origin.x) / segment.diff.x;
+		tFarX = (a.max.x - segment.origin.x) / segment.diff.x;
+		if (segment.diff.x < 0) { std::swap(tNearX, tFarX); }
+	} else {
+		///もし距離が0になると、線は平面的に、上の計算が０除算になると
+		///それを避けるには、まず線がAABBの中にあるかどうかを判断
+		/// なければfalseを返す、あると-INFINITYで、他の判断に回る
+		if (segment.origin.x < a.min.x || segment.origin.x > a.max.x) return false;
+		tNearX = -INFINITY;
+		tFarX = INFINITY;
+	}
+
+	if (segment.diff.y != 0) {
+		tNearY = (a.min.y - segment.origin.y) / segment.diff.y;
+		tFarY = (a.max.y - segment.origin.y) / segment.diff.y;
+		if (segment.diff.y < 0) { std::swap(tNearY, tFarY); }
+	} else {
+		if (segment.origin.y < a.min.y || segment.origin.y > a.max.y) return false;
+		tNearY = -INFINITY;
+		tFarY = INFINITY;
+	}
+
+	if (segment.diff.z != 0) {
+		tNearZ = (a.min.z - segment.origin.z) / segment.diff.z;
+		tFarZ = (a.max.z - segment.origin.z) / segment.diff.z;
+		if (segment.diff.z < 0) { std::swap(tNearZ, tFarZ); }
+	} else {
+		if (segment.origin.z < a.min.z || segment.origin.z > a.max.z) return false;
+		tNearZ = -INFINITY;
+		tFarZ = INFINITY;
+	}
+
+	/// AABBに入る点を探す
+	float tmin = std::max(std::max(tNearX, tNearY), tNearZ);
+	/// AABBに出る点を探す
+	float tmax = std::min(std::min(tFarX, tFarY), tFarZ);
+
+	/// 点が線の長さ外になるとfalse
+	if (tmax < 0 || tmin > 1) return false;
+
+	/// 判定基準は2_7 p.5参考
+	return tmin <= tmax;
+}
+
+bool crashDecision(const AABB& aabb, const Ray& ray) {
+	const float EPSILON = 1e-6f;
+
+	float tMin = -FLT_MAX;
+	float tMax = FLT_MAX;
+
+	// X 軸
+	if (fabs(ray.direction.x) < EPSILON) {
+		// 射線平行於 X 平面 → 如果起點不在範圍內 → 不相交
+		if (ray.origin.x < aabb.min.x || ray.origin.x > aabb.max.x)
+			return false;
+	} else {
+		float invD = 1.0f / ray.direction.x;
+		float t1 = (aabb.min.x - ray.origin.x) * invD;
+		float t2 = (aabb.max.x - ray.origin.x) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	// Y 軸
+	if (fabs(ray.direction.y) < EPSILON) {
+		if (ray.origin.y < aabb.min.y || ray.origin.y > aabb.max.y)
+			return false;
+	} else {
+		float invD = 1.0f / ray.direction.y;
+		float t1 = (aabb.min.y - ray.origin.y) * invD;
+		float t2 = (aabb.max.y - ray.origin.y) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	// Z 軸
+	if (fabs(ray.direction.z) < EPSILON) {
+		if (ray.origin.z < aabb.min.z || ray.origin.z > aabb.max.z)
+			return false;
+	} else {
+		float invD = 1.0f / ray.direction.z;
+		float t1 = (aabb.min.z - ray.origin.z) * invD;
+		float t2 = (aabb.max.z - ray.origin.z) * invD;
+		if (t1 > t2) std::swap(t1, t2);
+		tMin = std::max(tMin, t1);
+		tMax = std::min(tMax, t2);
+		if (tMin > tMax) return false;
+	}
+
+	// tMax < 0 → AABB 在射線後方
+	if (tMax < 0.0f)
+		return false;
+
+	return true;
+}
+
+bool crashDecision(const Sphere& sphere, const Ray& ray, float* tOut) {
+	Sphere sphereCopy = sphere;
+	Ray rayCopy = ray;
+
+	Vector3 oc = rayCopy.origin - sphereCopy.center;
+
+	float a = Dot(ray.direction, ray.direction);
+	float b = 2.0f * Dot(oc, ray.direction);
+	float c = Dot(oc, oc) - sphere.radius * sphere.radius;
+
+	float discriminant = b * b - 4.0f * a * c;
+	if (discriminant < 0.0f)
+		return false;
+
+	float sqrtD = std::sqrt(discriminant);
+
+	float t1 = (-b - sqrtD) / (2.0f * a);
+	float t2 = (-b + sqrtD) / (2.0f * a);
+
+	float t = -1.0f;
+	if (t1 >= 0.0f) t = t1;
+	else if (t2 >= 0.0f) t = t2;
+	else return false;
+
+	if (tOut) *tOut = t;
+
+	return true;
+
+}
 
 
 

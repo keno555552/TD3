@@ -18,17 +18,11 @@ void ResourceManager::Initialize(DirectXCore* device) {
 	config::default_Sprite2D_MeshBufferHandle_ = CreateSimpleSpriteMeshResource();
 	config::default_Triangle_MeshBufferHandle_ = CreateTriangleResource();
 	config::default_Cube_MeshBufferHandle_ = CreateCubeResource();
-	config::default_Sphere_MeshBufferHandle_ = CreateSphereResource(1);
+	config::default_Sphere_MeshBufferHandle_ = CreateSphereResource(10);
 }
 
 void ResourceManager::Finalize() {
 
-	if (!materialResourceList_.empty()) {
-		for (auto& ptr : materialResourceList_) {
-			ptr->ClearResource();
-			ptr.reset();
-		}
-	}
 	materialResourceList_.clear();
 
 	meshBufferList_.clear();
@@ -40,7 +34,6 @@ void ResourceManager::Finalize() {
 	idToIndex_.clear();
 	materialCounter_ = 0;
 }
-
 
 void ResourceManager::Destroy() {
 	instance_.reset();

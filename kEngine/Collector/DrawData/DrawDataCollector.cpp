@@ -46,6 +46,7 @@ void DrawDataCollector::PreCollect() {
 
 void DrawDataCollector::EndCollect() {
 
+
 	/// ネールスキップ
 	if (opaqueBucket2D_.empty() && transparentBucket2D_.empty()&&
 		opaqueBuckets3D_.empty() && transparentBucket3D_.empty())
@@ -308,9 +309,15 @@ TransformationMatrix DrawDataCollector::ObjectWVPAdjustment3D(ObjectData& object
 		part.transform.rotate.z = 0.0f;
 	}
 
-	Matrix4x4 partWorldMatrix = part.UpdateWorldMatrix();
-	Matrix4x4 worldMatrix = partWorldMatrix * followWorldMatrix;
+	Matrix4x4 localMatrix = MakeAffineMatrix(
+		part.transform.scale,
+		part.transform.rotate,
+		part.transform.translate
+	);
 
+	//Matrix4x4 worldMatrix = localMatrix * partParentMatrix * followWorldMatrix;
+	Matrix4x4 worldMatrix = localMatrix * followWorldMatrix;
+	
 	TransformationMatrix result{};
 	result.WVP = modelData.rootNode.localMatrix * worldMatrix * viewMatrix * projectionMatrix;
 	result.world = modelData.rootNode.localMatrix * worldMatrix;
@@ -409,8 +416,14 @@ TransformationMatrix DrawDataCollector::ObjectWVPAdjustmentPC(ObjectData& object
 		part.transform.rotate.z = 0.0f;
 	}
 
-	Matrix4x4 partWorldMatrix = part.UpdateWorldMatrix();
-	Matrix4x4 worldMatrix = partWorldMatrix * followWorldMatrix;
+	Matrix4x4 localMatrix = MakeAffineMatrix(
+		part.transform.scale,
+		part.transform.rotate,
+		part.transform.translate
+	);
+
+	//Matrix4x4 worldMatrix = localMatrix * partParentMatrix * followWorldMatrix;
+	Matrix4x4 worldMatrix = localMatrix * followWorldMatrix;
 
 	TransformationMatrix result{};
 	result.WVP = modelData.rootNode.localMatrix * worldMatrix * viewMatrix * projectionMatrix;

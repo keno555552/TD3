@@ -252,6 +252,12 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\Object\Panel\Panel.cpp" />
+    <ClCompile Include="kEngine\Data\Render\CPUData\DebugLine.cpp" />
+    <ClCompile Include="kEngine\Data\Render\GPUData\DebugLineGPU.cpp" />
+    <ClCompile Include="kEngine\Tool\DebugTool\DebugLineTool.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\Capsule.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\AABB.cpp" />
     <ClCompile Include="externals\DirectXTex\BC.cpp" />
     <ClCompile Include="externals\DirectXTex\BC4BC5.cpp" />
     <ClCompile Include="externals\DirectXTex\BC6HBC7.cpp" />
@@ -282,6 +288,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="externals\imgui\imgui_tables.cpp" />
     <ClCompile Include="externals\imgui\imgui_widgets.cpp" />
     <ClCompile Include="GAME\scenes\scene1.cpp" />
+    <ClCompile Include="GAME\Object\DetailButton\DetailButton.cpp" />
     <ClCompile Include="kEngine\GameObject\CountdownTimer\CountdownTimer.cpp" />
     <ClCompile Include="kEngine\Renderer\Lighting\AeraLight.cpp" />
     <ClCompile Include="kEngine\Renderer\Lighting\DirectionalLight.cpp" />
@@ -313,7 +320,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\core\inputCore.cpp" />
     <ClCompile Include="kEngine\core\config.cpp" />
     <ClCompile Include="kEngine\Renderer\Resource\BasicResource.cpp" />
-    <ClCompile Include="kEngine\Data\Geometry\crashData.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\crashIncluder.cpp" />
     <ClCompile Include="kEngine\Math\Geometry\Collision\crashDecision.cpp" />
     <ClCompile Include="kEngine\Tool\DefaultMenu\DefaultMenu.cpp" />
     <ClCompile Include="kEngine\Data\Game\MapChip\MapChipField.cpp" />
@@ -368,6 +375,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Render\Types\PSOType.cpp" />
     <ClCompile Include="kEngine\Renderer\Lighting\PointLight.cpp" />
     <ClCompile Include="kEngine\Math\Matrix3x3Math.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\Ray.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\OldHitBox.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\OBB.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
     <ClCompile Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.cpp" />
@@ -381,8 +391,17 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Renderer\Lighting\SpotLight.cpp" />
     <ClCompile Include="kEngine\GameObject\StartTimer\StartTimer.cpp" />
     <ClCompile Include="kEngine\Scenes\SceneFactory.cpp" />
+    <ClCompile Include="GAME\scenes\UITest.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\Segment.cpp" />
+    <ClCompile Include="kEngine\Data\Geometry\CrashData\Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\Object\Panel\Panel.h" />
+    <ClInclude Include="kEngine\Data\Render\CPUData\DebugLine.h" />
+    <ClInclude Include="kEngine\Data\Render\GPUData\DebugLineGPU.h" />
+    <ClInclude Include="kEngine\Tool\DebugTool\DebugLineTool.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\Capsule.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\AABB.h" />
     <ClInclude Include="externals\assimp\include\assimp\aabb.h" />
     <ClInclude Include="externals\assimp\include\assimp\ai_assert.h" />
     <ClInclude Include="externals\assimp\include\assimp\anim.h" />
@@ -486,6 +505,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="externals\nlohmann\json.hpp" />
     <ClInclude Include="externals\nlohmann\json_fwd.hpp" />
     <ClInclude Include="GAME\scenes\scene1.h" />
+    <ClInclude Include="GAME\Object\DetailButton\DetailButton.h" />
     <ClInclude Include="kEngine\GameObject\CountdownTimer\CountdownTimer.h" />
     <ClInclude Include="kEngine\Renderer\Lighting\AeraLight.h" />
     <ClInclude Include="kEngine\Renderer\Lighting\DirectionalLight.h" />
@@ -515,7 +535,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\core\inputCore.h" />
     <ClInclude Include="kEngine\core\config.h" />
     <ClInclude Include="kEngine\Renderer\Resource\BasicResource.h" />
-    <ClInclude Include="kEngine\Data\Geometry\crashData.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\crashIncluder.h" />
     <ClInclude Include="kEngine\Math\Geometry\Collision\crashDecision.h" />
     <ClInclude Include="kEngine\Tool\DefaultMenu\DefaultMenu.h" />
     <ClInclude Include="kEngine\Data\Game\MapChip\MapChipField.h" />
@@ -567,6 +587,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Data\Render\Types\LightingType.h" />
     <ClInclude Include="kEngine\Renderer\Lighting\PointLight.h" />
     <ClInclude Include="kEngine\Math\Matrix3x3Math.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\Ray.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\OldHitBox.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\OBB.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />
     <ClInclude Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.h" />
@@ -580,6 +603,9 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="kEngine\Renderer\Lighting\SpotLight.h" />
     <ClInclude Include="kEngine\GameObject\StartTimer\StartTimer.h" />
     <ClInclude Include="kEngine\Scenes\SceneFactory.h" />
+    <ClInclude Include="GAME\scenes\UITest.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\Segment.h" />
+    <ClInclude Include="kEngine\Data\Geometry\CrashData\Sphere.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="externals\DirectXTex\Shaders\BC6HEncode.hlsl">
