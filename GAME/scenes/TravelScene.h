@@ -13,7 +13,58 @@ public:
   ~TravelScene();
 
   void Update() override;
+
   void Draw() override;
+
+private:
+  /// <summary>
+  /// 更新に必要な部位がそろっているかチェック
+  /// </summary>
+  /// <returns></returns>
+  bool HasRequiredParts() const;
+
+  /// <summary>
+  /// 前フレーム保存
+  /// </summary>
+  void SavePreviousFrameState();
+
+  /// <summary>
+  /// 制限時間
+  /// </summary>
+  /// <param name="deltaTime"></param>
+  void UpdateTimeLimit(float deltaTime);
+
+  /// <summary>
+  /// キーのホールドを取得
+  /// </summary>
+  /// <param name="leftNowInput"></param>
+  /// <param name="rightNowInput"></param>
+  /// <param name="deltaTime"></param>
+  void UpdateHoldState(bool leftNowInput, bool rightNowInput, float deltaTime);
+
+  /// <summary>
+  /// 脚の曲げ状態と速度の更新
+  /// </summary>
+  /// <param name="leftNowInput"></param>
+  /// <param name="rightNowInput"></param>
+  void UpdateLegBendState(bool leftNowInput, bool rightNowInput);
+
+  /// <summary>
+  /// 入力や姿勢から移動を更新
+  /// </summary>
+  /// <param name="leftNowInput"></param>
+  /// <param name="rightNowInput"></param>
+  void UpdateMovementState(bool leftNowInput, bool rightNowInput);
+
+  /// <summary>
+  /// 見た目反映(アニメーション)
+  /// </summary>
+  void ApplyVisualState();
+
+  /// <summary>
+  /// シーン遷移
+  /// </summary>
+  void UpdateSceneTransition();
 
 private:
   /*ライト
@@ -67,18 +118,6 @@ private:
   float moveX_ = 0.0f;
   float velocityX_ = 0.0f;
 
-  // 検証用仮パラメータ
-  // float stability_ = 1.0f;  // 高いほど安定
-  // float accel_ = 1.0f;      // 高いほど一歩が強い
-  // float baseSpeed_ = 0.12f; // 一歩の基礎前進量
-  // float inertia_ = 0.90f;   // 高いほど速度が残る
-
-  // float autoSpeed_ = 0.08f;
-  // float steerPower_ = 0.01f;
-  // float returnForce_ = 0.003f;
-
-  // float drift_ = 0.003f;
-
   float inertia_ = 0.96f; // 高いほど流れが残る
 
   float moveY_ = 0.0f;     // プレイヤーの高さ
@@ -86,18 +125,18 @@ private:
   float gravity_ = 0.006f; // 重力
   float groundY_ = 0.0f;   // 地面の高さ
   bool isGrounded_ = true; // 接地中か
-  float jumpRatio_ = 3.0f;
+  float jumpRatio_ = 3.0f; // ジャンプ係数
 
-  /* プレイヤー見た目用変数
+  /* プレイヤー姿勢用変数
 　------------------------------*/
-  float bodyTilt_ = 0.0f;
-  float bodyTiltVelocity_ = 0.0f;
+  float bodyTilt_ = 0.0f;         // 体の傾き
+  float bodyTiltVelocity_ = 0.0f; // 傾き速度
 
   // 姿勢の基準・制限
   float maxForwardTilt_ = -0.60f; // 前傾の限界
   float maxBackwardTilt_ = 0.20f; // 後傾の限界
 
-  // 入力による姿勢寄与
+  // ImGui表示用
   float legDiffTiltPower_ = 0.08f; // 左右差による微調整
 
   // 脚の目標姿勢
@@ -195,6 +234,9 @@ private:
   float goalX_ = 20.0f;
   bool isGoalReached_ = false;
 
+  //===============================
+  // 改造によるパラメータ
+  //===============================
   struct TravelTuning {
     float runPower = 1.0f;
     float maxSpeed = 1.0f;
@@ -211,9 +253,11 @@ private:
   bool requireReleaseAfterLandLeft_ = false;
   bool requireReleaseAfterLandRight_ = false;
 
+  // 地面
   std::unique_ptr<Object> ground_ = nullptr;
   uint32_t groundModelHandle_ = 0;
 
+  // 制限時間
   float timeLimit_ = 30.0f;
   bool isTimeUp_ = false;
 
