@@ -59,6 +59,8 @@ TravelScene::TravelScene(kEngine *system) {
 
   LoadCustomizeData();
 
+  BuildFeaturesFromCustomizeData();
+
   ApplyCustomizeToMovementParam();
 
   UpdateChildRootsFromBody();
@@ -635,6 +637,54 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   tuning_.turnResponse += neckLengthDiff * 0.10f;
 
+  //--------------------------------
+  // CharacterFeatures 反映
+  //--------------------------------
+
+  // 安全用
+  float stability = tuning_.stability;
+  float turnResponse = tuning_.turnResponse;
+  float lift = tuning_.lift;
+
+  //----------------------
+  // 頭の数
+  //----------------------
+  float extraHeadCount = (std::max)(0.0f, features_.headCount - 1.0f);
+  stability -= extraHeadCount * 0.05f;
+
+  //----------------------
+  // 腕の数
+  //----------------------
+  float extraArmCount = (std::max)(0.0f, features_.armCount - 2.0f);
+  stability -= extraArmCount * 0.03f;
+
+  //----------------------
+  // 左右非対称
+  //----------------------
+  stability -= features_.asymmetry * 0.2f;
+  turnResponse += features_.asymmetry * 0.3f;
+
+  //----------------------
+  // 重心（高いほど不安定＆跳ねる）
+  //----------------------
+  float comOffset = (std::clamp)(features_.centerOfMassY, -3.0f, 3.0f);
+  stability -= comOffset * 0.1f;
+  lift += comOffset * 0.15f;
+
+  //----------------------
+  // 下限・上限
+  //----------------------
+  stability = (std::clamp)(stability, 0.3f, 2.0f);
+  turnResponse = (std::clamp)(turnResponse, 0.3f, 2.0f);
+  lift = (std::clamp)(lift, 0.3f, 2.0f);
+
+  //----------------------
+  // 反映
+  //----------------------
+  tuning_.stability = stability;
+  tuning_.turnResponse = turnResponse;
+  tuning_.lift = lift;
+
   //==============================
   // 安全クランプ
   //==============================
@@ -644,20 +694,26 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.lift = std::clamp(tuning_.lift, 0.3f, 2.0f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.3f, 2.0f);
 
-  Logger::Log("==== CUSTOMIZE PARAM ====");
-  Logger::Log("legLengthScale : %.3f", legLengthScale);
-  Logger::Log("legThicknessScale : %.3f", legThicknessScale);
-  Logger::Log("legDiff : %.3f", legDiff);
+  // Logger::Log("==== CUSTOMIZE PARAM ====");
+  // Logger::Log("legLengthScale : %.3f", legLengthScale);
+  // Logger::Log("legThicknessScale : %.3f", legThicknessScale);
+  // Logger::Log("legDiff : %.3f", legDiff);
 
-  Logger::Log("runPower : %.3f", tuning_.runPower);
-  Logger::Log("maxSpeed : %.3f", tuning_.maxSpeed);
-  Logger::Log("stability : %.3f", tuning_.stability);
-  Logger::Log("lift : %.3f", tuning_.lift);
-  Logger::Log("turnResponse : %.3f", tuning_.turnResponse);
-  Logger::Log("neckLengthScale : %.3f", neckLengthScale);
-  Logger::Log("neckThicknessScale : %.3f", neckThicknessScale);
-  Logger::Log("neckLengthDiff : %.3f", neckLengthDiff);
-  Logger::Log("neckThicknessDiff : %.3f", neckThicknessDiff);
+  // Logger::Log("runPower : %.3f", tuning_.runPower);
+  // Logger::Log("maxSpeed : %.3f", tuning_.maxSpeed);
+  // Logger::Log("stability : %.3f", tuning_.stability);
+  // Logger::Log("lift : %.3f", tuning_.lift);
+  // Logger::Log("turnResponse : %.3f", tuning_.turnResponse);
+  // Logger::Log("neckLengthScale : %.3f", neckLengthScale);
+  // Logger::Log("neckThicknessScale : %.3f", neckThicknessScale);
+  // Logger::Log("neckLengthDiff : %.3f", neckLengthDiff);
+  // Logger::Log("neckThicknessDiff : %.3f", neckThicknessDiff);
+
+  Logger::Log("headCount: %d\n", features_.headCount);
+  Logger::Log("armCount: %d\n", features_.armCount);
+  Logger::Log("asymmetry: %f\n", features_.asymmetry);
+  Logger::Log("centerOfMassY: %f\n", features_.centerOfMassY);
+  Logger::Log("partInstances size: %d", customizeData_->partInstances.size());
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -1137,8 +1193,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   //--------------------------------
   // 自然に元へ戻る
   //--------------------------------
-  // leftLegBend_ *= 0.99f;
-  // rightLegBend_ *= 0.99f;
   bodyStretch_ *= 0.90f;
 }
 
@@ -1293,4 +1347,43 @@ void TravelScene::UpdateSceneTransition() {
   if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = nextOutcome_;
   }
+}
+
+void TravelScene::BuildFeaturesFromCustomizeData() {
+  features_ = {};
+
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  for (const auto &instance : customizeData_->partInstances) {
+
+    Logger::Log("---- INSTANCE ----");
+    Logger::Log("partType: %d", (int)instance.partType);
+    Logger::Log("posX: %.3f", instance.localTransform.translate.x);
+    Logger::Log("posY: %.3f", instance.localTransform.translate.y);
+
+    if (instance.partType == ModBodyPart::Head) {
+      features_.headCount++;
+      Logger::Log("HEAD COUNTED");
+    }
+
+    if (instance.partType == ModBodyPart::LeftUpperArm ||
+        instance.partType == ModBodyPart::RightUpperArm) {
+      features_.armCount++;
+      Logger::Log("ARM COUNTED");
+    }
+
+    features_.centerOfMassY += instance.localTransform.translate.y;
+    features_.asymmetry += std::abs(instance.localTransform.translate.x);
+    features_.lowestPoint =
+        std::min(features_.lowestPoint, instance.localTransform.translate.y);
+  }
+
+  Logger::Log("==== RESULT ====");
+  Logger::Log("headCount: %d", features_.headCount);
+  Logger::Log("armCount: %d", features_.armCount);
+  Logger::Log("asymmetry: %.3f", features_.asymmetry);
+  Logger::Log("centerOfMassY: %.3f", features_.centerOfMassY);
+  Logger::Log("lowestPoint: %.3f", features_.lowestPoint);
 }

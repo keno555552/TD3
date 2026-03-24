@@ -237,6 +237,15 @@ private:
   //===============================
   // 改造によるパラメータ
   //===============================
+  struct CharacterFeatures {
+    int headCount = 0;
+    int armCount = 0;
+
+    float centerOfMassY = 0.0f;
+    float asymmetry = 0.0f;
+    float lowestPoint = 0.0f;
+  };
+
   struct TravelTuning {
     float runPower = 1.0f;
     float maxSpeed = 1.0f;
@@ -246,6 +255,7 @@ private:
     float strideScale = 1.0f;
   };
 
+  CharacterFeatures features_;
   TravelTuning tuning_;
 
   bool useCustomizeMove_ = true;
@@ -266,4 +276,7 @@ private:
   /// 使用するカメラを設定・更新する
   /// </summary>
   void CameraPart();
+
+private:
+  void BuildFeaturesFromCustomizeData();
 };
