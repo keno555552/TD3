@@ -15,6 +15,7 @@ enum class SceneOutcome{
 	WIN,
 	NEXT,
 	RETRY,
+	RETRY_MOD,
 	RETURN,
 	EXIT,
 };

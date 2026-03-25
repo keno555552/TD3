@@ -72,6 +72,13 @@ void ContestScene::Update() {
         nextOutcome_ = SceneOutcome::RETURN;
     }
 
+    // 同じお題でリトライ（MODシーンへ）
+    if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_R)) {
+        fade_.StartFadeOut();
+        isStartTransition_ = true;
+        nextOutcome_ = SceneOutcome::RETRY_MOD;
+    }
+
     // フェード更新
     fade_.Update(usingCamera_);
 
