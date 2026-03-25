@@ -267,6 +267,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
     <ClCompile Include="GAME\theme\ThemeManager.cpp" />
+    <ClCompile Include="GAME\userData\UserDataManager.cpp" />
     <ClCompile Include="kEngine\Data\Render\CPUData\DebugLine.cpp" />
     <ClCompile Include="kEngine\Data\Render\GPUData\DebugLineGPU.cpp" />
     <ClCompile Include="kEngine\Tool\DebugTool\DebugLineTool.cpp" />
@@ -428,6 +429,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\score\ScoreResult.h" />
     <ClInclude Include="GAME\theme\ThemeData.h" />
     <ClInclude Include="GAME\theme\ThemeManager.h" />
+    <ClInclude Include="GAME\userData\UserData.h" />
+    <ClInclude Include="GAME\userData\UserDataManager.h" />
     <ClInclude Include="kEngine\Data\Render\CPUData\DebugLine.h" />
     <ClInclude Include="kEngine\Data\Render\GPUData\DebugLineGPU.h" />
     <ClInclude Include="kEngine\Tool\DebugTool\DebugLineTool.h" />
