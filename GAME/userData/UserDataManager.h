@@ -2,6 +2,8 @@
 #include "UserData.h"
 #include <string>
 
+#include "externals/nlohmann/json.hpp"
+
 /// ユーザーデータのセーブ・ロードを管理するクラス
 class UserDataManager {
 public:
