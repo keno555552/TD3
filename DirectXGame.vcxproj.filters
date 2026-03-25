@@ -169,6 +169,7 @@
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\judges\JudgeManager.cpp" />
     <ClCompile Include="GAME\userData\UserDataManager.cpp" />
+    <ClCompile Include="GAME\nickname\NicknameManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
@@ -400,6 +401,8 @@
     <ClInclude Include="GAME\judges\JudgeManager.h" />
     <ClInclude Include="GAME\userData\UserData.h" />
     <ClInclude Include="GAME\userData\UserDataManager.h" />
+    <ClInclude Include="GAME\nickname\NicknameData.h" />
+    <ClInclude Include="GAME\nickname\NicknameManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
@@ -508,5 +511,6 @@
     <None Include="GAME\resources\judges\ono.json" />
     <None Include="GAME\resources\judges\sato.json" />
     <None Include="GAME\resources\judges\takeda.json" />
+    <None Include="GAME\resources\nicknames\nicknames.json" />
   </ItemGroup>
 </Project>

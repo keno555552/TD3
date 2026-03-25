@@ -1,0 +1,121 @@
+{
+  "adjectives": {
+    "SS": ["伝説の", "超一流の"],
+    "S":  ["一流の", "天才的"],
+    "A":  ["見事な", "芸術的な"],
+    "B":  ["なかなかの", "そこそこの"],
+    "C":  ["駆け出しの", "未熟な"],
+    "D":  ["迷走中の", "残念な"]
+  },
+
+  "nouns": {
+    "theme_match": ["体現者", "テーママスター"],
+    "impact":      ["存在感", "モンスター"],
+    "efficiency":  ["効率厨", "ミニマリスト"],
+    "commitment":  ["一点特化師", "職人"],
+    "judge_bonus": ["審査員キラー", "人たらし"]
+  },
+
+  "rare_nicknames": [
+    {
+      "rare_id": "phantom_perfect",
+      "nickname": "幻のパーフェクト",
+      "priority": "highest",
+      "condition_type": "all_stars_min",
+      "int_value": 5
+    },
+    {
+      "rare_id": "miss_perfect",
+      "nickname": "ミス・パーフェクト",
+      "priority": "high",
+      "condition_type": "first_rank_achieved",
+      "rank_value": "SS"
+    },
+    {
+      "rare_id": "cyborg",
+      "nickname": "サイボーグ",
+      "priority": "medium",
+      "condition_type": "stars_and_rank",
+      "rank_value": "S",
+      "star_conditions": [
+        { "star_name": "efficiency",   "min_value": 5, "max_value": 5 },
+        { "star_name": "theme_match",  "min_value": 4, "max_value": 5 }
+      ]
+    },
+    {
+      "rare_id": "golden_tyrant",
+      "nickname": "金色の暴君",
+      "priority": "medium",
+      "condition_type": "stars_and_rank",
+      "rank_value": "S",
+      "star_conditions": [
+        { "star_name": "impact",     "min_value": 5, "max_value": 5 },
+        { "star_name": "efficiency", "min_value": 1, "max_value": 1 }
+      ]
+    },
+    {
+      "rare_id": "bronze_collector",
+      "nickname": "ブロンズコレクター",
+      "priority": "medium",
+      "condition_type": "all_stars_equal",
+      "int_value": 3
+    },
+    {
+      "rare_id": "nuclear_fusion",
+      "nickname": "核融合",
+      "priority": "low",
+      "condition_type": "stars_combo",
+      "star_conditions": [
+        { "star_name": "efficiency",  "min_value": 5, "max_value": 5 },
+        { "star_name": "theme_match", "min_value": 4, "max_value": 5 }
+      ]
+    },
+    {
+      "rare_id": "one_hit_kill",
+      "nickname": "一撃必殺",
+      "priority": "low",
+      "condition_type": "stars_and_rank",
+      "rank_value": "A",
+      "star_conditions": [
+        { "star_name": "changed_parts_max", "min_value": 0, "max_value": 1 }
+      ]
+    },
+    {
+      "rare_id": "unanimous",
+      "nickname": "満場一致",
+      "priority": "low",
+      "condition_type": "judge_stars_all_equal"
+    },
+    {
+      "rare_id": "controversial",
+      "nickname": "賛否両論",
+      "priority": "low",
+      "condition_type": "judge_stars_diff_min",
+      "int_value": 3
+    },
+    {
+      "rare_id": "runaway_train",
+      "nickname": "暴走機関車",
+      "priority": "low",
+      "condition_type": "stars_combo",
+      "star_conditions": [
+        { "star_name": "impact",     "min_value": 5, "max_value": 5 },
+        { "star_name": "efficiency", "min_value": 1, "max_value": 1 }
+      ]
+    },
+    {
+      "rare_id": "au_naturel",
+      "nickname": "ありのまま",
+      "priority": "low",
+      "condition_type": "changed_parts_max",
+      "int_value": 0
+    },
+    {
+      "rare_id": "dimensional_fugitive",
+      "nickname": "異次元の逃亡者",
+      "priority": "low",
+      "condition_type": "clear_time_max",
+      "float_value": 0.0
+    }
+  ]
+}

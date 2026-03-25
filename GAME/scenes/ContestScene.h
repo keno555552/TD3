@@ -6,6 +6,10 @@
 #include "GAME/score/ScoreResult.h"
 #include "GAME/actor/ModBody.h"
 
+#include "GAME/nickname/NicknameManager.h"
+#include "GAME/nickname/NicknameData.h"
+#include "GAME/userData/UserDataManager.h"
+
 class ContestScene : public BaseScene {
 public:
   ContestScene(kEngine *system);
@@ -34,6 +38,11 @@ private:
 
   ScoreResult scoreResult_{};
   bool isScoreCalculated_ = false;
+
+  // 二つ名
+  NicknameTableData nicknameTable_{};
+  UserDataManager* userDataManager_ = nullptr;
+  EarnedNickname earnedNickname_{};
 
 private:
   /// <summary>
