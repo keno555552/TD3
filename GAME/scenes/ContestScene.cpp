@@ -45,6 +45,27 @@ ContestScene::ContestScene(kEngine* system) {
         scoreResult_ = ScoreCalculator::Calculate(*theme, *playerData, judgeList);
         isScoreCalculated_ = true;
     }
+
+    // ユーザーデータ読み込み
+    userDataManager_ = new UserDataManager();
+
+    // 二つ名テーブル読み込み
+    NicknameManager::LoadNicknameTable(
+        "GAME/resources/nicknames/nicknames.json", nicknameTable_);
+
+    // 二つ名生成
+    if (isScoreCalculated_) {
+        earnedNickname_ = NicknameManager::GenerateNickname(
+            nicknameTable_, scoreResult_, userDataManager_->GetUserData(),
+            *playerData);
+        earnedNickname_.earnedTheme = theme->themeId;
+
+        // ユーザーデータ更新＆保存
+        userDataManager_->IncrementPlayCount();
+        userDataManager_->UpdateBestRank(scoreResult_.overallRank);
+        userDataManager_->AddNickname(earnedNickname_);
+        userDataManager_->Save();
+    }
 }
 
 ContestScene::~ContestScene() {
@@ -53,6 +74,9 @@ ContestScene::~ContestScene() {
     system_->RemoveLight(light1_);
 
     delete light1_;
+
+    delete userDataManager_;
+    userDataManager_ = nullptr;
 }
 
 void ContestScene::Update() {
@@ -110,6 +134,14 @@ void ContestScene::Draw() {
     } else {
         // 総合ランク
         ImGui::Text("Overall Rank: %s", scoreResult_.overallRank.c_str());
+
+        // 二つ名を表示
+        if (earnedNickname_.isRare) {
+            ImGui::Text("Nickname: [RARE] %s", earnedNickname_.nickname.c_str());
+        } else {
+            ImGui::Text("Nickname: %s", earnedNickname_.nickname.c_str());
+        }
+
         ImGui::Text("Total Stars: %d / 25", scoreResult_.totalStars);
         ImGui::Separator();
         ImGui::Spacing();
