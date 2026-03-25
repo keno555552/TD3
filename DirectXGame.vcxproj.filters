@@ -168,6 +168,7 @@
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\judges\JudgeManager.cpp" />
+    <ClCompile Include="GAME\userData\UserDataManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
@@ -397,6 +398,8 @@
     <ClInclude Include="GAME\scenes\TitleScene.h" />
     <ClInclude Include="GAME\judges\JudgeData.h" />
     <ClInclude Include="GAME\judges\JudgeManager.h" />
+    <ClInclude Include="GAME\userData\UserData.h" />
+    <ClInclude Include="GAME\userData\UserDataManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
