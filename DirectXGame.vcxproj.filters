@@ -167,6 +167,7 @@
     <ClCompile Include="GAME\theme\ThemeManager.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
+    <ClCompile Include="GAME\actor\ControlPointChain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
@@ -394,6 +395,8 @@
     <ClInclude Include="GAME\theme\ThemeManager.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\scenes\TitleScene.h" />
+    <ClInclude Include="GAME\actor\ControlPointChain.h" />
+    <ClInclude Include="GAME\actor\ModControlPointTypes.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />

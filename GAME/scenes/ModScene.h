@@ -13,6 +13,7 @@
 /// 改造シーン本体
 /// 部位の追加、削除、付け替え、パラメータ編集を行い、次のシーンへ渡す改造結果を作る
 /// AssemblyGraph で構造を管理し、Object と ModBody で見た目を管理する
+/// さらに、操作点を Ray 選択してドラッグ移動する編集もここで扱う
 /// </summary>
 class ModScene : public BaseScene {
 public:
@@ -42,6 +43,17 @@ public:
   void Draw() override;
 
 private:
+  /// 操作点の情報をまとめる構造体
+  struct TorsoControlPoint {
+    ModControlPointRole role = ModControlPointRole::None; // 操作点の役割
+    Vector3 localPosition{0.0f, 0.0f, 0.0f}; // 部位ローカル空間での位置
+    float radius = 0.10f;                    // 操作点の見た目サイズ
+    bool movable = true;                     // 操作点を動かせるかどうか
+    bool isConnectionPoint = false;          // 接続点としての役割があるかどうか
+    bool acceptsParent = false;              // 親接続を受け入れるかどうか
+    bool acceptsChild = false;               // 子接続を受け入れるかどうか
+  };
+
   Light *light1_ = nullptr; // シーン内で使用するライト
 
   Camera *camera_ = nullptr;           // 通常カメラ
@@ -67,6 +79,27 @@ private:
   int selectedPartId_ = -1;      // 現在選択中の部位ID
   int reattachParentId_ = -1;    // 付け替え先として選択中の親部位ID
   int reattachConnectorId_ = -1; // 付け替え先として選択中の親コネクタID
+
+  int selectedControlPartId_ = -1;     // 現在選択中の操作点を持つ部位ID
+  int selectedControlPointIndex_ = -1; // 現在選択中の操作点インデックス
+
+  int hoveredPartId_ = -1; // マウス Ray が当たっている部位ID
+
+  int controlPointGizmoTextureHandle_ = 0; // 操作点球に使う白テクスチャ
+  std::vector<std::unique_ptr<Object>>
+      controlPointGizmos_;                  // 表示用の球オブジェクト
+  size_t activeControlPointGizmoCount_ = 0; // 今フレーム描画する球の数
+
+  bool isDraggingControlPoint_ = false; // 左ドラッグ中かどうか
+  float dragControlPlaneZ_ = 0.0f;      // ドラッグ時に固定する Z 平面
+  Vector3 dragControlPointOffset_{0.0f, 0.0f, 0.0f}; // 掴んだ位置との差分
+
+  std::vector<TorsoControlPoint> torsoControlPoints_; // 胴体の操作点情報一覧
+
+  float torsoChestToBellyLength_ = 0.45f;
+  float torsoBellyToWaistLength_ = 0.45f;
+
+  std::vector<ModControlPoint> torsoSharedPointsBuffer_;
 
 private:
   /// <summary>
@@ -195,6 +228,99 @@ private:
   /// <param name="partId">基準にする部位ID</param>
   /// <returns>実際に操作する部位ID</returns>
   int ResolveAssemblyOperationPartId(int partId) const;
+
+  /// <summary>
+  /// 操作点の Ray 選択とドラッグ移動を処理する
+  /// 左クリックで選択、左ドラッグで移動、左ボタンを離したら終了する
+  /// </summary>
+  void UpdateControlPointEditing();
+
+  /// <summary>
+  /// 現在のマウス Ray に最も近い操作点を探して選択する
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
+  /// <returns>選択成功なら true</returns>
+  bool PickControlPointFromMouseRay(const Ray &mouseRay);
+
+  /// <summary>
+  /// 選択中の操作点を現在のマウス Ray に沿って移動する
+  /// Z 固定平面との交点を使って移動先を求める
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
+  void MoveSelectedControlPointFromMouseRay(const Ray &mouseRay);
+
+  /// <summary>
+  /// 現在の操作点選択状態を解除する
+  /// </summary>
+  void ClearControlPointSelection();
+
+  /// <summary>
+  /// 現在のマウス Ray が当たっている部位を更新する
+  /// 見た目メッシュ近傍の球で簡易判定し、hoveredPartId_ を更新する
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
+  void UpdateHoveredPartFromMouseRay(const Ray &mouseRay);
+
+  /// <summary>
+  /// 操作点表示用球オブジェクト数を必要数まで確保する
+  /// </summary>
+  /// <param name="requiredCount">必要個数</param>
+  void EnsureControlPointGizmoCount(size_t requiredCount);
+
+  /// <summary>
+  /// hovered 部位または選択部位の操作点表示球を更新する
+  /// movable な点だけを表示し、選択中の点は色を変える
+  /// </summary>
+  void UpdateControlPointGizmos();
+
+  /// <summary>
+  /// 操作点表示球を描画する
+  /// </summary>
+  void DrawControlPointGizmos();
+
+  /* 胴体共有点関連
+  --------------------------------------*/
+
+  /// <summary>
+  /// 胴体の操作点情報を初期化する
+  /// </summary>
+  void ResetTorsoControlPoints();
+
+  /// <summary>
+  /// 指定した役割の操作点が存在するかどうかを返す
+  /// </summary>
+  /// <param name="role">確認する操作点の役割</param>
+  /// <returns>存在するなら true</returns>
+  int FindTorsoControlPointIndex(ModControlPointRole role) const;
+
+  /// <summary>
+  /// 指定した役割の操作点のワールド位置を返す
+  /// </summary>
+  /// <param name="role">確認する操作点の役割</param>
+  /// <returns>操作点のワールド位置。存在しない場合は {0,0,0} を返す</returns>
+  Vector3 GetTorsoControlPointWorldPosition(ModControlPointRole role) const;
+
+  /// <summary>
+  /// 指定した役割の操作点を移動する
+  /// </summary>
+  /// <param name="index">移動する操作点のインデックス</param>
+  /// <param name="newLocalPosition">新しいローカル位置</param>
+  /// <returns>移動成功なら true</returns>
+  bool MoveTorsoControlPoint(size_t index, const Vector3 &newLocalPosition);
+
+  /// <summary>
+  /// 指定した部位が胴体部位かどうかを返す
+  /// </summary>
+  /// <param name="part">確認する部位</param>
+  /// <returns>胴体部位なら true</returns>
+  bool IsTorsoPart(ModBodyPart part) const;
+
+  /// <summary>
+  /// 指定した部位IDが胴体部位かどうかを返す
+  /// </summary>
+  /// <param name="partId">確認する部位ID</param>
+  /// <returns>胴体部位なら true</returns>
+  bool IsTorsoVisiblePartId(int partId) const;
 
 #ifdef USE_IMGUI
   /// <summary>

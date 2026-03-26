@@ -43,7 +43,7 @@ struct ConnectorNode {
 /// </summary>
 struct PartNode {
   int id = -1;                          // 部位ID
-  ModBodyPart part = ModBodyPart::Body; // 部位種類
+  ModBodyPart part = ModBodyPart::ChestBody; // 部位種類
   PartSide side = PartSide::Center;     // 部位の左右属性
 
   int parentId = -1;          // 親部位ID
@@ -380,8 +380,20 @@ private:
   /// </summary>
   void RefreshManagedPartIds();
 
+  /// <summary>
+  /// 指定部位が Body の子部位かどうかを判定する
+  /// </summary>
+  /// <param name="part">判定対象部位</param>
+  /// <returns>Body の子部位なら true</returns>
   bool IsBodyChildPart(ModBodyPart part) const;
+
+  /// <summary>
+  /// 指定部位が Head に接続可能かどうかを判定する
+  /// </summary>
+  /// <param name="part">判定対象部位</param>
+  /// <returns>Head に接続可能なら true</returns>
   bool IsHeadAttachableToBody(ModBodyPart part) const;
+
   /// <summary>
   /// 指定種類の最初の部位IDを返す
   /// 首や頭の代表ノードを探すときに使う
@@ -390,7 +402,20 @@ private:
   /// <param name="excludeId">除外したい部位ID</param>
   /// <returns>見つかった部位ID。無ければ -1</returns>
   int FindFirstPartId(ModBodyPart part, int excludeId = -1) const;
+
+  /// <summary>
+  /// 指定した子部位をつなぐのに最も適した親側コネクタIDを探す
+  /// </summary>
+  /// <param name="childId">付け替え対象の子部位ID</param>
+  /// <param
+  /// name="removedPartId">削除予定の部位ID。-1の場合は通常の親探し</param>
+  /// <returns>新しい親部位ID。見つからない場合は -1</returns>
   int FindPreferredParentForChild(int childId, int removedPartId = -1) const;
+
+  /// <summary>
+  /// 現在存在している脚根元の数を数える
+  /// </summary>
+  /// <param name="newBodyId">Body 復帰後の Body 部位ID</param>
   void ReattachPartsForBodyRestore(int newBodyId);
 
   /// <summary>

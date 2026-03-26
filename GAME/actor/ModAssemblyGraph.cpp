@@ -35,37 +35,33 @@ float ClampScale(float v) {
 
 Vector3 ModAssemblyGraph::MakeDefaultLocalTranslate(ModBodyPart part,
                                                     PartSide side) const {
-  // 部位ごとの基本配置を返す
   switch (part) {
-  case ModBodyPart::Body:
+  case ModBodyPart::ChestBody:
+    return {0.0f, 0.0f, 0.0f};
+
+  case ModBodyPart::StomachBody:
     return {0.0f, 0.0f, 0.0f};
 
   case ModBodyPart::Neck:
     return {0.0f, 0.0f, 0.0f};
+
   case ModBodyPart::Head:
     return {0.0f, 0.0f, 0.0f};
 
   case ModBodyPart::LeftUpperArm:
-    return {0.0f, 0.0f, 0.0f};
   case ModBodyPart::RightUpperArm:
-    return {0.0f, 0.0f, 0.0f};
   case ModBodyPart::LeftForeArm:
   case ModBodyPart::RightForeArm:
-    return {0.0f, -0.25f, 0.0f};
-
   case ModBodyPart::LeftThigh:
-    return {0.0f, 0.0f, 0.0f};
   case ModBodyPart::RightThigh:
-    return {0.0f, 0.0f, 0.0f};
   case ModBodyPart::LeftShin:
   case ModBodyPart::RightShin:
-    return {0.0f, 0.25f, 0.0f};
+    return {0.0f, 0.0f, 0.0f};
 
   default:
     break;
   }
 
-  // 例外に入らなかった部位は左右属性から仮の初期位置を返す
   if (side == PartSide::Left) {
     return {-0.35f, 0.0f, 0.0f};
   }
@@ -80,6 +76,11 @@ ConnectorRole ModAssemblyGraph::DesiredParentConnectorRoleForChild(
   // 子部位の種類から、親に要求する接続点役割を返す
   switch (childPart) {
   case ModBodyPart::Neck:
+    return ConnectorRole::Neck;
+
+  case ModBodyPart::Head:
+    // Head は Neck があれば Neck に付き、無ければ Body にも付く
+    // Body 側では Neck ロールの接続点を頭の受け口としても使う
     return ConnectorRole::Neck;
 
   case ModBodyPart::LeftUpperArm:
@@ -98,10 +99,8 @@ ConnectorRole ModAssemblyGraph::DesiredParentConnectorRoleForChild(
   case ModBodyPart::RightShin:
     return ConnectorRole::LegJoint;
 
-  case ModBodyPart::Head:
-    return ConnectorRole::Neck;
-
-  case ModBodyPart::Body:
+  case ModBodyPart::ChestBody:
+  case ModBodyPart::StomachBody:
   case ModBodyPart::Count:
   default:
     return ConnectorRole::Generic;
@@ -143,40 +142,35 @@ int ModAssemblyGraph::ScoreConnectorMatch(const ConnectorNode &connector,
 }
 
 void ModAssemblyGraph::InitializeDefaultHumanoid() {
-  // 既存構造を初期化する
   nodes_.clear();
   nextPartId_ = 1;
   nextConnectorId_ = 1;
   bodyId_ = -1;
   headId_ = -1;
 
-  // 初期人型の中心となる Body -> Neck -> Head を作る
-  bodyId_ = AddPart(ModBodyPart::Body, PartSide::Center, -1, false);
+  bodyId_ = AddPart(ModBodyPart::ChestBody, PartSide::Center, -1, false);
+  const int stomachId =
+      AddPart(ModBodyPart::StomachBody, PartSide::Center, -1, false);
+
   const int neckId =
       AddPart(ModBodyPart::Neck, PartSide::Center, bodyId_, false);
 
-  // Head は 1 個は残したいが、追加削除はできるようにするので required
-  // にはしない
   headId_ = AddPart(ModBodyPart::Head, PartSide::Center, neckId, false);
 
-  // 左腕セットを作る
   const int lUpper =
       AddPart(ModBodyPart::LeftUpperArm, PartSide::Left, bodyId_, false);
   AddPart(ModBodyPart::LeftForeArm, PartSide::Left, lUpper, false);
 
-  // 右腕セットを作る
   const int rUpper =
       AddPart(ModBodyPart::RightUpperArm, PartSide::Right, bodyId_, false);
   AddPart(ModBodyPart::RightForeArm, PartSide::Right, rUpper, false);
 
-  // 左脚セットを作る
   const int lThigh =
-      AddPart(ModBodyPart::LeftThigh, PartSide::Left, bodyId_, false);
+      AddPart(ModBodyPart::LeftThigh, PartSide::Left, stomachId, false);
   AddPart(ModBodyPart::LeftShin, PartSide::Left, lThigh, false);
 
-  // 右脚セットを作る
   const int rThigh =
-      AddPart(ModBodyPart::RightThigh, PartSide::Right, bodyId_, false);
+      AddPart(ModBodyPart::RightThigh, PartSide::Right, stomachId, false);
   AddPart(ModBodyPart::RightShin, PartSide::Right, rThigh, false);
 }
 
@@ -256,50 +250,68 @@ int ModAssemblyGraph::AddPart(ModBodyPart part, PartSide side, int parentId,
 
 std::vector<ConnectorNode>
 ModAssemblyGraph::MakeDefaultConnectors(ModBodyPart part, PartSide side) {
-  // 返却用の接続点配列を用意する
   std::vector<ConnectorNode> result;
   ConnectorNode c;
 
-  // Body は首、左右肩、左右腰の専用接続点を持つ
-  if (part == ModBodyPart::Body) {
+  if (part == ModBodyPart::ChestBody) {
+    c = {nextConnectorId_++,
+         ConnectorRole::Generic,
+         PartSide::Center,
+         {0.0f, 0.0f, 0.0f}};
+    result.push_back(c);
+
     c = {nextConnectorId_++,
          ConnectorRole::Neck,
          PartSide::Center,
-         {0.0f, 0.75f, 0.0f}};
+         {0.0f, 0.45f, 0.0f}};
     result.push_back(c);
 
     c = {nextConnectorId_++,
          ConnectorRole::Shoulder,
          PartSide::Left,
-         {-0.85f, 0.75f, 0.0f}};
+         {-0.75f, 0.30f, 0.0f}};
     result.push_back(c);
 
     c = {nextConnectorId_++,
          ConnectorRole::Shoulder,
          PartSide::Right,
-         {0.85f, 0.75f, 0.0f}};
+         {0.75f, 0.30f, 0.0f}};
     result.push_back(c);
 
     c = {nextConnectorId_++,
-         ConnectorRole::Hip,
-         PartSide::Left,
-         {-0.35f, -0.85f, 0.0f}};
-    result.push_back(c);
-
-    c = {nextConnectorId_++,
-         ConnectorRole::Hip,
-         PartSide::Right,
-         {0.35f, -0.85f, 0.0f}};
+         ConnectorRole::Generic,
+         PartSide::Center,
+         {0.0f, -0.45f, 0.0f}};
     result.push_back(c);
 
     return result;
   }
 
-  // それ以外の部位は、まず根元用の汎用接続点を1つ持たせる
+  if (part == ModBodyPart::StomachBody) {
+    c = {nextConnectorId_++,
+         ConnectorRole::Generic,
+         PartSide::Center,
+         {0.0f, 0.0f, 0.0f}};
+    result.push_back(c);
+
+    c = {nextConnectorId_++,
+         ConnectorRole::Hip,
+         PartSide::Left,
+         {-0.35f, -0.45f, 0.0f}};
+    result.push_back(c);
+
+    c = {nextConnectorId_++,
+         ConnectorRole::Hip,
+         PartSide::Right,
+         {0.35f, -0.45f, 0.0f}};
+    result.push_back(c);
+
+    return result;
+  }
+
   c = {nextConnectorId_++, ConnectorRole::Generic, side, {0.0f, 0.0f, 0.0f}};
   result.push_back(c);
 
-  // 部位種類によって、先端や次段の接続用コネクタを追加する
   if (part == ModBodyPart::Neck) {
     c = {nextConnectorId_++,
          ConnectorRole::Neck,
@@ -327,37 +339,53 @@ ModAssemblyGraph::MakeDefaultConnectors(ModBodyPart part, PartSide side) {
 
 bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
                                       ModBodyPart child) const {
-  // Body には首、頭、腕根元、脚根元をつなげる
-  if (parent == ModBodyPart::Body) {
-    return child == ModBodyPart::Neck || child == ModBodyPart::Head ||
-           child == ModBodyPart::LeftUpperArm ||
-           child == ModBodyPart::RightUpperArm ||
-           child == ModBodyPart::LeftThigh || child == ModBodyPart::RightThigh;
+  if (parent == ModBodyPart::ChestBody) {
+    switch (child) {
+    case ModBodyPart::Neck:
+    case ModBodyPart::Head:
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+      return true;
+    default:
+      return false;
+    }
   }
 
-  // Neck には Head をつなげる
+  if (parent == ModBodyPart::StomachBody) {
+    switch (child) {
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+      return true;
+    default:
+      return false;
+    }
+  }
+
   if (parent == ModBodyPart::Neck) {
     return child == ModBodyPart::Head;
   }
 
-  // 上腕には前腕をつなげる
+  if (parent == ModBodyPart::Head) {
+    switch (child) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+      return true;
+
+    default:
+      return false;
+    }
+  }
+
   if (parent == ModBodyPart::LeftUpperArm ||
       parent == ModBodyPart::RightUpperArm) {
     return child == ModBodyPart::LeftForeArm ||
            child == ModBodyPart::RightForeArm;
   }
 
-  // 腿には脛をつなげる
   if (parent == ModBodyPart::LeftThigh || parent == ModBodyPart::RightThigh) {
     return child == ModBodyPart::LeftShin || child == ModBodyPart::RightShin;
-  }
-
-  // Head は Body 不在時の退避先として腕・脚だけ受け持つ
-  // Neck や Head をぶら下げるのは循環の原因になるので禁止する
-  if (parent == ModBodyPart::Head) {
-    return child == ModBodyPart::LeftUpperArm ||
-           child == ModBodyPart::RightUpperArm ||
-           child == ModBodyPart::LeftThigh || child == ModBodyPart::RightThigh;
   }
 
   return false;
@@ -553,6 +581,8 @@ int ModAssemblyGraph::CountHeads() const {
 }
 
 bool ModAssemblyGraph::IsBodyChildPart(ModBodyPart part) const {
+  // Body 直下に戻す候補
+  // Head は首優先なのでここには含めない
   return part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
          part == ModBodyPart::RightUpperArm || part == ModBodyPart::LeftThigh ||
          part == ModBodyPart::RightThigh;
@@ -599,30 +629,45 @@ int ModAssemblyGraph::FindPreferredParentForChild(int childId,
   const bool hasHead =
       headId_ >= 0 && nodes_.count(headId_) > 0 && headId_ != removedPartId;
 
-  // Head は Neck 優先、無ければ Body、さらに無ければ別 Head
+  // Head は Neck 優先、無ければ Body、さらに無ければ親なし
   if (child.part == ModBodyPart::Head) {
     const int neckId = FindFirstPartId(ModBodyPart::Neck, removedPartId);
-    if (neckId >= 0) {
+    if (neckId >= 0 && neckId != childId) {
       return neckId;
     }
-    if (hasBody) {
+
+    if (hasBody && bodyId_ != childId) {
       return bodyId_;
     }
-    if (hasHead && headId_ != childId) {
-      return headId_;
-    }
+
     return -1;
   }
 
-  // 首・腕根元・脚根元は Body 優先、無ければ Head
-  if (IsBodyChildPart(child.part)) {
-    if (hasBody) {
+  // Neck と腕根元は Body 優先、無ければ Head
+  if (child.part == ModBodyPart::Neck ||
+      child.part == ModBodyPart::LeftUpperArm ||
+      child.part == ModBodyPart::RightUpperArm) {
+    if (hasBody && bodyId_ != childId) {
       return bodyId_;
     }
+
     if (hasHead && headId_ != childId) {
       return headId_;
     }
+
     return -1;
+  }
+
+  // 腿は Stomach 優先、無ければ Body
+  if (child.part == ModBodyPart::LeftThigh ||
+      child.part == ModBodyPart::RightThigh) {
+
+    int stomachId = FindFirstPartId(ModBodyPart::StomachBody, removedPartId);
+    if (stomachId >= 0)
+      return stomachId;
+    if (hasHead && headId_ != childId) {
+      return headId_;
+    }
   }
 
   // 前腕は対応する上腕優先
@@ -633,6 +678,7 @@ int ModAssemblyGraph::FindPreferredParentForChild(int childId,
       return upperId;
     }
   }
+
   if (child.part == ModBodyPart::RightForeArm) {
     const int upperId =
         FindFirstPartId(ModBodyPart::RightUpperArm, removedPartId);
@@ -648,6 +694,7 @@ int ModAssemblyGraph::FindPreferredParentForChild(int childId,
       return thighId;
     }
   }
+
   if (child.part == ModBodyPart::RightShin) {
     const int thighId = FindFirstPartId(ModBodyPart::RightThigh, removedPartId);
     if (thighId >= 0) {
@@ -655,7 +702,7 @@ int ModAssemblyGraph::FindPreferredParentForChild(int childId,
     }
   }
 
-  // 最後の保険として従来の近さベースに落とす
+  // 最後の保険として近さベースに落とす
   return FindBestParentForChild(childId);
 }
 
@@ -792,10 +839,19 @@ void ModAssemblyGraph::NormalizeBodyChildLinks() {
 
     const ModBodyPart part = it->second.part;
 
+    // Body 復帰時に Body 直下へ戻す対象
+    // Head は別途 NormalizeHeadLinks で Neck 優先に正規化する
     if (part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
-        part == ModBodyPart::RightUpperArm || part == ModBodyPart::LeftThigh ||
-        part == ModBodyPart::RightThigh) {
+        part == ModBodyPart::RightUpperArm) {
+      // 体上部へ
       AttachPartToParent(id, bodyId_);
+    }
+    if (part == ModBodyPart::LeftThigh || part == ModBodyPart::RightThigh) {
+      // 体下部へ
+      int stomachId = FindFirstPartId(ModBodyPart::StomachBody);
+      if (stomachId >= 0) {
+        AttachPartToParent(id, stomachId);
+      }
     }
   }
 }
@@ -817,13 +873,20 @@ void ModAssemblyGraph::NormalizeHeadLinks() {
       continue;
     }
 
+    // 首があるなら必ず首につなぐ
     if (neckId >= 0 && neckId != id) {
       AttachPartToParent(id, neckId);
-    } else if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 && bodyId_ != id) {
-      AttachPartToParent(id, bodyId_);
-    } else {
-      DetachPartFromParent(id);
+      continue;
     }
+
+    // 首が無い場合は Body があれば Body につなぐ
+    if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 && bodyId_ != id) {
+      AttachPartToParent(id, bodyId_);
+      continue;
+    }
+
+    // どちらも無ければ親なし
+    DetachPartFromParent(id);
   }
 
   RefreshManagedPartIds();
@@ -842,7 +905,7 @@ void ModAssemblyGraph::RefreshManagedPartIds() {
 
   for (std::unordered_map<int, PartNode>::const_iterator it = nodes_.begin();
        it != nodes_.end(); ++it) {
-    if (bodyId_ < 0 && it->second.part == ModBodyPart::Body) {
+    if (bodyId_ < 0 && it->second.part == ModBodyPart::ChestBody) {
       bodyId_ = it->first;
     }
     if (headId_ < 0 && it->second.part == ModBodyPart::Head) {
@@ -902,7 +965,8 @@ bool ModAssemblyGraph::RemovePart(int partId) {
   }
 
   // Body は特別扱い
-  if (target.part == ModBodyPart::Body) {
+  if (target.part == ModBodyPart::ChestBody ||
+      target.part == ModBodyPart::StomachBody) {
     if (!RemoveBodyAttachedLimbsAndReattachOthers(partId)) {
       return false;
     }
@@ -991,8 +1055,8 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
       continue;
     }
 
-    // それ以外は近い候補へ
-    int newParent = FindBestParentForChild(childId);
+    // 前腕・脛は従来どおり内部親へ戻す
+    int newParent = FindPreferredParentForChild(childId, removedPartId);
 
     if (newParent >= 0) {
       AttachPartToParent(childId, newParent);
@@ -1137,6 +1201,7 @@ bool ModAssemblyGraph::AddArmAssembly(PartSide side) {
 
   int parentId = -1;
 
+  // 体があれば体優先、無ければ頭へ付ける
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
@@ -1163,6 +1228,7 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
 
   int parentId = -1;
 
+  // 体があれば体優先、無ければ頭へ付ける
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
@@ -1230,7 +1296,8 @@ bool ModAssemblyGraph::AddBodyPart() {
   }
 
   // Body は最上位として追加する
-  const int newBodyId = AddPart(ModBodyPart::Body, PartSide::Center, -1, false);
+  const int newBodyId =
+      AddPart(ModBodyPart::ChestBody, PartSide::Center, -1, false);
 
   if (newBodyId < 0) {
     return false;
