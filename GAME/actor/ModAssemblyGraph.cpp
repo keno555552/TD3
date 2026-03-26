@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include "GAME/scenes/ModScene.h"
 
 namespace {
 
@@ -222,28 +223,27 @@ const ConnectorNode *ModAssemblyGraph::FindConnector(int partId,
 
 int ModAssemblyGraph::AddPart(ModBodyPart part, PartSide side, int parentId,
                               bool required) {
-  // 新しい部位ノードを作成する
   PartNode node;
   node.id = nextPartId_++;
   node.part = part;
   node.side = side;
   node.required = required;
 
-  // 初期 transform を作り、部位ごとの初期位置を設定する
   node.localTransform = CreateDefaultTransform();
   node.localTransform.translate = MakeDefaultLocalTranslate(part, side);
 
-  // 部位種類に応じた接続点を作成する
   node.connectors = MakeDefaultConnectors(part, side);
 
-  // 親が存在する場合は、親子接続情報を設定する
   if (parentId >= 0 && nodes_.count(parentId) > 0) {
     node.parentId = parentId;
     node.parentConnectorId = FindConnectorIdForChild(parentId, part, side);
     node.selfConnectorId = node.connectors.empty() ? -1 : node.connectors[0].id;
+
+    const PartNode &parent = nodes_.at(parentId);
+    node.localTransform.translate =
+        MakeDefaultAttachLocal(parent.part, part, side);
   }
 
-  // ノード一覧へ追加して ID を返す
   nodes_[node.id] = node;
   return node.id;
 }
@@ -345,6 +345,8 @@ bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
     case ModBodyPart::Head:
     case ModBodyPart::LeftUpperArm:
     case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
       return true;
     default:
       return false;
@@ -372,7 +374,6 @@ bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
     case ModBodyPart::LeftThigh:
     case ModBodyPart::RightThigh:
       return true;
-
     default:
       return false;
     }
@@ -803,8 +804,127 @@ void ModAssemblyGraph::AttachPartToParent(int childId, int parentId) {
       FindConnectorIdForChild(parentId, child.part, child.side);
   child.selfConnectorId =
       child.connectors.empty() ? -1 : child.connectors[0].id;
+
+  ResetChildAttachLocal(child);
+}
+
+Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
+                                                 ModBodyPart childPart,
+                                                 PartSide childSide) const {
+  switch (parentPart) {
+  case ModBodyPart::ChestBody: {
+    switch (childPart) {
+    case ModBodyPart::Neck:
+      return {0.0f, 0.45f, 0.0f};
+
+    case ModBodyPart::Head:
+      return {0.0f, 0.75f, 0.0f};
+
+    case ModBodyPart::LeftUpperArm:
+      return {-0.75f, 0.30f, 0.0f};
+
+    case ModBodyPart::RightUpperArm:
+      return {0.75f, 0.30f, 0.0f};
+
+    case ModBodyPart::LeftThigh:
+      return {-0.35f, -0.70f, 0.0f};
+
+    case ModBodyPart::RightThigh:
+      return {0.35f, -0.70f, 0.0f};
+
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ModBodyPart::StomachBody: {
+    switch (childPart) {
+    case ModBodyPart::LeftThigh:
+      return {-0.35f, -0.45f, 0.0f};
+
+    case ModBodyPart::RightThigh:
+      return {0.35f, -0.45f, 0.0f};
+
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ModBodyPart::Head: {
+    switch (childPart) {
+    case ModBodyPart::LeftUpperArm:
+      return {-0.55f, 0.10f, 0.0f};
+
+    case ModBodyPart::RightUpperArm:
+      return {0.55f, 0.10f, 0.0f};
+
+    case ModBodyPart::LeftThigh:
+      return {-0.28f, -0.55f, 0.0f};
+
+    case ModBodyPart::RightThigh:
+      return {0.28f, -0.55f, 0.0f};
+
+    default:
+      break;
+    }
+    break;
+  }
+
+  case ModBodyPart::Neck: {
+    if (childPart == ModBodyPart::Head) {
+      return {0.0f, 0.0f, 0.0f};
+    }
+    break;
+  }
+
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm: {
+    if (childPart == ModBodyPart::LeftForeArm ||
+        childPart == ModBodyPart::RightForeArm) {
+      return {0.0f, 0.0f, 0.0f};
+    }
+    break;
+  }
+
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh: {
+    if (childPart == ModBodyPart::LeftShin ||
+        childPart == ModBodyPart::RightShin) {
+      return {0.0f, 0.0f, 0.0f};
+    }
+    break;
+  }
+
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+  case ModBodyPart::Count:
+  default:
+    break;
+  }
+
+  if (childSide == PartSide::Left) {
+    return {-0.35f, 0.0f, 0.0f};
+  }
+  if (childSide == PartSide::Right) {
+    return {0.35f, 0.0f, 0.0f};
+  }
+  return {0.0f, 0.0f, 0.0f};
+}
+
+void ModAssemblyGraph::ResetChildAttachLocal(PartNode &child) {
+  if (child.parentId < 0 || nodes_.count(child.parentId) == 0) {
+    child.localTransform.translate =
+        MakeDefaultLocalTranslate(child.part, child.side);
+    return;
+  }
+
+  const PartNode &parent = nodes_.at(child.parentId);
   child.localTransform.translate =
-      MakeDefaultLocalTranslate(child.part, child.side);
+      MakeDefaultAttachLocal(parent.part, child.part, child.side);
 }
 
 void ModAssemblyGraph::DetachPartFromParent(int childId) {
@@ -839,18 +959,17 @@ void ModAssemblyGraph::NormalizeBodyChildLinks() {
 
     const ModBodyPart part = it->second.part;
 
-    // Body 復帰時に Body 直下へ戻す対象
-    // Head は別途 NormalizeHeadLinks で Neck 優先に正規化する
     if (part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
         part == ModBodyPart::RightUpperArm) {
-      // 体上部へ
       AttachPartToParent(id, bodyId_);
     }
+
     if (part == ModBodyPart::LeftThigh || part == ModBodyPart::RightThigh) {
-      // 体下部へ
       int stomachId = FindFirstPartId(ModBodyPart::StomachBody);
       if (stomachId >= 0) {
         AttachPartToParent(id, stomachId);
+      } else {
+        AttachPartToParent(id, bodyId_);
       }
     }
   }
@@ -873,19 +992,16 @@ void ModAssemblyGraph::NormalizeHeadLinks() {
       continue;
     }
 
-    // 首があるなら必ず首につなぐ
     if (neckId >= 0 && neckId != id) {
       AttachPartToParent(id, neckId);
       continue;
     }
 
-    // 首が無い場合は Body があれば Body につなぐ
     if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 && bodyId_ != id) {
       AttachPartToParent(id, bodyId_);
       continue;
     }
 
-    // どちらも無ければ親なし
     DetachPartFromParent(id);
   }
 
@@ -1012,7 +1128,6 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
 
     PartNode &child = nodes_[childId];
 
-    // Head は Neck 優先、無ければ Body、どちらも無ければ親なし
     if (child.part == ModBodyPart::Head) {
       const int neckId = FindFirstPartId(ModBodyPart::Neck, removedPartId);
 
@@ -1027,7 +1142,6 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
       continue;
     }
 
-    // Neck は Body があれば Body、無ければ親なし
     if (child.part == ModBodyPart::Neck) {
       if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 &&
           bodyId_ != removedPartId) {
@@ -1038,11 +1152,8 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
       continue;
     }
 
-    // 腕根元・脚根元は Body 優先、Body が無ければ Head
     if (child.part == ModBodyPart::LeftUpperArm ||
-        child.part == ModBodyPart::RightUpperArm ||
-        child.part == ModBodyPart::LeftThigh ||
-        child.part == ModBodyPart::RightThigh) {
+        child.part == ModBodyPart::RightUpperArm) {
       if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 &&
           bodyId_ != removedPartId) {
         AttachPartToParent(childId, bodyId_);
@@ -1055,7 +1166,24 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
       continue;
     }
 
-    // 前腕・脛は従来どおり内部親へ戻す
+    if (child.part == ModBodyPart::LeftThigh ||
+        child.part == ModBodyPart::RightThigh) {
+      int stomachId = FindFirstPartId(ModBodyPart::StomachBody, removedPartId);
+
+      if (stomachId >= 0 && stomachId != childId) {
+        AttachPartToParent(childId, stomachId);
+      } else if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 &&
+                 bodyId_ != removedPartId && bodyId_ != childId) {
+        AttachPartToParent(childId, bodyId_);
+      } else if (headId_ >= 0 && nodes_.count(headId_) > 0 &&
+                 headId_ != removedPartId && headId_ != childId) {
+        AttachPartToParent(childId, headId_);
+      } else {
+        DetachPartFromParent(childId);
+      }
+      continue;
+    }
+
     int newParent = FindPreferredParentForChild(childId, removedPartId);
 
     if (newParent >= 0) {
@@ -1117,7 +1245,6 @@ int ModAssemblyGraph::FindBestParentForChild(int childId) const {
 
 bool ModAssemblyGraph::MovePart(int partId, int newParentId,
                                 int newParentConnectorId) {
-  // 対象部位と新しい親が存在するか確認する
   if (nodes_.count(partId) == 0 || nodes_.count(newParentId) == 0) {
     return false;
   }
@@ -1125,7 +1252,6 @@ bool ModAssemblyGraph::MovePart(int partId, int newParentId,
   PartNode &node = nodes_[partId];
   const PartNode &parent = nodes_.at(newParentId);
 
-  // 親子として接続可能か確認する
   if (!CanParentChild(parent.part, node.part)) {
     return false;
   }
@@ -1133,15 +1259,14 @@ bool ModAssemblyGraph::MovePart(int partId, int newParentId,
     return false;
   }
 
-  // 親情報を更新する
   node.parentId = newParentId;
-
-  // 親側コネクタは指定があればそれを使い、無ければ自動選択する
   node.parentConnectorId =
       newParentConnectorId >= 0
           ? newParentConnectorId
           : FindConnectorIdForChild(newParentId, node.part, node.side);
+  node.selfConnectorId = node.connectors.empty() ? -1 : node.connectors[0].id;
 
+  ResetChildAttachLocal(node);
   return true;
 }
 
@@ -1201,7 +1326,6 @@ bool ModAssemblyGraph::AddArmAssembly(PartSide side) {
 
   int parentId = -1;
 
-  // 体があれば体優先、無ければ頭へ付ける
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
@@ -1228,8 +1352,11 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
 
   int parentId = -1;
 
-  // 体があれば体優先、無ければ頭へ付ける
-  if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
+  int stomachId = FindFirstPartId(ModBodyPart::StomachBody);
+
+  if (stomachId >= 0) {
+    parentId = stomachId;
+  } else if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
     parentId = headId_;
@@ -1250,12 +1377,10 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
 bool ModAssemblyGraph::AddNeckPart() {
   int parentId = -1;
 
-  // Body があれば Body の下に追加する
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   }
 
-  // Body が無い場合は親なしの首として追加する
   const int neckId =
       AddPart(ModBodyPart::Neck, PartSide::Center, parentId, false);
 

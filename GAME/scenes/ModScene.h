@@ -136,7 +136,9 @@ private:
 
   /// <summary>
   /// AssemblyGraph の親子構造を Scene 上の Object 階層へ反映する
-  /// 親コネクタと子コネクタを使って root の位置を再計算する
+  /// free attach 方式で、各子部位の localTransform.translate を
+  /// 親ローカル空間での接続位置として使う
+  /// 前腕・脛など内部セグメントだけは owner の制御点を使う
   /// </summary>
   void ApplyAssemblyToSceneHierarchy();
 
@@ -321,6 +323,26 @@ private:
   /// <param name="partId">確認する部位ID</param>
   /// <returns>胴体部位なら true</returns>
   bool IsTorsoVisiblePartId(int partId) const;
+
+    /// <summary>
+  /// 親子の組み合わせから、デフォルトの接続位置を返す
+  /// localTransform.translate の基準位置として使う
+  /// </summary>
+  Vector3 MakeDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
+                                 PartSide childSide) const;
+
+  /// <summary>
+  /// 現在の親の形状を加味した接続基準位置を返す
+  /// torso の操作点や親スケールの影響をここで反映する
+  /// </summary>
+  Vector3 ResolveDynamicAttachBase(const PartNode &parentNode,
+                                   const PartNode &childNode) const;
+
+  /// <summary>
+  /// 子部位の最終的な root ローカル位置を返す
+  /// デフォルト接続位置との差分を、現在の親形状へ乗せ直す
+  /// </summary>
+  Vector3 ResolveAttachedLocalTranslate(const PartNode &childNode) const;
 
 #ifdef USE_IMGUI
   /// <summary>

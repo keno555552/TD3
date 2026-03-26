@@ -445,6 +445,19 @@ private:
   /// <param name="parentId">接続先親部位ID</param>
   void AttachPartToParent(int childId, int parentId);
 
+    /// <summary>
+  /// 親部位上での子部位のデフォルト接続位置を返す
+  /// free attach 方式の初期配置に使う
+  /// </summary>
+  Vector3 MakeDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
+                                 PartSide childSide) const;
+
+  /// <summary>
+  /// 子部位の現在の親に応じてデフォルト接続位置へ戻す
+  /// 親変更直後の初期配置に使う
+  /// </summary>
+  void ResetChildAttachLocal(PartNode &child);
+
 private:
   std::unordered_map<int, PartNode> nodes_; // 全部位ノード一覧
   int nextPartId_ = 1;                      // 次に発行する部位ID

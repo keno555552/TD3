@@ -176,6 +176,22 @@ int FindRoleIndexInPoints(const std::vector<ModControlPoint> &points,
   return -1;
 }
 
+Vector3 ComputeMainPositionWorldTranslate(const Object *target) {
+  if (target == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  Vector3 world = target->mainPosition.transform.translate;
+
+  const ObjectPart *parent = target->mainPosition.parentPart;
+  while (parent != nullptr) {
+    world = Add(world, parent->transform.translate);
+    parent = parent->parentPart;
+  }
+
+  return world;
+}
+
 } // namespace
 
 void ModBody::Initialize(Object *target, ModBodyPart part) {
@@ -585,8 +601,8 @@ Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
     return {0.0f, 0.0f, 0.0f};
   }
 
-  return Add(target->mainPosition.transform.translate,
-             controlPoints_[index].localPosition);
+  const Vector3 rootWorld = ComputeMainPositionWorldTranslate(target);
+  return Add(rootWorld, controlPoints_[index].localPosition);
 }
 
 void ModBody::BuildDefaultControlPoints() {
