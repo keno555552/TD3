@@ -1,0 +1,12 @@
+{
+  "judge_id": "sato",
+  "judge_name": "佐藤",
+  "judge_title": "長いものに目がないキリン愛好家",
+  "texture_path": "GAME/resources/texture/judge_default.png",
+  "favorite_parts": {
+    "Neck":       2.0,
+    "LeftThigh":  1.5,
+    "RightThigh": 1.5,
+    "Head":       -1.0
+  }
+}

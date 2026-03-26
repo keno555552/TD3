@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "GAME/theme/ThemeData.h"
+#include "GAME/judges/JudgeData.h"
 
 class PromptData {
 public:
@@ -17,10 +18,17 @@ public:
   static const ThemeData* GetThemeData();
   static void ClearThemeData();
 
+  static void SetJudges(const std::vector<JudgeData>& judges);
+  static const std::vector<JudgeData>* GetJudges();
+  static void ClearJudges();
+
 private:
   static std::string selectedPrompt_;
   static std::string selectedPromptTexturePath_;
 
   static ThemeData selectedTheme_;
   static bool hasThemeData_;
+
+  static std::vector<JudgeData> selectedJudges_;
+  static bool hasJudgeData_;
 };

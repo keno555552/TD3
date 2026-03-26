@@ -168,6 +168,9 @@
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\actor\ControlPointChain.cpp" />
+    <ClCompile Include="GAME\judges\JudgeManager.cpp" />
+    <ClCompile Include="GAME\userData\UserDataManager.cpp" />
+    <ClCompile Include="GAME\nickname\NicknameManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
@@ -395,8 +398,6 @@
     <ClInclude Include="GAME\theme\ThemeManager.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\scenes\TitleScene.h" />
-    <ClInclude Include="GAME\actor\ControlPointChain.h" />
-    <ClInclude Include="GAME\actor\ModControlPointTypes.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
@@ -499,5 +500,12 @@
     <None Include="externals\DirectXTex\Shaders\Compiled\BC7Encode_TryMode456CS_cs40.inc">
       <Filter>ヘッダー ファイル</Filter>
     </None>
+    <None Include="GAME\resources\judges\dr_mad.json" />
+    <None Include="GAME\resources\judges\himekawa.json" />
+    <None Include="GAME\resources\judges\onizuka.json" />
+    <None Include="GAME\resources\judges\ono.json" />
+    <None Include="GAME\resources\judges\sato.json" />
+    <None Include="GAME\resources\judges\takeda.json" />
+    <None Include="GAME\resources\nicknames\nicknames.json" />
   </ItemGroup>
 </Project>

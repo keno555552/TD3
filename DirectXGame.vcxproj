@@ -259,6 +259,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\actor\prompt\PromptData.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\json\JsonManager.cpp" />
+    <ClCompile Include="GAME\judges\JudgeManager.cpp" />
+    <ClCompile Include="GAME\nickname\NicknameManager.cpp" />
     <ClCompile Include="GAME\Object\Panel\Panel.cpp" />
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="GAME\scenes\ModScene.cpp" />
@@ -267,6 +269,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
     <ClCompile Include="GAME\theme\ThemeManager.cpp" />
+    <ClCompile Include="GAME\userData\UserDataManager.cpp" />
     <ClCompile Include="kEngine\Data\Render\CPUData\DebugLine.cpp" />
     <ClCompile Include="kEngine\Data\Render\GPUData\DebugLineGPU.cpp" />
     <ClCompile Include="kEngine\Tool\DebugTool\DebugLineTool.cpp" />
@@ -417,6 +420,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\prompt\PromptData.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\json\JsonManager.h" />
+    <ClInclude Include="GAME\judges\JudgeData.h" />
+    <ClInclude Include="GAME\judges\JudgeManager.h" />
+    <ClInclude Include="GAME\nickname\NicknameData.h" />
+    <ClInclude Include="GAME\nickname\NicknameManager.h" />
     <ClInclude Include="GAME\Object\Panel\Panel.h" />
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="GAME\scenes\ModScene.h" />
@@ -427,6 +434,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\score\ScoreResult.h" />
     <ClInclude Include="GAME\theme\ThemeData.h" />
     <ClInclude Include="GAME\theme\ThemeManager.h" />
+    <ClInclude Include="GAME\userData\UserData.h" />
+    <ClInclude Include="GAME\userData\UserDataManager.h" />
     <ClInclude Include="kEngine\Data\Render\CPUData\DebugLine.h" />
     <ClInclude Include="kEngine\Data\Render\GPUData\DebugLineGPU.h" />
     <ClInclude Include="kEngine\Tool\DebugTool\DebugLineTool.h" />
@@ -853,6 +862,13 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
+    <None Include="GAME\resources\judges\dr_mad.json" />
+    <None Include="GAME\resources\judges\himekawa.json" />
+    <None Include="GAME\resources\judges\onizuka.json" />
+    <None Include="GAME\resources\judges\ono.json" />
+    <None Include="GAME\resources\judges\sato.json" />
+    <None Include="GAME\resources\judges\takeda.json" />
+    <None Include="GAME\resources\nicknames\nicknames.json" />
     <None Include="packages.config" />
     <None Include="resources\map\map.csv" />
     <None Include="resources\map\map1.csv" />

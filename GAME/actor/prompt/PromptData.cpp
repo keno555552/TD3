@@ -6,6 +6,9 @@ std::string PromptData::selectedPromptTexturePath_ = "";
 ThemeData PromptData::selectedTheme_{};
 bool PromptData::hasThemeData_ = false;
 
+std::vector<JudgeData> PromptData::selectedJudges_{};
+bool PromptData::hasJudgeData_ = false;
+
 void PromptData::SetSelectedPrompt(const std::string &prompt) {
   selectedPrompt_ = prompt;
   selectedPromptTexturePath_.clear();
@@ -27,6 +30,7 @@ void PromptData::Clear() {
   selectedPrompt_.clear();
   selectedPromptTexturePath_.clear();
   ClearThemeData();
+  ClearJudges();
 }
 
 void PromptData::SetThemeData(const ThemeData& theme) {
@@ -44,4 +48,21 @@ const ThemeData* PromptData::GetThemeData() {
 void PromptData::ClearThemeData() {
     selectedTheme_ = ThemeData{};
     hasThemeData_ = false;
+}
+
+void PromptData::SetJudges(const std::vector<JudgeData>& judges) {
+    selectedJudges_ = judges;
+    hasJudgeData_ = true;
+}
+
+const std::vector<JudgeData>* PromptData::GetJudges() {
+    if (!hasJudgeData_) {
+        return nullptr;
+    }
+    return &selectedJudges_;
+}
+
+void PromptData::ClearJudges() {
+    selectedJudges_.clear();
+    hasJudgeData_ = false;
 }

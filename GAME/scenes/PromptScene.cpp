@@ -24,6 +24,9 @@ PromptScene::PromptScene(kEngine* system) {
     // お題マネージャー生成・全お題読み込み
     themeManager_ = new ThemeManager("GAME/resources/themes/");
 
+    // 審査員マネージャー生成・全審査員読み込み
+    judgeManager_ = new JudgeManager("GAME/resources/judges/");
+
     // お題演出ボード
     promptBoard_ = std::make_unique<PromptBoard>();
     promptBoard_->Initialize(
@@ -49,6 +52,9 @@ PromptScene::~PromptScene() {
 
     delete themeManager_;
     themeManager_ = nullptr;
+
+    delete judgeManager_;
+    judgeManager_ = nullptr;
 }
 
 void PromptScene::Update() {
@@ -107,6 +113,16 @@ void PromptScene::DecidePrompt() {
         return;
     }
 
+    // 審査員を 3 人選出して PromptData に保存
+    auto selectedJudges = judgeManager_->SelectRandom(3);
+    std::vector<JudgeData> judgesCopy;
+    for (const auto* judge : selectedJudges) {
+        if (judge != nullptr) {
+            judgesCopy.push_back(*judge);
+        }
+    }
+    PromptData::SetJudges(judgesCopy);
+
     // PromptData にお題名とテクスチャパスと ThemeData を保存
     PromptData::SetSelectedPrompt(selectedTheme_->themeName,
         selectedTheme_->texturePath);
@@ -142,6 +158,19 @@ void PromptScene::Draw() {
 
     ImGui::Text("Loaded themes: %d",
         static_cast<int>(themeManager_->GetThemeCount()));
+
+    ImGui::Text("Loaded judges: %d",
+        static_cast<int>(judgeManager_->GetJudgeCount()));
+
+    const auto* judges = PromptData::GetJudges();
+    if (judges != nullptr) {
+        ImGui::Separator();
+        ImGui::Text("Selected Judges:");
+        for (const auto& judge : *judges) {
+            ImGui::Text("  %s - %s", judge.judgeId.c_str(), judge.judgeTitle.c_str());
+        }
+    }
+
     ImGui::End();
 #endif
 

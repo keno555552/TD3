@@ -49,6 +49,11 @@ void SceneManager::SceneChanger() {
 			isSceneChange = true;
 			break;
 
+		case SceneOutcome::RETRY_MOD:
+			sceneUsingNameHandle_ = "MOD";
+			isSceneChange = true;
+			break;
+
 		case SceneOutcome::RETURN:
 			isSceneChange = true;
 			sceneUsingNameHandle_ = "TITLE";

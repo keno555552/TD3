@@ -1,0 +1,11 @@
+{
+  "judge_id": "onizuka",
+  "judge_name": "鬼塚",
+  "judge_title": "デカければ正義のパワー系審査員",
+  "texture_path": "GAME/resources/texture/judge_default.png",
+  "favorite_parts": {
+    "Body":          2.5,
+    "LeftUpperArm":  2.0,
+    "RightUpperArm": 2.0
+  }
+}
