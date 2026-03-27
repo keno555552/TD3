@@ -82,6 +82,46 @@ bool IsLegControlPart(ModBodyPart part) {
          part == ModBodyPart::RightThigh || part == ModBodyPart::RightShin;
 }
 
+bool IsArmControlPart(ModBodyPart part) {
+  return part == ModBodyPart::LeftUpperArm ||
+         part == ModBodyPart::LeftForeArm ||
+         part == ModBodyPart::RightUpperArm ||
+         part == ModBodyPart::RightForeArm;
+}
+
+float GetDefaultPointRadius(ModBodyPart part, ModControlPointRole role) {
+  switch (role) {
+  case ModControlPointRole::Chest:
+    return 0.12f;
+  case ModControlPointRole::Belly:
+    return 0.10f;
+  case ModControlPointRole::Waist:
+    return 0.12f;
+  case ModControlPointRole::LowerNeck:
+    return 0.09f;
+  case ModControlPointRole::UpperNeck:
+    return 0.08f;
+  case ModControlPointRole::HeadCenter:
+    return 0.11f;
+  case ModControlPointRole::Root:
+    return IsLegControlPart(part) ? 0.10f : 0.09f;
+  case ModControlPointRole::Bend:
+    return IsLegControlPart(part) ? 0.09f : 0.08f;
+  case ModControlPointRole::End:
+    return IsLegControlPart(part) ? 0.09f : 0.08f;
+  case ModControlPointRole::None:
+  default:
+    return 0.08f;
+  }
+}
+
+float GetDefaultSegmentRadius(ModBodyPart part, ModControlPointRole startRole,
+                              ModControlPointRole endRole) {
+  const float startDefault = GetDefaultPointRadius(part, startRole);
+  const float endDefault = GetDefaultPointRadius(part, endRole);
+  return (startDefault + endDefault) * 0.5f;
+}
+
 Vector3 MakePartScale(const Vector3 &baseScale, const ModBodyPartParam &param) {
   Vector3 scale = baseScale;
   scale.x *= param.scale.x;
@@ -207,8 +247,8 @@ void HideUnusedMeshes(Object *target, const std::vector<Transform> &baseParts,
 }
 
 void ApplySingleMeshFallback(Object *target, const Transform &baseMeshTransform,
-                            const std::vector<Transform> &baseParts,
-                            ModBodyPart part, const ModBodyPartParam &param) {
+                             const std::vector<Transform> &baseParts,
+                             ModBodyPart part, const ModBodyPartParam &param) {
   if (target == nullptr || target->objectParts_.empty()) {
     return;
   }
@@ -216,7 +256,8 @@ void ApplySingleMeshFallback(Object *target, const Transform &baseMeshTransform,
   Vector3 newScale = MakePartScale(baseMeshTransform.scale, param);
   Transform mesh = baseMeshTransform;
   mesh.scale = newScale;
-  mesh.translate = Add(baseMeshTransform.translate, GetAnchorOffset(part, newScale));
+  mesh.translate =
+      Add(baseMeshTransform.translate, GetAnchorOffset(part, newScale));
   target->objectParts_[0].transform = mesh;
 
   HideUnusedMeshes(target, baseParts, 1);
@@ -385,13 +426,15 @@ void ModBody::Apply(Object *target) {
     endRole = externalEndRole_;
   } else {
     if (!GetVisualSegmentRoles(part_, startRole, endRole)) {
-      ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
+      ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_,
+                              part_, param_);
       return;
     }
   }
 
   if (sourcePoints == nullptr || sourcePoints->empty()) {
-    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
+    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_,
+                            part_, param_);
     return;
   }
 
@@ -399,13 +442,18 @@ void ModBody::Apply(Object *target) {
   const int endIndex = FindRoleIndexInPoints(*sourcePoints, endRole);
 
   if (startIndex < 0 || endIndex < 0) {
-    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
+    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_,
+                            part_, param_);
     return;
   }
 
   Vector3 startPos =
       (*sourcePoints)[static_cast<size_t>(startIndex)].localPosition;
   Vector3 endPos = (*sourcePoints)[static_cast<size_t>(endIndex)].localPosition;
+
+  const float startRadius =
+      (*sourcePoints)[static_cast<size_t>(startIndex)].radius;
+  const float endRadius = (*sourcePoints)[static_cast<size_t>(endIndex)].radius;
 
   // 外部点列参照部位の描画:
   // - 前腕/脛/首などは「start基準（開始点を原点化）」でも良い
@@ -420,7 +468,7 @@ void ModBody::Apply(Object *target) {
     }
   }
 
-  ApplySegmentToObjectPart(target, 0, startPos, endPos);
+  ApplySegmentToObjectPart(target, 0, startPos, endPos, startRadius, endRadius);
 
   // 2つ目以降の mesh は使わない
   HideUnusedMeshes(target, basePartTransforms_, 1);
@@ -599,6 +647,36 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
   return true;
 }
 
+bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
+  if (index >= controlPoints_.size()) {
+    return false;
+  }
+
+  if (scaleFactor <= 0.0f) {
+    return false;
+  }
+
+  const ModControlPointRole role = controlPoints_[index].role;
+  const float defaultRadius = GetDefaultPointRadius(part_, role);
+  const float minRadius = defaultRadius * 0.60f;
+  const float maxRadius = defaultRadius * 2.50f;
+
+  float newRadius = controlPoints_[index].radius * scaleFactor;
+  newRadius = ClampFloat(newRadius, minRadius, maxRadius);
+
+  controlPoints_[index].radius = newRadius;
+
+  if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+    const int chainIndex = chain_.FindIndex(role);
+    if (chainIndex >= 0) {
+      std::vector<ControlPointNode> &nodes = chain_.GetNodes();
+      nodes[static_cast<size_t>(chainIndex)].radius = newRadius;
+    }
+  }
+
+  return true;
+}
+
 Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
                                               size_t index) const {
   if (target == nullptr || index >= controlPoints_.size()) {
@@ -774,7 +852,8 @@ void ModBody::UpdateControlPointHierarchy() {
 
 void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
                                        const Vector3 &startPos,
-                                       const Vector3 &endPos) {
+                                       const Vector3 &endPos, float startRadius,
+                                       float endRadius) {
   if (target == nullptr) {
     return;
   }
@@ -789,24 +868,46 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
 
   Transform mesh = basePartTransforms_[partIndex];
 
-  // 区間ベクトルと長さを求める
-  const Vector3 segment = Subtract(endPos, startPos);
-  const float segmentLength = (std::max)(Length(segment), 0.05f);
-  const Vector3 segmentDir = NormalizeSafe(segment, {0.0f, -1.0f, 0.0f});
+  const Vector3 rawSegment = Subtract(endPos, startPos);
+  const float rawLength = (std::max)(Length(rawSegment), 0.05f);
+  const Vector3 segmentDir = NormalizeSafe(rawSegment, {0.0f, -1.0f, 0.0f});
 
-  // モデルは原点中心で作られているので、必ず点間の中点へ置く
-  const Vector3 segmentCenter = LerpV(startPos, endPos, 0.5f);
-  mesh.translate = segmentCenter;
+  const float safeStartRadius = (std::max)(startRadius, 0.01f);
+  const float safeEndRadius = (std::max)(endRadius, 0.01f);
 
-  // -Y 向き基準の棒として回転を Z に反映する
+  // 操作点の中心同士ではなく、
+  // 両端の半径ぶんだけ外へ伸ばした区間でメッシュを作る
+  // こうすると操作点球がメッシュ内に収まりやすい
+  const Vector3 expandedStart =
+      Subtract(startPos, Multiply(safeStartRadius, segmentDir));
+  const Vector3 expandedEnd = Add(endPos, Multiply(safeEndRadius, segmentDir));
+
+  const Vector3 visualSegment = Subtract(expandedEnd, expandedStart);
+  const float visualLength = (std::max)(Length(visualSegment), rawLength);
+  const Vector3 visualCenter = LerpV(expandedStart, expandedEnd, 0.5f);
+
+  mesh.translate = visualCenter;
+
   mesh.rotate = basePartTransforms_[partIndex].rotate;
   mesh.rotate.z = AngleZFromMinusY(segmentDir);
 
-  // 太さは param.scale、長さは区間長に合わせる
+  // セグメント太さは両端操作点半径の大きい方に合わせる
+  const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);
+
+  ModControlPointRole startRole = ModControlPointRole::None;
+  ModControlPointRole endRole = ModControlPointRole::None;
+  GetVisualSegmentRoles(part_, startRole, endRole);
+
+  const float defaultSegmentRadius =
+      GetDefaultSegmentRadius(part_, startRole, endRole);
+
+  const float thicknessScale =
+      segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
+
   mesh.scale = basePartTransforms_[partIndex].scale;
-  mesh.scale.x *= param_.scale.x;
-  mesh.scale.y = segmentLength * param_.scale.y * param_.length;
-  mesh.scale.z *= param_.scale.z;
+  mesh.scale.x *= thicknessScale * param_.scale.x;
+  mesh.scale.y = visualLength * param_.scale.y * param_.length;
+  mesh.scale.z *= thicknessScale * param_.scale.z;
 
   target->objectParts_[partIndex].transform = mesh;
 }
