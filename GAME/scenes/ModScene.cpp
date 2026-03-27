@@ -779,10 +779,18 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.selfConnectorId = node->selfConnectorId;
     instance.localTransform = node->localTransform;
     instance.param = modBodies_[id].GetParam();
+
+    // 新方式ではインスタンス単位で count は常に 1
     instance.param.count = 1;
 
     customizeData_->partInstances.push_back(instance);
   }
+
+  // 新方式の可変長操作点配列を再構築する
+  RebuildControlPointSnapshotsFromScene();
+
+  // 旧固定操作点配列も互換用に保存する
+  SaveControlPointsToCustomizeData();
 
   // 旧方式配列も互換用に再構築する
   RebuildLegacyCustomizeDataFromInstances();
@@ -790,6 +798,50 @@ void ModScene::SyncCustomizeDataFromScene() {
   // 共通制限時間を共有データへ保存する
   customizeData_->timeLimit_ = timeLimit_;
   customizeData_->isTimeUp_ = isTimeUp_;
+
+  // shared に積む前に整合性を揃えておく
+  ModBody::NormalizeCustomizeData(*customizeData_);
+}
+
+void ModScene::RebuildControlPointSnapshotsFromScene() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  customizeData_->controlPointSnapshots.clear();
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    if (modBodies_.count(id) == 0) {
+      continue;
+    }
+
+    const std::vector<ModControlPoint> &points =
+        modBodies_.at(id).GetControlPoints();
+
+    for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
+      const ModControlPoint &point = points[pointIndex];
+
+      ModControlPointSnapshot snapshot;
+      snapshot.ownerPartId = id;
+      snapshot.ownerPartType = node->part;
+      snapshot.role = point.role;
+      snapshot.localPosition = point.localPosition;
+      snapshot.radius = point.radius;
+      snapshot.movable = point.movable;
+      snapshot.isConnectionPoint = point.isConnectionPoint;
+      snapshot.acceptsParent = point.acceptsParent;
+      snapshot.acceptsChild = point.acceptsChild;
+
+      customizeData_->controlPointSnapshots.push_back(snapshot);
+    }
+  }
 }
 
 void ModScene::RebuildLegacyCustomizeDataFromInstances() {
@@ -903,6 +955,12 @@ void ModScene::ResetToDefaultHumanoid() {
   // 選択状態と共有データも初期状態へ寄せる
   EnsureValidSelection();
   SyncCustomizeDataFromScene();
+
+  if (customizeData_ != nullptr) {
+    customizeData_->totalTimeLimit_ = 30.0f;
+    customizeData_->timeLimit_ = 30.0f;
+    customizeData_->isTimeUp_ = false;
+  }
 }
 
 void ModScene::SelectPart(int partId) {
