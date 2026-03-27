@@ -17,7 +17,7 @@ struct JudgeData {
   std::string judgeTitle;   // 二つ名（好みを反映した肩書き）
   std::string texturePath;
 
-  // 各パーツへの好み（11 パーツ分）
+  // 各パーツへの好み（12パーツ分）
   // インデックスは ModBodyPart の値をそのまま使用
-  std::array<JudgePartPreference, 11> partPreferences{};
+  std::array<JudgePartPreference, 12> partPreferences{};
 };

@@ -8,9 +8,14 @@
     {
       "set_name": "default",
       "parts": {
-        "Body": {
-          "scale_x": -4.0,
-          "scale_y": -3.0,
+        "ChestBody": {
+          "scale_x": -3.0,
+          "scale_y": -2.0,
+          "scale_z": 0.0
+        },
+        "StomachBody": {
+          "scale_x": -3.0,
+          "scale_y": -2.0,
           "scale_z": 0.0
         },
         "Neck": {

@@ -47,9 +47,9 @@ enum class BonusType {
 struct ScoreSet {
   std::string setName;
 
-  // ModBodyPart 全 11 種に対応するスケール倍率
+  // ModBodyPart 全12種に対応するスケール倍率
   // インデックスは ModBodyPart の値をそのまま使用
-  std::array<PartWeight, 11> partWeights{};
+  std::array<PartWeight, 12> partWeights{};
 
   // 左右の腕脚 4 種に対応する本数倍率
   std::array<CountWeight, static_cast<size_t>(CountPart::Count)> countWeights{};

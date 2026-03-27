@@ -8,7 +8,12 @@
     {
       "set_name": "default",
       "parts": {
-        "Body": {
+        "ChestBody": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "StomachBody": {
           "scale_x": 0.0,
           "scale_y": 0.0,
           "scale_z": 0.0
@@ -64,6 +69,7 @@
           "scale_z": 0.0
         }
       },
+
       "counts": {
         "left_arm": {
           "weight": 0.0,

@@ -186,21 +186,23 @@ void ContestScene::Draw() {
         // デバッグ用：内部スコア詳細
         if (ImGui::TreeNode("Debug: Internal Scores")) {
             const char* partNames[] = {
-                "Body",        "Neck",           "Head",
+                "Body","StomachBody","Neck","Head",
                 "LeftUpperArm", "LeftForeArm",   "RightUpperArm",
                 "RightForeArm", "LeftThigh",     "LeftShin",
                 "RightThigh",   "RightShin",
             };
+
             const char* countNames[] = {
                 "LeftArm", "RightArm", "LeftLeg", "RightLeg",
             };
+
             const char* bonusNames[] = {
                 "Symmetry", "CostEfficiency", "Minimalist",
                 "Wildcard", "Balance",
             };
 
             ImGui::Text("Part Scores (total: %.1f)", scoreResult_.totalPartScore);
-            for (int i = 0; i < 11; ++i) {
+            for (int i = 0; i < 12; ++i) {
                 ImGui::Text("  %s = %.1f", partNames[i], scoreResult_.partScores[i]);
             }
 

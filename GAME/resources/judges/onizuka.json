@@ -4,8 +4,9 @@
   "judge_title": "デカければ正義のパワー系審査員",
   "texture_path": "GAME/resources/texture/judge_default.png",
   "favorite_parts": {
-    "Body":          2.5,
-    "LeftUpperArm":  2.0,
+    "ChestBody": 2.5,
+    "StomachBody": 1.0,
+    "LeftUpperArm": 2.0,
     "RightUpperArm": 2.0
   }
 }
