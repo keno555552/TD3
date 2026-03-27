@@ -337,6 +337,45 @@ private:
   /// </summary>
   Vector3 ResolveAttachedLocalTranslate(const PartNode &childNode) const;
 
+  /// <summary>
+  /// マウスホイールで操作点の拡縮を行う
+  /// 選択中の操作点があればそれを優先し、無ければマウス Ray
+  /// 上の最近点を対象にする
+  /// </summary>
+  void UpdateControlPointWheelScaling();
+
+  /// <summary>
+  /// 胴体共有操作点の半径を拡縮する
+  /// </summary>
+  /// <param name="index">拡縮対象の操作点インデックス</param>
+  /// <param name="scaleFactor">倍率</param>
+  /// <returns>成功したら true</returns>
+  bool ScaleTorsoControlPoint(size_t index, float scaleFactor);
+
+  /// <summary>
+  /// 指定部位のメッシュ近傍ピック球を作る
+  /// hovered 判定や選択維持判定で共通利用する
+  /// </summary>
+  /// <param name="partId">対象部位ID</param>
+  /// <param name="outSphere">生成した球を受け取る</param>
+  /// <returns>生成できたら true</returns>
+  bool BuildPartPickSphere(int partId, Sphere &outSphere) const;
+
+  /// <summary>
+  /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
+  /// <returns>範囲内なら true</returns>
+  bool IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const;
+
+  /// <summary>
+  /// 透過処理用のフェードグループIDを返す
+  /// 胴体は ChestBody / StomachBody を同一グループとして扱う
+  /// </summary>
+  /// <param name="partId">対象部位ID</param>
+  /// <returns>グループID。無効なら -1</returns>
+  int ResolveFadeGroupId(int partId) const;
+
 #ifdef USE_IMGUI
   /// <summary>
   /// 改造シーン全体の ImGui を描画する

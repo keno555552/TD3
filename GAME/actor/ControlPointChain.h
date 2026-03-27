@@ -5,25 +5,26 @@
 
 /// <summary>
 /// 1つの関節ノード情報
-/// 完全なチェーン構造へ移行するための最小単位
+/// 親子構造を持つ操作点の最小単位
 /// </summary>
 struct ControlPointNode {
-  ModControlPointRole role = ModControlPointRole::None;
-  int parentIndex = -1;
+  ModControlPointRole role = ModControlPointRole::None; // 操作点の役割
+  int parentIndex = -1; // 親ノードindex（-1でルート）
 
-  Vector3 localPosition{0.0f, 0.0f, 0.0f};
+  Vector3 localPosition{0.0f, 0.0f, 0.0f}; // 親基準ローカル位置
 
-  float radius = 0.08f;
-  bool movable = true;
+  float radius = 0.08f; // ピック/表示サイズ
+  bool movable = true;  // 移動可能か
 
-  bool isConnectionPoint = false;
-  bool acceptsParent = false;
-  bool acceptsChild = false;
+  bool isConnectionPoint = false; // 接続点として扱うか
+  bool acceptsParent = false;     // 親接続を受けるか
+  bool acceptsChild = false;      // 子接続を受けるか
 };
 
 /// <summary>
-/// 肩→肘→手首、股関節→膝→足首のような
-/// 親子付き関節チェーンを管理するクラス
+/// 肩→肘→手首、股関節→膝→足首のような親子付き関節チェーンを管理するクラス
+/// - 各ノードは `parentIndex` と `localPosition` により階層を構成する
+/// - Move時は役割に応じた制約（長さ/半径/向き）を適用できる
 /// </summary>
 class ControlPointChain {
 public:
@@ -33,47 +34,44 @@ public:
   void Clear();
 
   /// <summary>
-  /// 腕チェーンを初期化する
-  /// Root -> Bend -> End
+  /// 腕チェーンを既定値で構築する（Root -> Bend -> End）
   /// </summary>
   void BuildArmChain();
 
   /// <summary>
-  /// 脚チェーンを初期化する
-  /// Root -> Bend -> End
+  /// 脚チェーンを既定値で構築する（Root -> Bend -> End）
   /// </summary>
   void BuildLegChain();
 
   /// <summary>
-  /// 胴体チェーンを初期化する
-  /// Chest -> Belly -> Waist
+  /// 胴体チェーンを既定値で構築する（Chest -> Belly -> Waist）
   /// </summary>
   void BuildTorsoChain();
 
   /// <summary>
-  /// 頭チェーンを初期化する
-  /// LowerNeck -> UpperNeck -> HeadCenter
+  /// 頭チェーンを既定値で構築する（LowerNeck -> UpperNeck -> HeadCenter）
   /// </summary>
   void BuildHeadChain();
 
   /// <summary>
-  /// 指定 role のノード index を返す
-  /// 見つからない場合は -1
+  /// 指定roleのノードindexを返す。見つからない場合は -1
   /// </summary>
   int FindIndex(ModControlPointRole role) const;
 
   /// <summary>
-  /// ノードを移動する
+  /// 指定ノードを移動する
+  /// 役割に応じて制約を適用し、必要なら子ノードも追従させる
   /// </summary>
   bool MovePoint(size_t index, const Vector3 &newLocalPosition);
 
   /// <summary>
-  /// 指定ノードのローカル座標を返す
+  /// 指定ノードのローカル座標（親基準）を返す
   /// </summary>
   Vector3 GetLocalPosition(size_t index) const;
 
   /// <summary>
-  /// 親子をたどったワールド座標を返す
+  /// 指定ノードのワールド座標（チェーン内）を返す
+  /// 親をたどって `localPosition` を加算する
   /// </summary>
   Vector3 GetWorldPosition(size_t index) const;
 
@@ -89,8 +87,8 @@ public:
 
 private:
   /// <summary>
-  /// 必要なら階層再計算を行う
-  /// 現状はローカル親子だけを使うので空実装
+  /// 階層キャッシュ更新用フック
+  /// 現状は逐次計算のため空実装（将来キャッシュ化する場合の差し込み口）
   /// </summary>
   void UpdateHierarchy();
 

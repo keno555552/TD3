@@ -1,6 +1,6 @@
 #include "ModScene.h"
-#include "GAME/actor/prompt/PromptData.h"
 #include "GAME/actor/ModObjectUtil.h"
+#include "GAME/actor/prompt/PromptData.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
 #include <unordered_set>
@@ -243,6 +243,30 @@ Vector3 ClampDistance(const Vector3 &origin, const Vector3 &target,
   return target;
 }
 
+float ClampFloatLocal(float value, float minValue, float maxValue) {
+  if (value < minValue) {
+    return minValue;
+  }
+  if (value > maxValue) {
+    return maxValue;
+  }
+  return value;
+}
+
+float GetControlPointGizmoDrawRadius(float influenceRadius) {
+  return ClampFloatLocal(influenceRadius * 0.45f, 0.035f, 0.12f);
+}
+
+float GetWheelScaleFactorFromDelta(int wheelDelta) {
+  if (wheelDelta > 0) {
+    return 1.08f;
+  }
+  if (wheelDelta < 0) {
+    return 1.0f / 1.08f;
+  }
+  return 1.0f;
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -431,6 +455,7 @@ void ModScene::Draw() {
 
 void ModScene::CameraPart() {
   // デバッグカメラ使用時は操作も含めて更新する
+
   if (useDebugCamera_) {
     usingCamera_ = debugCamera_;
 #ifdef USE_IMGUI
@@ -1026,6 +1051,18 @@ void ModScene::UpdateControlPointEditing() {
   // まずマウスが当たっている部位を更新する
   UpdateHoveredPartFromMouseRay(mouseRay);
 
+  // すでに操作点を選択している場合、
+  // マウスがその部位メッシュ範囲から外れたら選択解除する
+  if (selectedControlPointIndex_ >= 0 && !isDraggingControlPoint_) {
+    if (!IsMouseRayInsideSelectedControlMesh(mouseRay)) {
+      ClearControlPointSelection();
+      return;
+    }
+  }
+
+  // ホイールで操作点の半径を拡縮する
+  UpdateControlPointWheelScaling();
+
   // 左クリック開始時に操作点を拾う
   if (IsMouseLeftTriggered()) {
     if (PickControlPointFromMouseRay(mouseRay)) {
@@ -1252,7 +1289,7 @@ void ModScene::ClearControlPointSelection() {
 void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
   // ドラッグ中は選択部位を優先して表示する
   if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
-    hoveredPartId_ = selectedControlPartId_;
+    hoveredPartId_ = selectedPartId_;
     return;
   }
 
@@ -1262,23 +1299,10 @@ void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int partId = orderedPartIds_[i];
 
-    if (modObjects_.count(partId) == 0 || modBodies_.count(partId) == 0) {
-      continue;
-    }
-
-    Object *object = modObjects_[partId].get();
-    if (object == nullptr || object->objectParts_.empty()) {
-      continue;
-    }
-
-    // mesh の見た目中心とスケールから簡易球を作る
-    const Transform &mesh = object->objectParts_[0].transform;
-
     Sphere pickSphere{};
-    const Vector3 rootWorld =
-        ModObjectUtil::ComputeObjectRootWorldTranslate(object);
-    pickSphere.center = Add(rootWorld, mesh.translate);
-    pickSphere.radius = Max3(mesh.scale.x, mesh.scale.y, mesh.scale.z) * 0.75f;
+    if (!BuildPartPickSphere(partId, pickSphere)) {
+      continue;
+    }
 
     float t = 0.0f;
     if (!crashDecision(pickSphere, mouseRay, &t)) {
@@ -1329,6 +1353,13 @@ void ModScene::UpdateControlPointGizmos() {
     visiblePartId = selectedPartId_;
   }
 
+  if (IsTorsoVisiblePartId(visiblePartId)) {
+    const int chestId = assembly_.GetBodyId();
+    if (chestId >= 0) {
+      visiblePartId = chestId;
+    }
+  }
+
   if (visiblePartId < 0) {
     return;
   }
@@ -1365,16 +1396,18 @@ void ModScene::UpdateControlPointGizmos() {
 
       const Vector3 worldPos =
           GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
-      const float radius = torsoControlPoints_[i].radius;
+      const float influenceRadius = torsoControlPoints_[i].radius;
+      const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
 
       const Vector3 toCamera =
           NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
-      const Vector3 drawPos = Add(worldPos, Multiply(radius * 1.5f, toCamera));
+      const Vector3 drawPos =
+          Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
 
       gizmo->mainPosition.transform.translate = drawPos;
       gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-      gizmo->mainPosition.transform.scale = {radius * 2.0f, radius * 2.0f,
-                                             radius * 2.0f};
+      gizmo->mainPosition.transform.scale = {
+          drawRadius * 2.0f, drawRadius * 2.0f, drawRadius * 2.0f};
 
       gizmo->objectParts_[0].materialConfig->useModelTexture = false;
       gizmo->objectParts_[0].materialConfig->enableLighting = false;
@@ -1444,16 +1477,18 @@ void ModScene::UpdateControlPointGizmos() {
                              selectedControlPointIndex_ == static_cast<int>(i));
 
     const Vector3 worldPos = body.GetControlPointWorldPosition(partObject, i);
-    const float radius = points[i].radius;
+    const float influenceRadius = points[i].radius;
+    const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
 
     const Vector3 toCamera =
         NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
-    const Vector3 drawPos = Add(worldPos, Multiply(radius * 1.5f, toCamera));
+    const Vector3 drawPos =
+        Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
 
     gizmo->mainPosition.transform.translate = drawPos;
     gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-    gizmo->mainPosition.transform.scale = {radius * 2.0f, radius * 2.0f,
-                                           radius * 2.0f};
+    gizmo->mainPosition.transform.scale = {drawRadius * 2.0f, drawRadius * 2.0f,
+                                           drawRadius * 2.0f};
 
     gizmo->objectParts_[0].materialConfig->useModelTexture = false;
     gizmo->objectParts_[0].materialConfig->enableLighting = false;
@@ -1625,6 +1660,143 @@ ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
   return Add(dynamicBase, offsetFromDefault);
 }
 
+void ModScene::UpdateControlPointWheelScaling() {
+  if (usingCamera_ == nullptr) {
+    return;
+  }
+
+  // 中ボタン押し中はデバッグカメラ操作を優先する
+  if (system_->GetMouseIsPush(2)) {
+    return;
+  }
+
+  const int wheelDelta = system_->GetMouseScrollOrigin();
+  if (wheelDelta == 0) {
+    return;
+  }
+
+  const float scaleFactor = GetWheelScaleFactorFromDelta(wheelDelta);
+  if (scaleFactor == 1.0f) {
+    return;
+  }
+
+  // すでに選択中の操作点があるなら最優先でそれを拡縮する
+  if (selectedControlPointIndex_ >= 0) {
+    if (selectedControlPartId_ == -2) {
+      ScaleTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
+                             scaleFactor);
+      return;
+    }
+
+    if (selectedControlPartId_ >= 0 &&
+        modBodies_.count(selectedControlPartId_) > 0) {
+      modBodies_[selectedControlPartId_].ScaleControlPoint(
+          static_cast<size_t>(selectedControlPointIndex_), scaleFactor);
+      return;
+    }
+  }
+
+  // 未選択なら、hover中または選択中の部位を基準に
+  // マウス Ray に最も近い操作点を見つけてその場で拡縮する
+  const int visiblePartId =
+      (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
+
+  if (visiblePartId < 0) {
+    return;
+  }
+
+  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+
+  // 胴体共有点
+  if (IsTorsoVisiblePartId(visiblePartId)) {
+    float nearestT = FLT_MAX;
+    int nearestPointIndex = -1;
+
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      if (!(torsoControlPoints_[i].movable ||
+            torsoControlPoints_[i].isConnectionPoint)) {
+        continue;
+      }
+
+      Sphere sphere{};
+      sphere.center =
+          GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+      sphere.radius = torsoControlPoints_[i].radius;
+
+      float t = 0.0f;
+      if (!crashDecision(sphere, mouseRay, &t)) {
+        continue;
+      }
+
+      if (t < nearestT) {
+        nearestT = t;
+        nearestPointIndex = static_cast<int>(i);
+      }
+    }
+
+    if (nearestPointIndex >= 0) {
+      selectedControlPartId_ = -2;
+      selectedControlPointIndex_ = nearestPointIndex;
+      selectedPartId_ = visiblePartId;
+      ScaleTorsoControlPoint(static_cast<size_t>(nearestPointIndex),
+                             scaleFactor);
+    }
+
+    return;
+  }
+
+  const int controlOwnerId =
+      ResolveControlOwnerPartId(assembly_, visiblePartId);
+
+  if (controlOwnerId < 0) {
+    return;
+  }
+
+  if (modBodies_.count(controlOwnerId) == 0 ||
+      modObjects_.count(controlOwnerId) == 0) {
+    return;
+  }
+
+  Object *object = modObjects_[controlOwnerId].get();
+  if (object == nullptr) {
+    return;
+  }
+
+  ModBody &body = modBodies_[controlOwnerId];
+  const std::vector<ModControlPoint> &points = body.GetControlPoints();
+
+  float nearestT = FLT_MAX;
+  int nearestPointIndex = -1;
+
+  for (size_t i = 0; i < points.size(); ++i) {
+    if (!(points[i].movable || points[i].isConnectionPoint)) {
+      continue;
+    }
+
+    Sphere sphere{};
+    sphere.center = body.GetControlPointWorldPosition(object, i);
+    sphere.radius = points[i].radius;
+
+    float t = 0.0f;
+    if (!crashDecision(sphere, mouseRay, &t)) {
+      continue;
+    }
+
+    if (t < nearestT) {
+      nearestT = t;
+      nearestPointIndex = static_cast<int>(i);
+    }
+  }
+
+  if (nearestPointIndex >= 0) {
+    selectedControlPartId_ = controlOwnerId;
+    selectedControlPointIndex_ = nearestPointIndex;
+    selectedPartId_ = visiblePartId;
+
+    body.ScaleControlPoint(static_cast<size_t>(nearestPointIndex), scaleFactor);
+  }
+}
+
 bool ModScene::MoveTorsoControlPoint(size_t index,
                                      const Vector3 &newLocalPosition) {
   if (index >= torsoControlPoints_.size()) {
@@ -1717,6 +1889,123 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   }
 
   return false;
+}
+
+bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
+  if (index >= torsoControlPoints_.size()) {
+    return false;
+  }
+
+  if (scaleFactor <= 0.0f) {
+    return false;
+  }
+
+  const ModControlPointRole role = torsoControlPoints_[index].role;
+
+  float defaultRadius = 0.10f;
+  switch (role) {
+  case ModControlPointRole::Chest:
+    defaultRadius = 0.12f;
+    break;
+  case ModControlPointRole::Belly:
+    defaultRadius = 0.10f;
+    break;
+  case ModControlPointRole::Waist:
+    defaultRadius = 0.12f;
+    break;
+  default:
+    defaultRadius = 0.10f;
+    break;
+  }
+
+  const float minRadius = defaultRadius * 0.60f;
+  const float maxRadius = defaultRadius * 2.50f;
+
+  float newRadius = torsoControlPoints_[index].radius * scaleFactor;
+  newRadius = ClampFloatLocal(newRadius, minRadius, maxRadius);
+
+  torsoControlPoints_[index].radius = newRadius;
+  return true;
+}
+
+bool ModScene::BuildPartPickSphere(int partId, Sphere &outSphere) const {
+  if (modObjects_.count(partId) == 0 || modBodies_.count(partId) == 0) {
+    return false;
+  }
+
+  const Object *object = modObjects_.at(partId).get();
+  if (object == nullptr || object->objectParts_.empty()) {
+    return false;
+  }
+
+  const Transform &mesh = object->objectParts_[0].transform;
+
+  const Vector3 rootWorld =
+      ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+
+  outSphere.center = Add(rootWorld, mesh.translate);
+  outSphere.radius = Max3(mesh.scale.x, mesh.scale.y, mesh.scale.z) * 0.75f;
+  return true;
+}
+
+bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
+  if (selectedControlPointIndex_ < 0) {
+    return false;
+  }
+
+  // torso の共有点選択中は、Chest と Stomach の両方を有効範囲にする
+  if (selectedControlPartId_ == -2) {
+    const int chestId = assembly_.GetBodyId();
+    const int stomachId = assembly_.GetBodyId();
+
+    Sphere sphere{};
+    float t = 0.0f;
+
+    if (chestId >= 0 && BuildPartPickSphere(chestId, sphere)) {
+      if (crashDecision(sphere, mouseRay, &t)) {
+        return true;
+      }
+    }
+
+    if (stomachId >= 0 && BuildPartPickSphere(stomachId, sphere)) {
+      if (crashDecision(sphere, mouseRay, &t)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  if (selectedPartId_ < 0) {
+    return false;
+  }
+
+  Sphere sphere{};
+  if (!BuildPartPickSphere(selectedPartId_, sphere)) {
+    return false;
+  }
+
+  float t = 0.0f;
+  return crashDecision(sphere, mouseRay, &t);
+}
+
+int ModScene::ResolveFadeGroupId(int partId) const {
+  const PartNode *node = assembly_.FindNode(partId);
+  if (node == nullptr) {
+    return -1;
+  }
+
+  // 胴体は Chest / Stomach を同じグループとして扱う
+  if (node->part == ModBodyPart::ChestBody ||
+      node->part == ModBodyPart::StomachBody) {
+    const int chestId = assembly_.GetBodyId();
+    if (chestId >= 0) {
+      return chestId;
+    }
+    return partId;
+  }
+
+  return ResolveControlOwnerPartId(assembly_, partId);
 }
 
 bool ModScene::IsTorsoPart(ModBodyPart part) const {
@@ -1853,9 +2142,11 @@ void ModScene::UpdateModObjects() {
     }
   }
 
-  int fadedOwnerId = -1;
+  int fadedGroupId = -1;
   if (hoveredPartId_ >= 0) {
-    fadedOwnerId = ResolveControlOwnerPartId(assembly_, hoveredPartId_);
+    fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
+  } else if (selectedPartId_ >= 0) {
+    fadedGroupId = ResolveFadeGroupId(selectedPartId_);
   }
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -1871,9 +2162,9 @@ void ModScene::UpdateModObjects() {
 
     float alpha = 1.0f;
 
-    if (fadedOwnerId >= 0) {
-      const int ownerId = ResolveControlOwnerPartId(assembly_, id);
-      if (ownerId == fadedOwnerId) {
+    if (fadedGroupId >= 0) {
+      const int groupId = ResolveFadeGroupId(id);
+      if (groupId == fadedGroupId) {
         alpha = 0.35f;
       }
     }
@@ -2094,7 +2385,12 @@ void ModScene::DrawSelectedPartGui() {
         MoveTorsoControlPoint(i, localPos);
       }
 
-      ImGui::Text("Radius : %.2f", torsoControlPoints_[i].radius);
+      float radius = torsoControlPoints_[i].radius;
+      if (ImGui::SliderFloat("Radius", &radius, 0.06f, 0.30f, "%.2f")) {
+        torsoControlPoints_[i].radius = radius;
+      }
+
+      ImGui::Text("Influence Radius : %.2f", torsoControlPoints_[i].radius);
       ImGui::Text("Movable: %s",
                   torsoControlPoints_[i].movable ? "true" : "false");
 
@@ -2127,7 +2423,13 @@ void ModScene::DrawSelectedPartGui() {
           modBodies_[controlOwnerId].MoveControlPoint(i, localPos);
         }
 
-        ImGui::Text("Radius : %.2f", points[i].radius);
+        float radius = points[i].radius;
+        if (ImGui::SliderFloat("Radius", &radius, 0.05f, 0.30f, "%.2f")) {
+          const float current = (std::max)(points[i].radius, 0.0001f);
+          modBodies_[controlOwnerId].ScaleControlPoint(i, radius / current);
+        }
+
+        ImGui::Text("Influence Radius : %.2f", points[i].radius);
         ImGui::Text("Movable: %s", points[i].movable ? "true" : "false");
 
         ImGui::Separator();
