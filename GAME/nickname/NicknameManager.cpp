@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr size_t kPartCount = 11;
+constexpr size_t kPartCount = 12;
 constexpr float kEpsilon = 0.001f;
 
 /// パーツが変化しているか

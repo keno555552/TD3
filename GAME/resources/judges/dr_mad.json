@@ -4,12 +4,13 @@
   "judge_title": "全身改造推進委員長",
   "texture_path": "GAME/resources/texture/judge_default.png",
   "favorite_parts": {
-    "Body":          1.0,
-    "Neck":          1.0,
-    "Head":          1.0,
-    "LeftUpperArm":  1.0,
+    "ChestBody": 1.0,
+    "StomachBody": 1.0,
+    "Neck": 1.0,
+    "Head": 1.0,
+    "LeftUpperArm": 1.0,
     "RightUpperArm": 1.0,
-    "LeftThigh":     1.0,
-    "RightThigh":    1.0
+    "LeftThigh": 1.0,
+    "RightThigh": 1.0
   }
 }
