@@ -77,6 +77,24 @@ struct ModPartInstanceData {
   ModBodyPartParam param{};
 };
 
+/// <summary>
+/// 可変長の操作点スナップショット
+/// 新方式ではこちらを正とし、ownerPartId で所属部位を判別する
+/// </summary>
+struct ModControlPointSnapshot {
+  int ownerPartId = -1;                               // 所属部位ID
+  ModBodyPart ownerPartType = ModBodyPart::ChestBody; // 所属部位種別
+  ModControlPointRole role = ModControlPointRole::None;
+
+  Vector3 localPosition{0.0f, 0.0f, 0.0f}; // 部位ローカル位置
+  float radius = 0.08f;                    // ピック/表示サイズ
+  bool movable = true;                     // 移動可能か
+
+  bool isConnectionPoint = false; // 接続点として扱うか
+  bool acceptsParent = false;     // 親接続を受けるか
+  bool acceptsChild = false;      // 子接続を受けるか
+};
+
 struct ModControlPointData {
   Vector3 leftShoulderPos{0.0f, 0.0f, 0.0f};
   Vector3 leftElbowPos{0.0f, 0.0f, 0.0f};
@@ -105,21 +123,25 @@ struct ModControlPointData {
 
 /// <summary>
 /// シーン間で共有する改造データ
+/// 旧固定配列は互換維持のため残し、新方式の可変データも併せて持つ
 /// </summary>
 struct ModBodyCustomizeData {
-  std::vector<ModPartInstanceData> partInstances;
+  int dataVersion = 2;
 
+  // 新方式
+  std::vector<ModPartInstanceData> partInstances;
+  std::vector<ModControlPointSnapshot> controlPointSnapshots;
+
+  // 旧方式互換
   std::array<ModBodyPartParam, static_cast<size_t>(ModBodyPart::Count)>
       partParams{};
-
   std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
       bodyJointOffsets{};
-
-  // 操作点情報
   ModControlPointData controlPoints;
 
-  float timeLimit_ = 30.0f;      // 制限時間（秒）
-  float totalTimeLimit_ = 30.0f; // 制限時間の初期値（秒）。リセット用
+  // 共通進行データ
+  float timeLimit_ = 30.0f;      // 残り制限時間（秒）
+  float totalTimeLimit_ = 30.0f; // 制限時間の初期値（秒）
   bool isTimeUp_ = false;        // 時間切れになったか
 };
 
@@ -257,6 +279,12 @@ public:
   static const ModBodyCustomizeData *GetSharedCustomizeData();
 
   /// <summary>
+  /// 共有改造データを正規化する
+  /// 新旧両方式の配列の整合性を保つために使う
+  /// </summary>
+  static void NormalizeCustomizeData(ModBodyCustomizeData &data);
+
+  /// <summary>
   /// 外部から操作点一覧を丸ごと設定する（デバッグ用途 / 特殊用途向け）
   /// </summary>
   void SetControlPoints(const std::vector<ModControlPoint> &points) {
@@ -317,19 +345,52 @@ private:
                                 const Vector3 &startPos, const Vector3 &endPos,
                                 float startRadius, float endRadius);
 
+  /// <summary>
+  /// セグメント描画できない場合のフォールバック処理
+  /// </summary>
+  /// <param name="target"></param>
+  /// <param name="baseMeshTransform"></param>
+  /// <param name="baseParts"></param>
+  /// <param name="part"></param>
+  /// <param name="param"></param>
+  void ApplySingleMeshFallback(Object *target,
+                               const Transform &baseMeshTransform,
+                               const std::vector<Transform> &baseParts,
+                               ModBodyPart part, const ModBodyPartParam &param);
+
+  /// <summary>
+  /// 複数meshを持つObjectのうち、`startIndex`
+  /// 以降のmeshを基準transformに戻して消す
+  /// </summary>
+  /// <param name="target"></param>
+  /// <param name="basePartTransforms"></param>
+  /// <param name="startIndex"></param>
+  void HideUnusedMeshes(Object *target,
+                        const std::vector<Transform> &basePartTransforms,
+                        size_t startIndex);
+
+  /// <summary>
+  /// 操作点チェーンの状態を、操作点一覧へ同期する
+  /// </summary>
+  /// <param name="points"></param>
+  /// <param name="chain"></param>
+  void SyncControlPointsFromChain(std::vector<ModControlPoint> *points,
+                                  const ControlPointChain &chain);
+
 private:
   ModBodyPart part_ = ModBodyPart::ChestBody;
   ModBodyPartParam param_{};
-
-  Transform baseMainTransform_{};
-  Transform baseMeshTransform_{};
 
   /// <summary>
   /// 複数メッシュを持つObject用の初期transform一覧
   /// </summary>
   std::vector<Transform> basePartTransforms_;
+  Transform baseMainTransform_ = CreateDefaultTransform();
+  Transform baseMeshTransform_ = CreateDefaultTransform();
 
-  bool isBaseCached_ = false;
+  bool isBaseCached_ = false; // 基準transformがキャッシュされているかどうか
+  bool segmentStartAnchored_ =
+      false; // セグメント描画を開始点基準にするかどうか
 
   /// <summary>
   /// 現在の操作点一覧（見た目/編集UI/ピック判定に使用）
@@ -348,6 +409,4 @@ private:
   const std::vector<ModControlPoint> *externalControlPoints_ = nullptr;
   ModControlPointRole externalStartRole_ = ModControlPointRole::None;
   ModControlPointRole externalEndRole_ = ModControlPointRole::None;
-
-  bool segmentStartAnchored_ = false;
 };

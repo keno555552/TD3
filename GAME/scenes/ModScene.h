@@ -154,6 +154,12 @@ private:
   /// </summary>
   void SyncCustomizeDataFromScene();
 
+    /// <summary>
+  /// 現在のシーン状態から可変長の操作点スナップショットを再構築する
+  /// partId ごとに所属操作点を保存し、新方式参照コードが使える状態にする
+  /// </summary>
+  void RebuildControlPointSnapshotsFromScene();
+
   /// <summary>
   /// 新方式の partInstances から旧方式の固定配列データを再構築する
   /// 旧方式参照コードとの互換維持のために使う

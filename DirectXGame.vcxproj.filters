@@ -407,6 +407,7 @@
     <ClInclude Include="kEngine\Data\Geometry\CrashData\Segment.h" />
     <ClInclude Include="kEngine\Data\Geometry\CrashData\Sphere.h" />
     <ClInclude Include="GAME\actor\ModObjectUtil.h" />
+    <ClInclude Include="GAME\actor\ModBodyCustomizeDataUtil.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
