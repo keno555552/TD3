@@ -1,5 +1,6 @@
 #include "ModScene.h"
 #include "GAME/actor/prompt/PromptData.h"
+#include "GAME/actor/ModObjectUtil.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
 #include <unordered_set>
@@ -240,38 +241,6 @@ Vector3 ClampDistance(const Vector3 &origin, const Vector3 &target,
     return Add(origin, Multiply(maxLength, dir));
   }
   return target;
-}
-
-Vector3 ComputeObjectRootWorldTranslate(const Object *object) {
-  if (object == nullptr) {
-    return {0.0f, 0.0f, 0.0f};
-  }
-
-  Vector3 world = object->mainPosition.transform.translate;
-
-  const ObjectPart *parent = object->mainPosition.parentPart;
-  while (parent != nullptr) {
-    world = Add(world, parent->transform.translate);
-    parent = parent->parentPart;
-  }
-
-  return world;
-}
-
-Vector3 ComputeMainPositionWorldTranslate(const Object *target) {
-  if (target == nullptr) {
-    return {0.0f, 0.0f, 0.0f};
-  }
-
-  Vector3 world = target->mainPosition.transform.translate;
-
-  const ObjectPart *parent = target->mainPosition.parentPart;
-  while (parent != nullptr) {
-    world = Add(world, parent->transform.translate);
-    parent = parent->parentPart;
-  }
-
-  return world;
 }
 
 } // namespace
@@ -1229,7 +1198,8 @@ void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
       return;
     }
 
-    const Vector3 rootWorld = ComputeObjectRootWorldTranslate(bodyObject);
+    const Vector3 rootWorld =
+        ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
     const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
 
     MoveTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
@@ -1262,7 +1232,8 @@ void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
     return;
   }
 
-  const Vector3 rootWorld = ComputeObjectRootWorldTranslate(object);
+  const Vector3 rootWorld =
+      ModObjectUtil::ComputeObjectRootWorldTranslate(object);
   const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
 
   body.MoveControlPoint(static_cast<size_t>(selectedControlPointIndex_),
@@ -1304,7 +1275,8 @@ void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
     const Transform &mesh = object->objectParts_[0].transform;
 
     Sphere pickSphere{};
-    const Vector3 rootWorld = ComputeObjectRootWorldTranslate(object);
+    const Vector3 rootWorld =
+        ModObjectUtil::ComputeObjectRootWorldTranslate(object);
     pickSphere.center = Add(rootWorld, mesh.translate);
     pickSphere.radius = Max3(mesh.scale.x, mesh.scale.y, mesh.scale.z) * 0.75f;
 
@@ -1559,117 +1531,10 @@ int ModScene::FindTorsoControlPointIndex(ModControlPointRole role) const {
   return -1;
 }
 
-Vector3 ModScene::MakeDefaultAttachLocal(ModBodyPart parentPart,
-                                         ModBodyPart childPart,
-                                         PartSide childSide) const {
-  switch (parentPart) {
-  case ModBodyPart::ChestBody: {
-    switch (childPart) {
-    case ModBodyPart::Neck:
-      return {0.0f, 0.45f, 0.0f};
-
-    case ModBodyPart::Head:
-      return {0.0f, 0.75f, 0.0f};
-
-    case ModBodyPart::LeftUpperArm:
-      return {-0.75f, 0.30f, 0.0f};
-
-    case ModBodyPart::RightUpperArm:
-      return {0.75f, 0.30f, 0.0f};
-
-    case ModBodyPart::LeftThigh:
-      return {-0.35f, -0.70f, 0.0f};
-
-    case ModBodyPart::RightThigh:
-      return {0.35f, -0.70f, 0.0f};
-
-    default:
-      break;
-    }
-    break;
-  }
-
-  case ModBodyPart::StomachBody: {
-    switch (childPart) {
-    case ModBodyPart::LeftThigh:
-      return {-0.35f, -0.45f, 0.0f};
-
-    case ModBodyPart::RightThigh:
-      return {0.35f, -0.45f, 0.0f};
-
-    default:
-      break;
-    }
-    break;
-  }
-
-  case ModBodyPart::Head: {
-    switch (childPart) {
-    case ModBodyPart::LeftUpperArm:
-      return {-0.55f, 0.10f, 0.0f};
-
-    case ModBodyPart::RightUpperArm:
-      return {0.55f, 0.10f, 0.0f};
-
-    case ModBodyPart::LeftThigh:
-      return {-0.28f, -0.55f, 0.0f};
-
-    case ModBodyPart::RightThigh:
-      return {0.28f, -0.55f, 0.0f};
-
-    default:
-      break;
-    }
-    break;
-  }
-
-  case ModBodyPart::Neck: {
-    if (childPart == ModBodyPart::Head) {
-      return {0.0f, 0.0f, 0.0f};
-    }
-    break;
-  }
-
-  case ModBodyPart::LeftUpperArm:
-  case ModBodyPart::RightUpperArm: {
-    if (childPart == ModBodyPart::LeftForeArm ||
-        childPart == ModBodyPart::RightForeArm) {
-      return {0.0f, 0.0f, 0.0f};
-    }
-    break;
-  }
-
-  case ModBodyPart::LeftThigh:
-  case ModBodyPart::RightThigh: {
-    if (childPart == ModBodyPart::LeftShin ||
-        childPart == ModBodyPart::RightShin) {
-      return {0.0f, 0.0f, 0.0f};
-    }
-    break;
-  }
-
-  case ModBodyPart::LeftForeArm:
-  case ModBodyPart::RightForeArm:
-  case ModBodyPart::LeftShin:
-  case ModBodyPart::RightShin:
-  case ModBodyPart::Count:
-  default:
-    break;
-  }
-
-  if (childSide == PartSide::Left) {
-    return {-0.35f, 0.0f, 0.0f};
-  }
-  if (childSide == PartSide::Right) {
-    return {0.35f, 0.0f, 0.0f};
-  }
-  return {0.0f, 0.0f, 0.0f};
-}
-
 Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
                                            const PartNode &childNode) const {
-  const Vector3 defaultAttach =
-      MakeDefaultAttachLocal(parentNode.part, childNode.part, childNode.side);
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode.part, childNode.part, childNode.side);
 
   // torso 親は共有操作点から動的に接続基準を求める
   if (parentNode.part == ModBodyPart::ChestBody ||
@@ -1747,8 +1612,8 @@ ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
     return childNode.localTransform.translate;
   }
 
-  const Vector3 defaultAttach =
-      MakeDefaultAttachLocal(parentNode->part, childNode.part, childNode.side);
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode->part, childNode.part, childNode.side);
 
   const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
 

@@ -192,6 +192,50 @@ Vector3 ComputeMainPositionWorldTranslate(const Object *target) {
   return world;
 }
 
+void HideUnusedMeshes(Object *target, const std::vector<Transform> &baseParts,
+                      size_t startIndex) {
+  if (target == nullptr) {
+    return;
+  }
+
+  for (size_t i = startIndex; i < target->objectParts_.size(); ++i) {
+    if (i < baseParts.size()) {
+      target->objectParts_[i].transform = baseParts[i];
+    }
+    target->objectParts_[i].transform.scale = ZeroV();
+  }
+}
+
+void ApplySingleMeshFallback(Object *target, const Transform &baseMeshTransform,
+                            const std::vector<Transform> &baseParts,
+                            ModBodyPart part, const ModBodyPartParam &param) {
+  if (target == nullptr || target->objectParts_.empty()) {
+    return;
+  }
+
+  Vector3 newScale = MakePartScale(baseMeshTransform.scale, param);
+  Transform mesh = baseMeshTransform;
+  mesh.scale = newScale;
+  mesh.translate = Add(baseMeshTransform.translate, GetAnchorOffset(part, newScale));
+  target->objectParts_[0].transform = mesh;
+
+  HideUnusedMeshes(target, baseParts, 1);
+}
+
+void SyncControlPointsFromChain(std::vector<ModControlPoint> *points,
+                                const ControlPointChain &chain) {
+  if (points == nullptr) {
+    return;
+  }
+
+  const std::vector<ControlPointNode> &nodes = chain.GetNodes();
+  const size_t count = (std::min)(points->size(), nodes.size());
+
+  for (size_t i = 0; i < count; ++i) {
+    (*points)[i].localPosition = chain.GetWorldPosition(i);
+  }
+}
+
 } // namespace
 
 void ModBody::Initialize(Object *target, ModBodyPart part) {
@@ -341,33 +385,13 @@ void ModBody::Apply(Object *target) {
     endRole = externalEndRole_;
   } else {
     if (!GetVisualSegmentRoles(part_, startRole, endRole)) {
-      Vector3 newScale = MakePartScale(baseMeshTransform_.scale, param_);
-      Transform mesh = baseMeshTransform_;
-      mesh.scale = newScale;
-      mesh.translate =
-          Add(baseMeshTransform_.translate, GetAnchorOffset(part_, newScale));
-      target->objectParts_[0].transform = mesh;
-
-      for (size_t i = 1; i < target->objectParts_.size(); ++i) {
-        target->objectParts_[i].transform = basePartTransforms_[i];
-        target->objectParts_[i].transform.scale = ZeroV();
-      }
+      ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
       return;
     }
   }
 
   if (sourcePoints == nullptr || sourcePoints->empty()) {
-    Vector3 newScale = MakePartScale(baseMeshTransform_.scale, param_);
-    Transform mesh = baseMeshTransform_;
-    mesh.scale = newScale;
-    mesh.translate =
-        Add(baseMeshTransform_.translate, GetAnchorOffset(part_, newScale));
-    target->objectParts_[0].transform = mesh;
-
-    for (size_t i = 1; i < target->objectParts_.size(); ++i) {
-      target->objectParts_[i].transform = basePartTransforms_[i];
-      target->objectParts_[i].transform.scale = ZeroV();
-    }
+    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
     return;
   }
 
@@ -375,17 +399,7 @@ void ModBody::Apply(Object *target) {
   const int endIndex = FindRoleIndexInPoints(*sourcePoints, endRole);
 
   if (startIndex < 0 || endIndex < 0) {
-    Vector3 newScale = MakePartScale(baseMeshTransform_.scale, param_);
-    Transform mesh = baseMeshTransform_;
-    mesh.scale = newScale;
-    mesh.translate =
-        Add(baseMeshTransform_.translate, GetAnchorOffset(part_, newScale));
-    target->objectParts_[0].transform = mesh;
-
-    for (size_t i = 1; i < target->objectParts_.size(); ++i) {
-      target->objectParts_[i].transform = basePartTransforms_[i];
-      target->objectParts_[i].transform.scale = ZeroV();
-    }
+    ApplySingleMeshFallback(target, baseMeshTransform_, basePartTransforms_, part_, param_);
     return;
   }
 
@@ -409,10 +423,7 @@ void ModBody::Apply(Object *target) {
   ApplySegmentToObjectPart(target, 0, startPos, endPos);
 
   // 2つ目以降の mesh は使わない
-  for (size_t i = 1; i < target->objectParts_.size(); ++i) {
-    target->objectParts_[i].transform = basePartTransforms_[i];
-    target->objectParts_[i].transform.scale = ZeroV();
-  }
+  HideUnusedMeshes(target, basePartTransforms_, 1);
 }
 
 void ModBody::ResetControlPoints() {
@@ -468,14 +479,7 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
     }
 
     if (chain_.MovePoint(static_cast<size_t>(chainIndex), newLocalPosition)) {
-      std::vector<ModControlPoint> &points = controlPoints_;
-      const std::vector<ControlPointNode> &nodes = chain_.GetNodes();
-
-      const size_t count = (std::min)(points.size(), nodes.size());
-      for (size_t i = 0; i < count; ++i) {
-        points[i].localPosition = chain_.GetWorldPosition(i);
-      }
-
+      SyncControlPointsFromChain(&controlPoints_, chain_);
       UpdateControlPointHierarchy();
       return true;
     }

@@ -324,13 +324,6 @@ private:
   /// <returns>胴体部位なら true</returns>
   bool IsTorsoVisiblePartId(int partId) const;
 
-    /// <summary>
-  /// 親子の組み合わせから、デフォルトの接続位置を返す
-  /// localTransform.translate の基準位置として使う
-  /// </summary>
-  Vector3 MakeDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
-                                 PartSide childSide) const;
-
   /// <summary>
   /// 現在の親の形状を加味した接続基準位置を返す
   /// torso の操作点や親スケールの影響をここで反映する

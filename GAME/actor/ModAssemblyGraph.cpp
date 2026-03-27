@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
-#include "GAME/scenes/ModScene.h"
 
 namespace {
 

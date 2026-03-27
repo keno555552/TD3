@@ -42,9 +42,9 @@ struct ConnectorNode {
 /// 改造体の親子構造を管理するために、部位情報・親情報・ローカル変換・接続点をまとめて持つ
 /// </summary>
 struct PartNode {
-  int id = -1;                          // 部位ID
+  int id = -1;                               // 部位ID
   ModBodyPart part = ModBodyPart::ChestBody; // 部位種類
-  PartSide side = PartSide::Center;     // 部位の左右属性
+  PartSide side = PartSide::Center;          // 部位の左右属性
 
   int parentId = -1;          // 親部位ID
   int parentConnectorId = -1; // 親側で接続しているコネクタID
@@ -202,6 +202,14 @@ public:
   /// <param name="partId">対象部位ID</param>
   /// <returns>ワールド位置</returns>
   Vector3 ComputeWorldPosition(int partId) const;
+
+  /// <summary>
+  /// 親部位上での子部位のデフォルト接続位置を返す（参照用）
+  /// </summary>
+  Vector3 GetDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
+                                PartSide childSide) const {
+    return MakeDefaultAttachLocal(parentPart, childPart, childSide);
+  }
 
 private:
   /// <summary>
@@ -445,7 +453,7 @@ private:
   /// <param name="parentId">接続先親部位ID</param>
   void AttachPartToParent(int childId, int parentId);
 
-    /// <summary>
+  /// <summary>
   /// 親部位上での子部位のデフォルト接続位置を返す
   /// free attach 方式の初期配置に使う
   /// </summary>
