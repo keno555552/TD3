@@ -42,9 +42,9 @@ struct ConnectorNode {
 /// 改造体の親子構造を管理するために、部位情報・親情報・ローカル変換・接続点をまとめて持つ
 /// </summary>
 struct PartNode {
-  int id = -1;                          // 部位ID
-  ModBodyPart part = ModBodyPart::Body; // 部位種類
-  PartSide side = PartSide::Center;     // 部位の左右属性
+  int id = -1;                               // 部位ID
+  ModBodyPart part = ModBodyPart::ChestBody; // 部位種類
+  PartSide side = PartSide::Center;          // 部位の左右属性
 
   int parentId = -1;          // 親部位ID
   int parentConnectorId = -1; // 親側で接続しているコネクタID
@@ -202,6 +202,14 @@ public:
   /// <param name="partId">対象部位ID</param>
   /// <returns>ワールド位置</returns>
   Vector3 ComputeWorldPosition(int partId) const;
+
+  /// <summary>
+  /// 親部位上での子部位のデフォルト接続位置を返す（参照用）
+  /// </summary>
+  Vector3 GetDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
+                                PartSide childSide) const {
+    return MakeDefaultAttachLocal(parentPart, childPart, childSide);
+  }
 
 private:
   /// <summary>
@@ -380,8 +388,20 @@ private:
   /// </summary>
   void RefreshManagedPartIds();
 
+  /// <summary>
+  /// 指定部位が Body の子部位かどうかを判定する
+  /// </summary>
+  /// <param name="part">判定対象部位</param>
+  /// <returns>Body の子部位なら true</returns>
   bool IsBodyChildPart(ModBodyPart part) const;
+
+  /// <summary>
+  /// 指定部位が Head に接続可能かどうかを判定する
+  /// </summary>
+  /// <param name="part">判定対象部位</param>
+  /// <returns>Head に接続可能なら true</returns>
   bool IsHeadAttachableToBody(ModBodyPart part) const;
+
   /// <summary>
   /// 指定種類の最初の部位IDを返す
   /// 首や頭の代表ノードを探すときに使う
@@ -390,7 +410,20 @@ private:
   /// <param name="excludeId">除外したい部位ID</param>
   /// <returns>見つかった部位ID。無ければ -1</returns>
   int FindFirstPartId(ModBodyPart part, int excludeId = -1) const;
+
+  /// <summary>
+  /// 指定した子部位をつなぐのに最も適した親側コネクタIDを探す
+  /// </summary>
+  /// <param name="childId">付け替え対象の子部位ID</param>
+  /// <param
+  /// name="removedPartId">削除予定の部位ID。-1の場合は通常の親探し</param>
+  /// <returns>新しい親部位ID。見つからない場合は -1</returns>
   int FindPreferredParentForChild(int childId, int removedPartId = -1) const;
+
+  /// <summary>
+  /// 現在存在している脚根元の数を数える
+  /// </summary>
+  /// <param name="newBodyId">Body 復帰後の Body 部位ID</param>
   void ReattachPartsForBodyRestore(int newBodyId);
 
   /// <summary>
@@ -419,6 +452,19 @@ private:
   /// <param name="childId">接続する子部位ID</param>
   /// <param name="parentId">接続先親部位ID</param>
   void AttachPartToParent(int childId, int parentId);
+
+  /// <summary>
+  /// 親部位上での子部位のデフォルト接続位置を返す
+  /// free attach 方式の初期配置に使う
+  /// </summary>
+  Vector3 MakeDefaultAttachLocal(ModBodyPart parentPart, ModBodyPart childPart,
+                                 PartSide childSide) const;
+
+  /// <summary>
+  /// 子部位の現在の親に応じてデフォルト接続位置へ戻す
+  /// 親変更直後の初期配置に使う
+  /// </summary>
+  void ResetChildAttachLocal(PartNode &child);
 
 private:
   std::unordered_map<int, PartNode> nodes_; // 全部位ノード一覧

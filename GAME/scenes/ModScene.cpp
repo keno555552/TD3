@@ -1,5 +1,8 @@
 #include "ModScene.h"
 #include "GAME/actor/prompt/PromptData.h"
+#include "GAME/actor/ModObjectUtil.h"
+#include "Math/Geometry/Collision/crashDecision.h"
+#include <Windows.h>
 #include <unordered_set>
 
 namespace {
@@ -10,18 +13,42 @@ Vector3 Mul(const Vector3 &a, const Vector3 &b) {
   return {a.x * b.x, a.y * b.y, a.z * b.z};
 }
 
-Vector3 AddV(const Vector3 &a, const Vector3 &b) {
-  return {a.x + b.x, a.y + b.y, a.z + b.z};
+Vector3 NormalizeSafeV(const Vector3 &v, const Vector3 &fallback) {
+  const float len = Length(v);
+  if (len < 0.0001f) {
+    return fallback;
+  }
+
+  const float inv = 1.0f / len;
+  return {v.x * inv, v.y * inv, v.z * inv};
 }
 
-Vector3 SubV(const Vector3 &a, const Vector3 &b) {
-  return {a.x - b.x, a.y - b.y, a.z - b.z};
+float Max3(float a, float b, float c) {
+  return (std::max)(a, (std::max)(b, c));
+}
+
+Vector4 MakeColor(float r, float g, float b, float a = 1.0f) {
+  return {r, g, b, a};
+}
+
+Vector3 ZeroV() { return {0.0f, 0.0f, 0.0f}; }
+
+int FindRoleIndexInModPoints(const std::vector<ModControlPoint> &points,
+                             ModControlPointRole role) {
+  for (size_t i = 0; i < points.size(); ++i) {
+    if (points[i].role == role) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
 }
 
 const char *PartName(ModBodyPart part) {
   switch (part) {
-  case ModBodyPart::Body:
-    return "Body";
+  case ModBodyPart::ChestBody:
+    return "ChestBody";
+  case ModBodyPart::StomachBody:
+    return "StomachBody";
   case ModBodyPart::Neck:
     return "Neck";
   case ModBodyPart::Head:
@@ -49,12 +76,18 @@ const char *PartName(ModBodyPart part) {
 
 std::string ModelPath(ModBodyPart part) {
   switch (part) {
-  case ModBodyPart::Body:
-    return "GAME/resources/modBody/body/body.obj";
+  case ModBodyPart::ChestBody:
+    return "GAME/resources/modBody/chest/chest.obj";
+
+  case ModBodyPart::StomachBody:
+    return "GAME/resources/modBody/stomach/stomach.obj";
+
   case ModBodyPart::Neck:
     return "GAME/resources/modBody/neck/neck.obj";
+
   case ModBodyPart::Head:
     return "GAME/resources/modBody/head/head.obj";
+
   case ModBodyPart::LeftUpperArm:
     return "GAME/resources/modBody/leftUpperArm/leftUpperArm.obj";
   case ModBodyPart::LeftForeArm:
@@ -72,11 +105,143 @@ std::string ModelPath(ModBodyPart part) {
   case ModBodyPart::RightShin:
     return "GAME/resources/modBody/rightShin/rightShin.obj";
   default:
-    return "GAME/resources/modBody/body/body.obj";
+    return "GAME/resources/modBody/chest/chest.obj";
   }
 }
 
+int FindFirstChildPartId(const ModAssemblyGraph &assembly, int parentId,
+                         ModBodyPart wantedPart) {
+  const std::vector<int> children = assembly.GetChildren(parentId);
+  for (size_t i = 0; i < children.size(); ++i) {
+    const PartNode *child = assembly.FindNode(children[i]);
+    if (child != nullptr && child->part == wantedPart) {
+      return child->id;
+    }
+  }
+  return -1;
+}
+
+int ResolveControlOwnerPartId(const ModAssemblyGraph &assembly, int partId) {
+  const PartNode *node = assembly.FindNode(partId);
+  if (node == nullptr) {
+    return -1;
+  }
+
+  switch (node->part) {
+  case ModBodyPart::Neck: {
+    const int headId =
+        FindFirstChildPartId(assembly, node->id, ModBodyPart::Head);
+    if (headId >= 0) {
+      return headId;
+    }
+    break;
+  }
+
+  case ModBodyPart::LeftForeArm:
+    if (node->parentId >= 0) {
+      const PartNode *parent = assembly.FindNode(node->parentId);
+      if (parent != nullptr && parent->part == ModBodyPart::LeftUpperArm) {
+        return parent->id;
+      }
+    }
+    break;
+
+  case ModBodyPart::RightForeArm:
+    if (node->parentId >= 0) {
+      const PartNode *parent = assembly.FindNode(node->parentId);
+      if (parent != nullptr && parent->part == ModBodyPart::RightUpperArm) {
+        return parent->id;
+      }
+    }
+    break;
+
+  case ModBodyPart::LeftShin:
+    if (node->parentId >= 0) {
+      const PartNode *parent = assembly.FindNode(node->parentId);
+      if (parent != nullptr && parent->part == ModBodyPart::LeftThigh) {
+        return parent->id;
+      }
+    }
+    break;
+
+  case ModBodyPart::RightShin:
+    if (node->parentId >= 0) {
+      const PartNode *parent = assembly.FindNode(node->parentId);
+      if (parent != nullptr && parent->part == ModBodyPart::RightThigh) {
+        return parent->id;
+      }
+    }
+    break;
+
+  default:
+    break;
+  }
+
+  return partId;
+}
+
 bool IsSelectablePart(ModBodyPart part) { return part != ModBodyPart::Count; }
+
+bool IsMouseLeftPressed() {
+  return (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+}
+
+bool IsMouseLeftTriggered() {
+  static bool wasPressed = false;
+  const bool nowPressed = IsMouseLeftPressed();
+  const bool triggered = (!wasPressed && nowPressed);
+  wasPressed = nowPressed;
+  return triggered;
+}
+
+bool IsMouseLeftReleased() {
+  static bool wasPressed = false;
+  const bool nowPressed = IsMouseLeftPressed();
+  const bool released = (wasPressed && !nowPressed);
+  wasPressed = nowPressed;
+  return released;
+}
+
+bool RayPlaneIntersectionZ(const Ray &ray, float planeZ, Vector3 *hitPoint) {
+  const float epsilon = 0.0001f;
+
+  if (fabsf(ray.direction.z) < epsilon) {
+    return false;
+  }
+
+  const float t = (planeZ - ray.origin.z) / ray.direction.z;
+  if (t < 0.0f) {
+    return false;
+  }
+
+  if (hitPoint != nullptr) {
+    hitPoint->x = ray.origin.x + ray.direction.x * t;
+    hitPoint->y = ray.origin.y + ray.direction.y * t;
+    hitPoint->z = ray.origin.z + ray.direction.z * t;
+  }
+
+  return true;
+}
+
+Vector3 ClampDistance(const Vector3 &origin, const Vector3 &target,
+                      float minLength, float maxLength,
+                      const Vector3 &fallbackDir) {
+  Vector3 diff = Subtract(target, origin);
+  float length = Length(diff);
+
+  Vector3 dir = fallbackDir;
+  if (length > 0.0001f) {
+    dir = NormalizeSafeV(diff, fallbackDir);
+  }
+
+  if (length < minLength) {
+    return Add(origin, Multiply(minLength, dir));
+  }
+  if (length > maxLength) {
+    return Add(origin, Multiply(maxLength, dir));
+  }
+  return target;
+}
 
 } // namespace
 
@@ -123,6 +288,10 @@ ModScene::ModScene(kEngine *system) {
   // フェードインを開始する
   fade_.Initialize(system_);
   fade_.StartFadeIn();
+
+  // 操作点表示用の白テクスチャを読み込む
+  controlPointGizmoTextureHandle_ =
+      system_->LoadTexture("GAME/resources/texture/white100x100.png");
 }
 
 ModScene::~ModScene() {
@@ -194,7 +363,11 @@ void ModScene::Update() {
     SyncObjectsWithAssembly();
     LoadCustomizeData();
     EnsureValidSelection();
+    ClearControlPointSelection();
   }
+
+  // 操作点の選択とドラッグ移動を処理する
+  UpdateControlPointEditing();
 
   // 現在の構造とパラメータを見た目へ反映する
   UpdateModObjects();
@@ -228,6 +401,9 @@ void ModScene::Update() {
 void ModScene::Draw() {
   // 改造部位 Object を描画する
   DrawModObjects();
+
+  // 操作点表示球を描画する
+  DrawControlPointGizmos();
 
 #ifdef USE_IMGUI
   // シーン共通の簡易操作説明を表示する
@@ -277,6 +453,9 @@ void ModScene::CameraPart() {
 void ModScene::SetupModObjects() {
   // 初期人型構造を作成する
   assembly_.InitializeDefaultHumanoid();
+
+  // 胴体共有操作点を初期化する
+  ResetTorsoControlPoints();
 
   // Graph に合わせて Object 一覧を生成する
   SyncObjectsWithAssembly();
@@ -358,7 +537,7 @@ void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
 }
 
 void ModScene::ApplyAssemblyToSceneHierarchy() {
-  // まず全 Object の親参照をいったん外す
+  // まず全 Object の親参照をクリアする
   for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
            modObjects_.begin();
        it != modObjects_.end(); ++it) {
@@ -371,7 +550,7 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
     object->mainPosition.parentPart = nullptr;
   }
 
-  // 現在の AssemblyGraph に従って親子関係と root 位置を再設定する
+  // AssemblyGraph の親子関係を Scene の Object 階層へ反映する
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
 
@@ -385,11 +564,9 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
       continue;
     }
 
-    // 基本は Graph が持っているローカル位置を使う
     Vector3 localTranslate = node->localTransform.translate;
     const Vector3 localRotate = {0.0f, 0.0f, 0.0f};
 
-    // 親がいる場合は、親コネクタと自分のコネクタを合わせるように位置を補正する
     if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
       Object *parentObject = modObjects_[node->parentId].get();
       if (parentObject != nullptr) {
@@ -397,40 +574,52 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
         object->mainPosition.parentPart = &parentObject->mainPosition;
       }
 
-      // 親部位と自分の見た目スケールを取得する
-      Vector3 parentScale = {1.0f, 1.0f, 1.0f};
-      if (modBodies_.count(node->parentId) > 0) {
-        parentScale = modBodies_[node->parentId].GetVisualScaleRatio();
+      bool handledByOwnerPoint = false;
+
+      // 前腕・脛は owner の Bend に追従する
+      switch (node->part) {
+      case ModBodyPart::LeftForeArm:
+      case ModBodyPart::RightForeArm:
+      case ModBodyPart::LeftShin:
+      case ModBodyPart::RightShin: {
+        const int ownerId = ResolveControlOwnerPartId(assembly_, id);
+        if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
+          const std::vector<ModControlPoint> &ownerPoints =
+              modBodies_[ownerId].GetControlPoints();
+
+          const int bendIndex = modBodies_[ownerId].FindControlPointIndex(
+              ModControlPointRole::Bend);
+
+          if (bendIndex >= 0) {
+            localTranslate =
+                ownerPoints[static_cast<size_t>(bendIndex)].localPosition;
+            handledByOwnerPoint = true;
+          }
+        }
+        break;
       }
 
-      Vector3 selfScale = {1.0f, 1.0f, 1.0f};
-      if (modBodies_.count(id) > 0) {
-        selfScale = modBodies_[id].GetVisualScaleRatio();
+      case ModBodyPart::Head: {
+        const PartNode *parentNode = assembly_.FindNode(node->parentId);
+
+        // Neck の子である Head は Neck root と一致させる
+        if (parentNode != nullptr && parentNode->part == ModBodyPart::Neck) {
+          localTranslate = {0.0f, 0.0f, 0.0f};
+          handledByOwnerPoint = true;
+        }
+        break;
       }
 
-      // 親側と自分側の接続点を取得する
-      const ConnectorNode *parentConn =
-          assembly_.FindConnector(node->parentId, node->parentConnectorId);
-      const ConnectorNode *selfConn =
-          assembly_.FindConnector(id, node->selfConnectorId);
-
-      // 接続点のローカル位置をスケール込みで補正する
-      Vector3 parentAnchor = {0.0f, 0.0f, 0.0f};
-      Vector3 selfAnchor = {0.0f, 0.0f, 0.0f};
-
-      if (parentConn != nullptr) {
-        parentAnchor = Mul(parentConn->localPosition, parentScale);
-      }
-      if (selfConn != nullptr) {
-        selfAnchor = Mul(selfConn->localPosition, selfScale);
+      default:
+        break;
       }
 
-      // 親アンカーと自分アンカーが一致するよう root 位置を求める
-      localTranslate =
-          AddV(node->localTransform.translate, SubV(parentAnchor, selfAnchor));
+      // それ以外は、親の現在形状を使って接続位置を解決する
+      if (!handledByOwnerPoint) {
+        localTranslate = ResolveAttachedLocalTranslate(*node);
+      }
     }
 
-    // root transform へ反映する
     object->mainPosition.transform.translate = localTranslate;
     object->mainPosition.transform.rotate = localRotate;
     object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
@@ -643,6 +832,9 @@ void ModScene::ResetToDefaultHumanoid() {
   // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
+  // 胴体共有操作点も初期化する
+  ResetTorsoControlPoints();
+
   // Object 一覧を構造に合わせて再同期する
   SyncObjectsWithAssembly();
 
@@ -662,6 +854,9 @@ void ModScene::SelectPart(int partId) {
   // 付け替え候補は選択し直しになるのでリセットする
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
+
+  // 部位を選び直したら操作点選択もいったん解除する
+  ClearControlPointSelection();
 }
 
 void ModScene::EnsureValidSelection() {
@@ -692,6 +887,9 @@ void ModScene::EnsureValidSelection() {
   // 付け替え候補はリセットする
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
+
+  // 部位選択が無効化された場合は操作点選択も解除する
+  ClearControlPointSelection();
 }
 
 void ModScene::DeleteSelectedPart() {
@@ -715,28 +913,25 @@ void ModScene::DeleteSelectedPart() {
   selectedPartId_ = targetId;
   SyncObjectsWithAssembly();
   EnsureValidSelection();
+  ClearControlPointSelection();
 }
 
 void ModScene::ReattachSelectedPart() {
-  // 付け替え元と付け替え先がそろっていなければ何もしない
   if (selectedPartId_ < 0 || reattachParentId_ < 0) {
     return;
   }
 
-  // セット単位移動が必要な場合を考慮して対象部位IDを補正する
   const int targetId = ResolveAssemblyOperationPartId(selectedPartId_);
   if (targetId < 0) {
     return;
   }
 
-  // 親コネクタ指定付きで Graph の親子関係を変更する
-  int connectorId = reattachConnectorId_;
-  if (!assembly_.MovePart(targetId, reattachParentId_, connectorId)) {
+  if (!assembly_.MovePart(targetId, reattachParentId_, -1)) {
     return;
   }
 
-  // 構造変更後の Object 一覧を同期する
   SyncObjectsWithAssembly();
+  ClearControlPointSelection();
 }
 
 void ModScene::NudgeSelectedPart(const Vector3 &delta) {
@@ -753,7 +948,7 @@ void ModScene::NudgeSelectedPart(const Vector3 &delta) {
 
   // delta を加算してローカル位置を更新する
   assembly_.SetPartLocalTranslate(selectedPartId_,
-                                  AddV(node->localTransform.translate, delta));
+                                  Add(node->localTransform.translate, delta));
 }
 
 int ModScene::ResolveAssemblyOperationPartId(int partId) const {
@@ -763,7 +958,9 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
     return -1;
   }
 
-  // 前腕が選ばれている場合は上腕を操作対象にする
+  // 今の段階では腕・脚は既存の 2 パーツ構造のまま扱っている
+  // そのため、前腕を選んだ場合は上腕、脛を選んだ場合は腿を
+  // 編集対象へ寄せて、1 セットとして扱う
   switch (node->part) {
   case ModBodyPart::LeftForeArm:
     if (node->parentId >= 0) {
@@ -783,7 +980,6 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
     }
     break;
 
-  // 脛が選ばれている場合は腿を操作対象にする
   case ModBodyPart::LeftShin:
     if (node->parentId >= 0) {
       const PartNode *parent = assembly_.FindNode(node->parentId);
@@ -810,11 +1006,840 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
   return partId;
 }
 
+void ModScene::UpdateControlPointEditing() {
+#ifdef USE_IMGUI
+  if (ImGui::GetIO().WantCaptureMouse) {
+    if (!IsMouseLeftPressed()) {
+      isDraggingControlPoint_ = false;
+    }
+    hoveredPartId_ = -1;
+    return;
+  }
+#endif
+
+  if (usingCamera_ == nullptr) {
+    return;
+  }
+
+  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+
+  // まずマウスが当たっている部位を更新する
+  UpdateHoveredPartFromMouseRay(mouseRay);
+
+  // 左クリック開始時に操作点を拾う
+  if (IsMouseLeftTriggered()) {
+    if (PickControlPointFromMouseRay(mouseRay)) {
+      isDraggingControlPoint_ = true;
+    }
+  }
+
+  // ドラッグ中は現在の Ray から操作点位置を更新する
+  if (isDraggingControlPoint_ && IsMouseLeftPressed()) {
+    MoveSelectedControlPointFromMouseRay(mouseRay);
+  }
+
+  // 左ボタンを離したらドラッグ終了
+  if (IsMouseLeftReleased()) {
+    isDraggingControlPoint_ = false;
+  }
+}
+
+bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
+  const int visiblePartId =
+      (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
+
+  if (visiblePartId < 0) {
+    return false;
+  }
+
+  // 胴体共有点を優先して判定する
+  if (IsTorsoVisiblePartId(visiblePartId)) {
+    float nearestT = FLT_MAX;
+    int nearestPointIndex = -1;
+
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      if (!(torsoControlPoints_[i].movable ||
+            torsoControlPoints_[i].isConnectionPoint)) {
+        continue;
+      }
+
+      Sphere sphere{};
+      sphere.center =
+          GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+      sphere.radius = torsoControlPoints_[i].radius;
+
+      float t = 0.0f;
+      if (!crashDecision(sphere, mouseRay, &t)) {
+        continue;
+      }
+
+      if (t < nearestT) {
+        nearestT = t;
+        nearestPointIndex = static_cast<int>(i);
+      }
+    }
+
+    if (nearestPointIndex < 0) {
+      return false;
+    }
+
+    selectedControlPartId_ = -2;
+    selectedControlPointIndex_ = nearestPointIndex;
+    selectedPartId_ = visiblePartId;
+    reattachParentId_ = -1;
+    reattachConnectorId_ = -1;
+
+    const Vector3 worldPos = GetTorsoControlPointWorldPosition(
+        torsoControlPoints_[static_cast<size_t>(nearestPointIndex)].role);
+
+    dragControlPlaneZ_ = worldPos.z;
+
+    Vector3 hitPoint{};
+    if (RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+      dragControlPointOffset_ = Subtract(worldPos, hitPoint);
+    } else {
+      dragControlPointOffset_ = ZeroV();
+    }
+
+    return true;
+  }
+
+  const int controlOwnerId =
+      ResolveControlOwnerPartId(assembly_, visiblePartId);
+
+  if (controlOwnerId < 0) {
+    return false;
+  }
+
+  if (modBodies_.count(controlOwnerId) == 0 ||
+      modObjects_.count(controlOwnerId) == 0) {
+    return false;
+  }
+
+  float nearestT = FLT_MAX;
+  int nearestPointIndex = -1;
+
+  Object *object = modObjects_[controlOwnerId].get();
+  if (object == nullptr) {
+    return false;
+  }
+
+  ModBody &body = modBodies_[controlOwnerId];
+  const std::vector<ModControlPoint> &points = body.GetControlPoints();
+
+  for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
+    if (!(points[pointIndex].movable || points[pointIndex].isConnectionPoint)) {
+      continue;
+    }
+
+    Sphere sphere{};
+    sphere.center = body.GetControlPointWorldPosition(object, pointIndex);
+    sphere.radius = points[pointIndex].radius;
+
+    float t = 0.0f;
+    if (!crashDecision(sphere, mouseRay, &t)) {
+      continue;
+    }
+
+    if (t < nearestT) {
+      nearestT = t;
+      nearestPointIndex = static_cast<int>(pointIndex);
+    }
+  }
+
+  if (nearestPointIndex < 0) {
+    return false;
+  }
+
+  selectedControlPartId_ = controlOwnerId;
+  selectedControlPointIndex_ = nearestPointIndex;
+
+  selectedPartId_ = visiblePartId;
+  reattachParentId_ = -1;
+  reattachConnectorId_ = -1;
+
+  const Vector3 worldPos =
+      modBodies_[controlOwnerId].GetControlPointWorldPosition(
+          object, static_cast<size_t>(nearestPointIndex));
+
+  dragControlPlaneZ_ = worldPos.z;
+
+  Vector3 hitPoint{};
+  if (RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+    dragControlPointOffset_ = Subtract(worldPos, hitPoint);
+  } else {
+    dragControlPointOffset_ = ZeroV();
+  }
+
+  return true;
+}
+
+void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
+  if (selectedControlPointIndex_ < 0) {
+    return;
+  }
+
+  Vector3 hitPoint{};
+  if (!RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+    return;
+  }
+
+  const Vector3 targetWorld = Add(hitPoint, dragControlPointOffset_);
+
+  // torso 共有点
+  if (selectedControlPartId_ == -2) {
+    const int chestBodyId = assembly_.GetBodyId();
+    if (chestBodyId < 0 || modObjects_.count(chestBodyId) == 0) {
+      return;
+    }
+
+    Object *bodyObject = modObjects_[chestBodyId].get();
+    if (bodyObject == nullptr) {
+      return;
+    }
+
+    const Vector3 rootWorld =
+        ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
+    const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
+
+    MoveTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
+                          targetLocal);
+    return;
+  }
+
+  if (selectedControlPartId_ < 0) {
+    return;
+  }
+
+  if (modBodies_.count(selectedControlPartId_) == 0 ||
+      modObjects_.count(selectedControlPartId_) == 0) {
+    return;
+  }
+
+  ModBody &body = modBodies_[selectedControlPartId_];
+  const std::vector<ModControlPoint> &points = body.GetControlPoints();
+
+  if (selectedControlPointIndex_ >= static_cast<int>(points.size())) {
+    return;
+  }
+
+  if (!points[static_cast<size_t>(selectedControlPointIndex_)].movable) {
+    return;
+  }
+
+  Object *object = modObjects_[selectedControlPartId_].get();
+  if (object == nullptr) {
+    return;
+  }
+
+  const Vector3 rootWorld =
+      ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+  const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
+
+  body.MoveControlPoint(static_cast<size_t>(selectedControlPointIndex_),
+                        targetLocal);
+}
+
+void ModScene::ClearControlPointSelection() {
+  selectedControlPartId_ = -1;
+  selectedControlPointIndex_ = -1;
+  isDraggingControlPoint_ = false;
+  dragControlPlaneZ_ = 0.0f;
+  dragControlPointOffset_ = {0.0f, 0.0f, 0.0f};
+  hoveredPartId_ = -1;
+}
+
+void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
+  // ドラッグ中は選択部位を優先して表示する
+  if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
+    hoveredPartId_ = selectedControlPartId_;
+    return;
+  }
+
+  float nearestT = FLT_MAX;
+  int nearestPartId = -1;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int partId = orderedPartIds_[i];
+
+    if (modObjects_.count(partId) == 0 || modBodies_.count(partId) == 0) {
+      continue;
+    }
+
+    Object *object = modObjects_[partId].get();
+    if (object == nullptr || object->objectParts_.empty()) {
+      continue;
+    }
+
+    // mesh の見た目中心とスケールから簡易球を作る
+    const Transform &mesh = object->objectParts_[0].transform;
+
+    Sphere pickSphere{};
+    const Vector3 rootWorld =
+        ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+    pickSphere.center = Add(rootWorld, mesh.translate);
+    pickSphere.radius = Max3(mesh.scale.x, mesh.scale.y, mesh.scale.z) * 0.75f;
+
+    float t = 0.0f;
+    if (!crashDecision(pickSphere, mouseRay, &t)) {
+      continue;
+    }
+
+    if (t < nearestT) {
+      nearestT = t;
+      nearestPartId = partId;
+    }
+  }
+
+  hoveredPartId_ = nearestPartId;
+}
+
+void ModScene::EnsureControlPointGizmoCount(size_t requiredCount) {
+  while (controlPointGizmos_.size() < requiredCount) {
+    std::unique_ptr<Object> gizmo = std::make_unique<Object>();
+    gizmo->IntObject(system_);
+    gizmo->CreateDefaultData();
+    gizmo->modelHandle_ = config::default_Sphere_MeshBufferHandle_;
+
+    // カメラ正面向きで見やすくする
+    gizmo->isBillboard_ = true;
+
+    if (!gizmo->objectParts_.empty()) {
+      gizmo->objectParts_[0].materialConfig->textureHandle =
+          controlPointGizmoTextureHandle_;
+      gizmo->objectParts_[0].materialConfig->useModelTexture = false;
+      gizmo->objectParts_[0].materialConfig->enableLighting = false;
+      gizmo->objectParts_[0].materialConfig->textureColor =
+          MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+
+    controlPointGizmos_.push_back(std::move(gizmo));
+  }
+}
+
+void ModScene::UpdateControlPointGizmos() {
+  activeControlPointGizmoCount_ = 0;
+
+  int visiblePartId = -1;
+  if (isDraggingControlPoint_ && selectedPartId_ >= 0) {
+    visiblePartId = selectedPartId_;
+  } else if (hoveredPartId_ >= 0) {
+    visiblePartId = hoveredPartId_;
+  } else if (selectedPartId_ >= 0) {
+    visiblePartId = selectedPartId_;
+  }
+
+  if (visiblePartId < 0) {
+    return;
+  }
+
+  // torso 共有点表示
+  if (IsTorsoVisiblePartId(visiblePartId)) {
+    size_t visibleCount = 0;
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      if (torsoControlPoints_[i].movable ||
+          torsoControlPoints_[i].isConnectionPoint) {
+        ++visibleCount;
+      }
+    }
+
+    EnsureControlPointGizmoCount(visibleCount);
+
+    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    size_t gizmoIndex = 0;
+
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      if (!(torsoControlPoints_[i].movable ||
+            torsoControlPoints_[i].isConnectionPoint)) {
+        continue;
+      }
+
+      Object *gizmo = controlPointGizmos_[gizmoIndex].get();
+      if (gizmo == nullptr || gizmo->objectParts_.empty()) {
+        continue;
+      }
+
+      const bool isSelected =
+          (selectedControlPartId_ == -2 &&
+           selectedControlPointIndex_ == static_cast<int>(i));
+
+      const Vector3 worldPos =
+          GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+      const float radius = torsoControlPoints_[i].radius;
+
+      const Vector3 toCamera =
+          NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+      const Vector3 drawPos = Add(worldPos, Multiply(radius * 1.5f, toCamera));
+
+      gizmo->mainPosition.transform.translate = drawPos;
+      gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+      gizmo->mainPosition.transform.scale = {radius * 2.0f, radius * 2.0f,
+                                             radius * 2.0f};
+
+      gizmo->objectParts_[0].materialConfig->useModelTexture = false;
+      gizmo->objectParts_[0].materialConfig->enableLighting = false;
+
+      if (isSelected) {
+        gizmo->objectParts_[0].materialConfig->textureColor =
+            MakeColor(1.0f, 0.45f, 0.2f, 1.0f);
+      } else if (torsoControlPoints_[i].isConnectionPoint) {
+        gizmo->objectParts_[0].materialConfig->textureColor =
+            MakeColor(1.0f, 0.9f, 0.2f, 1.0f);
+      } else {
+        gizmo->objectParts_[0].materialConfig->textureColor =
+            MakeColor(0.35f, 0.9f, 1.0f, 1.0f);
+      }
+
+      gizmo->Update(usingCamera_);
+      ++gizmoIndex;
+    }
+
+    activeControlPointGizmoCount_ = gizmoIndex;
+    return;
+  }
+
+  const int controlOwnerId =
+      ResolveControlOwnerPartId(assembly_, visiblePartId);
+
+  if (controlOwnerId < 0) {
+    return;
+  }
+
+  if (modBodies_.count(controlOwnerId) == 0 ||
+      modObjects_.count(controlOwnerId) == 0) {
+    return;
+  }
+
+  Object *partObject = modObjects_[controlOwnerId].get();
+  if (partObject == nullptr) {
+    return;
+  }
+
+  ModBody &body = modBodies_[controlOwnerId];
+  const std::vector<ModControlPoint> &points = body.GetControlPoints();
+
+  size_t visibleCount = 0;
+  for (size_t i = 0; i < points.size(); ++i) {
+    if (points[i].movable || points[i].isConnectionPoint) {
+      ++visibleCount;
+    }
+  }
+
+  EnsureControlPointGizmoCount(visibleCount);
+
+  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+
+  size_t gizmoIndex = 0;
+  for (size_t i = 0; i < points.size(); ++i) {
+    if (!(points[i].movable || points[i].isConnectionPoint)) {
+      continue;
+    }
+
+    Object *gizmo = controlPointGizmos_[gizmoIndex].get();
+    if (gizmo == nullptr || gizmo->objectParts_.empty()) {
+      continue;
+    }
+
+    const bool isSelected = (selectedControlPartId_ == controlOwnerId &&
+                             selectedControlPointIndex_ == static_cast<int>(i));
+
+    const Vector3 worldPos = body.GetControlPointWorldPosition(partObject, i);
+    const float radius = points[i].radius;
+
+    const Vector3 toCamera =
+        NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+    const Vector3 drawPos = Add(worldPos, Multiply(radius * 1.5f, toCamera));
+
+    gizmo->mainPosition.transform.translate = drawPos;
+    gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+    gizmo->mainPosition.transform.scale = {radius * 2.0f, radius * 2.0f,
+                                           radius * 2.0f};
+
+    gizmo->objectParts_[0].materialConfig->useModelTexture = false;
+    gizmo->objectParts_[0].materialConfig->enableLighting = false;
+
+    if (isSelected) {
+      gizmo->objectParts_[0].materialConfig->textureColor =
+          MakeColor(1.0f, 0.45f, 0.2f, 1.0f);
+    } else if (points[i].isConnectionPoint) {
+      gizmo->objectParts_[0].materialConfig->textureColor =
+          MakeColor(1.0f, 0.9f, 0.2f, 1.0f);
+    } else {
+      gizmo->objectParts_[0].materialConfig->textureColor =
+          MakeColor(0.35f, 0.9f, 1.0f, 1.0f);
+    }
+
+    gizmo->Update(usingCamera_);
+    ++gizmoIndex;
+  }
+
+  activeControlPointGizmoCount_ = gizmoIndex;
+}
+
+void ModScene::DrawControlPointGizmos() {
+  for (size_t i = 0; i < activeControlPointGizmoCount_; ++i) {
+    Object *gizmo = controlPointGizmos_[i].get();
+    if (gizmo != nullptr) {
+      gizmo->Draw();
+    }
+  }
+}
+
+void ModScene::ResetTorsoControlPoints() {
+  torsoControlPoints_.clear();
+
+  torsoChestToBellyLength_ = 0.45f;
+  torsoBellyToWaistLength_ = 0.45f;
+
+  TorsoControlPoint chest{};
+  chest.role = ModControlPointRole::Chest;
+  chest.localPosition = {0.0f, 0.45f, 0.0f};
+  chest.radius = 0.12f;
+  chest.movable = true;
+  chest.isConnectionPoint = true;
+  chest.acceptsParent = false;
+  chest.acceptsChild = true;
+  torsoControlPoints_.push_back(chest);
+
+  TorsoControlPoint belly{};
+  belly.role = ModControlPointRole::Belly;
+  belly.localPosition = {0.0f, 0.0f, 0.0f};
+  belly.radius = 0.10f;
+  belly.movable = true;
+  belly.isConnectionPoint = true;
+  belly.acceptsParent = true;
+  belly.acceptsChild = true;
+  torsoControlPoints_.push_back(belly);
+
+  TorsoControlPoint waist{};
+  waist.role = ModControlPointRole::Waist;
+  waist.localPosition = {0.0f, -0.45f, 0.0f};
+  waist.radius = 0.12f;
+  waist.movable = true;
+  waist.isConnectionPoint = true;
+  waist.acceptsParent = true;
+  waist.acceptsChild = true;
+  torsoControlPoints_.push_back(waist);
+}
+
+int ModScene::FindTorsoControlPointIndex(ModControlPointRole role) const {
+  for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+    if (torsoControlPoints_[i].role == role) {
+      return static_cast<int>(i);
+    }
+  }
+  return -1;
+}
+
+Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
+                                           const PartNode &childNode) const {
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode.part, childNode.part, childNode.side);
+
+  // torso 親は共有操作点から動的に接続基準を求める
+  if (parentNode.part == ModBodyPart::ChestBody ||
+      parentNode.part == ModBodyPart::StomachBody) {
+    const int chestIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Chest);
+    const int waistIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Waist);
+
+    const Vector3 defaultChest = {0.0f, 0.45f, 0.0f};
+    const Vector3 defaultWaist = {0.0f, -0.45f, 0.0f};
+
+    const Vector3 currentChest =
+        (chestIndex >= 0)
+            ? torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition
+            : defaultChest;
+
+    const Vector3 currentWaist =
+        (waistIndex >= 0)
+            ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
+            : defaultWaist;
+
+    switch (childNode.part) {
+    case ModBodyPart::Neck:
+    case ModBodyPart::Head: {
+      const Vector3 relative = Subtract(defaultAttach, defaultChest);
+      return Add(currentChest, relative);
+    }
+
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm: {
+      const Vector3 relative = Subtract(defaultAttach, defaultChest);
+      return Add(currentChest, relative);
+    }
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh: {
+      const Vector3 relative = Subtract(defaultAttach, defaultWaist);
+      return Add(currentWaist, relative);
+    }
+
+    default:
+      return defaultAttach;
+    }
+  }
+
+  // Head 親は現在の見た目スケールを反映する
+  if (parentNode.part == ModBodyPart::Head) {
+    Vector3 parentScale = {1.0f, 1.0f, 1.0f};
+    if (modBodies_.count(parentNode.id) > 0) {
+      parentScale = modBodies_.at(parentNode.id).GetVisualScaleRatio();
+    }
+
+    return Mul(defaultAttach, parentScale);
+  }
+
+  // Neck 親にぶら下がる Head は root を一致させる
+  if (parentNode.part == ModBodyPart::Neck &&
+      childNode.part == ModBodyPart::Head) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  // それ以外はデフォルト位置
+  return defaultAttach;
+}
+
+Vector3
+ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
+  if (childNode.parentId < 0) {
+    return childNode.localTransform.translate;
+  }
+
+  const PartNode *parentNode = assembly_.FindNode(childNode.parentId);
+  if (parentNode == nullptr) {
+    return childNode.localTransform.translate;
+  }
+
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode->part, childNode.part, childNode.side);
+
+  const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
+
+  // 保存してある localTransform.translate は「デフォルトからの編集込み位置」
+  // なので差分だけ取り出して現在の親形状へ乗せ直す
+  const Vector3 offsetFromDefault =
+      Subtract(childNode.localTransform.translate, defaultAttach);
+
+  return Add(dynamicBase, offsetFromDefault);
+}
+
+bool ModScene::MoveTorsoControlPoint(size_t index,
+                                     const Vector3 &newLocalPosition) {
+  if (index >= torsoControlPoints_.size()) {
+    return false;
+  }
+
+  if (!torsoControlPoints_[index].movable) {
+    return false;
+  }
+
+  const int chestIndex = FindTorsoControlPointIndex(ModControlPointRole::Chest);
+  const int bellyIndex = FindTorsoControlPointIndex(ModControlPointRole::Belly);
+  const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
+
+  if (chestIndex < 0 || bellyIndex < 0 || waistIndex < 0) {
+    return false;
+  }
+
+  Vector3 chestPos =
+      torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition;
+  Vector3 bellyPos =
+      torsoControlPoints_[static_cast<size_t>(bellyIndex)].localPosition;
+  Vector3 waistPos =
+      torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition;
+
+  const float chestBellyMin = 0.20f;
+  const float chestBellyMax = 1.50f;
+  const float bellyWaistMin = 0.20f;
+  const float bellyWaistMax = 1.50f;
+
+  if (index == static_cast<size_t>(chestIndex)) {
+    Vector3 candidate = newLocalPosition;
+
+    candidate = ClampDistance(bellyPos, candidate, chestBellyMin, chestBellyMax,
+                              {0.0f, 1.0f, 0.0f});
+
+    if (candidate.y <= bellyPos.y + 0.05f) {
+      candidate.y = bellyPos.y + 0.05f;
+      candidate = ClampDistance(bellyPos, candidate, chestBellyMin,
+                                chestBellyMax, {0.0f, 1.0f, 0.0f});
+    }
+
+    torsoControlPoints_[index].localPosition = candidate;
+    torsoChestToBellyLength_ = Length(Subtract(candidate, bellyPos));
+    return true;
+  }
+
+  if (index == static_cast<size_t>(bellyIndex)) {
+    Vector3 candidate = newLocalPosition;
+
+    candidate = ClampDistance(chestPos, candidate, chestBellyMin, chestBellyMax,
+                              {0.0f, -1.0f, 0.0f});
+
+    candidate = ClampDistance(waistPos, candidate, bellyWaistMin, bellyWaistMax,
+                              {0.0f, 1.0f, 0.0f});
+
+    if (candidate.y >= chestPos.y - 0.05f) {
+      candidate.y = chestPos.y - 0.05f;
+    }
+    if (candidate.y <= waistPos.y + 0.05f) {
+      candidate.y = waistPos.y + 0.05f;
+    }
+
+    candidate = ClampDistance(chestPos, candidate, chestBellyMin, chestBellyMax,
+                              {0.0f, -1.0f, 0.0f});
+    candidate = ClampDistance(waistPos, candidate, bellyWaistMin, bellyWaistMax,
+                              {0.0f, 1.0f, 0.0f});
+
+    torsoControlPoints_[index].localPosition = candidate;
+    torsoChestToBellyLength_ = Length(Subtract(chestPos, candidate));
+    torsoBellyToWaistLength_ = Length(Subtract(candidate, waistPos));
+    return true;
+  }
+
+  if (index == static_cast<size_t>(waistIndex)) {
+    Vector3 candidate = newLocalPosition;
+
+    candidate = ClampDistance(bellyPos, candidate, bellyWaistMin, bellyWaistMax,
+                              {0.0f, -1.0f, 0.0f});
+
+    if (candidate.y >= bellyPos.y - 0.05f) {
+      candidate.y = bellyPos.y - 0.05f;
+      candidate = ClampDistance(bellyPos, candidate, bellyWaistMin,
+                                bellyWaistMax, {0.0f, -1.0f, 0.0f});
+    }
+
+    torsoControlPoints_[index].localPosition = candidate;
+    torsoBellyToWaistLength_ = Length(Subtract(bellyPos, candidate));
+    return true;
+  }
+
+  return false;
+}
+
+bool ModScene::IsTorsoPart(ModBodyPart part) const {
+  return part == ModBodyPart::ChestBody || part == ModBodyPart::StomachBody;
+}
+
+bool ModScene::IsTorsoVisiblePartId(int partId) const {
+  const PartNode *node = assembly_.FindNode(partId);
+  if (node == nullptr) {
+    return false;
+  }
+  return IsTorsoPart(node->part);
+}
+
+Vector3
+ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
+  const int chestBodyId = assembly_.GetBodyId();
+  if (chestBodyId < 0 || modObjects_.count(chestBodyId) == 0) {
+    return ZeroV();
+  }
+
+  const int pointIndex = FindTorsoControlPointIndex(role);
+  if (pointIndex < 0) {
+    return ZeroV();
+  }
+
+  const Object *bodyObject = modObjects_.at(chestBodyId).get();
+  if (bodyObject == nullptr) {
+    return ZeroV();
+  }
+
+  return Add(
+      bodyObject->mainPosition.transform.translate,
+      torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition);
+}
+
 void ModScene::UpdateModObjects() {
-  // 現在の AssemblyGraph を Object 階層へ反映する
+  // AssemblyGraph の接続関係を Scene の Object 階層へ反映する
   ApplyAssemblyToSceneHierarchy();
 
-  // 各部位に対して見た目パラメータを反映する
+  // torso 共有点バッファを更新する
+  torsoSharedPointsBuffer_.clear();
+  torsoSharedPointsBuffer_.reserve(torsoControlPoints_.size());
+
+  for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+    ModControlPoint point{};
+    point.role = torsoControlPoints_[i].role;
+    point.localPosition = torsoControlPoints_[i].localPosition;
+    point.radius = torsoControlPoints_[i].radius;
+    point.movable = torsoControlPoints_[i].movable;
+    point.isConnectionPoint = torsoControlPoints_[i].isConnectionPoint;
+    point.acceptsParent = torsoControlPoints_[i].acceptsParent;
+    point.acceptsChild = torsoControlPoints_[i].acceptsChild;
+    torsoSharedPointsBuffer_.push_back(point);
+  }
+
+  // まず各部位の外部点列参照を設定する
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    if (modBodies_.count(id) == 0) {
+      continue;
+    }
+
+    ModBody &body = modBodies_[id];
+    body.ClearExternalSegmentSource();
+
+    switch (node->part) {
+    case ModBodyPart::ChestBody: {
+      body.SetExternalSegmentSource(&torsoSharedPointsBuffer_,
+                                    ModControlPointRole::Chest,
+                                    ModControlPointRole::Belly);
+      break;
+    }
+
+    case ModBodyPart::StomachBody: {
+      body.SetExternalSegmentSource(&torsoSharedPointsBuffer_,
+                                    ModControlPointRole::Belly,
+                                    ModControlPointRole::Waist);
+      break;
+    }
+
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm: {
+      const int ownerId = ResolveControlOwnerPartId(assembly_, id);
+      if (ownerId >= 0 && ownerId != id && modBodies_.count(ownerId) > 0) {
+        body.SetExternalSegmentSource(&modBodies_[ownerId].GetControlPoints(),
+                                      ModControlPointRole::Bend,
+                                      ModControlPointRole::End);
+      }
+      break;
+    }
+
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin: {
+      const int ownerId = ResolveControlOwnerPartId(assembly_, id);
+      if (ownerId >= 0 && ownerId != id && modBodies_.count(ownerId) > 0) {
+        body.SetExternalSegmentSource(&modBodies_[ownerId].GetControlPoints(),
+                                      ModControlPointRole::Bend,
+                                      ModControlPointRole::End);
+      }
+      break;
+    }
+
+    case ModBodyPart::Neck: {
+      const int headId = FindFirstChildPartId(assembly_, id, ModBodyPart::Head);
+      if (headId >= 0 && modBodies_.count(headId) > 0) {
+        body.SetExternalSegmentSource(&modBodies_[headId].GetControlPoints(),
+                                      ModControlPointRole::LowerNeck,
+                                      ModControlPointRole::UpperNeck);
+      }
+      break;
+    }
+
+    default:
+      break;
+    }
+  }
+
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
 
@@ -828,7 +1853,39 @@ void ModScene::UpdateModObjects() {
     }
   }
 
-  // 全 Object をカメラ付きで更新する
+  int fadedOwnerId = -1;
+  if (hoveredPartId_ >= 0) {
+    fadedOwnerId = ResolveControlOwnerPartId(assembly_, hoveredPartId_);
+  }
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+    if (modObjects_.count(id) == 0) {
+      continue;
+    }
+
+    Object *object = modObjects_[id].get();
+    if (object == nullptr || object->objectParts_.empty()) {
+      continue;
+    }
+
+    float alpha = 1.0f;
+
+    if (fadedOwnerId >= 0) {
+      const int ownerId = ResolveControlOwnerPartId(assembly_, id);
+      if (ownerId == fadedOwnerId) {
+        alpha = 0.35f;
+      }
+    }
+
+    for (size_t partIndex = 0; partIndex < object->objectParts_.size();
+         ++partIndex) {
+      if (object->objectParts_[partIndex].materialConfig != nullptr) {
+        object->objectParts_[partIndex].materialConfig->textureColor.w = alpha;
+      }
+    }
+  }
+
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     if (modObjects_.count(id) == 0) {
@@ -840,6 +1897,8 @@ void ModScene::UpdateModObjects() {
       object->Update(usingCamera_);
     }
   }
+
+  UpdateControlPointGizmos();
 }
 
 void ModScene::DrawModObjects() {
@@ -1012,6 +2071,70 @@ void ModScene::DrawSelectedPartGui() {
   if (ImGui::Button("Reset Selected Part Params")) {
     ResetSelectedPartParams();
   }
+
+  ImGui::Separator();
+  ImGui::Text("Control Points");
+
+  if (IsTorsoVisiblePartId(selectedPartId_)) {
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      const bool isSelectedPoint =
+          (selectedControlPartId_ == -2 &&
+           selectedControlPointIndex_ == static_cast<int>(i));
+
+      ImGui::PushID(static_cast<int>(i));
+
+      if (isSelectedPoint) {
+        ImGui::Text("-> Point %d", static_cast<int>(i));
+      } else {
+        ImGui::Text("Point %d", static_cast<int>(i));
+      }
+
+      Vector3 localPos = torsoControlPoints_[i].localPosition;
+      if (ImGui::SliderFloat3("Local Pos", &localPos.x, -5.0f, 5.0f)) {
+        MoveTorsoControlPoint(i, localPos);
+      }
+
+      ImGui::Text("Radius : %.2f", torsoControlPoints_[i].radius);
+      ImGui::Text("Movable: %s",
+                  torsoControlPoints_[i].movable ? "true" : "false");
+
+      ImGui::Separator();
+      ImGui::PopID();
+    }
+  } else {
+    const int controlOwnerId =
+        ResolveControlOwnerPartId(assembly_, selectedPartId_);
+
+    if (controlOwnerId >= 0 && modBodies_.count(controlOwnerId) > 0) {
+      const std::vector<ModControlPoint> &points =
+          modBodies_[controlOwnerId].GetControlPoints();
+
+      for (size_t i = 0; i < points.size(); ++i) {
+        const bool isSelectedPoint =
+            (selectedControlPartId_ == controlOwnerId &&
+             selectedControlPointIndex_ == static_cast<int>(i));
+
+        ImGui::PushID(static_cast<int>(i));
+
+        if (isSelectedPoint) {
+          ImGui::Text("-> Point %d", static_cast<int>(i));
+        } else {
+          ImGui::Text("Point %d", static_cast<int>(i));
+        }
+
+        Vector3 localPos = points[i].localPosition;
+        if (ImGui::SliderFloat3("Local Pos", &localPos.x, -5.0f, 5.0f)) {
+          modBodies_[controlOwnerId].MoveControlPoint(i, localPos);
+        }
+
+        ImGui::Text("Radius : %.2f", points[i].radius);
+        ImGui::Text("Movable: %s", points[i].movable ? "true" : "false");
+
+        ImGui::Separator();
+        ImGui::PopID();
+      }
+    }
+  }
 }
 
 void ModScene::DrawModGui() {
@@ -1019,6 +2142,7 @@ void ModScene::DrawModGui() {
 
   ImGui::Text("MouseMiddleDrag : Move Camera");
   ImGui::Text("MouseRightDrag  : Rotate Camera");
+  ImGui::Text("MouseLeftDrag   : Move Control Point");
   ImGui::Text("DIK_0           : Toggle DebugCamera");
 
   ImGui::Separator();
