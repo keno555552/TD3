@@ -271,6 +271,11 @@ private:
   float timeLimit_ = 30.0f;
   bool isTimeUp_ = false;
 
+  // 追加オブジェクト
+  std::vector<Object *> extraObjects_;
+  std::vector<int> extraParentIds_;
+  std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
+
 private:
   /// <summary>
   /// 使用するカメラを設定・更新する
@@ -278,5 +283,17 @@ private:
   void CameraPart();
 
 private:
+  /// <summary>
+  /// 構造を特徴量に変換
+  /// </summary>
   void BuildFeaturesFromCustomizeData();
+
+  /// <summary>
+  ///
+  /// </summary>
+  void BuildExtraVisualParts();
+
+  void UpdateExtraVisualParts();
+  void DrawExtraVisualParts();
+  void ClearExtraVisualParts();
 };
