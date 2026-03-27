@@ -316,6 +316,10 @@ ModScene::ModScene(kEngine *system) {
   // 操作点表示用の白テクスチャを読み込む
   controlPointGizmoTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/white100x100.png");
+
+  // 共有データから制限時間を復元する
+  timeLimit_ = customizeData_->timeLimit_;
+  isTimeUp_ = customizeData_->isTimeUp_;
 }
 
 ModScene::~ModScene() {
@@ -329,6 +333,22 @@ ModScene::~ModScene() {
 }
 
 void ModScene::Update() {
+
+  // 共通制限時間を更新する
+  if (!isTimeUp_) {
+    timeLimit_ -= system_->GetDeltaTime();
+
+    if (timeLimit_ <= 0.0f) {
+      timeLimit_ = 0.0f;
+      isTimeUp_ = true;
+    }
+  } else {
+    SetupModObjects();            // 時間切れで構造をリセット
+    timeLimit_ = totalTimeLimit_; // 制限時間をリセット
+    isTimeUp_ = false;            // 時間切れ状態をリセット
+    outcome_ = SceneOutcome::RETRY;
+  }
+
   // 使用中カメラを更新する
   CameraPart();
 
@@ -416,6 +436,8 @@ void ModScene::Update() {
   // フェードアウト完了後に共有データを保存して次シーンへ進む
   if (isStartTransition_ && fade_.IsFinished()) {
     if (customizeData_ != nullptr) {
+      SaveControlPointsToCustomizeData();
+
       ModBody::SetSharedCustomizeData(*customizeData_);
     }
     outcome_ = SceneOutcome::NEXT;
@@ -443,6 +465,8 @@ void ModScene::Draw() {
   ImGui::Text("DIK_7   : Add Head");
   ImGui::Text("Delete  : Remove Selected Part");
   ImGui::Text("Arrow   : Move Selected Part");
+  ImGui::Text("Remaining Time : %.2f", timeLimit_);
+  ImGui::Text("Time Up        : %s", isTimeUp_ ? "YES" : "NO");
   ImGui::End();
 
   // 改造用UI本体を表示する
@@ -762,6 +786,10 @@ void ModScene::SyncCustomizeDataFromScene() {
 
   // 旧方式配列も互換用に再構築する
   RebuildLegacyCustomizeDataFromInstances();
+
+  // 共通制限時間を共有データへ保存する
+  customizeData_->timeLimit_ = timeLimit_;
+  customizeData_->isTimeUp_ = isTimeUp_;
 }
 
 void ModScene::RebuildLegacyCustomizeDataFromInstances() {
@@ -854,6 +882,11 @@ void ModScene::ResetSelectedPartParams() {
 }
 
 void ModScene::ResetToDefaultHumanoid() {
+
+  // 制限時間も初期化する
+  timeLimit_ = 30.0f;
+  isTimeUp_ = false;
+
   // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
@@ -2549,3 +2582,319 @@ const char *ModScene::SideName(PartSide side) const {
   }
 }
 #endif
+
+void ModScene::SaveControlPointsToCustomizeData() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  auto &cp = customizeData_->controlPoints;
+
+  cp.leftShoulderPos =
+      GetControlPointLocalPosition(ModControlPointRole::LeftShoulder);
+  cp.leftElbowPos =
+      GetControlPointLocalPosition(ModControlPointRole::LeftElbow);
+  cp.leftWristPos =
+      GetControlPointLocalPosition(ModControlPointRole::LeftWrist);
+
+  cp.rightShoulderPos =
+      GetControlPointLocalPosition(ModControlPointRole::RightShoulder);
+  cp.rightElbowPos =
+      GetControlPointLocalPosition(ModControlPointRole::RightElbow);
+  cp.rightWristPos =
+      GetControlPointLocalPosition(ModControlPointRole::RightWrist);
+
+  cp.leftHipPos = GetControlPointLocalPosition(ModControlPointRole::LeftHip);
+  cp.leftKneePos = GetControlPointLocalPosition(ModControlPointRole::LeftKnee);
+  cp.leftAnklePos =
+      GetControlPointLocalPosition(ModControlPointRole::LeftAnkle);
+
+  cp.rightHipPos = GetControlPointLocalPosition(ModControlPointRole::RightHip);
+  cp.rightKneePos =
+      GetControlPointLocalPosition(ModControlPointRole::RightKnee);
+  cp.rightAnklePos =
+      GetControlPointLocalPosition(ModControlPointRole::RightAnkle);
+
+  cp.chestPos = GetControlPointLocalPosition(ModControlPointRole::Chest);
+  cp.bellyPos = GetControlPointLocalPosition(ModControlPointRole::Belly);
+  cp.waistPos = GetControlPointLocalPosition(ModControlPointRole::Waist);
+
+  cp.lowerNeckPos =
+      GetControlPointLocalPosition(ModControlPointRole::LowerNeck);
+  cp.upperNeckPos =
+      GetControlPointLocalPosition(ModControlPointRole::UpperNeck);
+  cp.headCenterPos =
+      GetControlPointLocalPosition(ModControlPointRole::HeadCenter);
+
+  Logger::Log("SEND LeftShoulderPos : %.2f %.2f %.2f\n", cp.leftShoulderPos.x,
+              cp.leftShoulderPos.y, cp.leftShoulderPos.z);
+
+  Logger::Log("SEND LeftElbowPos : %.2f %.2f %.2f\n", cp.leftElbowPos.x,
+              cp.leftElbowPos.y, cp.leftElbowPos.z);
+  Logger::Log("SEND LeftWristPos : %.2f %.2f %.2f\n", cp.leftWristPos.x,
+              cp.leftWristPos.y, cp.leftWristPos.z);
+
+  Logger::Log("SEND RightShoulderPos : %.2f %.2f %.2f\n", cp.rightShoulderPos.x,
+              cp.rightShoulderPos.y, cp.rightShoulderPos.z);
+  Logger::Log("SEND RightElbowPos : %.2f %.2f %.2f\n", cp.rightElbowPos.x,
+              cp.rightElbowPos.y, cp.rightElbowPos.z);
+  Logger::Log("SEND RightWristPos : %.2f %.2f %.2f\n", cp.rightWristPos.x,
+              cp.rightWristPos.y, cp.rightWristPos.z);
+
+  Logger::Log("SEND LeftHipPos : %.2f %.2f %.2f\n", cp.leftHipPos.x,
+              cp.leftHipPos.y, cp.leftHipPos.z);
+  Logger::Log("SEND LeftKneePos : %.2f %.2f %.2f\n", cp.leftKneePos.x,
+              cp.leftKneePos.y, cp.leftKneePos.z);
+  Logger::Log("SEND LeftAnklePos : %.2f %.2f %.2f\n", cp.leftAnklePos.x,
+              cp.leftAnklePos.y, cp.leftAnklePos.z);
+
+  Logger::Log("SEND RightHipPos : %.2f %.2f %.2f\n", cp.rightHipPos.x,
+              cp.rightHipPos.y, cp.rightHipPos.z);
+  Logger::Log("SEND RightKneePos : %.2f %.2f %.2f\n", cp.rightKneePos.x,
+              cp.rightKneePos.y, cp.rightKneePos.z);
+  Logger::Log("SEND RightAnklePos : %.2f %.2f %.2f\n", cp.rightAnklePos.x,
+              cp.rightAnklePos.y, cp.rightAnklePos.z);
+
+  Logger::Log("SEND ChestPos : %.2f %.2f %.2f\n", cp.chestPos.x, cp.chestPos.y,
+              cp.chestPos.z);
+  Logger::Log("SEND BellyPos : %.2f %.2f %.2f\n", cp.bellyPos.x, cp.bellyPos.y,
+              cp.bellyPos.z);
+  Logger::Log("SEND WaistPos : %.2f %.2f %.2f\n", cp.waistPos.x, cp.waistPos.y,
+              cp.waistPos.z);
+
+  Logger::Log("SEND LowerNeckPos : %.2f %.2f %.2f\n", cp.lowerNeckPos.x,
+              cp.lowerNeckPos.y, cp.lowerNeckPos.z);
+  Logger::Log("SEND UpperNeckPos : %.2f %.2f %.2f\n", cp.upperNeckPos.x,
+              cp.upperNeckPos.y, cp.upperNeckPos.z);
+  Logger::Log("SEND HeadCenterPos : %.2f %.2f %.2f\n", cp.headCenterPos.x,
+              cp.headCenterPos.y, cp.headCenterPos.z);
+}
+Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
+  if (role == ModControlPointRole::LeftShoulder) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftUpperArm) {
+        return assembly_.ComputeWorldPosition(id);
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::LeftElbow) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftUpperArm) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int bendIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(bendIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::LeftWrist) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftUpperArm) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int endIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::End);
+        if (endIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(endIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightShoulder) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightUpperArm) {
+        return assembly_.ComputeWorldPosition(id);
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightElbow) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightUpperArm) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int bendIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(bendIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightWrist) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightUpperArm) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int endIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::End);
+        if (endIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(endIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::LeftHip) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftThigh) {
+        return assembly_.ComputeWorldPosition(id);
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::LeftKnee) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftThigh) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int bendIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(bendIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::LeftAnkle) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::LeftThigh) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int endIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::End);
+        if (endIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(endIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightHip) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightThigh) {
+        return assembly_.ComputeWorldPosition(id);
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightKnee) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightThigh) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int bendIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(bendIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::RightAnkle) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::RightThigh) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        const int endIndex =
+            modBodies_.at(id).FindControlPointIndex(ModControlPointRole::End);
+        if (endIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(endIndex));
+        }
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::Chest) {
+    return GetTorsoControlPointWorldPosition(ModControlPointRole::Chest);
+  }
+
+  if (role == ModControlPointRole::Belly) {
+    return GetTorsoControlPointWorldPosition(ModControlPointRole::Belly);
+  }
+
+  if (role == ModControlPointRole::Waist) {
+    return GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
+  }
+
+  if (role == ModControlPointRole::LowerNeck ||
+      role == ModControlPointRole::UpperNeck ||
+      role == ModControlPointRole::HeadCenter) {
+    for (const auto &[id, node] : assembly_.GetNodes()) {
+      if (node.part == ModBodyPart::Head) {
+        if (modBodies_.count(id) == 0 || modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        const int pointIndex = modBodies_.at(id).FindControlPointIndex(role);
+        if (pointIndex >= 0) {
+          return modBodies_.at(id).GetControlPointWorldPosition(
+              object, static_cast<size_t>(pointIndex));
+        }
+      }
+    }
+  }
+
+  return {0.0f, 0.0f, 0.0f};
+}

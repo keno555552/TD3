@@ -163,6 +163,53 @@ void TravelScene::Update() {
   ApplyVisualState();
 
   UpdateSceneTransition();
+
+  const ModControlPointData *cp = GetControlPoints();
+  if (cp != nullptr) {
+    Logger::Log("RECV LeftShoulderPos : %.2f %.2f %.2f\n",
+                cp->leftShoulderPos.x, cp->leftShoulderPos.y,
+                cp->leftShoulderPos.z);
+    Logger::Log("RECV LeftElbowPos : %.2f %.2f %.2f\n", cp->leftElbowPos.x,
+                cp->leftElbowPos.y, cp->leftElbowPos.z);
+    Logger::Log("RECV LeftWristPos : %.2f %.2f %.2f\n", cp->leftWristPos.x,
+                cp->leftWristPos.y, cp->leftWristPos.z);
+
+    Logger::Log("RECV RightShoulderPos : %.2f %.2f %.2f\n",
+                cp->rightShoulderPos.x, cp->rightShoulderPos.y,
+                cp->rightShoulderPos.z);
+    Logger::Log("RECV RightElbowPos : %.2f %.2f %.2f\n", cp->rightElbowPos.x,
+                cp->rightElbowPos.y, cp->rightElbowPos.z);
+    Logger::Log("RECV RightWristPos : %.2f %.2f %.2f\n", cp->rightWristPos.x,
+                cp->rightWristPos.y, cp->rightWristPos.z);
+
+    Logger::Log("RECV LeftHipPos : %.2f %.2f %.2f\n", cp->leftHipPos.x,
+                cp->leftHipPos.y, cp->leftHipPos.z);
+    Logger::Log("RECV LeftKneePos : %.2f %.2f %.2f\n", cp->leftKneePos.x,
+                cp->leftKneePos.y, cp->leftKneePos.z);
+    Logger::Log("RECV LeftAnklePos : %.2f %.2f %.2f\n", cp->leftAnklePos.x,
+                cp->leftAnklePos.y, cp->leftAnklePos.z);
+
+    Logger::Log("RECV RightHipPos : %.2f %.2f %.2f\n", cp->rightHipPos.x,
+                cp->rightHipPos.y, cp->rightHipPos.z);
+    Logger::Log("RECV RightKneePos : %.2f %.2f %.2f\n", cp->rightKneePos.x,
+                cp->rightKneePos.y, cp->rightKneePos.z);
+    Logger::Log("RECV RightAnklePos : %.2f %.2f %.2f\n", cp->rightAnklePos.x,
+                cp->rightAnklePos.y, cp->rightAnklePos.z);
+
+    Logger::Log("RECV ChestPos : %.2f %.2f %.2f\n", cp->chestPos.x,
+                cp->chestPos.y, cp->chestPos.z);
+    Logger::Log("RECV BellyPos : %.2f %.2f %.2f\n", cp->bellyPos.x,
+                cp->bellyPos.y, cp->bellyPos.z);
+    Logger::Log("RECV WaistPos : %.2f %.2f %.2f\n", cp->waistPos.x,
+                cp->waistPos.y, cp->waistPos.z);
+
+    Logger::Log("RECV LowerNeckPos : %.2f %.2f %.2f\n", cp->lowerNeckPos.x,
+                cp->lowerNeckPos.y, cp->lowerNeckPos.z);
+    Logger::Log("RECV UpperNeckPos : %.2f %.2f %.2f\n", cp->upperNeckPos.x,
+                cp->upperNeckPos.y, cp->upperNeckPos.z);
+    Logger::Log("RECV HeadCenterPos : %.2f %.2f %.2f\n", cp->headCenterPos.x,
+                cp->headCenterPos.y, cp->headCenterPos.z);
+  }
 }
 
 void TravelScene::Draw() {
@@ -444,7 +491,6 @@ void TravelScene::UpdateModObjects() {
     if (modObjects_[i] != nullptr) {
       modBodies_[i].Apply(modObjects_[i]);
 
-
       if (i == ToIndex(ModBodyPart::LeftForeArm) && modObjects_[i] != nullptr &&
           !modObjects_[i]->objectParts_.empty()) {
         Logger::Log("==== C After Apply ====");
@@ -544,6 +590,10 @@ void TravelScene::LoadCustomizeData() {
   if (customizeData_ == nullptr) {
     return;
   }
+
+  // ModScene から引き継いだ残り時間を復元する
+  timeLimit_ = customizeData_->timeLimit_;
+  isTimeUp_ = customizeData_->isTimeUp_;
 
   bodyJointOffsets_ = customizeData_->bodyJointOffsets;
 
@@ -690,22 +740,22 @@ void TravelScene::UpdateChildRootsFromBody() {
   //     -std::sin(leftUpperArmRotX) * leftUpperArmScale.y};
 
   // 上腕の位置
-  //Vector3 upperArmPos = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
+  // Vector3 upperArmPos = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
   //                          ->mainPosition.transform.translate;
 
   //// 回転後の肘オフセット（さっきログで出してたやつと同じ計算）
-  //float tipY = leftUpperArmForeArmConnector.y * leftUpperArmScale.y *
-  //                 std::cos(leftUpperArmRotX) -
-  //             leftUpperArmForeArmConnector.z * leftUpperArmScale.z *
-  //                 std::sin(leftUpperArmRotX);
+  // float tipY = leftUpperArmForeArmConnector.y * leftUpperArmScale.y *
+  //                  std::cos(leftUpperArmRotX) -
+  //              leftUpperArmForeArmConnector.z * leftUpperArmScale.z *
+  //                  std::sin(leftUpperArmRotX);
 
-  //float tipZ = leftUpperArmForeArmConnector.y * leftUpperArmScale.y *
-  //                 std::sin(leftUpperArmRotX) +
-  //             leftUpperArmForeArmConnector.z * leftUpperArmScale.z *
-  //                 std::cos(leftUpperArmRotX);
+  // float tipZ = leftUpperArmForeArmConnector.y * leftUpperArmScale.y *
+  //                  std::sin(leftUpperArmRotX) +
+  //              leftUpperArmForeArmConnector.z * leftUpperArmScale.z *
+  //                  std::cos(leftUpperArmRotX);
 
   // 上腕ローカル空間での肘位置
-  //Vector3 elbowLocalPos = {0.0f, tipY, tipZ};
+  // Vector3 elbowLocalPos = {0.0f, tipY, tipZ};
 
   //// 前腕モデルは中心基準っぽいので、半分先へずらす
   // float halfForeArmLength = leftForeArmScale.y * 0.5f;
@@ -729,7 +779,7 @@ void TravelScene::UpdateChildRootsFromBody() {
       0.0f, leftUpperArmForeArmConnector.y * leftUpperArmScale.y,
       leftUpperArmForeArmConnector.z * leftUpperArmScale.z};
 
-Vector3 foreArmLocalPos = {elbowLocalPos.x,
+  Vector3 foreArmLocalPos = {elbowLocalPos.x,
                              elbowLocalPos.y + leftForeArmScale.y * 0.5f,
                              elbowLocalPos.z};
 
@@ -1073,6 +1123,11 @@ void TravelScene::UpdateTimeLimit(float deltaTime) {
       timeLimit_ = 0.0f;
       isTimeUp_ = true;
     }
+  }
+
+  if (customizeData_ != nullptr) {
+    customizeData_->timeLimit_ = timeLimit_;
+    customizeData_->isTimeUp_ = isTimeUp_;
   }
 }
 
@@ -1568,6 +1623,13 @@ void TravelScene::ApplyVisualState() {
   //================================
   UpdateChildRootsFromBody();
 
+  const ModControlPointData *cp = GetControlPoints();
+  Vector3 saved = {0.0f, 0.0f, 0.0f};
+
+  if (cp != nullptr) {
+    saved = cp->leftShoulderPos;
+  }
+
   if (!neck->objectParts_.empty()) {
     neck->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
@@ -1666,6 +1728,9 @@ void TravelScene::UpdateSceneTransition() {
     fade_.StartFadeOut();
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::RETRY;
+
+    timeLimit_ = customizeData_->totalTimeLimit_;
+    isTimeUp_ = false;
   }
 
 #ifdef _DEBUG
@@ -1692,6 +1757,13 @@ void TravelScene::UpdateSceneTransition() {
   // フェード終了後シーン遷移
   if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = nextOutcome_;
+
+    // シーン遷移前にカスタマイズデータに時間制限関連の情報を反映させる
+    if (customizeData_ != nullptr) {
+      customizeData_->timeLimit_ = timeLimit_;
+      customizeData_->isTimeUp_ = isTimeUp_;
+      ModBody::SetSharedCustomizeData(*customizeData_);
+    }
   }
 }
 
@@ -1741,6 +1813,13 @@ void TravelScene::ClearExtraVisualParts() {
 
   extraObjects_.clear();
   extraParentIds_.clear();
+}
+
+const ModControlPointData *TravelScene::GetControlPoints() const {
+  if (customizeData_ == nullptr) {
+    return nullptr;
+  }
+  return &customizeData_->controlPoints;
 }
 
 void TravelScene::BuildExtraVisualParts() {

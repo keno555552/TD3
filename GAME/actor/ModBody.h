@@ -77,6 +77,32 @@ struct ModPartInstanceData {
   ModBodyPartParam param{};
 };
 
+struct ModControlPointData {
+  Vector3 leftShoulderPos{0.0f, 0.0f, 0.0f};
+  Vector3 leftElbowPos{0.0f, 0.0f, 0.0f};
+  Vector3 leftWristPos{0.0f, 0.0f, 0.0f};
+
+  Vector3 rightShoulderPos{0.0f, 0.0f, 0.0f};
+  Vector3 rightElbowPos{0.0f, 0.0f, 0.0f};
+  Vector3 rightWristPos{0.0f, 0.0f, 0.0f};
+
+  Vector3 leftHipPos{0.0f, 0.0f, 0.0f};
+  Vector3 leftKneePos{0.0f, 0.0f, 0.0f};
+  Vector3 leftAnklePos{0.0f, 0.0f, 0.0f};
+
+  Vector3 rightHipPos{0.0f, 0.0f, 0.0f};
+  Vector3 rightKneePos{0.0f, 0.0f, 0.0f};
+  Vector3 rightAnklePos{0.0f, 0.0f, 0.0f};
+
+  Vector3 chestPos{0.0f, 0.0f, 0.0f};
+  Vector3 bellyPos{0.0f, 0.0f, 0.0f};
+  Vector3 waistPos{0.0f, 0.0f, 0.0f};
+
+  Vector3 lowerNeckPos{0.0f, 0.0f, 0.0f};
+  Vector3 upperNeckPos{0.0f, 0.0f, 0.0f};
+  Vector3 headCenterPos{0.0f, 0.0f, 0.0f};
+};
+
 /// <summary>
 /// シーン間で共有する改造データ
 /// </summary>
@@ -88,6 +114,13 @@ struct ModBodyCustomizeData {
 
   std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
       bodyJointOffsets{};
+
+  // 操作点情報
+  ModControlPointData controlPoints;
+
+  float timeLimit_ = 30.0f;      // 制限時間（秒）
+  float totalTimeLimit_ = 30.0f; // 制限時間の初期値（秒）。リセット用
+  bool isTimeUp_ = false;        // 時間切れになったか
 };
 
 /// <summary>
