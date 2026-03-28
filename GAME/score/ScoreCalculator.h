@@ -19,6 +19,18 @@ public:
                                const ModBodyCustomizeData &playerData,
                                const std::vector<JudgeData> &judges = {});
 
+  /// 操作点ベースで1パーツの変化量合計を返す
+  static float GetPartChangeAmountFromCP(ModBodyPart partType,
+      const ModBodyCustomizeData& playerData);
+
+  /// 操作点ベースでパーツが変化しているかを返す
+  static bool IsPartChangedFromCP(ModBodyPart partType,
+      const ModBodyCustomizeData& playerData);
+
+  static Vector3 CalcPartChangeFromControlPoints(
+      ModBodyPart partType,
+      const ModBodyCustomizeData& playerData);
+
 private:
   // インスタンス化禁止
   ScoreCalculator() = delete;
@@ -27,10 +39,6 @@ private:
   static void CalcPartScores(const ScoreSet& scoreSet,
       const ModBodyCustomizeData& playerData,
       ScoreResult& result);
-
-  static Vector3 CalcPartChangeFromControlPoints(
-      ModBodyPart partType,
-      const ModBodyCustomizeData& playerData);
 
   /// 本数スコアを計算する
   static void CalcCountScores(const ScoreSet &scoreSet,
