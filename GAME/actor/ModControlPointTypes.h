@@ -32,4 +32,9 @@ enum class ModControlPointRole {
   RightHip,
   RightKnee,
   RightAnkle,
+
+  LeftShoulderRoot,
+  RightShoulderRoot,
+  LeftHipRoot,
+  RightHipRoot,
 };
