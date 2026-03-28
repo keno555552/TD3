@@ -507,8 +507,15 @@ void TravelScene::SetupInitialLayout() {
 /*   各部位Objectの更新をまとめて行う   */
 void TravelScene::UpdateModObjects() {
   for (size_t i = 0; i < modObjects_.size(); ++i) {
-    if (modObjects_[i] != nullptr) {
-      // modBodies_[i].Apply(modObjects_[i]);
+    if (modObjects_[i] == nullptr) {
+      continue;
+    }
+
+    ModBodyPart part = static_cast<ModBodyPart>(i);
+
+    if (part == ModBodyPart::Body || part == ModBodyPart::Neck ||
+        part == ModBodyPart::Head) {
+      modBodies_[i].Apply(modObjects_[i]);
     }
   }
 
@@ -516,14 +523,6 @@ void TravelScene::UpdateModObjects() {
     if (object != nullptr) {
       object->Update(usingCamera_);
     }
-  }
-
-  static int foreArmWorldLogFrame = 0;
-  foreArmWorldLogFrame++;
-
-  if (foreArmWorldLogFrame % 20 == 0) {
-    Object *leftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
-    Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
   }
 }
 
@@ -1518,10 +1517,10 @@ void TravelScene::ApplyVisualState() {
 
   body->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
-  body->mainPosition.transform.scale.x = 1.0f;
-  body->mainPosition.transform.scale.y =
-      (std::max)(0.65f, 1.0f - bodyStretch_ * 0.2f);
-  body->mainPosition.transform.scale.z = 1.0f;
+  // body->mainPosition.transform.scale.x = 1.0f;
+  // body->mainPosition.transform.scale.y =
+  //     (std::max)(0.65f, 1.0f - bodyStretch_ * 0.2f);
+  // body->mainPosition.transform.scale.z = 1.0f;
 
   //================================
   // 各部位の回転をいったん初期化
@@ -2020,7 +2019,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
   leftForeArmDir = Normalize(leftForeArmDir);
 
-  float leftUpperArmLength = Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
+  // float leftUpperArmLength = Length(Sub(cp->leftElbowPos,
+  // cp->leftShoulderPos));
   float leftForeArmAngleZ = atan2(leftForeArmDir.x, -leftForeArmDir.y);
 
   leftForeArm->mainPosition.transform.translate =
@@ -2032,8 +2032,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   Vector3 rightForeArmDir = Sub(cp->rightWristPos, cp->rightElbowPos);
   rightForeArmDir = Normalize(rightForeArmDir);
 
-  float rightUpperArmLength =
-      Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
+  // float rightUpperArmLength =
+  //     Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
   float rightForeArmAngleZ = atan2(rightForeArmDir.x, -rightForeArmDir.y);
 
   rightForeArm->mainPosition.transform.translate =
@@ -2061,6 +2061,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   rightShin->mainPosition.transform.translate =
       Sub(cp->rightKneePos, cp->bellyPos);
+
   rightShin->mainPosition.transform.rotate = {0.0f, 0.0f, rightShinAngleZ};
 
   if (leftUpperArm->objectParts_.empty() || leftForeArm->objectParts_.empty() ||
@@ -2071,90 +2072,218 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     return;
   }
 
+  //================================
+  // 太さパラメータ取得
+  //================================
+  const auto &leftUpperArmParam =
+      modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam();
+  const auto &leftForeArmParam =
+      modBodies_[ToIndex(ModBodyPart::LeftForeArm)].GetParam();
+  const auto &rightUpperArmParam =
+      modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetParam();
+  const auto &rightForeArmParam =
+      modBodies_[ToIndex(ModBodyPart::RightForeArm)].GetParam();
+
+  const auto &leftThighParam =
+      modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam();
+  const auto &leftShinParam =
+      modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam();
+  const auto &rightThighParam =
+      modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam();
+  const auto &rightShinParam =
+      modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam();
+
+  const float leftUpperArmStartR =
+      GetSnapshotRadius(ModBodyPart::LeftUpperArm, 1);
+  const float leftUpperArmBendR =
+      GetSnapshotRadius(ModBodyPart::LeftUpperArm, 2);
+  const float leftUpperArmEndR =
+      GetSnapshotRadius(ModBodyPart::LeftUpperArm, 3);
+
+  const float rightUpperArmStartR =
+      GetSnapshotRadius(ModBodyPart::RightUpperArm, 1);
+  const float rightUpperArmBendR =
+      GetSnapshotRadius(ModBodyPart::RightUpperArm, 2);
+  const float rightUpperArmEndR =
+      GetSnapshotRadius(ModBodyPart::RightUpperArm, 3);
+
+  const float leftThighStartR = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
+  const float leftThighBendR = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
+  const float leftThighEndR = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+
+  const float rightThighStartR = GetSnapshotRadius(ModBodyPart::RightThigh, 1);
+  const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
+  const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+
+  //================================================
+  // 無改造基準 0.1f から倍率化
+  //================================================
+  const float baseRadius = 0.1f;
+
+  const float leftUpperArmThicknessScale =
+      (std::max)(leftUpperArmStartR, leftUpperArmBendR) / baseRadius;
+  const float leftForeArmThicknessScale =
+      (std::max)(leftUpperArmBendR, leftUpperArmEndR) / baseRadius;
+
+  const float rightUpperArmThicknessScale =
+      (std::max)(rightUpperArmStartR, rightUpperArmBendR) / baseRadius;
+  const float rightForeArmThicknessScale =
+      (std::max)(rightUpperArmBendR, rightUpperArmEndR) / baseRadius;
+
+  const float leftThighThicknessScale =
+      (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
+  const float leftShinThicknessScale =
+      (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
+
+  const float rightThighThicknessScale =
+      (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
+  const float rightShinThicknessScale =
+      (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
+
+  //================================================
+  // 長さ
+  //================================================
+  const float leftUpperArmLength =
+      Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
+  const float leftForeArmLength =
+      Length(Sub(cp->leftWristPos, cp->leftElbowPos));
+
+  const float rightUpperArmLength =
+      Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
+  const float rightForeArmLength =
+      Length(Sub(cp->rightWristPos, cp->rightElbowPos));
+
+  const float leftThighLength = Length(Sub(cp->leftKneePos, cp->leftHipPos));
+  const float leftShinLength = Length(Sub(cp->leftAnklePos, cp->leftKneePos));
+
+  const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
+  const float rightShinLength =
+      Length(Sub(cp->rightAnklePos, cp->rightKneePos));
+
+  //================================================
   // 左上腕
+  //================================================
   leftUpperArm->objectParts_[0].transform.translate = {
       0.0f, -leftUpperArmLength * 0.5f, 0.0f};
-  leftUpperArm->objectParts_[0].transform.scale.y = leftUpperArmLength;
+  leftUpperArm->objectParts_[0].transform.scale.x =
+      leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
+  leftUpperArm->objectParts_[0].transform.scale.y =
+      leftUpperArmLength * leftUpperArmParam.scale.y * leftUpperArmParam.length;
+  leftUpperArm->objectParts_[0].transform.scale.z =
+      leftUpperArmThicknessScale * leftUpperArmParam.scale.z;
 
-  // 右上腕
-  rightUpperArm->objectParts_[0].transform.translate = {
-      0.0f, -rightUpperArmLength * 0.5f, 0.0f};
-  rightUpperArm->objectParts_[0].transform.scale.y = rightUpperArmLength;
-
-  // 左腿
-  float leftThighLength = Length(Sub(cp->leftHipPos, cp->leftKneePos));
-  leftThigh->objectParts_[0].transform.translate = {
-      0.0f, -leftThighLength * 0.5f, 0.0f};
-  leftThigh->objectParts_[0].transform.scale.y = leftThighLength;
-
-  // 右腿
-  float rightThighLength = Length(Sub(cp->rightHipPos, cp->rightKneePos));
-  rightThigh->objectParts_[0].transform.translate = {
-      0.0f, -rightThighLength * 0.5f, 0.0f};
-  rightThigh->objectParts_[0].transform.scale.y = rightThighLength;
-
+  //================================================
   // 左前腕
-  float leftForeArmLength = Length(Sub(cp->leftElbowPos, cp->leftWristPos));
+  //================================================
   leftForeArm->objectParts_[0].transform.translate = {
       0.0f, -leftForeArmLength * 0.5f, 0.0f};
-  leftForeArm->objectParts_[0].transform.scale.y = leftForeArmLength;
+  leftForeArm->objectParts_[0].transform.scale.x =
+      leftForeArmThicknessScale * leftForeArmParam.scale.x;
+  leftForeArm->objectParts_[0].transform.scale.y =
+      leftForeArmLength * leftForeArmParam.scale.y * leftForeArmParam.length;
+  leftForeArm->objectParts_[0].transform.scale.z =
+      leftForeArmThicknessScale * leftForeArmParam.scale.z;
 
+  //================================================
+  // 右上腕
+  //================================================
+  rightUpperArm->objectParts_[0].transform.translate = {
+      0.0f, -rightUpperArmLength * 0.5f, 0.0f};
+  rightUpperArm->objectParts_[0].transform.scale.x =
+      rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
+  rightUpperArm->objectParts_[0].transform.scale.y =
+      rightUpperArmLength * rightUpperArmParam.scale.y *
+      rightUpperArmParam.length;
+  rightUpperArm->objectParts_[0].transform.scale.z =
+      rightUpperArmThicknessScale * rightUpperArmParam.scale.z;
+
+  //================================================
   // 右前腕
-  float rightForeArmLength = Length(Sub(cp->rightElbowPos, cp->rightWristPos));
+  //================================================
   rightForeArm->objectParts_[0].transform.translate = {
       0.0f, -rightForeArmLength * 0.5f, 0.0f};
-  rightForeArm->objectParts_[0].transform.scale.y = rightForeArmLength;
+  rightForeArm->objectParts_[0].transform.scale.x =
+      rightForeArmThicknessScale * rightForeArmParam.scale.x;
+  rightForeArm->objectParts_[0].transform.scale.y =
+      rightForeArmLength * rightForeArmParam.scale.y * rightForeArmParam.length;
+  rightForeArm->objectParts_[0].transform.scale.z =
+      rightForeArmThicknessScale * rightForeArmParam.scale.z;
 
+  //================================================
+  // 左腿
+  //================================================
+  leftThigh->objectParts_[0].transform.translate = {
+      0.0f, -leftThighLength * 0.5f, 0.0f};
+  leftThigh->objectParts_[0].transform.scale.x =
+      leftThighThicknessScale * leftThighParam.scale.x;
+  leftThigh->objectParts_[0].transform.scale.y =
+      leftThighLength * leftThighParam.scale.y * leftThighParam.length;
+  leftThigh->objectParts_[0].transform.scale.z =
+      leftThighThicknessScale * leftThighParam.scale.z;
+
+  //================================================
   // 左脛
-  float leftShinLength = Length(Sub(cp->leftKneePos, cp->leftAnklePos));
+  //================================================
   leftShin->objectParts_[0].transform.translate = {0.0f, -leftShinLength * 0.5f,
                                                    0.0f};
-  leftShin->objectParts_[0].transform.scale.y = leftShinLength;
+  leftShin->objectParts_[0].transform.scale.x =
+      leftShinThicknessScale * leftShinParam.scale.x;
+  leftShin->objectParts_[0].transform.scale.y =
+      leftShinLength * leftShinParam.scale.y * leftShinParam.length;
+  leftShin->objectParts_[0].transform.scale.z =
+      leftShinThicknessScale * leftShinParam.scale.z;
 
+  //================================================
+  // 右腿
+  //================================================
+  rightThigh->objectParts_[0].transform.translate = {
+      0.0f, -rightThighLength * 0.5f, 0.0f};
+  rightThigh->objectParts_[0].transform.scale.x =
+      rightThighThicknessScale * rightThighParam.scale.x;
+  rightThigh->objectParts_[0].transform.scale.y =
+      rightThighLength * rightThighParam.scale.y * rightThighParam.length;
+  rightThigh->objectParts_[0].transform.scale.z =
+      rightThighThicknessScale * rightThighParam.scale.z;
+
+  //================================================
   // 右脛
-  float rightShinLength = Length(Sub(cp->rightKneePos, cp->rightAnklePos));
+  //================================================
   rightShin->objectParts_[0].transform.translate = {
       0.0f, -rightShinLength * 0.5f, 0.0f};
-  rightShin->objectParts_[0].transform.scale.y = rightShinLength;
+  rightShin->objectParts_[0].transform.scale.x =
+      rightShinThicknessScale * rightShinParam.scale.x;
+  rightShin->objectParts_[0].transform.scale.y =
+      rightShinLength * rightShinParam.scale.y * rightShinParam.length;
+  rightShin->objectParts_[0].transform.scale.z =
+      rightShinThicknessScale * rightShinParam.scale.z;
+}
 
-  static int debugFrame = 0;
-  debugFrame++;
-
-  if (debugFrame % 30 == 0) {
-
-    Logger::Log("==== Travel Check ====");
-
-    // 前腕
-    Logger::Log("LFore root : %.3f %.3f %.3f",
-                leftForeArm->mainPosition.transform.translate.x,
-                leftForeArm->mainPosition.transform.translate.y,
-                leftForeArm->mainPosition.transform.translate.z);
-
-    Logger::Log("LFore mesh : %.3f %.3f %.3f",
-                leftForeArm->objectParts_[0].transform.translate.x,
-                leftForeArm->objectParts_[0].transform.translate.y,
-                leftForeArm->objectParts_[0].transform.translate.z);
-
-    // 上腕
-    Logger::Log("LUpper root : %.3f %.3f %.3f",
-                leftUpperArm->mainPosition.transform.translate.x,
-                leftUpperArm->mainPosition.transform.translate.y,
-                leftUpperArm->mainPosition.transform.translate.z);
-
-    Logger::Log("LUpper mesh : %.3f %.3f %.3f",
-                leftUpperArm->objectParts_[0].transform.translate.x,
-                leftUpperArm->objectParts_[0].transform.translate.y,
-                leftUpperArm->objectParts_[0].transform.translate.z);
-
-    // すね
-    Logger::Log("LShin root : %.3f %.3f %.3f",
-                leftShin->mainPosition.transform.translate.x,
-                leftShin->mainPosition.transform.translate.y,
-                leftShin->mainPosition.transform.translate.z);
-
-    Logger::Log("LShin mesh : %.3f %.3f %.3f",
-                leftShin->objectParts_[0].transform.translate.x,
-                leftShin->objectParts_[0].transform.translate.y,
-                leftShin->objectParts_[0].transform.translate.z);
+float TravelScene::GetControlPointRadius(ModControlPointRole role) const {
+  if (customizeData_ == nullptr) {
+    return 0.1f;
   }
+
+  for (const auto &snap : customizeData_->controlPointSnapshots) {
+    if (snap.role == role) {
+      return snap.radius;
+    }
+  }
+
+  return 1.0f;
+}
+
+float TravelScene::GetSnapshotRadius(ModBodyPart ownerPart,
+                                     int localRole) const {
+  if (customizeData_ == nullptr) {
+    return 0.1f;
+  }
+
+  for (const auto &snap : customizeData_->controlPointSnapshots) {
+    if (snap.ownerPartType == ownerPart &&
+        static_cast<int>(snap.role) == localRole) {
+      return snap.radius;
+    }
+  }
+
+  return 0.1f;
 }
