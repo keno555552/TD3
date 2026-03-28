@@ -127,7 +127,6 @@ TravelScene::~TravelScene() {
 }
 
 void TravelScene::Update() {
-
   //===============================
   // カメラ更新
   //===============================
@@ -166,49 +165,6 @@ void TravelScene::Update() {
 
   const ModControlPointData *cp = GetControlPoints();
   if (cp != nullptr) {
-    // Logger::Log("RECV LeftShoulderPos : %.2f %.2f %.2f\n",
-    //             cp->leftShoulderPos.x, cp->leftShoulderPos.y,
-    //             cp->leftShoulderPos.z);
-    // Logger::Log("RECV LeftElbowPos : %.2f %.2f %.2f\n", cp->leftElbowPos.x,
-    //             cp->leftElbowPos.y, cp->leftElbowPos.z);
-    // Logger::Log("RECV LeftWristPos : %.2f %.2f %.2f\n", cp->leftWristPos.x,
-    //             cp->leftWristPos.y, cp->leftWristPos.z);
-
-    // Logger::Log("RECV RightShoulderPos : %.2f %.2f %.2f\n",
-    //             cp->rightShoulderPos.x, cp->rightShoulderPos.y,
-    //             cp->rightShoulderPos.z);
-    // Logger::Log("RECV RightElbowPos : %.2f %.2f %.2f\n", cp->rightElbowPos.x,
-    //             cp->rightElbowPos.y, cp->rightElbowPos.z);
-    // Logger::Log("RECV RightWristPos : %.2f %.2f %.2f\n", cp->rightWristPos.x,
-    //             cp->rightWristPos.y, cp->rightWristPos.z);
-
-    // Logger::Log("RECV LeftHipPos : %.2f %.2f %.2f\n", cp->leftHipPos.x,
-    //             cp->leftHipPos.y, cp->leftHipPos.z);
-    // Logger::Log("RECV LeftKneePos : %.2f %.2f %.2f\n", cp->leftKneePos.x,
-    //             cp->leftKneePos.y, cp->leftKneePos.z);
-    // Logger::Log("RECV LeftAnklePos : %.2f %.2f %.2f\n", cp->leftAnklePos.x,
-    //             cp->leftAnklePos.y, cp->leftAnklePos.z);
-
-    // Logger::Log("RECV RightHipPos : %.2f %.2f %.2f\n", cp->rightHipPos.x,
-    //             cp->rightHipPos.y, cp->rightHipPos.z);
-    // Logger::Log("RECV RightKneePos : %.2f %.2f %.2f\n", cp->rightKneePos.x,
-    //             cp->rightKneePos.y, cp->rightKneePos.z);
-    // Logger::Log("RECV RightAnklePos : %.2f %.2f %.2f\n", cp->rightAnklePos.x,
-    //             cp->rightAnklePos.y, cp->rightAnklePos.z);
-
-    // Logger::Log("RECV ChestPos : %.2f %.2f %.2f\n", cp->chestPos.x,
-    //             cp->chestPos.y, cp->chestPos.z);
-    // Logger::Log("RECV BellyPos : %.2f %.2f %.2f\n", cp->bellyPos.x,
-    //             cp->bellyPos.y, cp->bellyPos.z);
-    // Logger::Log("RECV WaistPos : %.2f %.2f %.2f\n", cp->waistPos.x,
-    //             cp->waistPos.y, cp->waistPos.z);
-
-    // Logger::Log("RECV LowerNeckPos : %.2f %.2f %.2f\n", cp->lowerNeckPos.x,
-    //             cp->lowerNeckPos.y, cp->lowerNeckPos.z);
-    // Logger::Log("RECV UpperNeckPos : %.2f %.2f %.2f\n", cp->upperNeckPos.x,
-    //             cp->upperNeckPos.y, cp->upperNeckPos.z);
-    // Logger::Log("RECV HeadCenterPos : %.2f %.2f %.2f\n", cp->headCenterPos.x,
-    //             cp->headCenterPos.y, cp->headCenterPos.z);
   }
 }
 
@@ -307,7 +263,12 @@ void TravelScene::CameraPart() {
 }
 
 void TravelScene::SetupModObjects() {
-  SetupPartObject(ModBodyPart::Body, "GAME/resources/modBody/body/body.obj");
+  // SetupPartObject(ModBodyPart::Body, "GAME/resources/modBody/body/body.obj");
+  SetupPartObject(ModBodyPart::ChestBody,
+                  "GAME/resources/modBody/chest/chest.obj");
+  SetupPartObject(ModBodyPart::StomachBody,
+                  "GAME/resources/modBody/stomach/stomach.obj");
+
   SetupPartObject(ModBodyPart::Neck, "GAME/resources/modBody/neck/neck.obj");
   SetupPartObject(ModBodyPart::Head, "GAME/resources/modBody/head/head.obj");
 
@@ -335,26 +296,28 @@ void TravelScene::SetupModObjects() {
 
   fixedPartIdToPart_.clear();
   fixedPartIdToPart_[1] =
-      &modObjects_[ToIndex(ModBodyPart::Body)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::ChestBody)]->mainPosition;
   fixedPartIdToPart_[2] =
-      &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::StomachBody)]->mainPosition;
   fixedPartIdToPart_[3] =
-      &modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
   fixedPartIdToPart_[4] =
-      &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition;
   fixedPartIdToPart_[5] =
-      &modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
   fixedPartIdToPart_[6] =
-      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition;
   fixedPartIdToPart_[7] =
-      &modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
   fixedPartIdToPart_[8] =
-      &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition;
   fixedPartIdToPart_[9] =
-      &modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
   fixedPartIdToPart_[10] =
-      &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+      &modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition;
   fixedPartIdToPart_[11] =
+      &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+  fixedPartIdToPart_[12] =
       &modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition;
 }
 
@@ -374,41 +337,56 @@ void TravelScene::SetupPartObject(ModBodyPart part, const std::string &path) {
 
 /*   部位同士の親子関係を設定する   */
 void TravelScene::SetupHierarchy() {
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
-  if (body == nullptr) {
+  Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+
+  if (chestBody == nullptr || stomachBody == nullptr) {
     return;
   }
 
-  ObjectPart *bodyRoot = &body->mainPosition;
+  ObjectPart *chestRoot = &chestBody->mainPosition;
+  ObjectPart *stomachRoot = &stomachBody->mainPosition;
 
-  // 1段目
-  modObjects_[ToIndex(ModBodyPart::Neck)]->followObject_ = bodyRoot;
-  modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition.parentPart = bodyRoot;
+  //============================
+  // 胴体
+  //============================
+  stomachBody->followObject_ = chestRoot;
+  stomachBody->mainPosition.parentPart = chestRoot;
+
+  // 首
+  modObjects_[ToIndex(ModBodyPart::Neck)]->followObject_ = chestRoot;
+  modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition.parentPart = chestRoot;
+
+  // 頭
+  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = chestRoot;
+  modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart = chestRoot;
 
   // modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = bodyRoot;
   // modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart =
   // bodyRoot;
 
-  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ =
-      &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart =
-      &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
+  // modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ =
+  //     &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
+  // modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart =
+  //     &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
 
-  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->followObject_ = bodyRoot;
+  // 腕
+  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->followObject_ = chestRoot;
   modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition.parentPart =
-      bodyRoot;
+      chestRoot;
 
-  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->followObject_ = chestRoot;
   modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition.parentPart =
-      bodyRoot;
+      chestRoot;
 
-  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->followObject_ = bodyRoot;
+  // 脚
+  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->followObject_ = stomachRoot;
   modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition.parentPart =
-      bodyRoot;
+      stomachRoot;
 
-  modObjects_[ToIndex(ModBodyPart::RightThigh)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightThigh)]->followObject_ = stomachRoot;
   modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition.parentPart =
-      bodyRoot;
+      stomachRoot;
 
   //============================
   // 二段目
@@ -419,36 +397,36 @@ void TravelScene::SetupHierarchy() {
   //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
   // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
   //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = chestRoot;
   modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
-      bodyRoot;
+      chestRoot;
 
   // 右前腕
   //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ =
   //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
   //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
   //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = chestRoot;
   modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
-      bodyRoot;
+      chestRoot;
 
   // 左脛
   // modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ =
   //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
   // modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
   //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = stomachRoot;
   modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
-      bodyRoot;
+      stomachRoot;
 
   // 右脛
   // modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ =
   //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
   // modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
   //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = bodyRoot;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = stomachRoot;
   modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
-      bodyRoot;
+      stomachRoot;
 }
 
 /*   各部位の初期配置を設定する   */
@@ -515,7 +493,7 @@ void TravelScene::UpdateModObjects() {
 
     if (part == ModBodyPart::Body || part == ModBodyPart::Neck ||
         part == ModBodyPart::Head) {
-      modBodies_[i].Apply(modObjects_[i]);
+      // modBodies_[i].Apply(modObjects_[i]);
     }
   }
 
@@ -561,6 +539,14 @@ void TravelScene::LoadCustomizeData() {
 
   for (size_t i = 0; i < modBodies_.size(); ++i) {
     modBodies_[i].SetParam(customizeData_->partParams[i]);
+
+    if (i == ToIndex(ModBodyPart::Head)) {
+      const auto &p = customizeData_->partParams[i];
+      Logger::Log("==== LOAD HEAD PARAM ====");
+      Logger::Log("index : %zu", i);
+      Logger::Log("scale : %.3f %.3f %.3f", p.scale.x, p.scale.y, p.scale.z);
+      Logger::Log("length : %.3f", p.length);
+    }
   }
 }
 
@@ -747,23 +733,6 @@ void TravelScene::UpdateChildRootsFromBody() {
 
   modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
       ->mainPosition.transform.translate = foreArmLocalPos;
-
-  Logger::Log("==== A UpdateChildRootsFromBody ====");
-  Logger::Log("LeftForeArm mainPosition : %.3f %.3f %.3f",
-              modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
-                  ->mainPosition.transform.translate.x,
-              modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
-                  ->mainPosition.transform.translate.y,
-              modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
-                  ->mainPosition.transform.translate.z);
-
-  Logger::Log("==== ForeArm Travel Compensation Check ====");
-  Logger::Log("elbowLocalPos : %.3f %.3f %.3f", elbowLocalPos.x,
-              elbowLocalPos.y, elbowLocalPos.z);
-  Logger::Log("leftForeArmScale : %.3f %.3f %.3f", leftForeArmScale.x,
-              leftForeArmScale.y, leftForeArmScale.z);
-  Logger::Log("foreArmLocalPos : %.3f %.3f %.3f", foreArmLocalPos.x,
-              foreArmLocalPos.y, foreArmLocalPos.z);
 
   // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
   //     ->mainPosition.transform.translate = {
@@ -978,28 +947,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.stability = std::clamp(tuning_.stability, 0.3f, 2.0f);
   tuning_.lift = std::clamp(tuning_.lift, 0.3f, 2.0f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.3f, 2.0f);
-
-  // Logger::Log("==== CUSTOMIZE PARAM ====");
-  // Logger::Log("legLengthScale : %.3f", legLengthScale);
-  // Logger::Log("legThicknessScale : %.3f", legThicknessScale);
-  // Logger::Log("legDiff : %.3f", legDiff);
-
-  // Logger::Log("runPower : %.3f", tuning_.runPower);
-  // Logger::Log("maxSpeed : %.3f", tuning_.maxSpeed);
-  // Logger::Log("stability : %.3f", tuning_.stability);
-  // Logger::Log("lift : %.3f", tuning_.lift);
-  // Logger::Log("turnResponse : %.3f", tuning_.turnResponse);
-  // Logger::Log("neckLengthScale : %.3f", neckLengthScale);
-  // Logger::Log("neckThicknessScale : %.3f", neckThicknessScale);
-  // Logger::Log("neckLengthDiff : %.3f", neckLengthDiff);
-  // Logger::Log("neckThicknessDiff : %.3f", neckThicknessDiff);
-
-  // Logger::Log("headCount: %d\n", features_.headCount);
-  // Logger::Log("armCount: %d\n", features_.armCount);
-  // Logger::Log("asymmetry: %f\n", features_.asymmetry);
-  // Logger::Log("centerOfMassY: %f\n", features_.centerOfMassY);
-  // Logger::Log("partInstances size: %d",
-  // customizeData_->partInstances.size());
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -1628,29 +1575,6 @@ void TravelScene::ApplyVisualState() {
     rightShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
 
-  static bool logged = false;
-  if (!logged) {
-    Logger::Log("==== Fixed Head / Neck ====");
-    Logger::Log("neck.translate : %.3f %.3f %.3f",
-                neck->mainPosition.transform.translate.x,
-                neck->mainPosition.transform.translate.y,
-                neck->mainPosition.transform.translate.z);
-    Logger::Log("neck.rotate : %.3f %.3f %.3f",
-                neck->mainPosition.transform.rotate.x,
-                neck->mainPosition.transform.rotate.y,
-                neck->mainPosition.transform.rotate.z);
-    Logger::Log("head.translate : %.3f %.3f %.3f",
-                head->mainPosition.transform.translate.x,
-                head->mainPosition.transform.translate.y,
-                head->mainPosition.transform.translate.z);
-    Logger::Log("head.rotate : %.3f %.3f %.3f",
-                head->mainPosition.transform.rotate.x,
-                head->mainPosition.transform.rotate.y,
-                head->mainPosition.transform.rotate.z);
-    Logger::Log("body.rotate.y : %.3f", body->mainPosition.transform.rotate.y);
-    logged = true;
-  }
-
   //================================
   // 固定部位と extra head を更新
   //================================
@@ -1730,20 +1654,13 @@ void TravelScene::BuildFeaturesFromCustomizeData() {
 
   for (const auto &instance : customizeData_->partInstances) {
 
-    // Logger::Log("---- INSTANCE ----");
-    // Logger::Log("partType: %d", (int)instance.partType);
-    // Logger::Log("posX: %.3f", instance.localTransform.translate.x);
-    // Logger::Log("posY: %.3f", instance.localTransform.translate.y);
-
     if (instance.partType == ModBodyPart::Head) {
       features_.headCount++;
-      // Logger::Log("HEAD COUNTED");
     }
 
     if (instance.partType == ModBodyPart::LeftUpperArm ||
         instance.partType == ModBodyPart::RightUpperArm) {
       features_.armCount++;
-      //  Logger::Log("ARM COUNTED");
     }
 
     features_.centerOfMassY += instance.localTransform.translate.y;
@@ -1751,13 +1668,6 @@ void TravelScene::BuildFeaturesFromCustomizeData() {
     features_.lowestPoint =
         std::min(features_.lowestPoint, instance.localTransform.translate.y);
   }
-
-  // Logger::Log("==== RESULT ====");
-  // Logger::Log("headCount: %d", features_.headCount);
-  // Logger::Log("armCount: %d", features_.armCount);
-  // Logger::Log("asymmetry: %.3f", features_.asymmetry);
-  // Logger::Log("centerOfMassY: %.3f", features_.centerOfMassY);
-  // Logger::Log("lowestPoint: %.3f", features_.lowestPoint);
 }
 
 void TravelScene::ClearExtraVisualParts() {
@@ -1780,9 +1690,6 @@ void TravelScene::BuildExtraVisualParts() {
 
   const Vector3 neckScale =
       modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
-
-  // Logger::Log("neck visual scale : %.3f %.3f %.3f", neckScale.x, neckScale.y,
-  //             neckScale.z);
 
   ClearExtraVisualParts();
 
@@ -1861,8 +1768,6 @@ void TravelScene::BuildExtraVisualParts() {
     }
 
     extraObjects_.push_back(obj);
-
-    // Logger::Log("Extra head created");
   }
 }
 
@@ -1910,7 +1815,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     return;
   }
 
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  // Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
   Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
 
@@ -1924,31 +1829,12 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
   Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
-  if (body == nullptr || neck == nullptr || head == nullptr ||
-      leftUpperArm == nullptr || leftForeArm == nullptr ||
-      rightUpperArm == nullptr || rightForeArm == nullptr ||
-      leftThigh == nullptr || leftShin == nullptr || rightThigh == nullptr ||
-      rightShin == nullptr) {
+  if (neck == nullptr || head == nullptr || leftUpperArm == nullptr ||
+      leftForeArm == nullptr || rightUpperArm == nullptr ||
+      rightForeArm == nullptr || leftThigh == nullptr || leftShin == nullptr ||
+      rightThigh == nullptr || rightShin == nullptr) {
     return;
   }
-
-  Logger::Log("==== BODY / CP CHECK ====");
-  Logger::Log("body world : %.3f %.3f %.3f",
-              body->mainPosition.transform.translate.x,
-              body->mainPosition.transform.translate.y,
-              body->mainPosition.transform.translate.z);
-
-  Logger::Log("chestPos : %.3f %.3f %.3f", cp->chestPos.x, cp->chestPos.y,
-              cp->chestPos.z);
-  Logger::Log("bellyPos : %.3f %.3f %.3f", cp->bellyPos.x, cp->bellyPos.y,
-              cp->bellyPos.z);
-  Logger::Log("waistPos : %.3f %.3f %.3f", cp->waistPos.x, cp->waistPos.y,
-              cp->waistPos.z);
-
-  Logger::Log("leftHipPos : %.3f %.3f %.3f", cp->leftHipPos.x, cp->leftHipPos.y,
-              cp->leftHipPos.z);
-  Logger::Log("rightHipPos : %.3f %.3f %.3f", cp->rightHipPos.x,
-              cp->rightHipPos.y, cp->rightHipPos.z);
 
   auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
@@ -1956,15 +1842,53 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   // body 自体の位置は移動処理側が持つので、ここでは触らない
 
+  //================================
+  // ChestBody / StomachBody を control point 基準で配置
+  //================================
+  Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+
+  if (chestBody == nullptr || stomachBody == nullptr) {
+    return;
+  }
+
+  auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
+  };
+
+  const Vector3 chestCenterWorld = Mid(cp->chestPos, cp->bellyPos);
+  const Vector3 stomachCenterWorld = Mid(cp->bellyPos, cp->waistPos);
+
+  const float chestLength = Length(Sub(cp->chestPos, cp->bellyPos));
+  const float stomachLength = Length(Sub(cp->bellyPos, cp->waistPos));
+
   //==============================
   // 1段目 : body の子
   //==============================
-  // 首と腕は Chest 基準
-  neck->mainPosition.transform.translate = Sub(cp->lowerNeckPos, cp->chestPos);
+  // neck->mainPosition.transform.translate = Sub(cp->lowerNeckPos,
+  // cp->chestPos);
+
+  // 首
+  const Vector3 bodyNeckConnector = {0.0f, 0.0f, 0.0f};
+  neck->mainPosition.transform.translate = bodyNeckConnector;
+
+  Vector3 neckVec = Sub(cp->upperNeckPos, cp->lowerNeckPos);
+  float neckLength = Length(neckVec);
+
+  Vector3 neckDir = {0.0f, 1.0f, 0.0f};
+  if (neckLength > 0.0001f) {
+    neckDir = Normalize(neckVec);
+  }
+
+  float neckAngleZ = atan2(neckDir.x, -neckDir.y);
+  neck->mainPosition.transform.rotate = {0.0f, 0.0f, neckAngleZ};
 
   // 左上腕
+  // leftUpperArm->mainPosition.transform.translate =
+  //    Sub(cp->leftShoulderPos, cp->chestPos);
+  Vector3 chestOffset = Sub(cp->chestPos, chestCenterWorld);
   leftUpperArm->mainPosition.transform.translate =
-      Sub(cp->leftShoulderPos, cp->chestPos);
+      Sub(cp->leftShoulderPos, cp->chestPos) + chestOffset;
 
   Vector3 leftUpperArmDir = Sub(cp->leftElbowPos, cp->leftShoulderPos);
   leftUpperArmDir = Normalize(leftUpperArmDir);
@@ -1976,7 +1900,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   // 右上腕
   rightUpperArm->mainPosition.transform.translate =
-      Sub(cp->rightShoulderPos, cp->chestPos);
+      Sub(cp->rightShoulderPos, cp->chestPos) + chestOffset;
 
   Vector3 rightUpperArmDir = Sub(cp->rightElbowPos, cp->rightShoulderPos);
   rightUpperArmDir = Normalize(rightUpperArmDir);
@@ -2012,8 +1936,23 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // 2段目 : 親の子
   //==============================
   // 頭
-  head->mainPosition.transform.translate =
-      Sub(cp->headCenterPos, cp->lowerNeckPos);
+  // head->mainPosition.transform.translate =
+  //   Sub(cp->headCenterPos, cp->upperNeckPos);
+  // head->mainPosition.transform.translate = {
+  //     bodyNeckConnector.x + neckDir.x * neckLength,
+  //     bodyNeckConnector.y + neckDir.y * neckLength,
+  //     bodyNeckConnector.z + neckDir.z * neckLength};
+
+  Vector3 headTopOffset = Sub(cp->headCenterPos, cp->upperNeckPos);
+  Vector3 headMidOffset = {headTopOffset.x * 0.5f, headTopOffset.y * 0.5f,
+                           headTopOffset.z * 0.5f};
+
+  head->mainPosition.transform.translate = {
+      neckDir.x * neckLength + headMidOffset.x,
+      neckDir.y * neckLength + headMidOffset.y,
+      neckDir.z * neckLength + headMidOffset.z};
+
+  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
   // 左前腕
   Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
@@ -2075,6 +2014,11 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   //================================
   // 太さパラメータ取得
   //================================
+  const auto &chestParam =
+      modBodies_[ToIndex(ModBodyPart::ChestBody)].GetParam();
+  const auto &stomachParam =
+      modBodies_[ToIndex(ModBodyPart::StomachBody)].GetParam();
+  const auto &headParam = modBodies_[ToIndex(ModBodyPart::Head)].GetParam();
   const auto &leftUpperArmParam =
       modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam();
   const auto &leftForeArmParam =
@@ -2107,6 +2051,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightUpperArmEndR =
       GetSnapshotRadius(ModBodyPart::RightUpperArm, 3);
 
+  Logger::Log("==== BODY PARAM DEBUG ====");
+  Logger::Log("chestParam scale : %.3f %.3f %.3f", chestParam.scale.x,
+              chestParam.scale.y, chestParam.scale.z);
+  Logger::Log("stomachParam scale : %.3f %.3f %.3f", stomachParam.scale.x,
+              stomachParam.scale.y, stomachParam.scale.z);
+  Logger::Log("chestParam length : %.3f", chestParam.length);
+  Logger::Log("stomachParam length : %.3f", stomachParam.length);
+
   const float leftThighStartR = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
   const float leftThighBendR = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
   const float leftThighEndR = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
@@ -2114,6 +2066,20 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightThighStartR = GetSnapshotRadius(ModBodyPart::RightThigh, 1);
   const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
   const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+
+  const float lowerNeckR = GetSnapshotRadius(ModBodyPart::Head, 7);
+  const float upperNeckR = GetSnapshotRadius(ModBodyPart::Head, 8);
+  const float headRadius = GetSnapshotRadius(ModBodyPart::Head, 9);
+  // const float chestR = GetSnapshotRadius(ModBodyPart::ChestBody, 4);
+  // const float bellyR = GetSnapshotRadius(ModBodyPart::ChestBody, 5);
+  // const float stomachR = GetSnapshotRadius(ModBodyPart::StomachBody, 6);
+  const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
+  const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
+  const float stomachR = GetControlPointRadius(ModControlPointRole::Waist);
+  Logger::Log("==== BODY RADIUS DEBUG ====");
+  Logger::Log("chestR : %.3f", chestR);
+  Logger::Log("bellyR : %.3f", bellyR);
+  Logger::Log("stomachR : %.3f", stomachR);
 
   //================================================
   // 無改造基準 0.1f から倍率化
@@ -2140,6 +2106,16 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightShinThicknessScale =
       (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
 
+  const float neckThicknessScale =
+      (std::max)(lowerNeckR, upperNeckR) / baseRadius;
+  const float headThicknessScale =
+      (std::max)(headRadius, upperNeckR) / baseRadius;
+  const float chestThicknessScale = (std::max)(chestR, bellyR) / baseRadius;
+  const float stomachThicknessScale = (std::max)(stomachR, bellyR) / baseRadius;
+  Logger::Log("==== BODY THICKNESS SCALE DEBUG ====");
+  Logger::Log("chestThicknessScale : %.3f", chestThicknessScale);
+  Logger::Log("stomachThicknessScale : %.3f", stomachThicknessScale);
+
   //================================================
   // 長さ
   //================================================
@@ -2159,6 +2135,69 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
   const float rightShinLength =
       Length(Sub(cp->rightAnklePos, cp->rightKneePos));
+
+  const auto &neckParam = modBodies_[ToIndex(ModBodyPart::Neck)].GetParam();
+
+  //============================
+  // 胸部
+  //============================
+  // chestBody->mainPosition.transform.translate = chestCenterWorld;
+  chestBody->mainPosition.transform.translate = {moveX_ + chestCenterWorld.x,
+                                                 moveY_ + chestCenterWorld.y,
+                                                 chestCenterWorld.z};
+  chestBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  if (!chestBody->objectParts_.empty()) {
+    chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength * 0.5f,
+                                                      0.0f};
+    chestBody->objectParts_[0].transform.scale.x =
+        chestThicknessScale * chestParam.scale.x;
+    chestBody->objectParts_[0].transform.scale.y =
+        chestLength * chestParam.scale.y;
+    chestBody->objectParts_[0].transform.scale.z =
+        chestThicknessScale * chestParam.scale.z;
+  }
+
+  //============================
+  // 腹部
+  // chestBody の子なので chestBody ローカルで置く
+  //============================
+  stomachBody->mainPosition.transform.translate =
+      Sub(stomachCenterWorld, chestCenterWorld);
+  stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  if (!stomachBody->objectParts_.empty()) {
+    stomachBody->objectParts_[0].transform.translate = {
+        0.0f, -stomachLength * 0.5f, 0.0f};
+    stomachBody->objectParts_[0].transform.scale.x =
+        stomachThicknessScale * stomachParam.scale.x;
+    stomachBody->objectParts_[0].transform.scale.y =
+        stomachLength * stomachParam.scale.y;
+    stomachBody->objectParts_[0].transform.scale.z =
+        stomachThicknessScale * stomachParam.scale.z;
+  }
+
+  if (!neck->objectParts_.empty()) {
+    neck->objectParts_[0].transform.translate = {0.0f, -neckLength * 0.5f,
+                                                 0.0f};
+
+    neck->objectParts_[0].transform.scale.x =
+        neckThicknessScale * neckParam.scale.x;
+    neck->objectParts_[0].transform.scale.y = neckLength * neckParam.scale.y;
+    neck->objectParts_[0].transform.scale.z =
+        neckThicknessScale * neckParam.scale.z;
+  }
+
+  float headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos)) * 2.0f;
+
+  if (!head->objectParts_.empty()) {
+    head->objectParts_[0].transform.scale.x =
+        headThicknessScale * headParam.scale.x;
+    head->objectParts_[0].transform.scale.y =
+        headHeight * headParam.scale.y * headParam.length;
+    head->objectParts_[0].transform.scale.z =
+        headThicknessScale * headParam.scale.z;
+  }
 
   //================================================
   // 左上腕
