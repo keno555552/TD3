@@ -14,6 +14,13 @@ namespace {
 } // namespace
 
 ContestScene::ContestScene(kEngine* system) {
+    const ModBodyCustomizeData* earlyCheck = ModBody::GetSharedCustomizeData();
+    if (earlyCheck != nullptr && !earlyCheck->controlPointSnapshots.empty()) {
+        const auto& s = earlyCheck->controlPointSnapshots[5];
+        Logger::Log("[ContestScene EARLY] snapshot[5] radius=%.3f pos=(%.3f,%.3f,%.3f)",
+            s.radius, s.localPosition.x, s.localPosition.y, s.localPosition.z);
+    }
+
     system_ = system;
 
     // ライト
@@ -35,6 +42,26 @@ ContestScene::ContestScene(kEngine* system) {
     // PromptData からお題と審査員を取得してスコア計算
     const ThemeData* theme = PromptData::GetThemeData();
     const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
+    if (playerData != nullptr) {
+        Logger::Log("[ContestScene] snapshots=%d default=%d",
+            static_cast<int>(playerData->controlPointSnapshots.size()),
+            static_cast<int>(playerData->defaultControlPointSnapshots.size()));
+        if (!playerData->controlPointSnapshots.empty()) {
+            const auto& s = playerData->controlPointSnapshots[4]; // 首のUpperNeck
+            Logger::Log("[ContestScene] snapshot[4] pos=(%.3f,%.3f,%.3f)",
+                s.localPosition.x, s.localPosition.y, s.localPosition.z);
+        }
+        if (!playerData->defaultControlPointSnapshots.empty()) {
+            const auto& d = playerData->defaultControlPointSnapshots[4];
+            Logger::Log("[ContestScene] default[4] pos=(%.3f,%.3f,%.3f)",
+                d.localPosition.x, d.localPosition.y, d.localPosition.z);
+        }
+    }
+    if (playerData != nullptr) {
+        Logger::Log("[ContestScene] controlPointSnapshots=%d defaultControlPointSnapshots=%d",
+            static_cast<int>(playerData->controlPointSnapshots.size()),
+            static_cast<int>(playerData->defaultControlPointSnapshots.size()));
+    }
     const std::vector<JudgeData>* judges = PromptData::GetJudges();
 
     if (theme != nullptr && playerData != nullptr) {

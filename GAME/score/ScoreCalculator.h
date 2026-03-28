@@ -3,6 +3,7 @@
 #include "GAME/judges/JudgeData.h"
 #include "GAME/score/ScoreResult.h"
 #include "GAME/theme/ThemeData.h"
+#include "GAME/actor/ModBodyCustomizeDataUtil.h"
 #include <vector>
 
 /// スコア計算を行う汎用ユーティリティクラス
@@ -23,9 +24,13 @@ private:
   ScoreCalculator() = delete;
 
   /// パーツごとの基本スコアを計算する
-  static void CalcPartScores(const ScoreSet &scoreSet,
-                             const ModBodyCustomizeData &playerData,
-                             ScoreResult &result);
+  static void CalcPartScores(const ScoreSet& scoreSet,
+      const ModBodyCustomizeData& playerData,
+      ScoreResult& result);
+
+  static Vector3 CalcPartChangeFromControlPoints(
+      ModBodyPart partType,
+      const ModBodyCustomizeData& playerData);
 
   /// 本数スコアを計算する
   static void CalcCountScores(const ScoreSet &scoreSet,
