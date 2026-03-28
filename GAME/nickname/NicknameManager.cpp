@@ -346,14 +346,19 @@ int NicknameManager::GetStarByName(const ScoreResult &result,
 
 /*   改造されたパーツ数を取得   */
 int NicknameManager::GetChangedPartCount(
-    const ModBodyCustomizeData &playerData) {
-  int count = 0;
-  for (size_t i = 0; i < kPartCount; ++i) {
-    if (IsPartChanged(playerData.partParams[i])) {
-      ++count;
+    const ModBodyCustomizeData& playerData) {
+    int count = 0;
+    for (size_t i = 0; i < kPartCount; ++i) {
+        Vector3 scale = ScoreCalculator::CalcPartChangeFromControlPoints(
+            static_cast<ModBodyPart>(i), playerData);
+        constexpr float kEpsilon = 0.01f;
+        if (std::abs(scale.x - 1.0f) > kEpsilon ||
+            std::abs(scale.y - 1.0f) > kEpsilon ||
+            std::abs(scale.z - 1.0f) > kEpsilon) {
+            ++count;
+        }
     }
-  }
-  return count;
+    return count;
 }
 
 /*   ランクの強さを数値に変換   */

@@ -194,45 +194,22 @@ ScoreResult ScoreCalculator::Calculate(const ThemeData& theme,
 	return result;
 }
 
-/*   パーツごとの基本スコア計算   */
-//void ScoreCalculator::CalcPartScores(const ScoreSet& scoreSet,
-//	const ModBodyCustomizeData& playerData,
-//	ScoreResult& result) {
-//	float total = 0.0f;
-//
-//	for (size_t i = 0; i < kPartCount; ++i) {
-//		const PartWeight& weight = scoreSet.partWeights[i];
-//		const ModBodyPartParam& param = playerData.partParams[i];
-//
-//		float score = 0.0f;
-//
-//		float deltaX = param.scale.x - 1.0f;
-//		if (weight.scaleX > 0.0f) {
-//			score += std::max(0.0f, deltaX) * weight.scaleX;
-//		} else if (weight.scaleX < 0.0f) {
-//			score += std::max(0.0f, -deltaX) * std::abs(weight.scaleX);
-//		}
-//
-//		float deltaY = param.scale.y - 1.0f;
-//		if (weight.scaleY > 0.0f) {
-//			score += std::max(0.0f, deltaY) * weight.scaleY;
-//		} else if (weight.scaleY < 0.0f) {
-//			score += std::max(0.0f, -deltaY) * std::abs(weight.scaleY);
-//		}
-//
-//		float deltaZ = param.scale.z - 1.0f;
-//		if (weight.scaleZ > 0.0f) {
-//			score += std::max(0.0f, deltaZ) * weight.scaleZ;
-//		} else if (weight.scaleZ < 0.0f) {
-//			score += std::max(0.0f, -deltaZ) * std::abs(weight.scaleZ);
-//		}
-//
-//		result.partScores[i] = TruncateToFirstDecimal(score);
-//		total += result.partScores[i];
-//	}
-//
-//	result.totalPartScore = TruncateToFirstDecimal(total);
-//}
+float ScoreCalculator::GetPartChangeAmountFromCP(
+	ModBodyPart partType, const ModBodyCustomizeData& playerData)
+{
+	Vector3 scale = CalcPartChangeFromControlPoints(partType, playerData);
+	return std::abs(scale.x - 1.0f) + std::abs(scale.y - 1.0f) +
+		std::abs(scale.z - 1.0f);
+}
+
+bool ScoreCalculator::IsPartChangedFromCP(ModBodyPart partType, const ModBodyCustomizeData& playerData)
+{
+	constexpr float kEpsilon = 0.01f;
+	Vector3 scale = CalcPartChangeFromControlPoints(partType, playerData);
+	return std::abs(scale.x - 1.0f) > kEpsilon ||
+		std::abs(scale.y - 1.0f) > kEpsilon ||
+		std::abs(scale.z - 1.0f) > kEpsilon;
+}
 
 /*   操作点から部位ごとの変化量（scale相当）を計算する   */
 Vector3 ScoreCalculator::CalcPartChangeFromControlPoints(
@@ -547,21 +524,30 @@ void ScoreCalculator::CalcBonusScores(const ThemeData& theme,
 /*   シンメトリーボーナス（0〜1）   */
 float ScoreCalculator::CalcSymmetryRaw(
 	const ModBodyCustomizeData& playerData) {
-	constexpr size_t pairCount =
-		sizeof(kSymmetryPairs) / sizeof(kSymmetryPairs[0]);
 	constexpr float kMaxDiffPerAxis = 2.0f;
 
+	struct SymmetryPairType {
+		ModBodyPart left;
+		ModBodyPart right;
+	};
+
+	const SymmetryPairType pairs[] = {
+		{ModBodyPart::LeftUpperArm, ModBodyPart::RightUpperArm},
+		{ModBodyPart::LeftForeArm, ModBodyPart::RightForeArm},
+		{ModBodyPart::LeftThigh, ModBodyPart::RightThigh},
+		{ModBodyPart::LeftShin, ModBodyPart::RightShin},
+	};
+
+	constexpr size_t pairCount = sizeof(pairs) / sizeof(pairs[0]);
 	float totalSimilarity = 0.0f;
 
 	for (size_t p = 0; p < pairCount; ++p) {
-		const ModBodyPartParam& left =
-			playerData.partParams[kSymmetryPairs[p].left];
-		const ModBodyPartParam& right =
-			playerData.partParams[kSymmetryPairs[p].right];
+		Vector3 leftScale = CalcPartChangeFromControlPoints(pairs[p].left, playerData);
+		Vector3 rightScale = CalcPartChangeFromControlPoints(pairs[p].right, playerData);
 
-		float diffX = std::abs(left.scale.x - right.scale.x);
-		float diffY = std::abs(left.scale.y - right.scale.y);
-		float diffZ = std::abs(left.scale.z - right.scale.z);
+		float diffX = std::abs(leftScale.x - rightScale.x);
+		float diffY = std::abs(leftScale.y - rightScale.y);
+		float diffZ = std::abs(leftScale.z - rightScale.z);
 
 		float simX = std::max(0.0f, 1.0f - diffX / kMaxDiffPerAxis);
 		float simY = std::max(0.0f, 1.0f - diffY / kMaxDiffPerAxis);
@@ -578,7 +564,8 @@ float ScoreCalculator::CalcCostEfficiencyRaw(
 	const ModBodyCustomizeData& playerData, float totalPartScore) {
 	float totalChange = 0.0f;
 	for (size_t i = 0; i < kPartCount; ++i) {
-		totalChange += GetPartChangeAmount(playerData.partParams[i]);
+		totalChange += GetPartChangeAmountFromCP(
+			static_cast<ModBodyPart>(i), playerData);
 	}
 
 	if (totalChange < 0.001f) {
@@ -597,7 +584,7 @@ float ScoreCalculator::CalcMinimalistRaw(
 	int unchangedCount = 0;
 
 	for (size_t i = 0; i < kPartCount; ++i) {
-		if (!IsPartChanged(playerData.partParams[i])) {
+		if (!IsPartChangedFromCP(static_cast<ModBodyPart>(i), playerData)) {
 			++unchangedCount;
 		}
 	}
@@ -619,7 +606,8 @@ float ScoreCalculator::CalcWildcardRaw(
 			std::abs(pw.scaleX) + std::abs(pw.scaleY) + std::abs(pw.scaleZ);
 
 		if (weightSum <= kLowWeightThreshold) {
-			float change = GetPartChangeAmount(playerData.partParams[i]);
+			float change = GetPartChangeAmountFromCP(
+				static_cast<ModBodyPart>(i), playerData);
 			totalWildChange += change;
 			++lowWeightPartCount;
 		}
@@ -641,7 +629,8 @@ float ScoreCalculator::CalcBalanceRaw(
 	float sum = 0.0f;
 
 	for (size_t i = 0; i < kPartCount; ++i) {
-		changes[i] = GetPartChangeAmount(playerData.partParams[i]);
+		changes[i] = GetPartChangeAmountFromCP(
+			static_cast<ModBodyPart>(i), playerData);
 		sum += changes[i];
 	}
 
@@ -669,7 +658,8 @@ int ScoreCalculator::CalcStarThemeMatch(float totalPartScore) {
 int ScoreCalculator::CalcStarImpact(const ModBodyCustomizeData& playerData) {
 	float totalChange = 0.0f;
 	for (size_t i = 0; i < kPartCount; ++i) {
-		totalChange += GetPartChangeAmount(playerData.partParams[i]);
+		totalChange += GetPartChangeAmountFromCP(
+			static_cast<ModBodyPart>(i), playerData);
 	}
 	return ClampStar(ThresholdToStar(totalChange, kImpactThresholds));
 }
@@ -686,7 +676,8 @@ int ScoreCalculator::CalcStarCommitment(
 	const ModBodyCustomizeData& playerData) {
 	float maxChange = 0.0f;
 	for (size_t i = 0; i < kPartCount; ++i) {
-		float change = GetPartChangeAmount(playerData.partParams[i]);
+		float change = GetPartChangeAmountFromCP(
+			static_cast<ModBodyPart>(i), playerData);
 		if (change > maxChange) {
 			maxChange = change;
 		}
@@ -703,20 +694,18 @@ int ScoreCalculator::CalcSingleJudgeStar(
 
 	std::vector<int> partStars;
 
-	for (size_t i = 0; i < 11; ++i) {
+	for (size_t i = 0; i < 12; ++i) {
 		float threshold = judge.partPreferences[i].threshold;
 
-		// 閾値 0 のパーツは関心なし
 		if (std::abs(threshold) < 0.001f) {
 			continue;
 		}
 
-		const ModBodyPartParam& param = playerData.partParams[i];
-		float changeAmount = GetPartChangeAmount(param);
-		bool isChanged = IsPartChanged(param);
+		ModBodyPart partType = static_cast<ModBodyPart>(i);
+		float changeAmount = GetPartChangeAmountFromCP(partType, playerData);
+		bool isChanged = IsPartChangedFromCP(partType, playerData);
 
 		if (threshold > 0.0f) {
-			// 好みパーツ
 			if (changeAmount >= threshold) {
 				partStars.push_back(5);
 			} else if (isChanged) {
@@ -725,7 +714,6 @@ int ScoreCalculator::CalcSingleJudgeStar(
 				partStars.push_back(3);
 			}
 		} else {
-			// 嫌いパーツ（threshold は負の値、絶対値を上限として使う）
 			float absThreshold = std::abs(threshold);
 			if (changeAmount >= absThreshold) {
 				partStars.push_back(3);
@@ -737,12 +725,10 @@ int ScoreCalculator::CalcSingleJudgeStar(
 		}
 	}
 
-	// 好み・嫌いパーツがない場合は基準値
 	if (partStars.empty()) {
 		return 3;
 	}
 
-	// 平均を四捨五入
 	float sum = 0.0f;
 	for (int s : partStars) {
 		sum += static_cast<float>(s);
