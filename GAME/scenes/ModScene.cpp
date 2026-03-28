@@ -267,6 +267,199 @@ float GetWheelScaleFactorFromDelta(int wheelDelta) {
   return 1.0f;
 }
 
+bool GetPickSegmentRoles(ModBodyPart part, ModControlPointRole& startRole,
+    ModControlPointRole& endRole) {
+    switch (part) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+        startRole = ModControlPointRole::Root;
+        endRole = ModControlPointRole::Bend;
+        return true;
+
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm:
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin:
+        startRole = ModControlPointRole::Bend;
+        endRole = ModControlPointRole::End;
+        return true;
+
+    case ModBodyPart::ChestBody:
+        startRole = ModControlPointRole::Chest;
+        endRole = ModControlPointRole::Belly;
+        return true;
+
+    case ModBodyPart::StomachBody:
+        startRole = ModControlPointRole::Belly;
+        endRole = ModControlPointRole::Waist;
+        return true;
+
+    case ModBodyPart::Neck:
+        startRole = ModControlPointRole::LowerNeck;
+        endRole = ModControlPointRole::UpperNeck;
+        return true;
+
+    case ModBodyPart::Head:
+        startRole = ModControlPointRole::UpperNeck;
+        endRole = ModControlPointRole::HeadCenter;
+        return true;
+
+    default:
+        return false;
+    }
+}
+
+float DistancePointToSegmentSq(const Vector3& point, const Vector3& a,
+    const Vector3& b) {
+    const Vector3 ab = Subtract(b, a);
+    const Vector3 ap = Subtract(point, a);
+
+    const float abLenSq = Dot(ab, ab);
+    if (abLenSq <= 0.000001f) {
+        const Vector3 diff = Subtract(point, a);
+        return Dot(diff, diff);
+    }
+
+    float t = Dot(ap, ab) / abLenSq;
+    t = ClampFloatLocal(t, 0.0f, 1.0f);
+
+    const Vector3 closest = Add(a, Multiply(t, ab));
+    const Vector3 diff = Subtract(point, closest);
+    return Dot(diff, diff);
+}
+
+bool IntersectRaySphereLocal(const Ray& ray, const Vector3& center, float radius,
+    float* outT) {
+    const Vector3 m = Subtract(ray.origin, center);
+    const float a = Dot(ray.direction, ray.direction);
+    const float b = Dot(m, ray.direction);
+    const float c = Dot(m, m) - radius * radius;
+
+    if (c <= 0.0f) {
+        if (outT != nullptr) {
+            *outT = 0.0f;
+        }
+        return true;
+    }
+
+    if (a <= 0.000001f) {
+        return false;
+    }
+
+    const float discriminant = b * b - a * c;
+    if (discriminant < 0.0f) {
+        return false;
+    }
+
+    float t = (-b - sqrtf(discriminant)) / a;
+    if (t < 0.0f) {
+        t = (-b + sqrtf(discriminant)) / a;
+        if (t < 0.0f) {
+            return false;
+        }
+    }
+
+    if (outT != nullptr) {
+        *outT = t;
+    }
+    return true;
+}
+
+bool IntersectRayCapsule(const Ray& ray, const Vector3& capsuleStart,
+    const Vector3& capsuleEnd, float capsuleRadius,
+    float* outT) {
+    const float epsilon = 0.0001f;
+    const float rayDirLenSq = Dot(ray.direction, ray.direction);
+    if (rayDirLenSq <= epsilon) {
+        return false;
+    }
+
+    const Vector3 d = Subtract(capsuleEnd, capsuleStart);
+    const float segLenSq = Dot(d, d);
+
+    if (segLenSq <= epsilon) {
+        return IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, outT);
+    }
+
+    const Vector3 m = Subtract(ray.origin, capsuleStart);
+    const Vector3 n = ray.direction;
+
+    const float md = Dot(m, d);
+    const float nd = Dot(n, d);
+    const float dd = segLenSq;
+    const float mn = Dot(m, n);
+    const float nn = Dot(n, n);
+
+    const float a = dd * nn - nd * nd;
+    const float k = Dot(m, m) - capsuleRadius * capsuleRadius;
+    const float c = dd * k - md * md;
+
+    float bestT = FLT_MAX;
+    bool hit = false;
+
+    if (fabsf(a) > epsilon) {
+        const float b = dd * mn - nd * md;
+        const float discriminant = b * b - a * c;
+
+        if (discriminant >= 0.0f) {
+            const float sqrtDiscriminant = sqrtf(discriminant);
+
+            float t0 = (-b - sqrtDiscriminant) / a;
+            float t1 = (-b + sqrtDiscriminant) / a;
+
+            if (t0 > t1) {
+                const float temp = t0;
+                t0 = t1;
+                t1 = temp;
+            }
+
+            if (t1 >= 0.0f) {
+                if (t0 < 0.0f) {
+                    t0 = 0.0f;
+                }
+
+                const float candidates[2] = { t0, t1 };
+                for (int i = 0; i < 2; ++i) {
+                    const float t = candidates[i];
+                    const float s = md + t * nd;
+                    if (s >= 0.0f && s <= dd) {
+                        if (t < bestT) {
+                            bestT = t;
+                            hit = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    float sphereT = 0.0f;
+    if (IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, &sphereT)) {
+        if (sphereT < bestT) {
+            bestT = sphereT;
+            hit = true;
+        }
+    }
+
+    if (IntersectRaySphereLocal(ray, capsuleEnd, capsuleRadius, &sphereT)) {
+        if (sphereT < bestT) {
+            bestT = sphereT;
+            hit = true;
+        }
+    }
+
+    if (!hit) {
+        return false;
+    }
+
+    if (outT != nullptr) {
+        *outT = bestT;
+    }
+    return true;
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -1509,36 +1702,40 @@ void ModScene::ClearControlPointSelection() {
   hoveredPartId_ = -1;
 }
 
-void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
-  // ドラッグ中は選択部位を優先して表示する
-  if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
-    hoveredPartId_ = selectedPartId_;
-    return;
-  }
-
-  float nearestT = FLT_MAX;
-  int nearestPartId = -1;
-
-  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-    const int partId = orderedPartIds_[i];
-
-    Sphere pickSphere{};
-    if (!BuildPartPickSphere(partId, pickSphere)) {
-      continue;
+void ModScene::UpdateHoveredPartFromMouseRay(const Ray& mouseRay) {
+    // ドラッグ中は選択部位を優先して表示する
+    if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
+        hoveredPartId_ = selectedPartId_;
+        return;
     }
 
-    float t = 0.0f;
-    if (!crashDecision(pickSphere, mouseRay, &t)) {
-      continue;
+    float nearestT = FLT_MAX;
+    int nearestPartId = -1;
+
+    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+        const int partId = orderedPartIds_[i];
+
+        Vector3 capsuleStart{};
+        Vector3 capsuleEnd{};
+        float capsuleRadius = 0.0f;
+
+        if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd, capsuleRadius)) {
+            continue;
+        }
+
+        float t = 0.0f;
+        if (!IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+            &t)) {
+            continue;
+        }
+
+        if (t < nearestT) {
+            nearestT = t;
+            nearestPartId = partId;
+        }
     }
 
-    if (t < nearestT) {
-      nearestT = t;
-      nearestPartId = partId;
-    }
-  }
-
-  hoveredPartId_ = nearestPartId;
+    hoveredPartId_ = nearestPartId;
 }
 
 void ModScene::EnsureControlPointGizmoCount(size_t requiredCount) {
@@ -2151,65 +2348,132 @@ bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
   return true;
 }
 
-bool ModScene::BuildPartPickSphere(int partId, Sphere &outSphere) const {
-  if (modObjects_.count(partId) == 0 || modBodies_.count(partId) == 0) {
-    return false;
-  }
+bool ModScene::BuildPartPickCapsule(int partId, Vector3& outStart,
+    Vector3& outEnd, float& outRadius) const {
+    outStart = { 0.0f, 0.0f, 0.0f };
+    outEnd = { 0.0f, 0.0f, 0.0f };
+    outRadius = 0.0f;
 
-  const Object *object = modObjects_.at(partId).get();
-  if (object == nullptr || object->objectParts_.empty()) {
-    return false;
-  }
+    const PartNode* node = assembly_.FindNode(partId);
+    if (node == nullptr) {
+        return false;
+    }
 
-  const Transform &mesh = object->objectParts_[0].transform;
+    ModControlPointRole startRole = ModControlPointRole::None;
+    ModControlPointRole endRole = ModControlPointRole::None;
+    if (!GetPickSegmentRoles(node->part, startRole, endRole)) {
+        return false;
+    }
 
-  const Vector3 rootWorld =
-      ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+    // torso は共有操作点から取る
+    if (node->part == ModBodyPart::ChestBody ||
+        node->part == ModBodyPart::StomachBody) {
+        const int startIndex = FindTorsoControlPointIndex(startRole);
+        const int endIndex = FindTorsoControlPointIndex(endRole);
 
-  outSphere.center = Add(rootWorld, mesh.translate);
-  outSphere.radius = Max3(mesh.scale.x, mesh.scale.y, mesh.scale.z) * 0.75f;
-  return true;
+        if (startIndex < 0 || endIndex < 0) {
+            return false;
+        }
+
+        outStart = GetTorsoControlPointWorldPosition(startRole);
+        outEnd = GetTorsoControlPointWorldPosition(endRole);
+
+        const float startRadius =
+            torsoControlPoints_[static_cast<size_t>(startIndex)].radius;
+        const float endRadius =
+            torsoControlPoints_[static_cast<size_t>(endIndex)].radius;
+
+        outRadius = (std::max)(startRadius, endRadius) * 1.05f;
+        outRadius = (std::max)(outRadius, 0.06f);
+        return true;
+    }
+
+    // それ以外は owner の操作点から取る
+    const int ownerId = ResolveControlOwnerPartId(assembly_, partId);
+    if (ownerId < 0) {
+        return false;
+    }
+
+    if (modBodies_.count(ownerId) == 0 || modObjects_.count(ownerId) == 0) {
+        return false;
+    }
+
+    const ModBody& body = modBodies_.at(ownerId);
+    const Object* object = modObjects_.at(ownerId).get();
+    if (object == nullptr) {
+        return false;
+    }
+
+    const int startIndex = body.FindControlPointIndex(startRole);
+    const int endIndex = body.FindControlPointIndex(endRole);
+    if (startIndex < 0 || endIndex < 0) {
+        return false;
+    }
+
+    const std::vector<ModControlPoint>& points = body.GetControlPoints();
+
+    outStart =
+        body.GetControlPointWorldPosition(object, static_cast<size_t>(startIndex));
+    outEnd =
+        body.GetControlPointWorldPosition(object, static_cast<size_t>(endIndex));
+
+    const float startRadius = points[static_cast<size_t>(startIndex)].radius;
+    const float endRadius = points[static_cast<size_t>(endIndex)].radius;
+
+    outRadius = (std::max)(startRadius, endRadius) * 1.05f;
+    outRadius = (std::max)(outRadius, 0.05f);
+
+    return true;
 }
 
-bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
-  if (selectedControlPointIndex_ < 0) {
-    return false;
-  }
+bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray& mouseRay) const {
+    if (selectedControlPointIndex_ < 0) {
+        return false;
+    }
 
-  // torso の共有点選択中は、Chest と Stomach の両方を有効範囲にする
-  if (selectedControlPartId_ == -2) {
-    const int chestId = assembly_.GetBodyId();
-    const int stomachId = assembly_.GetBodyId();
+    // torso の共有点選択中は torso 全体のどちらかに当たっていれば有効
+    if (selectedControlPartId_ == -2) {
+        for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+            const int partId = orderedPartIds_[i];
+            if (!IsTorsoVisiblePartId(partId)) {
+                continue;
+            }
 
-    Sphere sphere{};
+            Vector3 capsuleStart{};
+            Vector3 capsuleEnd{};
+            float capsuleRadius = 0.0f;
+
+            if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd,
+                capsuleRadius)) {
+                continue;
+            }
+
+            float t = 0.0f;
+            if (IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+                &t)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    if (selectedPartId_ < 0) {
+        return false;
+    }
+
+    Vector3 capsuleStart{};
+    Vector3 capsuleEnd{};
+    float capsuleRadius = 0.0f;
+
+    if (!BuildPartPickCapsule(selectedPartId_, capsuleStart, capsuleEnd,
+        capsuleRadius)) {
+        return false;
+    }
+
     float t = 0.0f;
-
-    if (chestId >= 0 && BuildPartPickSphere(chestId, sphere)) {
-      if (crashDecision(sphere, mouseRay, &t)) {
-        return true;
-      }
-    }
-
-    if (stomachId >= 0 && BuildPartPickSphere(stomachId, sphere)) {
-      if (crashDecision(sphere, mouseRay, &t)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  if (selectedPartId_ < 0) {
-    return false;
-  }
-
-  Sphere sphere{};
-  if (!BuildPartPickSphere(selectedPartId_, sphere)) {
-    return false;
-  }
-
-  float t = 0.0f;
-  return crashDecision(sphere, mouseRay, &t);
+    return IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+        &t);
 }
 
 int ModScene::ResolveFadeGroupId(int partId) const {
@@ -2366,10 +2630,23 @@ void ModScene::UpdateModObjects() {
   }
 
   int fadedGroupId = -1;
+
+  // カーソルが実際に部位へ当たっているときだけ hover フェードする
   if (hoveredPartId_ >= 0) {
-    fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
-  } else if (selectedPartId_ >= 0) {
-    fadedGroupId = ResolveFadeGroupId(selectedPartId_);
+      fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
+  }
+
+  // 操作点を選択している、またはドラッグ中なら
+  // その部位グループを維持してフェードする
+  if (selectedControlPointIndex_ >= 0) {
+      if (selectedControlPartId_ == -2) {
+          const int chestId = assembly_.GetBodyId();
+          if (chestId >= 0) {
+              fadedGroupId = ResolveFadeGroupId(chestId);
+          }
+      } else if (selectedPartId_ >= 0) {
+          fadedGroupId = ResolveFadeGroupId(selectedPartId_);
+      }
   }
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {

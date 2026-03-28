@@ -359,13 +359,16 @@ private:
   bool ScaleTorsoControlPoint(size_t index, float scaleFactor);
 
   /// <summary>
-  /// 指定部位のメッシュ近傍ピック球を作る
-  /// hovered 判定や選択維持判定で共通利用する
-  /// </summary>
-  /// <param name="partId">対象部位ID</param>
-  /// <param name="outSphere">生成した球を受け取る</param>
-  /// <returns>生成できたら true</returns>
-  bool BuildPartPickSphere(int partId, Sphere &outSphere) const;
+/// 指定部位のメッシュ近傍ピック用カプセルを作る
+/// hovered 判定や選択維持判定で共通利用する
+/// </summary>
+/// <param name="partId">対象部位ID</param>
+/// <param name="outStart">カプセル始点</param>
+/// <param name="outEnd">カプセル終点</param>
+/// <param name="outRadius">カプセル半径</param>
+/// <returns>生成できたら true</returns>
+  bool BuildPartPickCapsule(int partId, Vector3& outStart, Vector3& outEnd,
+      float& outRadius) const;
 
   /// <summary>
   /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
