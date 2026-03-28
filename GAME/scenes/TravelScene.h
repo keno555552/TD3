@@ -297,5 +297,7 @@ private:
   void DrawExtraVisualParts();
   void ClearExtraVisualParts();
 
-const ModControlPointData *GetControlPoints() const;
+  void UpdatePartRootsFromControlPoints();
+
+  const ModControlPointData *GetControlPoints() const;
 };

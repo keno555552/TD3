@@ -65,7 +65,7 @@ TravelScene::TravelScene(kEngine *system) {
 
   ApplyCustomizeToMovementParam();
 
-  UpdateChildRootsFromBody();
+  // UpdateChildRootsFromBody();
 
   leftLegBend_ = legRecoverAngle_;
   rightLegBend_ = legRecoverAngle_;
@@ -166,49 +166,49 @@ void TravelScene::Update() {
 
   const ModControlPointData *cp = GetControlPoints();
   if (cp != nullptr) {
-    Logger::Log("RECV LeftShoulderPos : %.2f %.2f %.2f\n",
-                cp->leftShoulderPos.x, cp->leftShoulderPos.y,
-                cp->leftShoulderPos.z);
-    Logger::Log("RECV LeftElbowPos : %.2f %.2f %.2f\n", cp->leftElbowPos.x,
-                cp->leftElbowPos.y, cp->leftElbowPos.z);
-    Logger::Log("RECV LeftWristPos : %.2f %.2f %.2f\n", cp->leftWristPos.x,
-                cp->leftWristPos.y, cp->leftWristPos.z);
+    // Logger::Log("RECV LeftShoulderPos : %.2f %.2f %.2f\n",
+    //             cp->leftShoulderPos.x, cp->leftShoulderPos.y,
+    //             cp->leftShoulderPos.z);
+    // Logger::Log("RECV LeftElbowPos : %.2f %.2f %.2f\n", cp->leftElbowPos.x,
+    //             cp->leftElbowPos.y, cp->leftElbowPos.z);
+    // Logger::Log("RECV LeftWristPos : %.2f %.2f %.2f\n", cp->leftWristPos.x,
+    //             cp->leftWristPos.y, cp->leftWristPos.z);
 
-    Logger::Log("RECV RightShoulderPos : %.2f %.2f %.2f\n",
-                cp->rightShoulderPos.x, cp->rightShoulderPos.y,
-                cp->rightShoulderPos.z);
-    Logger::Log("RECV RightElbowPos : %.2f %.2f %.2f\n", cp->rightElbowPos.x,
-                cp->rightElbowPos.y, cp->rightElbowPos.z);
-    Logger::Log("RECV RightWristPos : %.2f %.2f %.2f\n", cp->rightWristPos.x,
-                cp->rightWristPos.y, cp->rightWristPos.z);
+    // Logger::Log("RECV RightShoulderPos : %.2f %.2f %.2f\n",
+    //             cp->rightShoulderPos.x, cp->rightShoulderPos.y,
+    //             cp->rightShoulderPos.z);
+    // Logger::Log("RECV RightElbowPos : %.2f %.2f %.2f\n", cp->rightElbowPos.x,
+    //             cp->rightElbowPos.y, cp->rightElbowPos.z);
+    // Logger::Log("RECV RightWristPos : %.2f %.2f %.2f\n", cp->rightWristPos.x,
+    //             cp->rightWristPos.y, cp->rightWristPos.z);
 
-    Logger::Log("RECV LeftHipPos : %.2f %.2f %.2f\n", cp->leftHipPos.x,
-                cp->leftHipPos.y, cp->leftHipPos.z);
-    Logger::Log("RECV LeftKneePos : %.2f %.2f %.2f\n", cp->leftKneePos.x,
-                cp->leftKneePos.y, cp->leftKneePos.z);
-    Logger::Log("RECV LeftAnklePos : %.2f %.2f %.2f\n", cp->leftAnklePos.x,
-                cp->leftAnklePos.y, cp->leftAnklePos.z);
+    // Logger::Log("RECV LeftHipPos : %.2f %.2f %.2f\n", cp->leftHipPos.x,
+    //             cp->leftHipPos.y, cp->leftHipPos.z);
+    // Logger::Log("RECV LeftKneePos : %.2f %.2f %.2f\n", cp->leftKneePos.x,
+    //             cp->leftKneePos.y, cp->leftKneePos.z);
+    // Logger::Log("RECV LeftAnklePos : %.2f %.2f %.2f\n", cp->leftAnklePos.x,
+    //             cp->leftAnklePos.y, cp->leftAnklePos.z);
 
-    Logger::Log("RECV RightHipPos : %.2f %.2f %.2f\n", cp->rightHipPos.x,
-                cp->rightHipPos.y, cp->rightHipPos.z);
-    Logger::Log("RECV RightKneePos : %.2f %.2f %.2f\n", cp->rightKneePos.x,
-                cp->rightKneePos.y, cp->rightKneePos.z);
-    Logger::Log("RECV RightAnklePos : %.2f %.2f %.2f\n", cp->rightAnklePos.x,
-                cp->rightAnklePos.y, cp->rightAnklePos.z);
+    // Logger::Log("RECV RightHipPos : %.2f %.2f %.2f\n", cp->rightHipPos.x,
+    //             cp->rightHipPos.y, cp->rightHipPos.z);
+    // Logger::Log("RECV RightKneePos : %.2f %.2f %.2f\n", cp->rightKneePos.x,
+    //             cp->rightKneePos.y, cp->rightKneePos.z);
+    // Logger::Log("RECV RightAnklePos : %.2f %.2f %.2f\n", cp->rightAnklePos.x,
+    //             cp->rightAnklePos.y, cp->rightAnklePos.z);
 
-    Logger::Log("RECV ChestPos : %.2f %.2f %.2f\n", cp->chestPos.x,
-                cp->chestPos.y, cp->chestPos.z);
-    Logger::Log("RECV BellyPos : %.2f %.2f %.2f\n", cp->bellyPos.x,
-                cp->bellyPos.y, cp->bellyPos.z);
-    Logger::Log("RECV WaistPos : %.2f %.2f %.2f\n", cp->waistPos.x,
-                cp->waistPos.y, cp->waistPos.z);
+    // Logger::Log("RECV ChestPos : %.2f %.2f %.2f\n", cp->chestPos.x,
+    //             cp->chestPos.y, cp->chestPos.z);
+    // Logger::Log("RECV BellyPos : %.2f %.2f %.2f\n", cp->bellyPos.x,
+    //             cp->bellyPos.y, cp->bellyPos.z);
+    // Logger::Log("RECV WaistPos : %.2f %.2f %.2f\n", cp->waistPos.x,
+    //             cp->waistPos.y, cp->waistPos.z);
 
-    Logger::Log("RECV LowerNeckPos : %.2f %.2f %.2f\n", cp->lowerNeckPos.x,
-                cp->lowerNeckPos.y, cp->lowerNeckPos.z);
-    Logger::Log("RECV UpperNeckPos : %.2f %.2f %.2f\n", cp->upperNeckPos.x,
-                cp->upperNeckPos.y, cp->upperNeckPos.z);
-    Logger::Log("RECV HeadCenterPos : %.2f %.2f %.2f\n", cp->headCenterPos.x,
-                cp->headCenterPos.y, cp->headCenterPos.z);
+    // Logger::Log("RECV LowerNeckPos : %.2f %.2f %.2f\n", cp->lowerNeckPos.x,
+    //             cp->lowerNeckPos.y, cp->lowerNeckPos.z);
+    // Logger::Log("RECV UpperNeckPos : %.2f %.2f %.2f\n", cp->upperNeckPos.x,
+    //             cp->upperNeckPos.y, cp->upperNeckPos.z);
+    // Logger::Log("RECV HeadCenterPos : %.2f %.2f %.2f\n", cp->headCenterPos.x,
+    //             cp->headCenterPos.y, cp->headCenterPos.z);
   }
 }
 
@@ -330,7 +330,7 @@ void TravelScene::SetupModObjects() {
                   "GAME/resources/modBody/rightShin/rightShin.obj");
 
   SetupHierarchy();
-  SetupInitialLayout();
+  // SetupInitialLayout();
   SetupBodyJointOffsets();
 
   fixedPartIdToPart_.clear();
@@ -410,26 +410,45 @@ void TravelScene::SetupHierarchy() {
   modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition.parentPart =
       bodyRoot;
 
-  // 2段目
-  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ =
-      &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+  //============================
+  // 二段目
+  //============================
+
+  // 左前腕
+  // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ =
+  //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+  // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
+  //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = bodyRoot;
   modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
-      &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+      bodyRoot;
 
-  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ =
-      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+  // 右前腕
+  //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ =
+  //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+  //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
+  //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = bodyRoot;
   modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
-      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+      bodyRoot;
 
-  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ =
-      &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+  // 左脛
+  // modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ =
+  //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+  // modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
+  //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = bodyRoot;
   modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
-      &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+      bodyRoot;
 
-  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ =
-      &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+  // 右脛
+  // modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ =
+  //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+  // modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
+  //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = bodyRoot;
   modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
-      &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+      bodyRoot;
 }
 
 /*   各部位の初期配置を設定する   */
@@ -489,39 +508,13 @@ void TravelScene::SetupInitialLayout() {
 void TravelScene::UpdateModObjects() {
   for (size_t i = 0; i < modObjects_.size(); ++i) {
     if (modObjects_[i] != nullptr) {
-      modBodies_[i].Apply(modObjects_[i]);
-
-      if (i == ToIndex(ModBodyPart::LeftForeArm) && modObjects_[i] != nullptr &&
-          !modObjects_[i]->objectParts_.empty()) {
-        Logger::Log("==== C After Apply ====");
-        Logger::Log("LeftForeArm mesh local translate : %.3f %.3f %.3f",
-                    modObjects_[i]->objectParts_[0].transform.translate.x,
-                    modObjects_[i]->objectParts_[0].transform.translate.y,
-                    modObjects_[i]->objectParts_[0].transform.translate.z);
-        Logger::Log("LeftForeArm mesh local rotate : %.3f %.3f %.3f",
-                    modObjects_[i]->objectParts_[0].transform.rotate.x,
-                    modObjects_[i]->objectParts_[0].transform.rotate.y,
-                    modObjects_[i]->objectParts_[0].transform.rotate.z);
-      }
+      // modBodies_[i].Apply(modObjects_[i]);
     }
   }
 
   for (auto &object : modObjects_) {
     if (object != nullptr) {
       object->Update(usingCamera_);
-
-      if (object == modObjects_[ToIndex(ModBodyPart::LeftForeArm)] &&
-          !object->objectParts_.empty()) {
-        Logger::Log("==== D After Object Update ====");
-        Logger::Log("LeftForeArm mainPosition : %.3f %.3f %.3f",
-                    object->mainPosition.transform.translate.x,
-                    object->mainPosition.transform.translate.y,
-                    object->mainPosition.transform.translate.z);
-        Logger::Log("LeftForeArm mesh local translate : %.3f %.3f %.3f",
-                    object->objectParts_[0].transform.translate.x,
-                    object->objectParts_[0].transform.translate.y,
-                    object->objectParts_[0].transform.translate.z);
-      }
     }
   }
 
@@ -531,36 +524,6 @@ void TravelScene::UpdateModObjects() {
   if (foreArmWorldLogFrame % 20 == 0) {
     Object *leftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
     Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
-
-    if (leftUpperArm != nullptr) {
-      Logger::Log("==== UpperArm CHECK ====");
-      Logger::Log("upper mainPosition : %.3f %.3f %.3f",
-                  leftUpperArm->mainPosition.transform.translate.x,
-                  leftUpperArm->mainPosition.transform.translate.y,
-                  leftUpperArm->mainPosition.transform.translate.z);
-
-      if (!leftUpperArm->objectParts_.empty()) {
-        Logger::Log("upper mesh local : %.3f %.3f %.3f",
-                    leftUpperArm->objectParts_[0].transform.translate.x,
-                    leftUpperArm->objectParts_[0].transform.translate.y,
-                    leftUpperArm->objectParts_[0].transform.translate.z);
-      }
-    }
-
-    if (leftForeArm != nullptr) {
-      Logger::Log("==== ForeArm CHECK ====");
-      Logger::Log("fore mainPosition : %.3f %.3f %.3f",
-                  leftForeArm->mainPosition.transform.translate.x,
-                  leftForeArm->mainPosition.transform.translate.y,
-                  leftForeArm->mainPosition.transform.translate.z);
-
-      if (!leftForeArm->objectParts_.empty()) {
-        Logger::Log("fore mesh local : %.3f %.3f %.3f",
-                    leftForeArm->objectParts_[0].transform.translate.x,
-                    leftForeArm->objectParts_[0].transform.translate.y,
-                    leftForeArm->objectParts_[0].transform.translate.z);
-      }
-    }
   }
 }
 
@@ -1545,12 +1508,16 @@ void TravelScene::ApplyVisualState() {
   Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
   body->mainPosition.transform.translate.x = moveX_;
-  const float legHeightOffset = ComputeLegHeightOffset();
-  body->mainPosition.transform.translate.y = moveY_ + legHeightOffset;
+  // const float legHeightOffset = ComputeLegHeightOffset();
+  // body->mainPosition.transform.translate.y = moveY_ + legHeightOffset;
+  body->mainPosition.transform.translate.y = moveY_;
 
-  body->mainPosition.transform.rotate.x = 0.0f;
-  body->mainPosition.transform.rotate.y = 1.57f;
-  body->mainPosition.transform.rotate.z = bodyTilt_;
+  // body->mainPosition.transform.rotate.x = 0.0f;
+  // body->mainPosition.transform.rotate.y = 1.57f;
+  // body->mainPosition.transform.rotate.z = bodyTilt_;
+
+  body->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
   body->mainPosition.transform.scale.x = 1.0f;
   body->mainPosition.transform.scale.y =
       (std::max)(0.65f, 1.0f - bodyStretch_ * 0.2f);
@@ -1574,54 +1541,54 @@ void TravelScene::ApplyVisualState() {
   rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
   rightShin->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
-  head->mainPosition.transform.rotate.x =
-      (leftLegBend_ - rightLegBend_) * 0.15f;
+  // head->mainPosition.transform.rotate.x =
+  //     (leftLegBend_ - rightLegBend_) * 0.15f;
 
-  leftUpperArm->mainPosition.transform.rotate.x = rightLegBend_ * 0.6f;
-  rightUpperArm->mainPosition.transform.rotate.x = leftLegBend_ * 0.6f;
+  // leftUpperArm->mainPosition.transform.rotate.x = rightLegBend_ * 0.6f;
+  // rightUpperArm->mainPosition.transform.rotate.x = leftLegBend_ * 0.6f;
 
+  //// leftForeArm->mainPosition.transform.rotate.x =
+  ////     leftUpperArm->mainPosition.transform.rotate.x - 0.45f;
+  //// rightForeArm->mainPosition.transform.rotate.x =
+  ////     rightUpperArm->mainPosition.transform.rotate.x - 0.45f;
+
+  //// leftForeArm->mainPosition.transform.rotate.x = 0.45f;
+  //// leftForeArm->mainPosition.transform.rotate.x = 0.0f;
   // leftForeArm->mainPosition.transform.rotate.x =
-  //     leftUpperArm->mainPosition.transform.rotate.x - 0.45f;
-  // rightForeArm->mainPosition.transform.rotate.x =
-  //     rightUpperArm->mainPosition.transform.rotate.x - 0.45f;
+  //     leftUpperArm->mainPosition.transform.rotate.x;
 
-  // leftForeArm->mainPosition.transform.rotate.x = 0.45f;
-  // leftForeArm->mainPosition.transform.rotate.x = 0.0f;
-  leftForeArm->mainPosition.transform.rotate.x =
-      leftUpperArm->mainPosition.transform.rotate.x;
+  // rightForeArm->mainPosition.transform.rotate.x = 0.45f;
 
-  rightForeArm->mainPosition.transform.rotate.x = 0.45f;
+  // static int armAxisLogFrame = 0;
+  // armAxisLogFrame++;
 
-  static int armAxisLogFrame = 0;
-  armAxisLogFrame++;
+  // if (armAxisLogFrame % 20 == 0) {
+  // }
 
-  if (armAxisLogFrame % 20 == 0) {
-  }
+  // static int foreArmAxisCheckFrame = 0;
+  // foreArmAxisCheckFrame++;
 
-  static int foreArmAxisCheckFrame = 0;
-  foreArmAxisCheckFrame++;
+  // if (foreArmAxisCheckFrame % 20 == 0) {
+  // }
 
-  if (foreArmAxisCheckFrame % 20 == 0) {
-  }
+  // const float thighBase = 0.10f;
 
-  const float thighBase = 0.10f;
+  // leftThigh->mainPosition.transform.rotate.x = thighBase + leftLegBend_ *
+  // 0.70f; rightThigh->mainPosition.transform.rotate.x =
+  //     thighBase + rightLegBend_ * 0.70f;
 
-  leftThigh->mainPosition.transform.rotate.x = thighBase + leftLegBend_ * 0.70f;
-  rightThigh->mainPosition.transform.rotate.x =
-      thighBase + rightLegBend_ * 0.70f;
+  //// leftShin->mainPosition.transform.rotate.x =
+  ////     leftThigh->mainPosition.transform.rotate.x + 0.45f;
+  //// rightShin->mainPosition.transform.rotate.x =
+  ////     rightThigh->mainPosition.transform.rotate.x + 0.45f;
 
-  // leftShin->mainPosition.transform.rotate.x =
-  //     leftThigh->mainPosition.transform.rotate.x + 0.45f;
-  // rightShin->mainPosition.transform.rotate.x =
-  //     rightThigh->mainPosition.transform.rotate.x + 0.45f;
-
-  leftShin->mainPosition.transform.rotate.x = -0.45f;
-  rightShin->mainPosition.transform.rotate.x = -0.45f;
+  // leftShin->mainPosition.transform.rotate.x = -0.45f;
+  // rightShin->mainPosition.transform.rotate.x = -0.45f;
 
   //================================
   // 回転を入れたあと、親子接続位置を再計算
   //================================
-  UpdateChildRootsFromBody();
+  UpdatePartRootsFromControlPoints();
 
   const ModControlPointData *cp = GetControlPoints();
   Vector3 saved = {0.0f, 0.0f, 0.0f};
@@ -1641,18 +1608,6 @@ void TravelScene::ApplyVisualState() {
   }
   if (!leftForeArm->objectParts_.empty()) {
     leftForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
-  }
-
-  if (!leftForeArm->objectParts_.empty()) {
-    Logger::Log("==== B ApplyVisualState ====");
-    Logger::Log("LeftForeArm mesh local translate : %.3f %.3f %.3f",
-                leftForeArm->objectParts_[0].transform.translate.x,
-                leftForeArm->objectParts_[0].transform.translate.y,
-                leftForeArm->objectParts_[0].transform.translate.z);
-    Logger::Log("LeftForeArm mesh local rotate : %.3f %.3f %.3f",
-                leftForeArm->objectParts_[0].transform.rotate.x,
-                leftForeArm->objectParts_[0].transform.rotate.y,
-                leftForeArm->objectParts_[0].transform.rotate.z);
   }
 
   if (!rightUpperArm->objectParts_.empty()) {
@@ -1827,8 +1782,8 @@ void TravelScene::BuildExtraVisualParts() {
   const Vector3 neckScale =
       modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
 
-  Logger::Log("neck visual scale : %.3f %.3f %.3f", neckScale.x, neckScale.y,
-              neckScale.z);
+  // Logger::Log("neck visual scale : %.3f %.3f %.3f", neckScale.x, neckScale.y,
+  //             neckScale.z);
 
   ClearExtraVisualParts();
 
@@ -1904,20 +1859,6 @@ void TravelScene::BuildExtraVisualParts() {
     auto it = fixedPartIdToPart_.find(instance.parentId);
     if (it != fixedPartIdToPart_.end()) {
       obj->followObject_ = it->second;
-
-      Logger::Log("==== ExtraHead Build ====");
-      Logger::Log("instance.partId : %d", instance.partId);
-      Logger::Log("instance.parentId : %d", instance.parentId);
-      Logger::Log("local.translate : %.3f %.3f %.3f",
-                  instance.localTransform.translate.x,
-                  instance.localTransform.translate.y,
-                  instance.localTransform.translate.z);
-      Logger::Log(
-          "local.rotate : %.3f %.3f %.3f", instance.localTransform.rotate.x,
-          instance.localTransform.rotate.y, instance.localTransform.rotate.z);
-      Logger::Log(
-          "local.scale : %.3f %.3f %.3f", instance.localTransform.scale.x,
-          instance.localTransform.scale.y, instance.localTransform.scale.z);
     }
 
     extraObjects_.push_back(obj);
@@ -1935,20 +1876,6 @@ void TravelScene::UpdateExtraVisualParts() {
     }
 
     if (!logged) {
-      Logger::Log("==== ExtraHead Update ====");
-      Logger::Log("obj local.translate : %.3f %.3f %.3f",
-                  obj->mainPosition.transform.translate.x,
-                  obj->mainPosition.transform.translate.y,
-                  obj->mainPosition.transform.translate.z);
-      Logger::Log("obj local.rotate : %.3f %.3f %.3f",
-                  obj->mainPosition.transform.rotate.x,
-                  obj->mainPosition.transform.rotate.y,
-                  obj->mainPosition.transform.rotate.z);
-      Logger::Log("obj local.scale : %.3f %.3f %.3f",
-                  obj->mainPosition.transform.scale.x,
-                  obj->mainPosition.transform.scale.y,
-                  obj->mainPosition.transform.scale.z);
-      Logger::Log("has followObject : %s", obj->followObject_ ? "YES" : "NO");
 
       logged = true;
     }
@@ -1974,5 +1901,260 @@ void TravelScene::DrawExtraVisualParts() {
     if (obj != nullptr) {
       obj->Draw();
     }
+  }
+}
+
+void TravelScene::UpdatePartRootsFromControlPoints() {
+
+  const ModControlPointData *cp = GetControlPoints();
+  if (cp == nullptr) {
+    return;
+  }
+
+  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
+  Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
+
+  Object *leftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object *leftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
+  Object *rightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object *rightForeArm = modObjects_[ToIndex(ModBodyPart::RightForeArm)];
+
+  Object *leftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object *leftShin = modObjects_[ToIndex(ModBodyPart::LeftShin)];
+  Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
+
+  if (body == nullptr || neck == nullptr || head == nullptr ||
+      leftUpperArm == nullptr || leftForeArm == nullptr ||
+      rightUpperArm == nullptr || rightForeArm == nullptr ||
+      leftThigh == nullptr || leftShin == nullptr || rightThigh == nullptr ||
+      rightShin == nullptr) {
+    return;
+  }
+
+  Logger::Log("==== BODY / CP CHECK ====");
+  Logger::Log("body world : %.3f %.3f %.3f",
+              body->mainPosition.transform.translate.x,
+              body->mainPosition.transform.translate.y,
+              body->mainPosition.transform.translate.z);
+
+  Logger::Log("chestPos : %.3f %.3f %.3f", cp->chestPos.x, cp->chestPos.y,
+              cp->chestPos.z);
+  Logger::Log("bellyPos : %.3f %.3f %.3f", cp->bellyPos.x, cp->bellyPos.y,
+              cp->bellyPos.z);
+  Logger::Log("waistPos : %.3f %.3f %.3f", cp->waistPos.x, cp->waistPos.y,
+              cp->waistPos.z);
+
+  Logger::Log("leftHipPos : %.3f %.3f %.3f", cp->leftHipPos.x, cp->leftHipPos.y,
+              cp->leftHipPos.z);
+  Logger::Log("rightHipPos : %.3f %.3f %.3f", cp->rightHipPos.x,
+              cp->rightHipPos.y, cp->rightHipPos.z);
+
+  auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  };
+
+  // body 自体の位置は移動処理側が持つので、ここでは触らない
+
+  //==============================
+  // 1段目 : body の子
+  //==============================
+  // 首と腕は Chest 基準
+  neck->mainPosition.transform.translate = Sub(cp->lowerNeckPos, cp->chestPos);
+
+  // 左上腕
+  leftUpperArm->mainPosition.transform.translate =
+      Sub(cp->leftShoulderPos, cp->chestPos);
+
+  Vector3 leftUpperArmDir = Sub(cp->leftElbowPos, cp->leftShoulderPos);
+  leftUpperArmDir = Normalize(leftUpperArmDir);
+
+  float leftUpperArmAngleZ = atan2(leftUpperArmDir.x, -leftUpperArmDir.y);
+
+  leftUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f,
+                                                 leftUpperArmAngleZ};
+
+  // 右上腕
+  rightUpperArm->mainPosition.transform.translate =
+      Sub(cp->rightShoulderPos, cp->chestPos);
+
+  Vector3 rightUpperArmDir = Sub(cp->rightElbowPos, cp->rightShoulderPos);
+  rightUpperArmDir = Normalize(rightUpperArmDir);
+
+  float rightUpperArmAngleZ = atan2(rightUpperArmDir.x, -rightUpperArmDir.y);
+
+  rightUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f,
+                                                  rightUpperArmAngleZ};
+
+  // 左腿
+  leftThigh->mainPosition.transform.translate =
+      Sub(cp->leftHipPos, cp->bellyPos);
+
+  Vector3 leftThighDir = Sub(cp->leftKneePos, cp->leftHipPos);
+  leftThighDir = Normalize(leftThighDir);
+
+  float leftThighAngleZ = atan2(leftThighDir.x, -leftThighDir.y);
+
+  leftThigh->mainPosition.transform.rotate = {0.0f, 0.0f, leftThighAngleZ};
+
+  // 右腿
+  rightThigh->mainPosition.transform.translate =
+      Sub(cp->rightHipPos, cp->bellyPos);
+
+  Vector3 rightThighDir = Sub(cp->rightKneePos, cp->rightHipPos);
+  rightThighDir = Normalize(rightThighDir);
+
+  float rightThighAngleZ = atan2(rightThighDir.x, -rightThighDir.y);
+
+  rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, rightThighAngleZ};
+
+  //==============================
+  // 2段目 : 親の子
+  //==============================
+  // 頭
+  head->mainPosition.transform.translate =
+      Sub(cp->headCenterPos, cp->lowerNeckPos);
+
+  // 左前腕
+  Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
+  leftForeArmDir = Normalize(leftForeArmDir);
+
+  float leftUpperArmLength = Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
+  float leftForeArmAngleZ = atan2(leftForeArmDir.x, -leftForeArmDir.y);
+
+  leftForeArm->mainPosition.transform.translate =
+      Sub(cp->leftElbowPos, cp->chestPos);
+
+  leftForeArm->mainPosition.transform.rotate = {0.0f, 0.0f, leftForeArmAngleZ};
+
+  // 右前腕
+  Vector3 rightForeArmDir = Sub(cp->rightWristPos, cp->rightElbowPos);
+  rightForeArmDir = Normalize(rightForeArmDir);
+
+  float rightUpperArmLength =
+      Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
+  float rightForeArmAngleZ = atan2(rightForeArmDir.x, -rightForeArmDir.y);
+
+  rightForeArm->mainPosition.transform.translate =
+      Sub(cp->rightElbowPos, cp->chestPos);
+
+  rightForeArm->mainPosition.transform.rotate = {0.0f, 0.0f,
+                                                 rightForeArmAngleZ};
+
+  // 左脛
+  Vector3 leftShinDir = Sub(cp->leftAnklePos, cp->leftKneePos);
+  leftShinDir = Normalize(leftShinDir);
+
+  float leftShinAngleZ = atan2(leftShinDir.x, -leftShinDir.y);
+
+  leftShin->mainPosition.transform.translate =
+      Sub(cp->leftKneePos, cp->bellyPos);
+
+  leftShin->mainPosition.transform.rotate = {0.0f, 0.0f, leftShinAngleZ};
+
+  // 右脛
+  Vector3 rightShinDir = Sub(cp->rightAnklePos, cp->rightKneePos);
+  rightShinDir = Normalize(rightShinDir);
+
+  float rightShinAngleZ = atan2(rightShinDir.x, -rightShinDir.y);
+
+  rightShin->mainPosition.transform.translate =
+      Sub(cp->rightKneePos, cp->bellyPos);
+  rightShin->mainPosition.transform.rotate = {0.0f, 0.0f, rightShinAngleZ};
+
+  if (leftUpperArm->objectParts_.empty() || leftForeArm->objectParts_.empty() ||
+      rightUpperArm->objectParts_.empty() ||
+      rightForeArm->objectParts_.empty() || leftThigh->objectParts_.empty() ||
+      leftShin->objectParts_.empty() || rightThigh->objectParts_.empty() ||
+      rightShin->objectParts_.empty()) {
+    return;
+  }
+
+  // 左上腕
+  leftUpperArm->objectParts_[0].transform.translate = {
+      0.0f, -leftUpperArmLength * 0.5f, 0.0f};
+  leftUpperArm->objectParts_[0].transform.scale.y = leftUpperArmLength;
+
+  // 右上腕
+  rightUpperArm->objectParts_[0].transform.translate = {
+      0.0f, -rightUpperArmLength * 0.5f, 0.0f};
+  rightUpperArm->objectParts_[0].transform.scale.y = rightUpperArmLength;
+
+  // 左腿
+  float leftThighLength = Length(Sub(cp->leftHipPos, cp->leftKneePos));
+  leftThigh->objectParts_[0].transform.translate = {
+      0.0f, -leftThighLength * 0.5f, 0.0f};
+  leftThigh->objectParts_[0].transform.scale.y = leftThighLength;
+
+  // 右腿
+  float rightThighLength = Length(Sub(cp->rightHipPos, cp->rightKneePos));
+  rightThigh->objectParts_[0].transform.translate = {
+      0.0f, -rightThighLength * 0.5f, 0.0f};
+  rightThigh->objectParts_[0].transform.scale.y = rightThighLength;
+
+  // 左前腕
+  float leftForeArmLength = Length(Sub(cp->leftElbowPos, cp->leftWristPos));
+  leftForeArm->objectParts_[0].transform.translate = {
+      0.0f, -leftForeArmLength * 0.5f, 0.0f};
+  leftForeArm->objectParts_[0].transform.scale.y = leftForeArmLength;
+
+  // 右前腕
+  float rightForeArmLength = Length(Sub(cp->rightElbowPos, cp->rightWristPos));
+  rightForeArm->objectParts_[0].transform.translate = {
+      0.0f, -rightForeArmLength * 0.5f, 0.0f};
+  rightForeArm->objectParts_[0].transform.scale.y = rightForeArmLength;
+
+  // 左脛
+  float leftShinLength = Length(Sub(cp->leftKneePos, cp->leftAnklePos));
+  leftShin->objectParts_[0].transform.translate = {0.0f, -leftShinLength * 0.5f,
+                                                   0.0f};
+  leftShin->objectParts_[0].transform.scale.y = leftShinLength;
+
+  // 右脛
+  float rightShinLength = Length(Sub(cp->rightKneePos, cp->rightAnklePos));
+  rightShin->objectParts_[0].transform.translate = {
+      0.0f, -rightShinLength * 0.5f, 0.0f};
+  rightShin->objectParts_[0].transform.scale.y = rightShinLength;
+
+  static int debugFrame = 0;
+  debugFrame++;
+
+  if (debugFrame % 30 == 0) {
+
+    Logger::Log("==== Travel Check ====");
+
+    // 前腕
+    Logger::Log("LFore root : %.3f %.3f %.3f",
+                leftForeArm->mainPosition.transform.translate.x,
+                leftForeArm->mainPosition.transform.translate.y,
+                leftForeArm->mainPosition.transform.translate.z);
+
+    Logger::Log("LFore mesh : %.3f %.3f %.3f",
+                leftForeArm->objectParts_[0].transform.translate.x,
+                leftForeArm->objectParts_[0].transform.translate.y,
+                leftForeArm->objectParts_[0].transform.translate.z);
+
+    // 上腕
+    Logger::Log("LUpper root : %.3f %.3f %.3f",
+                leftUpperArm->mainPosition.transform.translate.x,
+                leftUpperArm->mainPosition.transform.translate.y,
+                leftUpperArm->mainPosition.transform.translate.z);
+
+    Logger::Log("LUpper mesh : %.3f %.3f %.3f",
+                leftUpperArm->objectParts_[0].transform.translate.x,
+                leftUpperArm->objectParts_[0].transform.translate.y,
+                leftUpperArm->objectParts_[0].transform.translate.z);
+
+    // すね
+    Logger::Log("LShin root : %.3f %.3f %.3f",
+                leftShin->mainPosition.transform.translate.x,
+                leftShin->mainPosition.transform.translate.y,
+                leftShin->mainPosition.transform.translate.z);
+
+    Logger::Log("LShin mesh : %.3f %.3f %.3f",
+                leftShin->objectParts_[0].transform.translate.x,
+                leftShin->objectParts_[0].transform.translate.y,
+                leftShin->objectParts_[0].transform.translate.z);
   }
 }

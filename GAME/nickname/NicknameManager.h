@@ -3,6 +3,7 @@
 #include "GAME/score/ScoreResult.h"
 #include "GAME/userData/UserData.h"
 #include "externals/nlohmann/json.hpp"
+#include "GAME/score/ScoreCalculator.h"
 #include <string>
 
 /// 二つ名の生成・レア判定を行うクラス
