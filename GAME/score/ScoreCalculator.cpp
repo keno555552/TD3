@@ -195,6 +195,240 @@ ScoreResult ScoreCalculator::Calculate(const ThemeData& theme,
 }
 
 /*   パーツごとの基本スコア計算   */
+//void ScoreCalculator::CalcPartScores(const ScoreSet& scoreSet,
+//	const ModBodyCustomizeData& playerData,
+//	ScoreResult& result) {
+//	float total = 0.0f;
+//
+//	for (size_t i = 0; i < kPartCount; ++i) {
+//		const PartWeight& weight = scoreSet.partWeights[i];
+//		const ModBodyPartParam& param = playerData.partParams[i];
+//
+//		float score = 0.0f;
+//
+//		float deltaX = param.scale.x - 1.0f;
+//		if (weight.scaleX > 0.0f) {
+//			score += std::max(0.0f, deltaX) * weight.scaleX;
+//		} else if (weight.scaleX < 0.0f) {
+//			score += std::max(0.0f, -deltaX) * std::abs(weight.scaleX);
+//		}
+//
+//		float deltaY = param.scale.y - 1.0f;
+//		if (weight.scaleY > 0.0f) {
+//			score += std::max(0.0f, deltaY) * weight.scaleY;
+//		} else if (weight.scaleY < 0.0f) {
+//			score += std::max(0.0f, -deltaY) * std::abs(weight.scaleY);
+//		}
+//
+//		float deltaZ = param.scale.z - 1.0f;
+//		if (weight.scaleZ > 0.0f) {
+//			score += std::max(0.0f, deltaZ) * weight.scaleZ;
+//		} else if (weight.scaleZ < 0.0f) {
+//			score += std::max(0.0f, -deltaZ) * std::abs(weight.scaleZ);
+//		}
+//
+//		result.partScores[i] = TruncateToFirstDecimal(score);
+//		total += result.partScores[i];
+//	}
+//
+//	result.totalPartScore = TruncateToFirstDecimal(total);
+//}
+
+/*   操作点から部位ごとの変化量（scale相当）を計算する   */
+Vector3 ScoreCalculator::CalcPartChangeFromControlPoints(
+	ModBodyPart partType,
+	const ModBodyCustomizeData& playerData) {
+
+	// 部位タイプごとに、対応するroleを定義する
+	// owner部位: チェーンの最初のセグメント（role[0]→role[1]）
+	// 子部位: チェーンの2番目のセグメント（role[1]→role[2]）
+
+	struct SegmentDef {
+		ModBodyPart ownerType;           // snapshotのownerPartType
+		ModControlPointRole startRole;   // セグメント開始点のrole
+		ModControlPointRole endRole;     // セグメント終了点のrole
+		ModControlPointRole radiusRole1; // radius計算に使うrole1
+		ModControlPointRole radiusRole2; // radius計算に使うrole2
+	};
+
+	SegmentDef segment;
+	bool found = false;
+
+	switch (partType) {
+		// 胴体: Chest→Belly
+	case ModBodyPart::ChestBody:
+		segment = { ModBodyPart::ChestBody, ModControlPointRole::Chest,
+				   ModControlPointRole::Belly, ModControlPointRole::Chest,
+				   ModControlPointRole::Belly };
+		found = true;
+		Logger::Log("[ChestDebug] looking for ownerType=%d startRole=%d endRole=%d",
+			static_cast<int>(ModBodyPart::ChestBody),
+			static_cast<int>(ModControlPointRole::Chest),
+			static_cast<int>(ModControlPointRole::Belly));
+		break;
+
+		// 腹: Belly→Waist
+	case ModBodyPart::StomachBody:
+		segment = { ModBodyPart::ChestBody, ModControlPointRole::Belly,
+				   ModControlPointRole::Waist, ModControlPointRole::Belly,
+				   ModControlPointRole::Waist };
+		found = true;
+		break;
+
+		// 首: LowerNeck→UpperNeck
+	case ModBodyPart::Neck:
+		segment = { ModBodyPart::Head, ModControlPointRole::LowerNeck,
+				   ModControlPointRole::UpperNeck, ModControlPointRole::LowerNeck,
+				   ModControlPointRole::UpperNeck };
+		found = true;
+		break;
+
+		// 頭: UpperNeck→HeadCenter
+	case ModBodyPart::Head:
+		segment = { ModBodyPart::Head, ModControlPointRole::UpperNeck,
+				   ModControlPointRole::HeadCenter, ModControlPointRole::UpperNeck,
+				   ModControlPointRole::HeadCenter };
+		found = true;
+		break;
+
+		// 左上腕: Root→Bend
+	case ModBodyPart::LeftUpperArm:
+		segment = { ModBodyPart::LeftUpperArm, ModControlPointRole::Root,
+				   ModControlPointRole::Bend, ModControlPointRole::Root,
+				   ModControlPointRole::Bend };
+		found = true;
+		break;
+
+		// 左前腕: Bend→End
+	case ModBodyPart::LeftForeArm:
+		segment = { ModBodyPart::LeftUpperArm, ModControlPointRole::Bend,
+				   ModControlPointRole::End, ModControlPointRole::Bend,
+				   ModControlPointRole::End };
+		found = true;
+		break;
+
+		// 右上腕: Root→Bend
+	case ModBodyPart::RightUpperArm:
+		segment = { ModBodyPart::RightUpperArm, ModControlPointRole::Root,
+				   ModControlPointRole::Bend, ModControlPointRole::Root,
+				   ModControlPointRole::Bend };
+		found = true;
+		break;
+
+		// 右前腕: Bend→End
+	case ModBodyPart::RightForeArm:
+		segment = { ModBodyPart::RightUpperArm, ModControlPointRole::Bend,
+				   ModControlPointRole::End, ModControlPointRole::Bend,
+				   ModControlPointRole::End };
+		found = true;
+		break;
+
+		// 左腿: Root→Bend
+	case ModBodyPart::LeftThigh:
+		segment = { ModBodyPart::LeftThigh, ModControlPointRole::Root,
+				   ModControlPointRole::Bend, ModControlPointRole::Root,
+				   ModControlPointRole::Bend };
+		found = true;
+		break;
+
+		// 左脛: Bend→End
+	case ModBodyPart::LeftShin:
+		segment = { ModBodyPart::LeftThigh, ModControlPointRole::Bend,
+				   ModControlPointRole::End, ModControlPointRole::Bend,
+				   ModControlPointRole::End };
+		found = true;
+		break;
+
+		// 右腿: Root→Bend
+	case ModBodyPart::RightThigh:
+		segment = { ModBodyPart::RightThigh, ModControlPointRole::Root,
+				   ModControlPointRole::Bend, ModControlPointRole::Root,
+				   ModControlPointRole::Bend };
+		found = true;
+		break;
+
+		// 右脛: Bend→End
+	case ModBodyPart::RightShin:
+		segment = { ModBodyPart::RightThigh, ModControlPointRole::Bend,
+				   ModControlPointRole::End, ModControlPointRole::Bend,
+				   ModControlPointRole::End };
+		found = true;
+		break;
+
+	default:
+		break;
+	}
+
+	if (!found) {
+		return { 1.0f, 1.0f, 1.0f };
+	}
+
+	// ownerTypeに属するsnapshotからroleで操作点を探すヘルパー
+	auto findByRole = [](const std::vector<ModControlPointSnapshot>& snapshots,
+		ModBodyPart ownerType,
+		ModControlPointRole role) -> const ModControlPointSnapshot* {
+			for (size_t i = 0; i < snapshots.size(); ++i) {
+				if (snapshots[i].ownerPartType == ownerType &&
+					snapshots[i].role == role) {
+					return &snapshots[i];
+				}
+			}
+			return nullptr;
+	};
+
+	// 現在とデフォルトの操作点を取得する
+	const auto* curStart = findByRole(playerData.controlPointSnapshots,
+		segment.ownerType, segment.startRole);
+	const auto* curEnd = findByRole(playerData.controlPointSnapshots,
+		segment.ownerType, segment.endRole);
+	const auto* defStart = findByRole(playerData.defaultControlPointSnapshots,
+		segment.ownerType, segment.startRole);
+	const auto* defEnd = findByRole(playerData.defaultControlPointSnapshots,
+		segment.ownerType, segment.endRole);
+
+	if (curStart == nullptr || curEnd == nullptr ||
+		defStart == nullptr || defEnd == nullptr) {
+		return { 1.0f, 1.0f, 1.0f };
+	}
+
+	// 長さの変化率（start→endの距離）
+	float defLen = Length(Subtract(defEnd->localPosition, defStart->localPosition));
+	float curLen = Length(Subtract(curEnd->localPosition, curStart->localPosition));
+	float lengthRatio = (defLen > 0.001f) ? curLen / defLen : 1.0f;
+
+	// 太さの変化率（radiusの平均変化率）
+	const auto* curR1 = findByRole(playerData.controlPointSnapshots,
+		segment.ownerType, segment.radiusRole1);
+	const auto* curR2 = findByRole(playerData.controlPointSnapshots,
+		segment.ownerType, segment.radiusRole2);
+	const auto* defR1 = findByRole(playerData.defaultControlPointSnapshots,
+		segment.ownerType, segment.radiusRole1);
+	const auto* defR2 = findByRole(playerData.defaultControlPointSnapshots,
+		segment.ownerType, segment.radiusRole2);
+
+	float radiusRatio = 1.0f;
+	int rc = 0;
+	float rSum = 0.0f;
+
+	if (curR1 != nullptr && defR1 != nullptr && defR1->radius > 0.001f) {
+		rSum += curR1->radius / defR1->radius;
+		++rc;
+	}
+	if (curR2 != nullptr && defR2 != nullptr && defR2->radius > 0.001f) {
+		rSum += curR2->radius / defR2->radius;
+		++rc;
+	}
+	if (rc > 0) {
+		radiusRatio = rSum / static_cast<float>(rc);
+	}
+
+	// return の直前（関数の最後）に追加
+	Logger::Log("[CalcPartChange] partType=%d scale=(%.3f, %.3f, %.3f)",
+		static_cast<int>(partType), radiusRatio, lengthRatio, radiusRatio);
+
+	return { radiusRatio, lengthRatio, radiusRatio };
+}
+/*   パーツごとの基本スコア計算   */
 void ScoreCalculator::CalcPartScores(const ScoreSet& scoreSet,
 	const ModBodyCustomizeData& playerData,
 	ScoreResult& result) {
@@ -202,25 +436,31 @@ void ScoreCalculator::CalcPartScores(const ScoreSet& scoreSet,
 
 	for (size_t i = 0; i < kPartCount; ++i) {
 		const PartWeight& weight = scoreSet.partWeights[i];
-		const ModBodyPartParam& param = playerData.partParams[i];
+		ModBodyPart partType = static_cast<ModBodyPart>(i);
+
+		// 操作点から変化量を計算する
+		Vector3 scale = CalcPartChangeFromControlPoints(partType, playerData);
 
 		float score = 0.0f;
 
-		float deltaX = param.scale.x - 1.0f;
+		// X 成分（太さ）
+		float deltaX = scale.x - 1.0f;
 		if (weight.scaleX > 0.0f) {
 			score += std::max(0.0f, deltaX) * weight.scaleX;
 		} else if (weight.scaleX < 0.0f) {
 			score += std::max(0.0f, -deltaX) * std::abs(weight.scaleX);
 		}
 
-		float deltaY = param.scale.y - 1.0f;
+		// Y 成分（長さ）
+		float deltaY = scale.y - 1.0f;
 		if (weight.scaleY > 0.0f) {
 			score += std::max(0.0f, deltaY) * weight.scaleY;
 		} else if (weight.scaleY < 0.0f) {
 			score += std::max(0.0f, -deltaY) * std::abs(weight.scaleY);
 		}
 
-		float deltaZ = param.scale.z - 1.0f;
+		// Z 成分（太さ）
+		float deltaZ = scale.z - 1.0f;
 		if (weight.scaleZ > 0.0f) {
 			score += std::max(0.0f, deltaZ) * weight.scaleZ;
 		} else if (weight.scaleZ < 0.0f) {

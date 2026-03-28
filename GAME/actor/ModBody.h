@@ -132,6 +132,9 @@ struct ModBodyCustomizeData {
   std::vector<ModPartInstanceData> partInstances;
   std::vector<ModControlPointSnapshot> controlPointSnapshots;
 
+  // デフォルト操作点スナップショット（改造前の初期状態）
+  std::vector<ModControlPointSnapshot> defaultControlPointSnapshots;
+
   // 旧方式互換
   std::array<ModBodyPartParam, static_cast<size_t>(ModBodyPart::Count)>
       partParams{};
