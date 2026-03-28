@@ -300,4 +300,8 @@ private:
   void UpdatePartRootsFromControlPoints();
 
   const ModControlPointData *GetControlPoints() const;
+
+  float GetControlPointRadius(ModControlPointRole role) const;
+
+  float GetSnapshotRadius(ModBodyPart ownerPart, int localRole) const;
 };
