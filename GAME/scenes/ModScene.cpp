@@ -1986,74 +1986,169 @@ int ModScene::FindTorsoControlPointIndex(ModControlPointRole role) const {
   return -1;
 }
 
-Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
-                                           const PartNode &childNode) const {
-  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
-      parentNode.part, childNode.part, childNode.side);
+Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
+    const PartNode& childNode) const {
+    const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+        parentNode.part, childNode.part, childNode.side);
 
-  // torso 親は共有操作点から動的に接続基準を求める
-  if (parentNode.part == ModBodyPart::ChestBody ||
-      parentNode.part == ModBodyPart::StomachBody) {
-    const int chestIndex =
-        FindTorsoControlPointIndex(ModControlPointRole::Chest);
-    const int waistIndex =
-        FindTorsoControlPointIndex(ModControlPointRole::Waist);
+    // ------------------------------------------------------------
+    // torso 親:
+    // 胸系の子は Chest、脚系の子は Waist を基準にする。
+    // さらに基準操作点の radius 比率で接続オフセットも拡縮する。
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::ChestBody ||
+        parentNode.part == ModBodyPart::StomachBody) {
+        const int chestIndex =
+            FindTorsoControlPointIndex(ModControlPointRole::Chest);
+        const int waistIndex =
+            FindTorsoControlPointIndex(ModControlPointRole::Waist);
 
-    const Vector3 defaultChest = {0.0f, 0.45f, 0.0f};
-    const Vector3 defaultWaist = {0.0f, -0.45f, 0.0f};
+        const Vector3 defaultChest = { 0.0f, 0.45f, 0.0f };
+        const Vector3 defaultWaist = { 0.0f, -0.45f, 0.0f };
 
-    const Vector3 currentChest =
-        (chestIndex >= 0)
+        const Vector3 currentChest =
+            (chestIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition
             : defaultChest;
 
-    const Vector3 currentWaist =
-        (waistIndex >= 0)
+        const Vector3 currentWaist =
+            (waistIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
             : defaultWaist;
 
-    switch (childNode.part) {
-    case ModBodyPart::Neck:
-    case ModBodyPart::Head: {
-      const Vector3 relative = Subtract(defaultAttach, defaultChest);
-      return Add(currentChest, relative);
+        const float defaultChestRadius = 0.12f;
+        const float defaultWaistRadius = 0.12f;
+
+        const float currentChestRadius =
+            GetTorsoControlPointRadius(ModControlPointRole::Chest,
+                defaultChestRadius);
+
+        const float currentWaistRadius =
+            GetTorsoControlPointRadius(ModControlPointRole::Waist,
+                defaultWaistRadius);
+
+        const float chestRadiusRatio =
+            currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
+
+        const float waistRadiusRatio =
+            currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
+
+        switch (childNode.part) {
+        case ModBodyPart::Neck:
+        case ModBodyPart::Head: {
+            const Vector3 relative = Subtract(defaultAttach, defaultChest);
+
+            // 上方向と横方向を胸の拡縮に追従させる
+            const Vector3 scaledRelative = ScaleVectorComponents(
+                relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
+
+            return Add(currentChest, scaledRelative);
+        }
+
+        case ModBodyPart::LeftUpperArm:
+        case ModBodyPart::RightUpperArm: {
+            const Vector3 relative = Subtract(defaultAttach, defaultChest);
+
+            // 肩位置も胸の太さ変化に追従
+            const Vector3 scaledRelative = ScaleVectorComponents(
+                relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
+
+            return Add(currentChest, scaledRelative);
+        }
+
+        case ModBodyPart::LeftThigh:
+        case ModBodyPart::RightThigh: {
+            const Vector3 relative = Subtract(defaultAttach, defaultWaist);
+
+            // 腰位置も waist 半径の変化に追従
+            const Vector3 scaledRelative = ScaleVectorComponents(
+                relative, { waistRadiusRatio, waistRadiusRatio, waistRadiusRatio });
+
+            return Add(currentWaist, scaledRelative);
+        }
+
+        default:
+            return defaultAttach;
+        }
     }
 
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm: {
-      const Vector3 relative = Subtract(defaultAttach, defaultChest);
-      return Add(currentChest, relative);
+    // ------------------------------------------------------------
+    // Head 親:
+    // 将来的に頭に腕や脚が付くときのため、
+    // HeadCenter 半径を使って接続位置を拡縮する。
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::Head) {
+        const float defaultHeadRadius = 0.11f;
+        const float currentHeadRadius =
+            GetPartControlPointRadius(parentNode.id, ModControlPointRole::HeadCenter,
+                defaultHeadRadius);
+
+        const float headRadiusRatio =
+            currentHeadRadius / (std::max)(defaultHeadRadius, 0.0001f);
+
+        return ScaleVectorComponents(defaultAttach,
+            { headRadiusRatio, headRadiusRatio,
+             headRadiusRatio });
     }
 
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh: {
-      const Vector3 relative = Subtract(defaultAttach, defaultWaist);
-      return Add(currentWaist, relative);
+    // ------------------------------------------------------------
+    // Neck 親にぶら下がる Head は root 一致
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::Neck &&
+        childNode.part == ModBodyPart::Head) {
+        return { 0.0f, 0.0f, 0.0f };
     }
 
-    default:
-      return defaultAttach;
-    }
-  }
-
-  // Head 親は現在の見た目スケールを反映する
-  if (parentNode.part == ModBodyPart::Head) {
-    Vector3 parentScale = {1.0f, 1.0f, 1.0f};
+    // ------------------------------------------------------------
+    // それ以外:
+    // 既存の見た目スケールで追従させる
+    // param.scale / length を使う部位向け
+    // ------------------------------------------------------------
     if (modBodies_.count(parentNode.id) > 0) {
-      parentScale = modBodies_.at(parentNode.id).GetVisualScaleRatio();
+        const Vector3 parentScale = modBodies_.at(parentNode.id).GetVisualScaleRatio();
+        return ScaleVectorComponents(defaultAttach, parentScale);
     }
 
-    return Mul(defaultAttach, parentScale);
-  }
+    return defaultAttach;
+}
 
-  // Neck 親にぶら下がる Head は root を一致させる
-  if (parentNode.part == ModBodyPart::Neck &&
-      childNode.part == ModBodyPart::Head) {
-    return {0.0f, 0.0f, 0.0f};
-  }
+float ModScene::GetTorsoControlPointRadius(ModControlPointRole role,
+    float defaultRadius) const {
+    const int index = FindTorsoControlPointIndex(role);
+    if (index < 0) {
+        return defaultRadius;
+    }
 
-  // それ以外はデフォルト位置
-  return defaultAttach;
+    return torsoControlPoints_[static_cast<size_t>(index)].radius;
+}
+
+float ModScene::GetPartControlPointRadius(int partId, ModControlPointRole role,
+    float defaultRadius) const {
+    auto it = modBodies_.find(partId);
+    if (it == modBodies_.end()) {
+        return defaultRadius;
+    }
+
+    const int pointIndex = it->second.FindControlPointIndex(role);
+    if (pointIndex < 0) {
+        return defaultRadius;
+    }
+
+    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
+    if (static_cast<size_t>(pointIndex) >= points.size()) {
+        return defaultRadius;
+    }
+
+    return points[static_cast<size_t>(pointIndex)].radius;
+}
+
+Vector3 ModScene::ScaleVectorComponents(const Vector3& value,
+    const Vector3& scale) const {
+    return {
+        value.x * scale.x,
+        value.y * scale.y,
+        value.z * scale.z,
+    };
 }
 
 Vector3
