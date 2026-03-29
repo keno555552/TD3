@@ -255,6 +255,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\actor\ControlPointChain.cpp" />
     <ClCompile Include="GAME\actor\ModAssemblyGraph.cpp" />
     <ClCompile Include="GAME\actor\ModBody.cpp" />
+    <ClCompile Include="GAME\actor\ModCustomizeDataStore.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptData.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
@@ -416,6 +417,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ControlPointChain.h" />
     <ClInclude Include="GAME\actor\ModAssemblyGraph.h" />
     <ClInclude Include="GAME\actor\ModBody.h" />
+    <ClInclude Include="GAME\actor\ModCustomizeDataStore.h" />
     <ClInclude Include="GAME\actor\prompt\PromptBoard.h" />
     <ClInclude Include="GAME\actor\prompt\PromptData.h" />
     <ClInclude Include="GAME\effect\Fade.h" />

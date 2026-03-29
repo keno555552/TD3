@@ -1,4 +1,5 @@
 #include "ModBody.h"
+#include "ModCustomizeDataStore.h"
 #include <cmath>
 
 namespace {
@@ -159,44 +160,6 @@ Vector3 GetAnchorOffset(ModBodyPart part, const Vector3 &newScale) {
   }
 }
 
-ModBodyCustomizeData MakeDefaultCustomizeData() {
-  ModBodyCustomizeData data{};
-  data.dataVersion = 2;
-
-  for (auto &param : data.partParams) {
-    param.scale = {1.0f, 1.0f, 1.0f};
-    param.length = 1.0f;
-    param.count = 1;
-    param.enabled = true;
-  }
-
-  for (auto &offset : data.bodyJointOffsets) {
-    offset = {0.0f, 0.0f, 0.0f};
-  }
-
-  data.bodyJointOffsets[ToIndex(ModBodyPart::Neck)] = {0.0f, 1.0f, 0.0f};
-  data.bodyJointOffsets[ToIndex(ModBodyPart::LeftUpperArm)] = {-1.25f, 1.0f,
-                                                               0.0f};
-  data.bodyJointOffsets[ToIndex(ModBodyPart::RightUpperArm)] = {1.25f, 1.0f,
-                                                                0.0f};
-  data.bodyJointOffsets[ToIndex(ModBodyPart::LeftThigh)] = {-0.5f, -1.25f,
-                                                            0.0f};
-  data.bodyJointOffsets[ToIndex(ModBodyPart::RightThigh)] = {0.5f, -1.25f,
-                                                             0.0f};
-
-  data.controlPointSnapshots.clear();
-  data.timeLimit_ = 30.0f;
-  data.totalTimeLimit_ = 30.0f;
-  data.isTimeUp_ = false;
-
-  return data;
-}
-
-std::unique_ptr<ModBodyCustomizeData> &SharedCustomizeDataStorage() {
-  static std::unique_ptr<ModBodyCustomizeData> sharedData = nullptr;
-  return sharedData;
-}
-
 ModControlPoint MakePoint(ModControlPointRole role,
                           const Vector3 &localPosition, float radius,
                           bool movable, bool isConnectionPoint,
@@ -238,89 +201,12 @@ Vector3 ComputeMainPositionWorldTranslate(const Object *target) {
   return world;
 }
 
-bool IsValidPartType(ModBodyPart part) {
-  const size_t index = static_cast<size_t>(part);
-  return index < static_cast<size_t>(ModBodyPart::Count);
-}
-
 void ClearLegacyPartParams(ModBodyCustomizeData &data) {
   for (size_t i = 0; i < static_cast<size_t>(ModBodyPart::Count); ++i) {
     data.partParams[i].scale = {1.0f, 1.0f, 1.0f};
     data.partParams[i].length = 1.0f;
     data.partParams[i].count = 0;
     data.partParams[i].enabled = false;
-  }
-}
-
-void ApplySnapshotToLegacyControlPoint(
-    ModControlPointData &legacy, const ModControlPointSnapshot &snapshot) {
-  switch (snapshot.role) {
-  case ModControlPointRole::LeftShoulder:
-    legacy.leftShoulderPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::LeftElbow:
-    legacy.leftElbowPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::LeftWrist:
-    legacy.leftWristPos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::RightShoulder:
-    legacy.rightShoulderPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::RightElbow:
-    legacy.rightElbowPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::RightWrist:
-    legacy.rightWristPos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::LeftHip:
-    legacy.leftHipPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::LeftKnee:
-    legacy.leftKneePos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::LeftAnkle:
-    legacy.leftAnklePos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::RightHip:
-    legacy.rightHipPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::RightKnee:
-    legacy.rightKneePos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::RightAnkle:
-    legacy.rightAnklePos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::Chest:
-    legacy.chestPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::Belly:
-    legacy.bellyPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::Waist:
-    legacy.waistPos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::LowerNeck:
-    legacy.lowerNeckPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::UpperNeck:
-    legacy.upperNeckPos = snapshot.localPosition;
-    break;
-  case ModControlPointRole::HeadCenter:
-    legacy.headCenterPos = snapshot.localPosition;
-    break;
-
-  case ModControlPointRole::Root:
-  case ModControlPointRole::Bend:
-  case ModControlPointRole::End:
-  case ModControlPointRole::None:
-  default:
-    break;
   }
 }
 
@@ -352,116 +238,59 @@ Vector3 ModBody::GetVisualScaleRatio() const {
 }
 
 std::unique_ptr<ModBodyCustomizeData> ModBody::CreateDefaultCustomizeData() {
-  return std::make_unique<ModBodyCustomizeData>(MakeDefaultCustomizeData());
+  return ModCustomizeDataStore::CreateDefaultCustomizeData();
 }
 
 std::unique_ptr<ModBodyCustomizeData> ModBody::CopySharedCustomizeData() {
-  const std::unique_ptr<ModBodyCustomizeData> &sharedData =
-      SharedCustomizeDataStorage();
-
-  if (sharedData == nullptr) {
-    return nullptr;
-  }
-
-  return std::make_unique<ModBodyCustomizeData>(*sharedData);
+  return ModCustomizeDataStore::CopySharedCustomizeData();
 }
 
 void ModBody::SetSharedCustomizeData(const ModBodyCustomizeData &data) {
-  ModBodyCustomizeData normalized = data;
-  NormalizeCustomizeData(normalized);
-  SharedCustomizeDataStorage() =
-      std::make_unique<ModBodyCustomizeData>(normalized);
+  ModCustomizeDataStore::SetSharedCustomizeData(data);
 }
 
 const ModBodyCustomizeData *ModBody::GetSharedCustomizeData() {
-  return SharedCustomizeDataStorage().get();
+  return ModCustomizeDataStore::GetSharedCustomizeData();
 }
 
 void ModBody::NormalizeCustomizeData(ModBodyCustomizeData &data) {
-  data.dataVersion = 2;
-
-  // 新方式の partInstances を基準に旧固定配列を再構築する
-  ClearLegacyPartParams(data);
-
-  std::array<bool, static_cast<size_t>(ModBodyPart::Count)> hasRepresentative{};
-  std::array<int, static_cast<size_t>(ModBodyPart::Count)> counts{};
-
-  for (size_t i = 0; i < data.partInstances.size(); ++i) {
-    ModPartInstanceData &instance = data.partInstances[i];
-
-    if (!IsValidPartType(instance.partType)) {
-      continue;
-    }
-
-    instance.param.count = 1;
-
-    const size_t index = static_cast<size_t>(instance.partType);
-    counts[index] += 1;
-
-    if (!hasRepresentative[index]) {
-      data.partParams[index] = instance.param;
-      data.partParams[index].count = 1;
-      hasRepresentative[index] = true;
-    }
-  }
-
-  for (size_t i = 0; i < counts.size(); ++i) {
-    data.partParams[i].count = counts[i];
-    if (counts[i] <= 0) {
-      data.partParams[i].enabled = false;
-    }
-  }
-
-  // 可変長操作点から旧固定操作点へも反映しておく
-  for (size_t i = 0; i < data.controlPointSnapshots.size(); ++i) {
-    ApplySnapshotToLegacyControlPoint(data.controlPoints,
-                                      data.controlPointSnapshots[i]);
-  }
-
-  // 残り時間が負にならないように最低限補正する
-  if (data.timeLimit_ < 0.0f) {
-    data.timeLimit_ = 0.0f;
-  }
-
-  if (data.totalTimeLimit_ < 0.0f) {
-    data.totalTimeLimit_ = 0.0f;
-  }
+  ModCustomizeDataStore::NormalizeCustomizeData(data);
 }
 
 bool ModBody::HasOwnControlPoints() const {
-  switch (part_) {
-  case ModBodyPart::Head:
-  case ModBodyPart::LeftUpperArm:
-  case ModBodyPart::RightUpperArm:
-  case ModBodyPart::LeftThigh:
-  case ModBodyPart::RightThigh:
-    return true;
+    switch (part_) {
+    case ModBodyPart::Head:
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+        return true;
 
-  case ModBodyPart::ChestBody:
-  case ModBodyPart::StomachBody:
-  case ModBodyPart::Neck:
-  case ModBodyPart::LeftForeArm:
-  case ModBodyPart::RightForeArm:
-  case ModBodyPart::LeftShin:
-  case ModBodyPart::RightShin:
-  case ModBodyPart::Count:
-  default:
-    return false;
-  }
+    case ModBodyPart::ChestBody:
+    case ModBodyPart::StomachBody:
+    case ModBodyPart::Neck:
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm:
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin:
+    case ModBodyPart::Count:
+    default:
+        return false;
+    }
 }
 
 void ModBody::SetExternalSegmentSource(
-    const std::vector<ModControlPoint> *points, ModControlPointRole startRole,
+    const std::vector<ModControlPoint>* points, ModControlPointRole startRole,
     ModControlPointRole endRole) {
-  externalControlPoints_ = points;
-  externalStartRole_ = startRole;
-  externalEndRole_ = endRole;
+    externalControlPoints_ = points;
+    externalStartRole_ = startRole;
+    externalEndRole_ = endRole;
 }
 
 void ModBody::ClearExternalSegmentSource() {
-  externalControlPoints_ = nullptr;
-  externalStartRole_ = ModControlPointRole::None;
-  externalEndRole_ = ModControlPointRole::None;
+    externalControlPoints_ = nullptr;
+    externalStartRole_ = ModControlPointRole::None;
+    externalEndRole_ = ModControlPointRole::None;
 }
 
 void ModBody::CacheBaseTransforms(Object *target) {
@@ -749,33 +578,34 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
 }
 
 bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
-  if (index >= controlPoints_.size()) {
-    return false;
-  }
-
-  if (scaleFactor <= 0.0f) {
-    return false;
-  }
-
-  const ModControlPointRole role = controlPoints_[index].role;
-  const float defaultRadius = GetDefaultPointRadius(part_, role);
-  const float minRadius = defaultRadius * 0.60f;
-  const float maxRadius = defaultRadius * 2.50f;
-
-  float newRadius = controlPoints_[index].radius * scaleFactor;
-  newRadius = ClampFloat(newRadius, minRadius, maxRadius);
-
-  controlPoints_[index].radius = newRadius;
-
-  if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
-    const int chainIndex = chain_.FindIndex(role);
-    if (chainIndex >= 0) {
-      std::vector<ControlPointNode> &nodes = chain_.GetNodes();
-      nodes[static_cast<size_t>(chainIndex)].radius = newRadius;
+    if (index >= controlPoints_.size()) {
+        return false;
     }
-  }
 
-  return true;
+    if (scaleFactor <= 0.0f) {
+        return false;
+    }
+
+    const ModControlPointRole role = controlPoints_[index].role;
+    const float defaultRadius = GetDefaultPointRadius(part_, role);
+    const float minRadius = defaultRadius * 0.60f;
+    const float maxRadius = defaultRadius * 2.50f;
+
+    float newRadius = controlPoints_[index].radius * scaleFactor;
+    newRadius = ClampFloat(newRadius, minRadius, maxRadius);
+
+    controlPoints_[index].radius = newRadius;
+
+    if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+        const int chainIndex = chain_.FindIndex(role);
+        if (chainIndex >= 0) {
+            std::vector<ControlPointNode>& nodes = chain_.GetNodes();
+            nodes[static_cast<size_t>(chainIndex)].radius = newRadius;
+        }
+    }
+
+    UpdateControlPointHierarchy();
+    return true;
 }
 
 Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
@@ -878,77 +708,162 @@ void ModBody::BuildDefaultControlPoints() {
   }
 }
 
+void ModBody::PushPointToMinimumDistance(int fixedIndex, int movableIndex,
+    float extraMargin) {
+    if (fixedIndex < 0 || movableIndex < 0) {
+        return;
+    }
+
+    if (static_cast<size_t>(fixedIndex) >= controlPoints_.size() ||
+        static_cast<size_t>(movableIndex) >= controlPoints_.size()) {
+        return;
+    }
+
+    const Vector3 fixedPos = controlPoints_[static_cast<size_t>(fixedIndex)].localPosition;
+    Vector3 movablePos = controlPoints_[static_cast<size_t>(movableIndex)].localPosition;
+
+    const float fixedRadius = controlPoints_[static_cast<size_t>(fixedIndex)].radius;
+    const float movableRadius = controlPoints_[static_cast<size_t>(movableIndex)].radius;
+
+    const float minDistance = fixedRadius + movableRadius + extraMargin;
+
+    Vector3 diff = Subtract(movablePos, fixedPos);
+    float length = Length(diff);
+
+    Vector3 dir = { 0.0f, -1.0f, 0.0f };
+    if (length > 0.0001f) {
+        dir = NormalizeSafe(diff, dir);
+    }
+
+    if (length < minDistance) {
+        movablePos = Add(fixedPos, Multiply(minDistance, dir));
+        controlPoints_[static_cast<size_t>(movableIndex)].localPosition = movablePos;
+    }
+}
+
+void ModBody::EnforceAdjacentPointSpacing() {
+    const float extraMargin = 0.01f;
+
+    // 腕・脚チェーン
+    {
+        const int rootIndex = FindControlPointIndex(ModControlPointRole::Root);
+        const int bendIndex = FindControlPointIndex(ModControlPointRole::Bend);
+        const int endIndex = FindControlPointIndex(ModControlPointRole::End);
+
+        if (rootIndex >= 0 && bendIndex >= 0) {
+            PushPointToMinimumDistance(rootIndex, bendIndex, extraMargin);
+        }
+
+        if (bendIndex >= 0 && endIndex >= 0) {
+            PushPointToMinimumDistance(bendIndex, endIndex, extraMargin);
+        }
+    }
+
+    // 頭チェーン
+    {
+        const int lowerIndex = FindControlPointIndex(ModControlPointRole::LowerNeck);
+        const int upperIndex = FindControlPointIndex(ModControlPointRole::UpperNeck);
+        const int headIndex = FindControlPointIndex(ModControlPointRole::HeadCenter);
+
+        if (lowerIndex >= 0 && upperIndex >= 0) {
+            PushPointToMinimumDistance(lowerIndex, upperIndex, extraMargin);
+        }
+
+        if (upperIndex >= 0 && headIndex >= 0) {
+            PushPointToMinimumDistance(upperIndex, headIndex, extraMargin);
+        }
+    }
+
+    // torso
+    {
+        const int chestIndex = FindControlPointIndex(ModControlPointRole::Chest);
+        const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
+        const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
+
+        if (chestIndex >= 0 && bellyIndex >= 0) {
+            PushPointToMinimumDistance(chestIndex, bellyIndex, extraMargin);
+        }
+
+        if (bellyIndex >= 0 && waistIndex >= 0) {
+            PushPointToMinimumDistance(bellyIndex, waistIndex, extraMargin);
+        }
+    }
+}
+
 void ModBody::UpdateControlPointHierarchy() {
-  const int bendIndex = FindControlPointIndex(ModControlPointRole::Bend);
-  const int endIndex = FindControlPointIndex(ModControlPointRole::End);
+    const int bendIndex = FindControlPointIndex(ModControlPointRole::Bend);
+    const int endIndex = FindControlPointIndex(ModControlPointRole::End);
 
-  if (bendIndex >= 0 && endIndex >= 0) {
-    const Vector3 diff =
-        Subtract(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
-                 controlPoints_[static_cast<size_t>(bendIndex)].localPosition);
+    if (bendIndex >= 0 && endIndex >= 0) {
+        const Vector3 diff =
+            Subtract(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
+                controlPoints_[static_cast<size_t>(bendIndex)].localPosition);
 
-    if (Length(diff) < 0.0001f) {
-      controlPoints_[static_cast<size_t>(endIndex)].localPosition =
-          Add(controlPoints_[static_cast<size_t>(bendIndex)].localPosition,
-              {0.0f, -0.5f, 0.0f});
+        if (Length(diff) < 0.0001f) {
+            controlPoints_[static_cast<size_t>(endIndex)].localPosition =
+                Add(controlPoints_[static_cast<size_t>(bendIndex)].localPosition,
+                    { 0.0f, -0.5f, 0.0f });
+        }
     }
-  }
 
-  const int chestIndex = FindControlPointIndex(ModControlPointRole::Chest);
-  const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
-  const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
+    const int chestIndex = FindControlPointIndex(ModControlPointRole::Chest);
+    const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
+    const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
 
-  if (chestIndex >= 0 && bellyIndex >= 0) {
-    const Vector3 diff =
-        Subtract(controlPoints_[static_cast<size_t>(bellyIndex)].localPosition,
-                 controlPoints_[static_cast<size_t>(chestIndex)].localPosition);
+    if (chestIndex >= 0 && bellyIndex >= 0) {
+        const Vector3 diff =
+            Subtract(controlPoints_[static_cast<size_t>(bellyIndex)].localPosition,
+                controlPoints_[static_cast<size_t>(chestIndex)].localPosition);
 
-    if (Length(diff) < 0.0001f) {
-      controlPoints_[static_cast<size_t>(bellyIndex)].localPosition =
-          Add(controlPoints_[static_cast<size_t>(chestIndex)].localPosition,
-              {0.0f, -0.5f, 0.0f});
+        if (Length(diff) < 0.0001f) {
+            controlPoints_[static_cast<size_t>(bellyIndex)].localPosition =
+                Add(controlPoints_[static_cast<size_t>(chestIndex)].localPosition,
+                    { 0.0f, -0.5f, 0.0f });
+        }
     }
-  }
 
-  if (bellyIndex >= 0 && waistIndex >= 0) {
-    const Vector3 diff =
-        Subtract(controlPoints_[static_cast<size_t>(waistIndex)].localPosition,
-                 controlPoints_[static_cast<size_t>(bellyIndex)].localPosition);
+    if (bellyIndex >= 0 && waistIndex >= 0) {
+        const Vector3 diff =
+            Subtract(controlPoints_[static_cast<size_t>(waistIndex)].localPosition,
+                controlPoints_[static_cast<size_t>(bellyIndex)].localPosition);
 
-    if (Length(diff) < 0.0001f) {
-      controlPoints_[static_cast<size_t>(waistIndex)].localPosition =
-          Add(controlPoints_[static_cast<size_t>(bellyIndex)].localPosition,
-              {0.0f, -0.5f, 0.0f});
+        if (Length(diff) < 0.0001f) {
+            controlPoints_[static_cast<size_t>(waistIndex)].localPosition =
+                Add(controlPoints_[static_cast<size_t>(bellyIndex)].localPosition,
+                    { 0.0f, -0.5f, 0.0f });
+        }
     }
-  }
 
-  const int lowerIndex = FindControlPointIndex(ModControlPointRole::LowerNeck);
-  const int upperIndex = FindControlPointIndex(ModControlPointRole::UpperNeck);
-  const int headIndex = FindControlPointIndex(ModControlPointRole::HeadCenter);
+    const int lowerIndex = FindControlPointIndex(ModControlPointRole::LowerNeck);
+    const int upperIndex = FindControlPointIndex(ModControlPointRole::UpperNeck);
+    const int headIndex = FindControlPointIndex(ModControlPointRole::HeadCenter);
 
-  if (lowerIndex >= 0 && upperIndex >= 0) {
-    const Vector3 diff =
-        Subtract(controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
-                 controlPoints_[static_cast<size_t>(lowerIndex)].localPosition);
+    if (lowerIndex >= 0 && upperIndex >= 0) {
+        const Vector3 diff =
+            Subtract(controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
+                controlPoints_[static_cast<size_t>(lowerIndex)].localPosition);
 
-    if (Length(diff) < 0.0001f) {
-      controlPoints_[static_cast<size_t>(upperIndex)].localPosition =
-          Add(controlPoints_[static_cast<size_t>(lowerIndex)].localPosition,
-              {0.0f, 0.35f, 0.0f});
+        if (Length(diff) < 0.0001f) {
+            controlPoints_[static_cast<size_t>(upperIndex)].localPosition =
+                Add(controlPoints_[static_cast<size_t>(lowerIndex)].localPosition,
+                    { 0.0f, 0.3f, 0.0f });
+        }
     }
-  }
 
-  if (upperIndex >= 0 && headIndex >= 0) {
-    const Vector3 diff =
-        Subtract(controlPoints_[static_cast<size_t>(headIndex)].localPosition,
-                 controlPoints_[static_cast<size_t>(upperIndex)].localPosition);
+    if (upperIndex >= 0 && headIndex >= 0) {
+        const Vector3 diff =
+            Subtract(controlPoints_[static_cast<size_t>(headIndex)].localPosition,
+                controlPoints_[static_cast<size_t>(upperIndex)].localPosition);
 
-    if (Length(diff) < 0.0001f) {
-      controlPoints_[static_cast<size_t>(headIndex)].localPosition =
-          Add(controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
-              {0.0f, 0.5f, 0.0f});
+        if (Length(diff) < 0.0001f) {
+            controlPoints_[static_cast<size_t>(headIndex)].localPosition =
+                Add(controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
+                    { 0.0f, 0.5f, 0.0f });
+        }
     }
-  }
+
+    // 半径ぶんの食い込みを防ぐ
+    EnforceAdjacentPointSpacing();
 }
 
 void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,

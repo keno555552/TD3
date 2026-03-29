@@ -871,93 +871,49 @@ void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
 }
 
 void ModScene::ApplyAssemblyToSceneHierarchy() {
-  // まず全 Object の親参照をクリアする
-  for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
-           modObjects_.begin();
-       it != modObjects_.end(); ++it) {
-    Object *object = it->second.get();
-    if (object == nullptr) {
-      continue;
-    }
-
-    object->followObject_ = nullptr;
-    object->mainPosition.parentPart = nullptr;
-  }
-
-  // AssemblyGraph の親子関係を Scene の Object 階層へ反映する
-  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-    const int id = orderedPartIds_[i];
-
-    const PartNode *node = assembly_.FindNode(id);
-    if (node == nullptr || modObjects_.count(id) == 0) {
-      continue;
-    }
-
-    Object *object = modObjects_[id].get();
-    if (object == nullptr) {
-      continue;
-    }
-
-    Vector3 localTranslate = node->localTransform.translate;
-    const Vector3 localRotate = {0.0f, 0.0f, 0.0f};
-
-    if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
-      Object *parentObject = modObjects_[node->parentId].get();
-      if (parentObject != nullptr) {
-        object->followObject_ = &parentObject->mainPosition;
-        object->mainPosition.parentPart = &parentObject->mainPosition;
-      }
-
-      bool handledByOwnerPoint = false;
-
-      // 前腕・脛は owner の Bend に追従する
-      switch (node->part) {
-      case ModBodyPart::LeftForeArm:
-      case ModBodyPart::RightForeArm:
-      case ModBodyPart::LeftShin:
-      case ModBodyPart::RightShin: {
-        const int ownerId = ResolveControlOwnerPartId(assembly_, id);
-        if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
-          const std::vector<ModControlPoint> &ownerPoints =
-              modBodies_[ownerId].GetControlPoints();
-
-          const int bendIndex = modBodies_[ownerId].FindControlPointIndex(
-              ModControlPointRole::Bend);
-
-          if (bendIndex >= 0) {
-            localTranslate =
-                ownerPoints[static_cast<size_t>(bendIndex)].localPosition;
-            handledByOwnerPoint = true;
-          }
+    for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
+        modObjects_.begin();
+        it != modObjects_.end(); ++it) {
+        Object* object = it->second.get();
+        if (object == nullptr) {
+            continue;
         }
-        break;
-      }
 
-      case ModBodyPart::Head: {
-        const PartNode *parentNode = assembly_.FindNode(node->parentId);
-
-        // Neck の子である Head は Neck root と一致させる
-        if (parentNode != nullptr && parentNode->part == ModBodyPart::Neck) {
-          localTranslate = {0.0f, 0.0f, 0.0f};
-          handledByOwnerPoint = true;
-        }
-        break;
-      }
-
-      default:
-        break;
-      }
-
-      // それ以外は、親の現在形状を使って接続位置を解決する
-      if (!handledByOwnerPoint) {
-        localTranslate = ResolveAttachedLocalTranslate(*node);
-      }
+        object->followObject_ = nullptr;
+        object->mainPosition.parentPart = nullptr;
     }
 
-    object->mainPosition.transform.translate = localTranslate;
-    object->mainPosition.transform.rotate = localRotate;
-    object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
-  }
+    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+        const int id = orderedPartIds_[i];
+
+        const PartNode* node = assembly_.FindNode(id);
+        if (node == nullptr || modObjects_.count(id) == 0) {
+            continue;
+        }
+
+        Object* object = modObjects_[id].get();
+        if (object == nullptr) {
+            continue;
+        }
+
+        Vector3 localTranslate = node->localTransform.translate;
+        const Vector3 localRotate = { 0.0f, 0.0f, 0.0f };
+
+        if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
+            Object* parentObject = modObjects_[node->parentId].get();
+            if (parentObject != nullptr) {
+                object->followObject_ = &parentObject->mainPosition;
+                object->mainPosition.parentPart = &parentObject->mainPosition;
+            }
+
+            // すべての親子接続をここで統一的に解決する
+            localTranslate = ResolveAttachedLocalTranslate(*node);
+        }
+
+        object->mainPosition.transform.translate = localTranslate;
+        object->mainPosition.transform.rotate = localRotate;
+        object->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+    }
 }
 
 void ModScene::LoadCustomizeData() {
@@ -2012,9 +1968,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
         parentNode.part, childNode.part, childNode.side);
 
     // ------------------------------------------------------------
-    // torso 親:
-    // 胸系の子は Chest、脚系の子は Waist を基準にする。
-    // さらに基準操作点の radius 比率で接続オフセットも拡縮する。
+    // torso 親
     // ------------------------------------------------------------
     if (parentNode.part == ModBodyPart::ChestBody ||
         parentNode.part == ModBodyPart::StomachBody) {
@@ -2057,33 +2011,24 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
         case ModBodyPart::Neck:
         case ModBodyPart::Head: {
             const Vector3 relative = Subtract(defaultAttach, defaultChest);
-
-            // 上方向と横方向を胸の拡縮に追従させる
             const Vector3 scaledRelative = ScaleVectorComponents(
                 relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
-
             return Add(currentChest, scaledRelative);
         }
 
         case ModBodyPart::LeftUpperArm:
         case ModBodyPart::RightUpperArm: {
             const Vector3 relative = Subtract(defaultAttach, defaultChest);
-
-            // 肩位置も胸の太さ変化に追従
             const Vector3 scaledRelative = ScaleVectorComponents(
                 relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
-
             return Add(currentChest, scaledRelative);
         }
 
         case ModBodyPart::LeftThigh:
         case ModBodyPart::RightThigh: {
             const Vector3 relative = Subtract(defaultAttach, defaultWaist);
-
-            // 腰位置も waist 半径の変化に追従
             const Vector3 scaledRelative = ScaleVectorComponents(
                 relative, { waistRadiusRatio, waistRadiusRatio, waistRadiusRatio });
-
             return Add(currentWaist, scaledRelative);
         }
 
@@ -2093,9 +2038,68 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
     }
 
     // ------------------------------------------------------------
-    // Head 親:
-    // 将来的に頭に腕や脚が付くときのため、
-    // HeadCenter 半径を使って接続位置を拡縮する。
+    // UpperArm 親 -> ForeArm 子
+    // Bend 点を基準にする
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::LeftUpperArm ||
+        parentNode.part == ModBodyPart::RightUpperArm) {
+        if (childNode.part == ModBodyPart::LeftForeArm ||
+            childNode.part == ModBodyPart::RightForeArm) {
+            auto it = modBodies_.find(parentNode.id);
+            if (it != modBodies_.end()) {
+                const int bendIndex =
+                    it->second.FindControlPointIndex(ModControlPointRole::Bend);
+                if (bendIndex >= 0) {
+                    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
+                    return points[static_cast<size_t>(bendIndex)].localPosition;
+                }
+            }
+            return defaultAttach;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Thigh 親 -> Shin 子
+    // Bend 点を基準にする
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::LeftThigh ||
+        parentNode.part == ModBodyPart::RightThigh) {
+        if (childNode.part == ModBodyPart::LeftShin ||
+            childNode.part == ModBodyPart::RightShin) {
+            auto it = modBodies_.find(parentNode.id);
+            if (it != modBodies_.end()) {
+                const int bendIndex =
+                    it->second.FindControlPointIndex(ModControlPointRole::Bend);
+                if (bendIndex >= 0) {
+                    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
+                    return points[static_cast<size_t>(bendIndex)].localPosition;
+                }
+            }
+            return defaultAttach;
+        }
+    }
+
+    // ------------------------------------------------------------
+    // Neck 親 -> Head 子
+    // Head の LowerNeck を基準にしつつ、UpperNeck 側の変化も追従させる
+    // ------------------------------------------------------------
+    if (parentNode.part == ModBodyPart::Neck &&
+        childNode.part == ModBodyPart::Head) {
+        const int headId = childNode.id;
+        auto it = modBodies_.find(headId);
+        if (it != modBodies_.end()) {
+            const int lowerIndex =
+                it->second.FindControlPointIndex(ModControlPointRole::LowerNeck);
+            if (lowerIndex >= 0) {
+                const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
+                return points[static_cast<size_t>(lowerIndex)].localPosition;
+            }
+        }
+        return { 0.0f, 0.0f, 0.0f };
+    }
+
+    // ------------------------------------------------------------
+    // Head 親
     // ------------------------------------------------------------
     if (parentNode.part == ModBodyPart::Head) {
         const float defaultHeadRadius = 0.11f;
@@ -2107,22 +2111,11 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
             currentHeadRadius / (std::max)(defaultHeadRadius, 0.0001f);
 
         return ScaleVectorComponents(defaultAttach,
-            { headRadiusRatio, headRadiusRatio,
-             headRadiusRatio });
+            { headRadiusRatio, headRadiusRatio, headRadiusRatio });
     }
 
     // ------------------------------------------------------------
-    // Neck 親にぶら下がる Head は root 一致
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::Neck &&
-        childNode.part == ModBodyPart::Head) {
-        return { 0.0f, 0.0f, 0.0f };
-    }
-
-    // ------------------------------------------------------------
-    // それ以外:
-    // 既存の見た目スケールで追従させる
-    // param.scale / length を使う部位向け
+    // その他
     // ------------------------------------------------------------
     if (modBodies_.count(parentNode.id) > 0) {
         const Vector3 parentScale = modBodies_.at(parentNode.id).GetVisualScaleRatio();
@@ -2172,27 +2165,29 @@ Vector3 ModScene::ScaleVectorComponents(const Vector3& value,
 }
 
 Vector3
-ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
-  if (childNode.parentId < 0) {
-    return childNode.localTransform.translate;
-  }
+ModScene::ResolveAttachedLocalTranslate(const PartNode& childNode) const {
+    if (childNode.parentId < 0) {
+        return childNode.localTransform.translate;
+    }
 
-  const PartNode *parentNode = assembly_.FindNode(childNode.parentId);
-  if (parentNode == nullptr) {
-    return childNode.localTransform.translate;
-  }
+    const PartNode* parentNode = assembly_.FindNode(childNode.parentId);
+    if (parentNode == nullptr) {
+        return childNode.localTransform.translate;
+    }
 
-  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
-      parentNode->part, childNode.part, childNode.side);
+    const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+        parentNode->part, childNode.part, childNode.side);
 
-  const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
+    const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
 
-  // 保存してある localTransform.translate は「デフォルトからの編集込み位置」
-  // なので差分だけ取り出して現在の親形状へ乗せ直す
-  const Vector3 offsetFromDefault =
-      Subtract(childNode.localTransform.translate, defaultAttach);
+    // 保存してある localTransform.translate はデフォルト接続基準からの編集差分
+    const Vector3 offsetFromDefault =
+        Subtract(childNode.localTransform.translate, defaultAttach);
 
-  return Add(dynamicBase, offsetFromDefault);
+    // 子自身の太さ・長さ増加ぶんだけ、親から外へ押し出す
+    const Vector3 childSelfOffset = ResolveChildSelfAttachOffset(childNode);
+
+    return Add(Add(dynamicBase, offsetFromDefault), childSelfOffset);
 }
 
 void ModScene::UpdateControlPointWheelScaling() {
@@ -2608,6 +2603,194 @@ int ModScene::ResolveFadeGroupId(int partId) const {
   }
 
   return ResolveControlOwnerPartId(assembly_, partId);
+}
+
+Vector3 ModScene::ResolveAttachOutwardDirection(const PartNode& childNode) const {
+    switch (childNode.part) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::LeftForeArm:
+        return NormalizeSafeV({ -1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f });
+
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::RightForeArm:
+        return NormalizeSafeV({ 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f });
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightThigh:
+    case ModBodyPart::RightShin:
+        return NormalizeSafeV({ 0.0f, -1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f });
+
+    case ModBodyPart::Neck:
+    case ModBodyPart::Head:
+        return NormalizeSafeV({ 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f });
+
+    case ModBodyPart::ChestBody:
+    case ModBodyPart::StomachBody:
+    case ModBodyPart::Count:
+    default:
+        break;
+    }
+
+    // fallback
+    if (childNode.localTransform.translate.x < 0.0f) {
+        return { -1.0f, 0.0f, 0.0f };
+    }
+    if (childNode.localTransform.translate.x > 0.0f) {
+        return { 1.0f, 0.0f, 0.0f };
+    }
+    if (childNode.localTransform.translate.y < 0.0f) {
+        return { 0.0f, -1.0f, 0.0f };
+    }
+    return { 0.0f, 1.0f, 0.0f };
+}
+
+float ModScene::GetChildDefaultAttachRadius(ModBodyPart part) const {
+    switch (part) {
+    case ModBodyPart::Neck:
+        return 0.09f;
+
+    case ModBodyPart::Head:
+        return 0.11f;
+
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm:
+        return 0.09f;
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin:
+        return 0.10f;
+
+    case ModBodyPart::ChestBody:
+    case ModBodyPart::StomachBody:
+    case ModBodyPart::Count:
+    default:
+        return 0.10f;
+    }
+}
+
+float ModScene::GetChildCurrentAttachRadius(const PartNode& childNode) const {
+    const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
+
+    // owner 操作点を持つ部位は root / lowerNeck / headCenter などの半径を優先
+    if (modBodies_.count(childNode.id) > 0) {
+        switch (childNode.part) {
+        case ModBodyPart::LeftUpperArm:
+        case ModBodyPart::RightUpperArm:
+        case ModBodyPart::LeftThigh:
+        case ModBodyPart::RightThigh: {
+            const float pointRadius =
+                GetPartControlPointRadius(childNode.id, ModControlPointRole::Root, defaultRadius);
+            const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+            return pointRadius * (std::max)(scale.x, scale.z);
+        }
+
+        case ModBodyPart::Head: {
+            const float pointRadius =
+                GetPartControlPointRadius(childNode.id, ModControlPointRole::LowerNeck, defaultRadius);
+            const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+            return pointRadius * (std::max)(scale.x, scale.z);
+        }
+
+        default:
+            break;
+        }
+    }
+
+    // owner を持たない部位は親 owner 側の接続元半径を使う
+    if (childNode.part == ModBodyPart::LeftForeArm ||
+        childNode.part == ModBodyPart::RightForeArm ||
+        childNode.part == ModBodyPart::LeftShin ||
+        childNode.part == ModBodyPart::RightShin) {
+        const int ownerId = ResolveControlOwnerPartId(assembly_, childNode.id);
+        if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
+            const float pointRadius =
+                GetPartControlPointRadius(ownerId, ModControlPointRole::Bend, defaultRadius);
+            const Vector3 scale = modBodies_.at(ownerId).GetVisualScaleRatio();
+            return pointRadius * (std::max)(scale.x, scale.z);
+        }
+    }
+
+    if (childNode.part == ModBodyPart::Neck) {
+        const int headId = FindFirstChildPartId(assembly_, childNode.id, ModBodyPart::Head);
+        if (headId >= 0 && modBodies_.count(headId) > 0) {
+            const float pointRadius =
+                GetPartControlPointRadius(headId, ModControlPointRole::LowerNeck, defaultRadius);
+            const Vector3 scale = modBodies_.at(headId).GetVisualScaleRatio();
+            return pointRadius * (std::max)(scale.x, scale.z);
+        }
+    }
+
+    if (modBodies_.count(childNode.id) > 0) {
+        const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+        return defaultRadius * (std::max)(scale.x, scale.z);
+    }
+
+    return defaultRadius;
+}
+
+float ModScene::GetChildDefaultLength(ModBodyPart part) const {
+    switch (part) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm:
+        return 1.10f;
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin:
+        return 1.40f;
+
+    case ModBodyPart::Neck:
+        return 0.28f;
+
+    case ModBodyPart::Head:
+        return 0.80f;
+
+    case ModBodyPart::ChestBody:
+    case ModBodyPart::StomachBody:
+    case ModBodyPart::Count:
+    default:
+        return 1.0f;
+    }
+}
+
+float ModScene::GetChildCurrentLength(const PartNode& childNode) const {
+    const float defaultLength = GetChildDefaultLength(childNode.part);
+
+    if (modBodies_.count(childNode.id) > 0) {
+        const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+        return defaultLength * scale.y;
+    }
+
+    return defaultLength;
+}
+
+Vector3 ModScene::ResolveChildSelfAttachOffset(const PartNode& childNode) const {
+    const Vector3 outward = ResolveAttachOutwardDirection(childNode);
+
+    const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
+    const float currentRadius = GetChildCurrentAttachRadius(childNode);
+    const float extraRadius = (std::max)(0.0f, currentRadius - defaultRadius);
+
+    const float defaultLength = GetChildDefaultLength(childNode.part);
+    const float currentLength = GetChildCurrentLength(childNode);
+    const float extraLength = (std::max)(0.0f, currentLength - defaultLength);
+
+    // 太さ増加はそのまま押し出し
+    float pushDistance = extraRadius;
+
+    // 長さ増加で根元側にもはみ出すタイプを少し前へ逃がす
+    // 半分全部やると動きすぎるので 0.35f 程度に抑える
+    pushDistance += extraLength * 0.35f;
+
+    return Multiply(pushDistance, outward);
 }
 
 bool ModScene::IsTorsoPart(ModBodyPart part) const {

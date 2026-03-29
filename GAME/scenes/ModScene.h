@@ -405,6 +405,41 @@ private:
 	/// <returns>グループID。無効なら -1</returns>
 	int ResolveFadeGroupId(int partId) const;
 
+	/// <summary>
+/// 子部位自身の現在サイズぶんだけ接続位置を押し出す補正量を返す
+/// 太さや長さを増やしたときに、親へ埋まらないようにするために使う
+/// </summary>
+	Vector3 ResolveChildSelfAttachOffset(const PartNode& childNode) const;
+
+	/// <summary>
+	/// 接続位置の押し出し方向を返す
+	/// 左腕なら左、右腕なら右、頭なら上、脚なら下のような向きを返す
+	/// </summary>
+	Vector3 ResolveAttachOutwardDirection(const PartNode& childNode) const;
+
+	/// <summary>
+	/// 子部位のデフォルト半径を返す
+	/// 接続時の埋まり補正量計算に使う
+	/// </summary>
+	float GetChildDefaultAttachRadius(ModBodyPart part) const;
+
+	/// <summary>
+	/// 子部位の現在接続半径を返す
+	/// owner 操作点半径や見た目パラメータを反映した概算値として使う
+	/// </summary>
+	float GetChildCurrentAttachRadius(const PartNode& childNode) const;
+
+	/// <summary>
+	/// 子部位のデフォルト長さを返す
+	/// 長さ変更時の根元側食い込み補正に使う
+	/// </summary>
+	float GetChildDefaultLength(ModBodyPart part) const;
+
+	/// <summary>
+	/// 子部位の現在長さ倍率込み長さを返す
+	/// </summary>
+	float GetChildCurrentLength(const PartNode& childNode) const;
+
 #ifdef USE_IMGUI
 	/// <summary>
 	/// 改造シーン全体の ImGui を描画する
