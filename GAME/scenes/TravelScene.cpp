@@ -3014,6 +3014,53 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
   };
 
+  int baseHeadPartId = -1;
+
+  if (customizeData_ != nullptr) {
+    for (size_t i = 0; i < customizeData_->partInstances.size(); ++i) {
+      const auto &instance = customizeData_->partInstances[i];
+      if (instance.partType == ModBodyPart::Head) {
+        baseHeadPartId = instance.partId;
+        break; // 最初の Head を固定頭
+      }
+    }
+  }
+
+  Vector3 baseLowerNeckPos = {0.0f, 0.0f, 0.0f};
+  Vector3 baseUpperNeckPos = {0.0f, 0.0f, 0.0f};
+  Vector3 baseHeadCenterPos = {0.0f, 0.0f, 0.0f};
+
+  bool hasBaseLowerNeck = false;
+  bool hasBaseUpperNeck = false;
+  bool hasBaseHeadCenter = false;
+
+  float lowerNeckR = 0.1f;
+  float upperNeckR = 0.1f;
+  float headRadius = 0.1f;
+
+  if (customizeData_ != nullptr && baseHeadPartId >= 0) {
+    for (size_t i = 0; i < customizeData_->controlPointSnapshots.size(); ++i) {
+      const auto &snap = customizeData_->controlPointSnapshots[i];
+      if (snap.ownerPartId != baseHeadPartId) {
+        continue;
+      }
+
+      if (snap.role == ModControlPointRole::LowerNeck) {
+        baseLowerNeckPos = snap.localPosition;
+        lowerNeckR = snap.radius;
+        hasBaseLowerNeck = true;
+      } else if (snap.role == ModControlPointRole::UpperNeck) {
+        baseUpperNeckPos = snap.localPosition;
+        upperNeckR = snap.radius;
+        hasBaseUpperNeck = true;
+      } else if (snap.role == ModControlPointRole::HeadCenter) {
+        baseHeadCenterPos = snap.localPosition;
+        headRadius = snap.radius;
+        hasBaseHeadCenter = true;
+      }
+    }
+  }
+
   // body 自体の位置は移動処理側が持つので、ここでは触らない
 
   //================================
@@ -3129,20 +3176,42 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
   // 頭
-  // Head は UpperNeck -> HeadCenter の区間で作る
-  Vector3 headVector = Sub(cp->headCenterPos, cp->upperNeckPos);
-  float headLength = Length(headVector);
+  // 頭
+  // 固定頭も snapshot ベースで作る
+  Vector3 headVector = {0.0f, 1.0f, 0.0f};
+  float headLength = 0.0001f;
+  float headAngleZ = 0.0f;
 
-  if (headLength < 0.0001f) {
-    headLength = 0.0001f;
-    headVector = {0.0f, 1.0f, 0.0f};
+  if (hasBaseUpperNeck && hasBaseHeadCenter) {
+    headVector = Sub(baseHeadCenterPos, baseUpperNeckPos);
+    headLength = Length(headVector);
+
+    if (headLength < 0.0001f) {
+      headLength = 0.0001f;
+      headVector = {0.0f, 1.0f, 0.0f};
+    }
+
+    Vector3 headDir = Normalize(headVector);
+    headAngleZ = atan2(headDir.x, -headDir.y);
+
+    head->mainPosition.transform.translate =
+        Sub(baseUpperNeckPos, cp->chestPos) + chestOffset;
+  } else {
+    headVector = Sub(cp->headCenterPos, cp->upperNeckPos);
+    headLength = Length(headVector);
+
+    if (headLength < 0.0001f) {
+      headLength = 0.0001f;
+      headVector = {0.0f, 1.0f, 0.0f};
+    }
+
+    Vector3 headDir = Normalize(headVector);
+    headAngleZ = atan2(headDir.x, -headDir.y);
+
+    head->mainPosition.transform.translate =
+        Sub(cp->upperNeckPos, cp->chestPos) + chestOffset;
   }
 
-  Vector3 headDir = Normalize(headVector);
-  float headAngleZ = atan2(headDir.x, -headDir.y);
-
-  // root は UpperNeck
-  head->mainPosition.transform.translate = cp->upperNeckPos;
   head->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
 
   // 左前腕
@@ -3258,12 +3327,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
   const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
 
-  const float lowerNeckR = GetSnapshotRadius(ModBodyPart::Head, 7);
-  const float upperNeckR = GetSnapshotRadius(ModBodyPart::Head, 8);
-  const float headRadius = GetSnapshotRadius(ModBodyPart::Head, 9);
-  // const float chestR = GetSnapshotRadius(ModBodyPart::ChestBody, 4);
-  // const float bellyR = GetSnapshotRadius(ModBodyPart::ChestBody, 5);
-  // const float stomachR = GetSnapshotRadius(ModBodyPart::StomachBody, 6);
   const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
   const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
   const float stomachR = GetControlPointRadius(ModControlPointRole::Waist);
@@ -3379,7 +3442,13 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
         neckThicknessScale * neckParam.scale.z;
   }
 
-  float headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos)) * 2.0f;
+  float headHeight = 0.0001f;
+
+  if (hasBaseUpperNeck && hasBaseHeadCenter) {
+    headHeight = Length(Sub(baseHeadCenterPos, baseUpperNeckPos));
+  } else {
+    headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos));
+  }
 
   if (headHeight < 0.0001f) {
     headHeight = 0.0001f;

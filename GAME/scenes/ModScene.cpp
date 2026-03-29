@@ -417,25 +417,21 @@ void ModScene::Update() {
   UpdateModObjects();
 
   if (isStartTransition_) {
-      // 胴体(id=1)と頭(id=4)の操作点を確認する
-      for (const auto& pair : modBodies_) {
-          const auto& points = pair.second.GetControlPoints();
-          if (!points.empty()) {
-              Logger::Log("[PreSync] partId=%d partType=%d points=%d",
-                  pair.first,
-                  static_cast<int>(pair.second.GetPart()),
-                  static_cast<int>(points.size()));
-              for (size_t pi = 0; pi < points.size(); ++pi) {
-                  Logger::Log("  point[%d] role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
-                      static_cast<int>(pi),
-                      static_cast<int>(points[pi].role),
-                      points[pi].localPosition.x,
-                      points[pi].localPosition.y,
-                      points[pi].localPosition.z,
-                      points[pi].radius);
-              }
-          }
+    // 胴体(id=1)と頭(id=4)の操作点を確認する
+    for (const auto &pair : modBodies_) {
+      const auto &points = pair.second.GetControlPoints();
+      if (!points.empty()) {
+        Logger::Log("[PreSync] partId=%d partType=%d points=%d", pair.first,
+                    static_cast<int>(pair.second.GetPart()),
+                    static_cast<int>(points.size()));
+        for (size_t pi = 0; pi < points.size(); ++pi) {
+          Logger::Log("  point[%d] role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
+                      static_cast<int>(pi), static_cast<int>(points[pi].role),
+                      points[pi].localPosition.x, points[pi].localPosition.y,
+                      points[pi].localPosition.z, points[pi].radius);
+        }
       }
+    }
   }
 
   // 現在のシーン状態を共有データへ書き戻す
@@ -457,21 +453,22 @@ void ModScene::Update() {
 
   // フェードアウト完了後に共有データを保存して次シーンへ進む
   if (isStartTransition_ && fade_.IsFinished()) {
-      if (customizeData_ != nullptr) {
-          Logger::Log("[ModScene Exit] controlPointSnapshots=%d",
-              static_cast<int>(customizeData_->controlPointSnapshots.size()));
-          for (size_t i = 0; i < customizeData_->controlPointSnapshots.size(); ++i) {
-              const auto& s = customizeData_->controlPointSnapshots[i];
-              Logger::Log("  [%d] ownerType=%d role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
-                  static_cast<int>(i),
-                  static_cast<int>(s.ownerPartType),
-                  static_cast<int>(s.role),
-                  s.localPosition.x, s.localPosition.y, s.localPosition.z,
-                  s.radius);
-          }
-          ModBody::SetSharedCustomizeData(*customizeData_);
+    if (customizeData_ != nullptr) {
+      Logger::Log(
+          "[ModScene Exit] controlPointSnapshots=%d",
+          static_cast<int>(customizeData_->controlPointSnapshots.size()));
+      for (size_t i = 0; i < customizeData_->controlPointSnapshots.size();
+           ++i) {
+        const auto &s = customizeData_->controlPointSnapshots[i];
+        Logger::Log(
+            "  [%d] ownerType=%d role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
+            static_cast<int>(i), static_cast<int>(s.ownerPartType),
+            static_cast<int>(s.role), s.localPosition.x, s.localPosition.y,
+            s.localPosition.z, s.radius);
       }
-      outcome_ = SceneOutcome::NEXT;
+      ModBody::SetSharedCustomizeData(*customizeData_);
+    }
+    outcome_ = SceneOutcome::NEXT;
   }
 }
 
@@ -548,64 +545,66 @@ void ModScene::SetupModObjects() {
 
   // SetupModObjects() の末尾の defaultControlPointSnapshots 保存部分を差し替え
   if (customizeData_ != nullptr) {
-      customizeData_->defaultControlPointSnapshots.clear();
+    customizeData_->defaultControlPointSnapshots.clear();
 
-      // まず torsoControlPoints_ から胴体のデフォルト操作点を保存する
-      {
-          int chestPartId = -1;
-          for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-              const PartNode* node = assembly_.FindNode(orderedPartIds_[i]);
-              if (node != nullptr && node->part == ModBodyPart::ChestBody) {
-                  chestPartId = orderedPartIds_[i];
-                  break;
-              }
-          }
-
-          if (chestPartId >= 0) {
-              for (size_t pi = 0; pi < torsoControlPoints_.size(); ++pi) {
-                  const auto& point = torsoControlPoints_[pi];
-                  ModControlPointSnapshot snap;
-                  snap.ownerPartId = chestPartId;
-                  snap.ownerPartType = ModBodyPart::ChestBody;
-                  snap.role = point.role;
-                  snap.localPosition = point.localPosition;
-                  snap.radius = point.radius;
-                  snap.movable = point.movable;
-                  snap.isConnectionPoint = point.isConnectionPoint;
-                  snap.acceptsParent = point.acceptsParent;
-                  snap.acceptsChild = point.acceptsChild;
-                  customizeData_->defaultControlPointSnapshots.push_back(snap);
-              }
-          }
+    // まず torsoControlPoints_ から胴体のデフォルト操作点を保存する
+    {
+      int chestPartId = -1;
+      for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+        const PartNode *node = assembly_.FindNode(orderedPartIds_[i]);
+        if (node != nullptr && node->part == ModBodyPart::ChestBody) {
+          chestPartId = orderedPartIds_[i];
+          break;
+        }
       }
 
-      // 残りの部位は modBodies_ から（胴体はスキップ）
-      for (const auto& id : orderedPartIds_) {
-          if (modBodies_.count(id) == 0) continue;
-          const PartNode* node = assembly_.FindNode(id);
-          if (node == nullptr) continue;
-
-          // ChestBody と StomachBody は torsoControlPoints_ で処理済み
-          if (node->part == ModBodyPart::ChestBody ||
-              node->part == ModBodyPart::StomachBody) {
-              continue;
-          }
-
-          const auto& points = modBodies_[id].GetControlPoints();
-          for (const auto& point : points) {
-              ModControlPointSnapshot snap;
-              snap.ownerPartId = id;
-              snap.ownerPartType = node->part;
-              snap.role = point.role;
-              snap.localPosition = point.localPosition;
-              snap.radius = point.radius;
-              snap.movable = point.movable;
-              snap.isConnectionPoint = point.isConnectionPoint;
-              snap.acceptsParent = point.acceptsParent;
-              snap.acceptsChild = point.acceptsChild;
-              customizeData_->defaultControlPointSnapshots.push_back(snap);
-          }
+      if (chestPartId >= 0) {
+        for (size_t pi = 0; pi < torsoControlPoints_.size(); ++pi) {
+          const auto &point = torsoControlPoints_[pi];
+          ModControlPointSnapshot snap;
+          snap.ownerPartId = chestPartId;
+          snap.ownerPartType = ModBodyPart::ChestBody;
+          snap.role = point.role;
+          snap.localPosition = point.localPosition;
+          snap.radius = point.radius;
+          snap.movable = point.movable;
+          snap.isConnectionPoint = point.isConnectionPoint;
+          snap.acceptsParent = point.acceptsParent;
+          snap.acceptsChild = point.acceptsChild;
+          customizeData_->defaultControlPointSnapshots.push_back(snap);
+        }
       }
+    }
+
+    // 残りの部位は modBodies_ から（胴体はスキップ）
+    for (const auto &id : orderedPartIds_) {
+      if (modBodies_.count(id) == 0)
+        continue;
+      const PartNode *node = assembly_.FindNode(id);
+      if (node == nullptr)
+        continue;
+
+      // ChestBody と StomachBody は torsoControlPoints_ で処理済み
+      if (node->part == ModBodyPart::ChestBody ||
+          node->part == ModBodyPart::StomachBody) {
+        continue;
+      }
+
+      const auto &points = modBodies_[id].GetControlPoints();
+      for (const auto &point : points) {
+        ModControlPointSnapshot snap;
+        snap.ownerPartId = id;
+        snap.ownerPartType = node->part;
+        snap.role = point.role;
+        snap.localPosition = point.localPosition;
+        snap.radius = point.radius;
+        snap.movable = point.movable;
+        snap.isConnectionPoint = point.isConnectionPoint;
+        snap.acceptsParent = point.acceptsParent;
+        snap.acceptsChild = point.acceptsChild;
+        customizeData_->defaultControlPointSnapshots.push_back(snap);
+      }
+    }
   }
 }
 
@@ -903,100 +902,98 @@ void ModScene::SyncCustomizeDataFromScene() {
 }
 
 void ModScene::RebuildControlPointSnapshotsFromScene() {
-    if (customizeData_ == nullptr) {
-        return;
-    }
+  if (customizeData_ == nullptr) {
+    return;
+  }
 
-    customizeData_->controlPointSnapshots.clear();
+  customizeData_->controlPointSnapshots.clear();
 
-    // まず torsoControlPoints_ から胴体の操作点を保存する
-    {
-        // ChestBody の partId を探す
-        int chestPartId = -1;
-        for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-            const PartNode* node = assembly_.FindNode(orderedPartIds_[i]);
-            if (node != nullptr && node->part == ModBodyPart::ChestBody) {
-                chestPartId = orderedPartIds_[i];
-                break;
-            }
-        }
-
-        if (chestPartId >= 0) {
-            for (size_t pi = 0; pi < torsoControlPoints_.size(); ++pi) {
-                const auto& point = torsoControlPoints_[pi];
-
-                ModControlPointSnapshot snapshot;
-                snapshot.ownerPartId = chestPartId;
-                snapshot.ownerPartType = ModBodyPart::ChestBody;
-                snapshot.role = point.role;
-                snapshot.localPosition = point.localPosition;
-                snapshot.radius = point.radius;
-                snapshot.movable = point.movable;
-                snapshot.isConnectionPoint = point.isConnectionPoint;
-                snapshot.acceptsParent = point.acceptsParent;
-                snapshot.acceptsChild = point.acceptsChild;
-
-                customizeData_->controlPointSnapshots.push_back(snapshot);
-            }
-        }
-    }
-
-    // 残りの部位は modBodies_ から読み取る（胴体はスキップ）
+  // まず torsoControlPoints_ から胴体の操作点を保存する
+  {
+    // ChestBody の partId を探す
+    int chestPartId = -1;
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-        const int id = orderedPartIds_[i];
-
-        const PartNode* node = assembly_.FindNode(id);
-        if (node == nullptr) {
-            continue;
-        }
-
-        // ChestBody と StomachBody は torsoControlPoints_ で処理済みなのでスキップ
-        if (node->part == ModBodyPart::ChestBody ||
-            node->part == ModBodyPart::StomachBody) {
-            continue;
-        }
-
-        if (modBodies_.count(id) == 0) {
-            continue;
-        }
-
-        const std::vector<ModControlPoint>& points =
-            modBodies_.at(id).GetControlPoints();
-
-        Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
-                    static_cast<int>(node->part),
-                    static_cast<int>(points.size()));
-
-        if (id == 13) {
-          for (size_t pointIndex = 0; pointIndex < points.size();
-               ++pointIndex) {
-            Logger::Log(
-                "  point[%d] role=%d pos=(%.3f, %.3f, %.3f) radius=%.3f",
-                static_cast<int>(pointIndex),
-                static_cast<int>(points[pointIndex].role),
-                points[pointIndex].localPosition.x,
-                points[pointIndex].localPosition.y,
-                points[pointIndex].localPosition.z, points[pointIndex].radius);
-          }
-        }
-
-        for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
-            const ModControlPoint& point = points[pointIndex];
-
-            ModControlPointSnapshot snapshot;
-            snapshot.ownerPartId = id;
-            snapshot.ownerPartType = node->part;
-            snapshot.role = point.role;
-            snapshot.localPosition = point.localPosition;
-            snapshot.radius = point.radius;
-            snapshot.movable = point.movable;
-            snapshot.isConnectionPoint = point.isConnectionPoint;
-            snapshot.acceptsParent = point.acceptsParent;
-            snapshot.acceptsChild = point.acceptsChild;
-
-            customizeData_->controlPointSnapshots.push_back(snapshot);
-        }
+      const PartNode *node = assembly_.FindNode(orderedPartIds_[i]);
+      if (node != nullptr && node->part == ModBodyPart::ChestBody) {
+        chestPartId = orderedPartIds_[i];
+        break;
+      }
     }
+
+    if (chestPartId >= 0) {
+      for (size_t pi = 0; pi < torsoControlPoints_.size(); ++pi) {
+        const auto &point = torsoControlPoints_[pi];
+
+        ModControlPointSnapshot snapshot;
+        snapshot.ownerPartId = chestPartId;
+        snapshot.ownerPartType = ModBodyPart::ChestBody;
+        snapshot.role = point.role;
+        snapshot.localPosition = point.localPosition;
+        snapshot.radius = point.radius;
+        snapshot.movable = point.movable;
+        snapshot.isConnectionPoint = point.isConnectionPoint;
+        snapshot.acceptsParent = point.acceptsParent;
+        snapshot.acceptsChild = point.acceptsChild;
+
+        customizeData_->controlPointSnapshots.push_back(snapshot);
+      }
+    }
+  }
+
+  // 残りの部位は modBodies_ から読み取る（胴体はスキップ）
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    // ChestBody と StomachBody は torsoControlPoints_ で処理済みなのでスキップ
+    if (node->part == ModBodyPart::ChestBody ||
+        node->part == ModBodyPart::StomachBody) {
+      continue;
+    }
+
+    if (modBodies_.count(id) == 0) {
+      continue;
+    }
+
+    const std::vector<ModControlPoint> &points =
+        modBodies_.at(id).GetControlPoints();
+
+    Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
+                static_cast<int>(node->part), static_cast<int>(points.size()));
+
+    if (id == 13) {
+      for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
+        Logger::Log("  point[%d] role=%d pos=(%.3f, %.3f, %.3f) radius=%.3f",
+                    static_cast<int>(pointIndex),
+                    static_cast<int>(points[pointIndex].role),
+                    points[pointIndex].localPosition.x,
+                    points[pointIndex].localPosition.y,
+                    points[pointIndex].localPosition.z,
+                    points[pointIndex].radius);
+      }
+    }
+
+    for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
+      const ModControlPoint &point = points[pointIndex];
+
+      ModControlPointSnapshot snapshot;
+      snapshot.ownerPartId = id;
+      snapshot.ownerPartType = node->part;
+      snapshot.role = point.role;
+      snapshot.localPosition = point.localPosition;
+      snapshot.radius = point.radius;
+      snapshot.movable = point.movable;
+      snapshot.isConnectionPoint = point.isConnectionPoint;
+      snapshot.acceptsParent = point.acceptsParent;
+      snapshot.acceptsChild = point.acceptsChild;
+
+      customizeData_->controlPointSnapshots.push_back(snapshot);
+    }
+  }
 }
 
 void ModScene::RebuildLegacyCustomizeDataFromInstances() {
