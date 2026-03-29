@@ -380,6 +380,18 @@ private:
   void SyncControlPointsFromChain(std::vector<ModControlPoint> *points,
                                   const ControlPointChain &chain);
 
+  /// <summary>
+/// 隣接する操作点同士が半径ぶんめり込まないように距離を補正する
+/// Root-Bend、Bend-End、LowerNeck-UpperNeck、UpperNeck-HeadCenter に適用する
+/// </summary>
+  void EnforceAdjacentPointSpacing();
+
+  /// <summary>
+  /// 2点間が最小距離以上になるように後ろ側の点を押し出す
+  /// </summary>
+  void PushPointToMinimumDistance(int fixedIndex, int movableIndex,
+      float extraMargin);
+
 private:
   ModBodyPart part_ = ModBodyPart::ChestBody;
   ModBodyPartParam param_{};

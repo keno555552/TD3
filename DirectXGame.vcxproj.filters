@@ -171,6 +171,7 @@
     <ClCompile Include="GAME\scenes\UITest.cpp" />
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Segment.cpp" />
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Sphere.cpp" />
+    <ClCompile Include="GAME\actor\ModCustomizeDataStore.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\actor\ControlPointChain.h" />
@@ -408,6 +409,7 @@
     <ClInclude Include="kEngine\Data\Geometry\CrashData\Sphere.h" />
     <ClInclude Include="GAME\actor\ModObjectUtil.h" />
     <ClInclude Include="GAME\actor\ModBodyCustomizeDataUtil.h" />
+    <ClInclude Include="GAME\actor\ModCustomizeDataStore.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
