@@ -544,10 +544,6 @@ void TravelScene::LoadCustomizeData() {
 
     if (i == ToIndex(ModBodyPart::Head)) {
       const auto &p = customizeData_->partParams[i];
-      Logger::Log("==== LOAD HEAD PARAM ====");
-      Logger::Log("index : %zu", i);
-      Logger::Log("scale : %.3f %.3f %.3f", p.scale.x, p.scale.y, p.scale.z);
-      Logger::Log("length : %.3f", p.length);
     }
   }
 }
@@ -767,188 +763,177 @@ void TravelScene::UpdateChildRootsFromBody() {
 void TravelScene::ApplyCustomizeToMovementParam() {
   //==============================
   // 各部位のパラメータ取得
+  // 長さは scale.y で扱う
   //==============================
-  const auto &body =
-      modBodies_[static_cast<size_t>(ModBodyPart::Body)].GetParam();
-  const auto &neck =
-      modBodies_[static_cast<size_t>(ModBodyPart::Neck)].GetParam();
-  const auto &leftThigh =
-      modBodies_[static_cast<size_t>(ModBodyPart::LeftThigh)].GetParam();
-  const auto &rightThigh =
-      modBodies_[static_cast<size_t>(ModBodyPart::RightThigh)].GetParam();
-
-  const auto &leftShin =
-      modBodies_[static_cast<size_t>(ModBodyPart::LeftShin)].GetParam();
-  const auto &rightShin =
-      modBodies_[static_cast<size_t>(ModBodyPart::RightShin)].GetParam();
+  const auto &chest = modBodies_[ToIndex(ModBodyPart::ChestBody)].GetParam();
+  const auto &stomach =
+      modBodies_[ToIndex(ModBodyPart::StomachBody)].GetParam();
+  const auto &neck = modBodies_[ToIndex(ModBodyPart::Neck)].GetParam();
+  const auto &head = modBodies_[ToIndex(ModBodyPart::Head)].GetParam();
 
   const auto &leftUpperArm =
-      modBodies_[static_cast<size_t>(ModBodyPart::LeftUpperArm)].GetParam();
+      modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam();
   const auto &rightUpperArm =
-      modBodies_[static_cast<size_t>(ModBodyPart::RightUpperArm)].GetParam();
+      modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetParam();
+  const auto &leftForeArm =
+      modBodies_[ToIndex(ModBodyPart::LeftForeArm)].GetParam();
+  const auto &rightForeArm =
+      modBodies_[ToIndex(ModBodyPart::RightForeArm)].GetParam();
+
+  const auto &leftThigh =
+      modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam();
+  const auto &rightThigh =
+      modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam();
+  const auto &leftShin = modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam();
+  const auto &rightShin =
+      modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam();
+
+  auto AvgXZ = [](const ModBodyPartParam &p) -> float {
+    return (p.scale.x + p.scale.z) * 0.5f;
+  };
+
+  auto AvgXYZ = [](const ModBodyPartParam &p) -> float {
+    return (p.scale.x + p.scale.y + p.scale.z) / 3.0f;
+  };
 
   //==============================
-  // 基本値の計算
+  // 長さ（scale.y をそのまま使う）
   //==============================
+  const float leftLegLength = leftThigh.scale.y + leftShin.scale.y;
+  const float rightLegLength = rightThigh.scale.y + rightShin.scale.y;
+  const float avgLegLength = (leftLegLength + rightLegLength) * 0.5f;
 
-  // 脚の長さ感（Y）
-  const float legLengthScale = (leftThigh.scale.y + rightThigh.scale.y +
-                                leftShin.scale.y + rightShin.scale.y) *
-                               0.25f;
+  // const float leftArmLength = leftUpperArm.scale.y + leftForeArm.scale.y;
+  // const float rightArmLength = rightUpperArm.scale.y + rightForeArm.scale.y;
+  // const float avgArmLength = (leftArmLength + rightArmLength) * 0.5f;
 
-  // 脚の太さ感（X/Z）
-  const float leftThighThickness =
-      (leftThigh.scale.x + leftThigh.scale.z) * 0.5f;
-  const float rightThighThickness =
-      (rightThigh.scale.x + rightThigh.scale.z) * 0.5f;
-  const float leftShinThickness = (leftShin.scale.x + leftShin.scale.z) * 0.5f;
-  const float rightShinThickness =
-      (rightShin.scale.x + rightShin.scale.z) * 0.5f;
-
-  const float legThicknessScale = (leftThighThickness + rightThighThickness +
-                                   leftShinThickness + rightShinThickness) *
-                                  0.25f;
-
-  // 長くて細いほど大きくなる
-  const float legSlimness = legLengthScale / (legThicknessScale + 0.001f);
-
-  // 腕の太さ感（安定補助に少しだけ使う）
-  const float leftUpperArmThickness =
-      (leftUpperArm.scale.x + leftUpperArm.scale.z) * 0.5f;
-  const float rightUpperArmThickness =
-      (rightUpperArm.scale.x + rightUpperArm.scale.z) * 0.5f;
-  const float armThicknessScale =
-      (leftUpperArmThickness + rightUpperArmThickness) * 0.5f;
-
-  // Bodyの大きさ感（XYZ全部）
-  const float bodyScaleAvg =
-      (body.scale.x + body.scale.y + body.scale.z) / 3.0f;
-
-  // 左右差（脚の長さ差）
-  const float leftLegTotal = leftThigh.scale.y + leftShin.scale.y;
-  const float rightLegTotal = rightThigh.scale.y + rightShin.scale.y;
-  const float legDiff = std::abs(leftLegTotal - rightLegTotal);
-
-  float neckLengthScale = neck.scale.y;
-  float neckThicknessScale = (neck.scale.x + neck.scale.z) * 0.5f;
+  const float neckLengthScale = neck.scale.y;
 
   //==============================
-  // チューニング値生成
+  // 太さ
   //==============================
+  const float leftLegThickness = (AvgXZ(leftThigh) + AvgXZ(leftShin)) * 0.5f;
+  const float rightLegThickness = (AvgXZ(rightThigh) + AvgXZ(rightShin)) * 0.5f;
+  const float legThicknessScale = (leftLegThickness + rightLegThickness) * 0.5f;
 
+  const float leftArmThickness =
+      (AvgXZ(leftUpperArm) + AvgXZ(leftForeArm)) * 0.5f;
+  const float rightArmThickness =
+      (AvgXZ(rightUpperArm) + AvgXZ(rightForeArm)) * 0.5f;
+  const float armThicknessScale = (leftArmThickness + rightArmThickness) * 0.5f;
+
+  const float neckThicknessScale = AvgXZ(neck);
+  const float headSizeScale = AvgXYZ(head);
+
+  //==============================
+  // 胴体の大きさ
+  //==============================
+  const float chestScaleAvg = AvgXYZ(chest);
+  const float stomachScaleAvg = AvgXYZ(stomach);
+  const float torsoScaleAvg = (chestScaleAvg + stomachScaleAvg) * 0.5f;
+
+  //==============================
+  // 左右差
+  //==============================
+  const float legDiff = std::abs(leftLegLength - rightLegLength);
+  // const float armDiff = std::abs(leftArmLength - rightArmLength);
+
+  //==============================
+  // 細長さ
+  //==============================
+  const float legSlimness = avgLegLength / (legThicknessScale + 0.001f);
+
+  //==============================
+  // ベース
+  //==============================
+  tuning_.runPower = 0.75f;
+  tuning_.maxSpeed = 1.0f;
+  tuning_.stability = 1.0f;
+  tuning_.lift = 1.0f;
+  tuning_.turnResponse = 1.0f;
+
+  //==============================
   // 前進力
-  float lengthDiff = legLengthScale - 1.0f;
-  float thicknessDiff = legThicknessScale - 1.0f;
+  // 脚長いと強い
+  // 太い脚・重い胴体・左右差で落ちる
+  //==============================
+  tuning_.runPower += (avgLegLength - 1.0f) * 2.2f;
+  tuning_.runPower -= (legThicknessScale - 1.0f) * 1.2f;
+  tuning_.runPower -= (torsoScaleAvg - 1.0f) * 1.0f;
+  tuning_.runPower -= legDiff * 1.8f;
 
-  float lengthPenalty = lengthDiff * lengthDiff; // 長すぎても短すぎてもダメ
-  float thicknessPenalty = thicknessDiff * thicknessDiff;
+  //==============================
+  // 最高速
+  // 脚長いとかなり速い
+  // 頭でかい・胴体重い・左右差で落ちる
+  //==============================
+  tuning_.maxSpeed += (avgLegLength - 1.0f) * 2.7f;
+  tuning_.maxSpeed -= (legThicknessScale - 1.0f) * 0.9f;
+  tuning_.maxSpeed -= (torsoScaleAvg - 1.0f) * 0.8f;
+  tuning_.maxSpeed -= (headSizeScale - 1.0f) * 0.5f;
+  tuning_.maxSpeed -= legDiff * 1.6f;
 
-  tuning_.runPower =
-      (std::max)(0.5f, 1.0f - lengthPenalty * 0.4f - thicknessPenalty * 0.55f);
-
-  tuning_.runPower -= (bodyScaleAvg - 1.0f) * 0.25f;
-
-  // 最高速度
-  // 長いとちょっと速い（歩幅）
-  float lengthBonus = lengthDiff * 0.45f;
-
-  // 太いと遅い
-  float thicknessPenaltySpeed = thicknessDiff * 0.2f;
-
-  // 左右差でロス
-  float balancePenalty = legDiff * 0.15f;
-
-  tuning_.maxSpeed =
-      1.0f + lengthBonus - thicknessPenaltySpeed - balancePenalty;
-
-  // 下限
-  tuning_.maxSpeed = (std::max)(0.4f, tuning_.maxSpeed);
-
+  //==============================
   // 安定性
-  // 太い脚・太い腕・大きい胴体は安定
-  // 長くて細い脚、左右差は不安定
-  tuning_.stability = 1.0f + (legThicknessScale - 1.0f) * 0.6f +
-                      (armThicknessScale - 1.0f) * 0.2f +
-                      (bodyScaleAvg - 1.0f) * 0.35f -
-                      (legSlimness - 1.0f) * 0.45f - legDiff * 0.30f;
+  // 太い脚・太い腕・太い首は安定
+  // 細長い脚・長い首・大きい頭・左右差は不安定
+  //==============================
+  tuning_.stability += (legThicknessScale - 1.0f) * 1.5f;
+  tuning_.stability += (armThicknessScale - 1.0f) * 0.5f;
+  tuning_.stability += (neckThicknessScale - 1.0f) * 0.7f;
 
-  float neckLengthDiff = neckLengthScale - 1.0f;
-  float neckThicknessDiff = neckThicknessScale - 1.0f;
+  tuning_.stability -= (legSlimness - 1.0f) * 1.5f;
+  tuning_.stability -= (neckLengthScale - 1.0f) * 1.2f;
+  tuning_.stability -= (headSizeScale - 1.0f) * 1.0f;
+  tuning_.stability -= legDiff * 1.8f;
+  // tuning_.stability -= armDiff * 0.4f;
+  tuning_.stability -= features_.asymmetry * 0.35f;
 
-  // 長いほど不安定、太いほど安定
-  tuning_.stability -= neckLengthDiff * 0.15f;
-  tuning_.stability += neckThicknessDiff * 0.10f;
+  //==============================
+  // 上方向
+  // 脚長いと跳ねる
+  // 太い脚・重い胴体・大きい頭で落ちる
+  //==============================
+  tuning_.lift += (avgLegLength - 1.0f) * 3.0f;
+  tuning_.lift -= (legThicknessScale - 1.0f) * 0.7f;
+  tuning_.lift -= (torsoScaleAvg - 1.0f) * 0.8f;
+  tuning_.lift -= (headSizeScale - 1.0f) * 0.3f;
 
-  // 上方向の出やすさ
-  // 長い脚は少し有利、太い脚と大きい胴体は重くする
-  tuning_.lift = 1.0f + (legLengthScale - 1.0f) * 0.20f -
-                 (legThicknessScale - 1.0f) * 0.25f -
-                 (bodyScaleAvg - 1.0f) * 0.20f;
+  float comOffset = std::clamp(features_.centerOfMassY, -3.0f, 3.0f);
+  tuning_.lift += comOffset * 0.2f;
 
-  // 傾きの反応
-  // 細長い脚や左右差があると不安定に反応しやすい
-  // 大きい胴体は鈍くする
-  tuning_.turnResponse = 1.0f + (legSlimness - 1.0f) * 0.25f + legDiff * 0.20f -
-                         (bodyScaleAvg - 1.0f) * 0.15f;
+  //==============================
+  // 傾きやすさ
+  // 細長い脚・左右差・長い首・非対称で暴れる
+  //==============================
+  tuning_.turnResponse += (legSlimness - 1.0f) * 1.2f;
+  tuning_.turnResponse += legDiff * 2.0f;
+  // tuning_.turnResponse += armDiff * 0.3f;
+  tuning_.turnResponse += (neckLengthScale - 1.0f) * 0.8f;
+  tuning_.turnResponse += features_.asymmetry * 0.5f;
+  tuning_.turnResponse -= (torsoScaleAvg - 1.0f) * 0.5f;
 
-  tuning_.turnResponse += neckLengthDiff * 0.10f;
-
-  //--------------------------------
-  // CharacterFeatures 反映
-  //--------------------------------
-
-  // 安全用
-  float stability = tuning_.stability;
-  float turnResponse = tuning_.turnResponse;
-  float lift = tuning_.lift;
-
-  //----------------------
-  // 頭の数
-  //----------------------
+  //==============================
+  // 追加パーツの影響
+  //==============================
   float extraHeadCount = (std::max)(0.0f, features_.headCount - 1.0f);
-  stability -= extraHeadCount * 0.05f;
-
-  //----------------------
-  // 腕の数
-  //----------------------
   float extraArmCount = (std::max)(0.0f, features_.armCount - 2.0f);
-  stability -= extraArmCount * 0.03f;
 
-  //----------------------
-  // 左右非対称
-  //----------------------
-  stability -= features_.asymmetry * 0.2f;
-  turnResponse += features_.asymmetry * 0.3f;
+  tuning_.stability -= extraHeadCount * 0.8f;
+  tuning_.turnResponse += extraHeadCount * 0.8f;
+  tuning_.lift += extraHeadCount * 0.2f;
 
-  //----------------------
-  // 重心（高いほど不安定＆跳ねる）
-  //----------------------
-  float comOffset = (std::clamp)(features_.centerOfMassY, -3.0f, 3.0f);
-  stability -= comOffset * 0.1f;
-  lift += comOffset * 0.15f;
-
-  //----------------------
-  // 下限・上限
-  //----------------------
-  stability = (std::clamp)(stability, 0.3f, 2.0f);
-  turnResponse = (std::clamp)(turnResponse, 0.3f, 2.0f);
-  lift = (std::clamp)(lift, 0.3f, 2.0f);
-
-  //----------------------
-  // 反映
-  //----------------------
-  tuning_.stability = stability;
-  tuning_.turnResponse = turnResponse;
-  tuning_.lift = lift;
+  tuning_.stability -= extraArmCount * 0.15f;
+  tuning_.runPower += extraArmCount * 0.1f;
 
   //==============================
-  // 安全クランプ
+  // プロトタイプ用に広めにクランプ
   //==============================
-  tuning_.runPower = std::clamp(tuning_.runPower, 0.5f, 2.5f);
-  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.3f, 2.0f);
-  tuning_.stability = std::clamp(tuning_.stability, 0.3f, 2.0f);
-  tuning_.lift = std::clamp(tuning_.lift, 0.3f, 2.0f);
-  tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.3f, 2.0f);
+  tuning_.runPower = std::clamp(tuning_.runPower, 0.1f, 4.0f);
+  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.2f, 4.5f);
+  tuning_.stability = std::clamp(tuning_.stability, 0.1f, 3.5f);
+  tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
+  tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -992,7 +977,8 @@ float TravelScene::ComputeLegHeightOffset() const {
 }
 
 bool TravelScene::HasRequiredParts() const {
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
   Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
 
@@ -1007,7 +993,7 @@ bool TravelScene::HasRequiredParts() const {
   Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
   // nullチェック
-  if (body == nullptr || neck == nullptr || head == nullptr ||
+  if (chestBody == nullptr || neck == nullptr || head == nullptr ||
       leftUpperArm == nullptr || leftForeArm == nullptr ||
       rightUpperArm == nullptr || rightForeArm == nullptr ||
       leftThigh == nullptr || leftShin == nullptr || rightThigh == nullptr ||
@@ -1117,6 +1103,18 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   float stability = useCustomizeMove_ ? tuning_.stability : 1.0f;
   float turnResponse = useCustomizeMove_ ? tuning_.turnResponse : 1.0f;
 
+  float instability = (std::max)(0.0f, 1.0f - stability);
+  float overResponse = (std::max)(0.0f, turnResponse - 1.0f);
+
+  // 不安定な体型は、何もしてなくても少しずつ崩れる
+  bodyTiltVelocity_ += instability * 0.010f;
+
+  // 傾きやすすぎる体型は、前回蹴った側へ流れやすい
+  if (lastKickSide_ != 0) {
+    float sideBias = (lastKickSide_ < 0) ? -1.0f : 1.0f;
+    bodyTiltVelocity_ += sideBias * overResponse * 0.006f;
+  }
+
   if (!leftNowInput) {
     float leftRecoveryAccel = leftLegBendSpeed_ - leftLegPrevBendSpeed_;
 
@@ -1174,8 +1172,10 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   bool useRightPush = false;
   float adoptedDriveUse = 0.0f;
 
+  float singleStepBasePush = 0.22f;
+  float singleStepJumpScale = 0.55f;
+
   if (leftNowInput && isGrounded_ && velocityY_ <= 0.0f &&
-      leftDriveAccum_ >= minDriveToKick_ && leftHoldEnough &&
       !requireReleaseAfterLandLeft_) {
 
     float sequenceBonus = 1.0f;
@@ -1186,15 +1186,20 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       sequenceBonus = sameSideKickPenalty_;
     }
 
-    float driveUse = (std::min)(leftDriveAccum_, driveUsePerFrame_);
+    float driveUse = 0.0f;
+    if (leftDriveAccum_ >= minDriveToKick_ && leftHoldEnough) {
+      driveUse = (std::min)(leftDriveAccum_, driveUsePerFrame_);
+    }
 
-    leftPushCandidate = driveUse * drivePushScale_ * pushPower_ *
-                        groundAssist_ * groundedKickFactor_ * 2.0f *
-                        sequenceBonus;
+    float drivePush = driveUse * drivePushScale_ * pushPower_ * groundAssist_ *
+                      groundedKickFactor_ * 2.0f * sequenceBonus;
+
+    float basePush = singleStepBasePush * pushPower_ * sequenceBonus;
+
+    leftPushCandidate = (std::max)(basePush, drivePush);
   }
 
   if (rightNowInput && isGrounded_ && velocityY_ <= 0.0f &&
-      rightDriveAccum_ >= minDriveToKick_ && rightHoldEnough &&
       !requireReleaseAfterLandRight_) {
     float sequenceBonus = 1.0f;
     if (lastKickSide_ == -1) {
@@ -1203,11 +1208,17 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       sequenceBonus = sameSideKickPenalty_;
     }
 
-    float driveUse = (std::min)(rightDriveAccum_, driveUsePerFrame_);
+    float driveUse = 0.0f;
+    if (rightDriveAccum_ >= minDriveToKick_ && rightHoldEnough) {
+      driveUse = (std::min)(rightDriveAccum_, driveUsePerFrame_);
+    }
 
-    rightPushCandidate = driveUse * drivePushScale_ * pushPower_ *
-                         groundAssist_ * groundedKickFactor_ * 2.0f *
-                         sequenceBonus;
+    float drivePush = driveUse * drivePushScale_ * pushPower_ * groundAssist_ *
+                      groundedKickFactor_ * 2.0f * sequenceBonus;
+
+    float basePush = singleStepBasePush * pushPower_ * sequenceBonus;
+
+    rightPushCandidate = (std::max)(basePush, drivePush);
   }
 
   float totalPush = 0.0f;
@@ -1270,18 +1281,109 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float groundBoost = isGrounded_ ? 1.2f : 0.6f;
 
     float runPower = useCustomizeMove_ ? tuning_.runPower : 1.0f;
-
-    float pushX = totalPush * runPower *
-                  (0.40f + forwardRate * 0.50f + tiltForwardFactor * 0.75f) *
-                  footForwardBonus * groundBoost;
+    float lift = useCustomizeMove_ ? tuning_.lift : 1.0f;
+    float maxSpeed = useCustomizeMove_ ? tuning_.maxSpeed : 1.0f;
 
     float upwardSuppressByTilt =
         std::clamp(1.0f - tiltForwardFactor * 0.25f, 0.75f, 1.0f);
 
-    float lift = useCustomizeMove_ ? tuning_.lift : 1.0f;
+    const Vector3 lua = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
+                            ->objectParts_[0]
+                            .transform.scale;
 
-    float pushY = totalPush * lift * jumpRatio_ * upwardRate *
-                  upwardSuppressByTilt * footUpwardSuppress;
+    const Vector3 lfa = modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
+                            ->objectParts_[0]
+                            .transform.scale;
+
+    const Vector3 rua = modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
+                            ->objectParts_[0]
+                            .transform.scale;
+
+    const Vector3 rfa = modObjects_[ToIndex(ModBodyPart::RightForeArm)]
+                            ->objectParts_[0]
+                            .transform.scale;
+
+    // 脚と同じで、描画に使ってる実際の長さをそのまま使う
+    float avgArmScaleY = (lua.y + lfa.y + rua.y + rfa.y) * 0.25f;
+
+    // 無改造1.0基準
+    float armLengthPenalty = 1.0f - (avgArmScaleY - 1.0f) * 0.5f;
+    armLengthPenalty = std::clamp(armLengthPenalty, 0.45f, 1.0f);
+
+    Logger::Log("==== ARM UPDATE CHECK ====");
+    Logger::Log("lua.y : %.3f", lua.y);
+    Logger::Log("lfa.y : %.3f", lfa.y);
+    Logger::Log("rua.y : %.3f", rua.y);
+    Logger::Log("rfa.y : %.3f", rfa.y);
+    Logger::Log("avgArmScaleY : %.3f", avgArmScaleY);
+    Logger::Log("armLengthPenalty : %.3f", armLengthPenalty);
+
+    // 前進は脚長の影響をかなり感じるように強め
+    float pushX = totalPush *
+                  (0.15f + runPower * 1.05f + forwardRate * 0.20f +
+                   tiltForwardFactor * 0.35f) *
+                  footForwardBonus * groundBoost * armLengthPenalty;
+
+    // float legLengthBoost = 1.0f;
+
+    // if (useCustomizeMove_) {
+    //   const auto &lt =
+    //   modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam(); const auto &rt
+    //   = modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam(); const auto
+    //   &ls = modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam(); const auto
+    //   &rs = modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam();
+
+    //  // 平均（無改造で1.0想定）
+    //  float avgLegScaleY =
+    //      (lt.scale.y + rt.scale.y + ls.scale.y + rs.scale.y) * 0.25f;
+
+    //  legLengthBoost += (avgLegScaleY - 1.0f) * 1.6f;
+    //}
+
+    // legLengthBoost = std::clamp(legLengthBoost, 1.0f, 2.5f);
+
+    const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+                           ->objectParts_[0]
+                           .transform.scale;
+
+    const Vector3 rt = modObjects_[ToIndex(ModBodyPart::RightThigh)]
+                           ->objectParts_[0]
+                           .transform.scale;
+
+    const Vector3 ls = modObjects_[ToIndex(ModBodyPart::LeftShin)]
+                           ->objectParts_[0]
+                           .transform.scale;
+
+    const Vector3 rs = modObjects_[ToIndex(ModBodyPart::RightShin)]
+                           ->objectParts_[0]
+                           .transform.scale;
+
+    // 基本の2本だけ
+    float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
+
+    float pushY = totalPush * (0.12f + lift * 0.22f) *
+                      (avgLegScaleY * avgLegScaleY) * jumpRatio_ *
+                      upwardSuppressByTilt * footUpwardSuppress +
+                  0.02f;
+
+    if (!bothInput) {
+      pushY *= singleStepJumpScale;
+    }
+
+    // 不安定すぎる体は蹴った時も余計に傾く
+    bodyTiltVelocity_ += instability * 0.010f;
+
+    // turnResponse が高い体は、蹴った瞬間にさらにブレる
+    if (turnResponse > 1.2f) {
+      float sideBias = 0.0f;
+      if (useLeftPush) {
+        sideBias = -1.0f;
+      } else if (useRightPush) {
+        sideBias = 1.0f;
+      }
+
+      bodyTiltVelocity_ += sideBias * (turnResponse - 1.2f) * 0.010f;
+    }
 
     velocityX_ += pushX;
     velocityY_ += pushY;
@@ -1324,8 +1426,8 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   bodyTiltVelocity_ += netTorque;
 
   // 減衰
-  float tiltDamping = 0.80f + (stability - 1.0f) * 0.08f;
-  tiltDamping = std::clamp(tiltDamping, 0.70f, 0.92f);
+  float tiltDamping = 0.88f - instability * 0.25f;
+  tiltDamping = std::clamp(tiltDamping, 0.55f, 0.92f);
   bodyTiltVelocity_ *= tiltDamping;
 
   // 更新
@@ -1393,6 +1495,26 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   //--------------------------------
   // 速度減衰
   //--------------------------------
+  // velocityX_ *= inertia_;
+
+  // float maxSpeed = useCustomizeMove_ ? tuning_.maxSpeed : 1.0f;
+  // velocityX_ = std::clamp(velocityX_, -1.2f * maxSpeed, 1.2f * maxSpeed);
+
+  // moveX_ += velocityX_;
+
+  // velocityY_ -= gravity_;
+  // moveY_ += velocityY_;
+
+  // if (moveY_ <= groundY_) {
+  //   isGrounded_ = true;
+  //   moveY_ = groundY_;
+  //   velocityY_ = 0.0f;
+  // } else {
+  //   isGrounded_ = false;
+  // }
+
+  // bool justLanded = (!wasGrounded && isGrounded_);
+
   velocityX_ *= inertia_;
 
   float maxSpeed = useCustomizeMove_ ? tuning_.maxSpeed : 1.0f;
@@ -1402,6 +1524,9 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   velocityY_ -= gravity_;
   moveY_ += velocityY_;
+
+  // 着地する直前の落下速度を保存
+  float preLandVelocityY = velocityY_;
 
   if (moveY_ <= groundY_) {
     isGrounded_ = true;
@@ -1944,21 +2069,6 @@ void TravelScene::BuildExtraVisualParts() {
           // root は UpperNeck
           obj->mainPosition.transform.translate = upperSnap->localPosition;
           obj->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
-
-          Logger::Log("==== EXTRA HEAD SIMPLE DEBUG ====");
-          Logger::Log("partId : %d", instance.partId);
-          Logger::Log("parentId : %d", instance.parentId);
-          Logger::Log("upperPos : %.3f %.3f %.3f", upperSnap->localPosition.x,
-                      upperSnap->localPosition.y, upperSnap->localPosition.z);
-          Logger::Log(
-              "headCenterPos : %.3f %.3f %.3f", headCenterSnap->localPosition.x,
-              headCenterSnap->localPosition.y, headCenterSnap->localPosition.z);
-          Logger::Log("headLength : %.3f", headLength);
-          Logger::Log("finalTranslate : %.3f %.3f %.3f",
-                      obj->mainPosition.transform.translate.x,
-                      obj->mainPosition.transform.translate.y,
-                      obj->mainPosition.transform.translate.z);
-          Logger::Log("headAngleZ : %.3f", headAngleZ);
         }
       }
       //============================
@@ -2199,9 +2309,6 @@ void TravelScene::BuildExtraVisualParts() {
           mesh.scale = baseScale;
           mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
 
-          Logger::Log("EXTRA RIGHT FOREARM FAILED : partId=%d ownerId=%d",
-                      instance.partId, ownerPartId);
-
         } else {
           //================================
           // 長さ
@@ -2270,25 +2377,6 @@ void TravelScene::BuildExtraVisualParts() {
             obj->mainPosition.transform.translate = ownerTranslate;
           }
           obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
-
-          Logger::Log("==== EXTRA RIGHT FOREARM DEBUG ====");
-          Logger::Log("partId : %d", instance.partId);
-          Logger::Log("ownerId : %d", ownerPartId);
-          Logger::Log("parentId : %d", instance.parentId);
-          Logger::Log("bendPos : %.3f %.3f %.3f", bendSnap->localPosition.x,
-                      bendSnap->localPosition.y, bendSnap->localPosition.z);
-          Logger::Log("endPos : %.3f %.3f %.3f", endSnap->localPosition.x,
-                      endSnap->localPosition.y, endSnap->localPosition.z);
-          Logger::Log("length : %.3f", armLength);
-          Logger::Log("bendRadius : %.3f", bendRadius);
-          Logger::Log("endRadius : %.3f", endRadius);
-          Logger::Log("finalScale : %.3f %.3f %.3f", mesh.scale.x, mesh.scale.y,
-                      mesh.scale.z);
-          Logger::Log("rootTranslate : %.3f %.3f %.3f",
-                      obj->mainPosition.transform.translate.x,
-                      obj->mainPosition.transform.translate.y,
-                      obj->mainPosition.transform.translate.z);
-          Logger::Log("angleZ : %.3f", armAngleZ);
         }
       } else if (instance.partType == ModBodyPart::LeftForeArm) {
 
@@ -2324,9 +2412,6 @@ void TravelScene::BuildExtraVisualParts() {
 
           mesh.scale = baseScale;
           mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
-
-          Logger::Log("EXTRA LEFT FOREARM FAILED : partId=%d ownerId=%d",
-                      instance.partId, ownerPartId);
 
         } else {
           //================================
@@ -2523,9 +2608,6 @@ void TravelScene::BuildExtraVisualParts() {
           mesh.scale = baseScale;
           mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
 
-          Logger::Log("EXTRA LEFT SHIN FAILED : partId=%d ownerId=%d",
-                      instance.partId, ownerPartId);
-
         } else {
           Vector3 legVector =
               Sub(endSnap->localPosition, bendSnap->localPosition);
@@ -2712,9 +2794,6 @@ void TravelScene::BuildExtraVisualParts() {
 
           mesh.scale = baseScale;
           mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
-
-          Logger::Log("EXTRA RIGHT SHIN FAILED : partId=%d ownerId=%d",
-                      instance.partId, ownerPartId);
 
         } else {
           Vector3 legVector =
@@ -3311,14 +3390,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightUpperArmEndR =
       GetSnapshotRadius(ModBodyPart::RightUpperArm, 3);
 
-  Logger::Log("==== BODY PARAM DEBUG ====");
-  Logger::Log("chestParam scale : %.3f %.3f %.3f", chestParam.scale.x,
-              chestParam.scale.y, chestParam.scale.z);
-  Logger::Log("stomachParam scale : %.3f %.3f %.3f", stomachParam.scale.x,
-              stomachParam.scale.y, stomachParam.scale.z);
-  Logger::Log("chestParam length : %.3f", chestParam.length);
-  Logger::Log("stomachParam length : %.3f", stomachParam.length);
-
   const float leftThighStartR = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
   const float leftThighBendR = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
   const float leftThighEndR = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
@@ -3330,10 +3401,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
   const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
   const float stomachR = GetControlPointRadius(ModControlPointRole::Waist);
-  Logger::Log("==== BODY RADIUS DEBUG ====");
-  Logger::Log("chestR : %.3f", chestR);
-  Logger::Log("bellyR : %.3f", bellyR);
-  Logger::Log("stomachR : %.3f", stomachR);
 
   //================================================
   // 無改造基準 0.1f から倍率化
@@ -3366,9 +3433,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       (std::max)(headRadius, upperNeckR) / baseRadius;
   const float chestThicknessScale = (std::max)(chestR, bellyR) / baseRadius;
   const float stomachThicknessScale = (std::max)(stomachR, bellyR) / baseRadius;
-  Logger::Log("==== BODY THICKNESS SCALE DEBUG ====");
-  Logger::Log("chestThicknessScale : %.3f", chestThicknessScale);
-  Logger::Log("stomachThicknessScale : %.3f", stomachThicknessScale);
 
   //================================================
   // 長さ
