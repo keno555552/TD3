@@ -537,6 +537,8 @@ void TravelScene::LoadCustomizeData() {
 
   bodyJointOffsets_ = customizeData_->bodyJointOffsets;
 
+  controlPointSnapshots_ = customizeData_->controlPointSnapshots;
+
   for (size_t i = 0; i < modBodies_.size(); ++i) {
     modBodies_[i].SetParam(customizeData_->partParams[i]);
 
@@ -1687,9 +1689,9 @@ const ModControlPointData *TravelScene::GetControlPoints() const {
 }
 
 void TravelScene::BuildExtraVisualParts() {
-
-  const Vector3 neckScale =
-      modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
+  auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  };
 
   ClearExtraVisualParts();
 
@@ -1697,102 +1699,1274 @@ void TravelScene::BuildExtraVisualParts() {
     return;
   }
 
+  std::unordered_map<int, ObjectPart *> builtPartIdToPart;
+
   bool baseHeadSkipped = false;
+  bool baseNeckSkipped = false;
+  bool baseRightUpperArmSkipped = false;
+  bool baseRightForeArmSkipped = false;
+  bool baseLeftUpperArmSkipped = false;
+  bool baseLeftForeArmSkipped = false;
+  bool baseLeftThighSkipped = false;
+  bool baseLeftShinSkipped = false;
+  bool baseRightThighSkipped = false;
+  bool baseRightShinSkipped = false;
 
   for (const auto &instance : customizeData_->partInstances) {
 
-    if (instance.partType != ModBodyPart::Head) {
+    if (instance.partType != ModBodyPart::Head &&
+        instance.partType != ModBodyPart::Neck &&
+        instance.partType != ModBodyPart::RightUpperArm &&
+        instance.partType != ModBodyPart::RightForeArm &&
+        instance.partType != ModBodyPart::LeftUpperArm &&
+        instance.partType != ModBodyPart::LeftForeArm &&
+        instance.partType != ModBodyPart::LeftThigh &&
+        instance.partType != ModBodyPart::LeftShin &&
+        instance.partType != ModBodyPart::RightThigh &&
+        instance.partType != ModBodyPart::RightShin) {
       continue;
     }
 
-    // 既存の固定Head 1個ぶんはスキップ
-    if (!baseHeadSkipped) {
-      baseHeadSkipped = true;
+    // 固定1個目はスキップ
+    if (instance.partType == ModBodyPart::Head) {
+      if (!baseHeadSkipped) {
+        baseHeadSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::Neck) {
+      if (!baseNeckSkipped) {
+        baseNeckSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::RightUpperArm) {
+      if (!baseRightUpperArmSkipped) {
+        baseRightUpperArmSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::RightForeArm) {
+      if (!baseRightForeArmSkipped) {
+        baseRightForeArmSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::LeftUpperArm) {
+      if (!baseLeftUpperArmSkipped) {
+        baseLeftUpperArmSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::LeftForeArm) {
+      if (!baseLeftForeArmSkipped) {
+        baseLeftForeArmSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::LeftThigh) {
+      if (!baseLeftThighSkipped) {
+        baseLeftThighSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::LeftShin) {
+      if (!baseLeftShinSkipped) {
+        baseLeftShinSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::RightThigh) {
+      if (!baseRightThighSkipped) {
+        baseRightThighSkipped = true;
+        continue;
+      }
+    }
+
+    if (instance.partType == ModBodyPart::RightShin) {
+      if (!baseRightShinSkipped) {
+        baseRightShinSkipped = true;
+        continue;
+      }
+    }
+
+    std::string modelPath;
+    if (instance.partType == ModBodyPart::Head) {
+      modelPath = "GAME/resources/modBody/head/head.obj";
+    } else if (instance.partType == ModBodyPart::Neck) {
+      modelPath = "GAME/resources/modBody/neck/neck.obj";
+    } else if (instance.partType == ModBodyPart::RightUpperArm) {
+      modelPath = "GAME/resources/modBody/rightUpperArm/rightUpperArm.obj";
+    } else if (instance.partType == ModBodyPart::RightForeArm) {
+      modelPath = "GAME/resources/modBody/rightForeArm/rightForeArm.obj";
+    } else if (instance.partType == ModBodyPart::LeftUpperArm) {
+      modelPath = "GAME/resources/modBody/leftUpperArm/leftUpperArm.obj";
+    } else if (instance.partType == ModBodyPart::LeftForeArm) {
+      modelPath = "GAME/resources/modBody/leftForeArm/leftForeArm.obj";
+    } else if (instance.partType == ModBodyPart::LeftThigh) {
+      modelPath = "GAME/resources/modBody/leftThighs/leftThighs.obj";
+    } else if (instance.partType == ModBodyPart::LeftShin) {
+      modelPath = "GAME/resources/modBody/leftShin/leftShin.obj";
+    } else if (instance.partType == ModBodyPart::RightThigh) {
+      modelPath = "GAME/resources/modBody/rightThighs/rightThighs.obj";
+    } else if (instance.partType == ModBodyPart::RightShin) {
+      modelPath = "GAME/resources/modBody/rightShin/rightShin.obj";
+    } else {
       continue;
     }
 
-    const int modelHandle =
-        system_->SetModelObj("GAME/resources/modBody/head/head.obj");
+    const int modelHandle = system_->SetModelObj(modelPath);
 
     Object *obj = new Object;
     obj->IntObject(system_);
     obj->CreateModelData(modelHandle);
+
+    // まずは localTransform をそのまま使う
     obj->mainPosition.transform = instance.localTransform;
 
-    //================================
-    // ModBody::Apply 相当の見た目補正
-    //================================
+    // 親設定
+    if (instance.partType == ModBodyPart::Head ||
+        instance.partType == ModBodyPart::Neck) {
+      obj->followObject_ =
+          &modObjects_[ToIndex(ModBodyPart::ChestBody)]->mainPosition;
+      obj->mainPosition.parentPart =
+          &modObjects_[ToIndex(ModBodyPart::ChestBody)]->mainPosition;
+    } else if (instance.partType == ModBodyPart::RightForeArm ||
+               instance.partType == ModBodyPart::LeftForeArm) {
+      obj->followObject_ =
+          &modObjects_[ToIndex(ModBodyPart::ChestBody)]->mainPosition;
+      obj->mainPosition.parentPart =
+          &modObjects_[ToIndex(ModBodyPart::ChestBody)]->mainPosition;
+    } else if (instance.partType == ModBodyPart::LeftShin ||
+               instance.partType == ModBodyPart::RightShin) {
+      obj->followObject_ =
+          &modObjects_[ToIndex(ModBodyPart::StomachBody)]->mainPosition;
+      obj->mainPosition.parentPart =
+          &modObjects_[ToIndex(ModBodyPart::StomachBody)]->mainPosition;
+    } else {
+      auto extraIt = builtPartIdToPart.find(instance.parentId);
+      if (extraIt != builtPartIdToPart.end()) {
+        obj->followObject_ = extraIt->second;
+        obj->mainPosition.parentPart = extraIt->second;
+      } else {
+        auto fixedIt = fixedPartIdToPart_.find(instance.parentId);
+        if (fixedIt != fixedPartIdToPart_.end()) {
+          obj->followObject_ = fixedIt->second;
+          obj->mainPosition.parentPart = fixedIt->second;
+        }
+      }
+    }
+
     if (!obj->objectParts_.empty()) {
       Transform &mesh = obj->objectParts_[0].transform;
+      const Vector3 baseScale = mesh.scale;
 
-      // 元のメッシュスケールを基準に param を反映
-      Vector3 baseScale = mesh.scale;
+      //============================
+      // Head
+      //============================
+      if (instance.partType == ModBodyPart::Head) {
 
-      Vector3 newScale = {baseScale.x * instance.param.scale.x,
-                          baseScale.y * instance.param.scale.y *
-                              instance.param.length,
-                          baseScale.z * instance.param.scale.z};
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
 
-      if (!instance.param.enabled) {
-        newScale = {0.0f, 0.0f, 0.0f};
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == instance.partId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *upperSnap = nullptr;
+        const ModControlPointSnapshot *headCenterSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::UpperNeck) {
+            upperSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::HeadCenter) {
+            headCenterSnap = snap;
+          }
+        }
+
+        if (upperSnap == nullptr || headCenterSnap == nullptr) {
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, 0.0f, 0.0f};
+        } else {
+          //================================
+          // 長さ・向き
+          // Head は UpperNeck -> HeadCenter
+          //================================
+          Vector3 headVector =
+              Sub(headCenterSnap->localPosition, upperSnap->localPosition);
+          float headLength = Length(headVector);
+
+          if (headLength < 0.0001f) {
+            headLength = 0.0001f;
+            headVector = {0.0f, 1.0f, 0.0f};
+          }
+
+          Vector3 headDir = Normalize(headVector);
+          float headAngleZ = atan2(headDir.x, -headDir.y);
+
+          //================================
+          // 太さ
+          //================================
+          const float baseRadius = 0.1f;
+          float headThicknessScale =
+              (std::max)(upperSnap->radius, headCenterSnap->radius) /
+              baseRadius;
+
+          if (headThicknessScale < 0.0001f) {
+            headThicknessScale = 0.0001f;
+          }
+
+          const auto &headParam =
+              modBodies_[ToIndex(ModBodyPart::Head)].GetParam();
+
+          mesh.scale.x = headThicknessScale * headParam.scale.x;
+          mesh.scale.y = headLength * headParam.scale.y * headParam.length;
+          mesh.scale.z = headThicknessScale * headParam.scale.z;
+
+          // 頭メッシュを区間の中央に置く
+          mesh.translate = {0.0f, -headLength * 0.5f, 0.0f};
+
+          if (!instance.param.enabled) {
+            mesh.scale = {0.0f, 0.0f, 0.0f};
+          }
+
+          // root は UpperNeck
+          obj->mainPosition.transform.translate = upperSnap->localPosition;
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
+
+          Logger::Log("==== EXTRA HEAD SIMPLE DEBUG ====");
+          Logger::Log("partId : %d", instance.partId);
+          Logger::Log("parentId : %d", instance.parentId);
+          Logger::Log("upperPos : %.3f %.3f %.3f", upperSnap->localPosition.x,
+                      upperSnap->localPosition.y, upperSnap->localPosition.z);
+          Logger::Log(
+              "headCenterPos : %.3f %.3f %.3f", headCenterSnap->localPosition.x,
+              headCenterSnap->localPosition.y, headCenterSnap->localPosition.z);
+          Logger::Log("headLength : %.3f", headLength);
+          Logger::Log("finalTranslate : %.3f %.3f %.3f",
+                      obj->mainPosition.transform.translate.x,
+                      obj->mainPosition.transform.translate.y,
+                      obj->mainPosition.transform.translate.z);
+          Logger::Log("headAngleZ : %.3f", headAngleZ);
+        }
       }
+      //============================
+      // RightUpperArm
+      //============================
+      else if (instance.partType == ModBodyPart::RightUpperArm) {
 
-      mesh.scale = newScale;
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
 
-      mesh.translate.y += newScale.y * 0.5f;
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == instance.partId) {
+            snaps.push_back(&snap);
+          }
+        }
 
-      const Vector3 neckScale =
-          modBodies_[ToIndex(ModBodyPart::Neck)].GetVisualScaleRatio();
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
 
-      const Vector3 neckHeadConnector = {0.0f, 0.65f, 0.0f};
-      const Vector3 headRootConnector = {0.0f, 0.0f, 0.0f};
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
 
-      if (instance.parentId == 2) {
-        obj->mainPosition.transform.translate = {
-            neckHeadConnector.x * neckScale.x -
-                headRootConnector.x * newScale.x +
-                instance.localTransform.translate.x,
-            neckHeadConnector.y * neckScale.y -
-                headRootConnector.y * newScale.y +
-                instance.localTransform.translate.y,
-            neckHeadConnector.z * neckScale.z -
-                headRootConnector.z * newScale.z +
-                instance.localTransform.translate.z};
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+        } else {
+          const ModControlPointSnapshot *rootSnap = nullptr;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendSnap = snap;
+            }
+          }
+
+          //================================
+          // 長さ・向き
+          // 上腕は Root -> Bend
+          //================================
+          Vector3 armVector = {0.0f, -1.0f, 0.0f};
+          float armLength = 0.0001f;
+          float armAngleZ = 0.0f;
+
+          if (rootSnap != nullptr && bendSnap != nullptr) {
+            armVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
+            armLength = Length(armVector);
+
+            if (armLength < 0.0001f) {
+              armLength = 0.0001f;
+              armVector = {0.0f, -1.0f, 0.0f};
+            }
+
+            Vector3 armDir = Normalize(armVector);
+            armAngleZ = atan2(armDir.x, -armDir.y);
+
+            obj->mainPosition.transform.translate =
+                instance.localTransform.translate;
+          } else {
+            mesh.scale = baseScale;
+            mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+          }
+
+          //================================
+          // 太さ
+          // fixed の RightUpperArm と同じ考え方に揃える
+          //================================
+          float startRadius = 0.1f;
+          float bendRadius = 0.1f;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              startRadius = snap->radius;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendRadius = snap->radius;
+            }
+          }
+
+          const auto &rightUpperArmParam =
+              modBodies_[ToIndex(ModBodyPart::RightUpperArm)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float rightUpperArmThicknessScale =
+              (std::max)(startRadius, bendRadius) / baseRadius;
+
+          mesh.scale.x =
+              rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
+          mesh.scale.y = armLength * rightUpperArmParam.scale.y *
+                         rightUpperArmParam.length;
+          mesh.scale.z =
+              rightUpperArmThicknessScale * rightUpperArmParam.scale.z;
+
+          mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::LeftUpperArm) {
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == instance.partId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+        } else {
+          const ModControlPointSnapshot *rootSnap = nullptr;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendSnap = snap;
+            }
+          }
+
+          //================================
+          // 長さ・向き
+          // 上腕は Root -> Bend
+          //================================
+          Vector3 armVector = {0.0f, -1.0f, 0.0f};
+          float armLength = 0.0001f;
+          float armAngleZ = 0.0f;
+
+          if (rootSnap != nullptr && bendSnap != nullptr) {
+            armVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
+            armLength = Length(armVector);
+
+            if (armLength < 0.0001f) {
+              armLength = 0.0001f;
+              armVector = {0.0f, -1.0f, 0.0f};
+            }
+
+            Vector3 armDir = Normalize(armVector);
+            armAngleZ = atan2(armDir.x, -armDir.y);
+
+            obj->mainPosition.transform.translate =
+                instance.localTransform.translate;
+          } else {
+            mesh.scale = baseScale;
+            mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+          }
+
+          //================================
+          // 太さ
+          // fixed の LeftUpperArm と同じ考え方に揃える
+          //================================
+          float startRadius = 0.1f;
+          float bendRadius = 0.1f;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              startRadius = snap->radius;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendRadius = snap->radius;
+            }
+          }
+
+          const auto &leftUpperArmParam =
+              modBodies_[ToIndex(ModBodyPart::LeftUpperArm)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float leftUpperArmThicknessScale =
+              (std::max)(startRadius, bendRadius) / baseRadius;
+
+          mesh.scale.x = leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
+          mesh.scale.y =
+              armLength * leftUpperArmParam.scale.y * leftUpperArmParam.length;
+          mesh.scale.z = leftUpperArmThicknessScale * leftUpperArmParam.scale.z;
+
+          mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::RightForeArm) {
+
+        int ownerPartId = instance.partId;
+
+        // 右前腕の control owner は親の右上腕
+        if (instance.parentId >= 0) {
+          ownerPartId = instance.parentId;
+        }
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+          Logger::Log("EXTRA RIGHT FOREARM FAILED : partId=%d ownerId=%d",
+                      instance.partId, ownerPartId);
+
+        } else {
+          //================================
+          // 長さ
+          //================================
+          Vector3 armVector =
+              Sub(endSnap->localPosition, bendSnap->localPosition);
+          float armLength = Length(armVector);
+
+          if (armLength < 0.0001f) {
+            armLength = 0.0001f;
+            armVector = {0.0f, -1.0f, 0.0f};
+          }
+
+          Vector3 armDir = Normalize(armVector);
+          float armAngleZ = atan2(armDir.x, -armDir.y);
+
+          //================================
+          // 太さ
+          // fixed の RightForeArm と同じ考え方に揃える
+          //================================
+          float bendRadius = bendSnap->radius;
+          float endRadius = endSnap->radius;
+
+          const auto &rightForeArmParam =
+              modBodies_[ToIndex(ModBodyPart::RightForeArm)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float rightForeArmThicknessScale =
+              (std::max)(bendRadius, endRadius) / baseRadius;
+
+          mesh.scale.x = rightForeArmThicknessScale * rightForeArmParam.scale.x;
+          mesh.scale.y =
+              armLength * rightForeArmParam.scale.y * rightForeArmParam.length;
+          mesh.scale.z = rightForeArmThicknessScale * rightForeArmParam.scale.z;
+
+          mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
+
+          // 右前腕の root は肘位置
+          Vector3 ownerTranslate = {0.0f, 0.0f, 0.0f};
+
+          // owner の追加右上腕 instance の root 位置を取る
+          for (const auto &ownerInstance : customizeData_->partInstances) {
+            if (ownerInstance.partId == ownerPartId) {
+              ownerTranslate = ownerInstance.localTransform.translate;
+              break;
+            }
+          }
+
+          const ModControlPointSnapshot *rootSnap = nullptr;
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+              break;
+            }
+          }
+
+          if (rootSnap != nullptr) {
+            Vector3 elbowOffset =
+                Sub(bendSnap->localPosition, rootSnap->localPosition);
+
+            obj->mainPosition.transform.translate = {
+                ownerTranslate.x + elbowOffset.x,
+                ownerTranslate.y + elbowOffset.y,
+                ownerTranslate.z + elbowOffset.z};
+          } else {
+            obj->mainPosition.transform.translate = ownerTranslate;
+          }
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+
+          Logger::Log("==== EXTRA RIGHT FOREARM DEBUG ====");
+          Logger::Log("partId : %d", instance.partId);
+          Logger::Log("ownerId : %d", ownerPartId);
+          Logger::Log("parentId : %d", instance.parentId);
+          Logger::Log("bendPos : %.3f %.3f %.3f", bendSnap->localPosition.x,
+                      bendSnap->localPosition.y, bendSnap->localPosition.z);
+          Logger::Log("endPos : %.3f %.3f %.3f", endSnap->localPosition.x,
+                      endSnap->localPosition.y, endSnap->localPosition.z);
+          Logger::Log("length : %.3f", armLength);
+          Logger::Log("bendRadius : %.3f", bendRadius);
+          Logger::Log("endRadius : %.3f", endRadius);
+          Logger::Log("finalScale : %.3f %.3f %.3f", mesh.scale.x, mesh.scale.y,
+                      mesh.scale.z);
+          Logger::Log("rootTranslate : %.3f %.3f %.3f",
+                      obj->mainPosition.transform.translate.x,
+                      obj->mainPosition.transform.translate.y,
+                      obj->mainPosition.transform.translate.z);
+          Logger::Log("angleZ : %.3f", armAngleZ);
+        }
+      } else if (instance.partType == ModBodyPart::LeftForeArm) {
+
+        int ownerPartId = instance.partId;
+
+        // 左前腕の control owner は親の左上腕
+        if (instance.parentId >= 0) {
+          ownerPartId = instance.parentId;
+        }
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+          Logger::Log("EXTRA LEFT FOREARM FAILED : partId=%d ownerId=%d",
+                      instance.partId, ownerPartId);
+
+        } else {
+          //================================
+          // 長さ
+          //================================
+          Vector3 armVector =
+              Sub(endSnap->localPosition, bendSnap->localPosition);
+          float armLength = Length(armVector);
+
+          if (armLength < 0.0001f) {
+            armLength = 0.0001f;
+            armVector = {0.0f, -1.0f, 0.0f};
+          }
+
+          Vector3 armDir = Normalize(armVector);
+          float armAngleZ = atan2(armDir.x, -armDir.y);
+
+          //================================
+          // 太さ
+          // fixed の LeftForeArm と同じ考え方に揃える
+          //================================
+          float bendRadius = bendSnap->radius;
+          float endRadius = endSnap->radius;
+
+          const auto &leftForeArmParam =
+              modBodies_[ToIndex(ModBodyPart::LeftForeArm)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float leftForeArmThicknessScale =
+              (std::max)(bendRadius, endRadius) / baseRadius;
+
+          mesh.scale.x = leftForeArmThicknessScale * leftForeArmParam.scale.x;
+          mesh.scale.y =
+              armLength * leftForeArmParam.scale.y * leftForeArmParam.length;
+          mesh.scale.z = leftForeArmThicknessScale * leftForeArmParam.scale.z;
+
+          mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
+
+          // 左前腕の root は肘位置
+          Vector3 ownerTranslate = {0.0f, 0.0f, 0.0f};
+
+          for (const auto &ownerInstance : customizeData_->partInstances) {
+            if (ownerInstance.partId == ownerPartId) {
+              ownerTranslate = ownerInstance.localTransform.translate;
+              break;
+            }
+          }
+
+          const ModControlPointSnapshot *rootSnap = nullptr;
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+              break;
+            }
+          }
+
+          if (rootSnap != nullptr) {
+            Vector3 elbowOffset =
+                Sub(bendSnap->localPosition, rootSnap->localPosition);
+
+            obj->mainPosition.transform.translate = {
+                ownerTranslate.x + elbowOffset.x,
+                ownerTranslate.y + elbowOffset.y,
+                ownerTranslate.z + elbowOffset.z};
+          } else {
+            obj->mainPosition.transform.translate = ownerTranslate;
+          }
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::LeftThigh) {
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == instance.partId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+        } else {
+          const ModControlPointSnapshot *rootSnap = nullptr;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendSnap = snap;
+            }
+          }
+
+          Vector3 legVector = {0.0f, -1.0f, 0.0f};
+          float legLength = 0.0001f;
+          float legAngleZ = 0.0f;
+
+          if (rootSnap != nullptr && bendSnap != nullptr) {
+            legVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
+            legLength = Length(legVector);
+
+            if (legLength < 0.0001f) {
+              legLength = 0.0001f;
+              legVector = {0.0f, -1.0f, 0.0f};
+            }
+
+            Vector3 legDir = Normalize(legVector);
+            legAngleZ = atan2(legDir.x, -legDir.y);
+
+            obj->mainPosition.transform.translate =
+                instance.localTransform.translate;
+          } else {
+            mesh.scale = baseScale;
+            mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+          }
+
+          float startRadius = 0.1f;
+          float bendRadius = 0.1f;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              startRadius = snap->radius;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendRadius = snap->radius;
+            }
+          }
+
+          const auto &leftThighParam =
+              modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float leftThighThicknessScale =
+              (std::max)(startRadius, bendRadius) / baseRadius;
+
+          mesh.scale.x = leftThighThicknessScale * leftThighParam.scale.x;
+          mesh.scale.y =
+              legLength * leftThighParam.scale.y * leftThighParam.length;
+          mesh.scale.z = leftThighThicknessScale * leftThighParam.scale.z;
+
+          mesh.translate = {0.0f, -legLength * 0.5f, 0.0f};
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, legAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::LeftShin) {
+
+        int ownerPartId = instance.partId;
+
+        // 左すねの control owner は親の左腿
+        if (instance.parentId >= 0) {
+          ownerPartId = instance.parentId;
+        }
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+          Logger::Log("EXTRA LEFT SHIN FAILED : partId=%d ownerId=%d",
+                      instance.partId, ownerPartId);
+
+        } else {
+          Vector3 legVector =
+              Sub(endSnap->localPosition, bendSnap->localPosition);
+          float legLength = Length(legVector);
+
+          if (legLength < 0.0001f) {
+            legLength = 0.0001f;
+            legVector = {0.0f, -1.0f, 0.0f};
+          }
+
+          Vector3 legDir = Normalize(legVector);
+          float legAngleZ = atan2(legDir.x, -legDir.y);
+
+          float bendRadius = bendSnap->radius;
+          float endRadius = endSnap->radius;
+
+          const auto &leftShinParam =
+              modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float leftShinThicknessScale =
+              (std::max)(bendRadius, endRadius) / baseRadius;
+
+          mesh.scale.x = leftShinThicknessScale * leftShinParam.scale.x;
+          mesh.scale.y =
+              legLength * leftShinParam.scale.y * leftShinParam.length;
+          mesh.scale.z = leftShinThicknessScale * leftShinParam.scale.z;
+
+          mesh.translate = {0.0f, -legLength * 0.5f, 0.0f};
+
+          Vector3 ownerTranslate = {0.0f, 0.0f, 0.0f};
+
+          for (const auto &ownerInstance : customizeData_->partInstances) {
+            if (ownerInstance.partId == ownerPartId) {
+              ownerTranslate = ownerInstance.localTransform.translate;
+              break;
+            }
+          }
+
+          const ModControlPointSnapshot *rootSnap = nullptr;
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+              break;
+            }
+          }
+
+          if (rootSnap != nullptr) {
+            Vector3 kneeOffset =
+                Sub(bendSnap->localPosition, rootSnap->localPosition);
+
+            obj->mainPosition.transform.translate = {
+                ownerTranslate.x + kneeOffset.x,
+                ownerTranslate.y + kneeOffset.y,
+                ownerTranslate.z + kneeOffset.z};
+          } else {
+            obj->mainPosition.transform.translate = ownerTranslate;
+          }
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, legAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::RightThigh) {
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == instance.partId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+        } else {
+          const ModControlPointSnapshot *rootSnap = nullptr;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendSnap = snap;
+            }
+          }
+
+          Vector3 legVector = {0.0f, -1.0f, 0.0f};
+          float legLength = 0.0001f;
+          float legAngleZ = 0.0f;
+
+          if (rootSnap != nullptr && bendSnap != nullptr) {
+            legVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
+            legLength = Length(legVector);
+
+            if (legLength < 0.0001f) {
+              legLength = 0.0001f;
+              legVector = {0.0f, -1.0f, 0.0f};
+            }
+
+            Vector3 legDir = Normalize(legVector);
+            legAngleZ = atan2(legDir.x, -legDir.y);
+
+            obj->mainPosition.transform.translate =
+                instance.localTransform.translate;
+          } else {
+            mesh.scale = baseScale;
+            mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+          }
+
+          float startRadius = 0.1f;
+          float bendRadius = 0.1f;
+
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              startRadius = snap->radius;
+            }
+            if (snap->role == ModControlPointRole::Bend) {
+              bendRadius = snap->radius;
+            }
+          }
+
+          const auto &rightThighParam =
+              modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float rightThighThicknessScale =
+              (std::max)(startRadius, bendRadius) / baseRadius;
+
+          mesh.scale.x = rightThighThicknessScale * rightThighParam.scale.x;
+          mesh.scale.y =
+              legLength * rightThighParam.scale.y * rightThighParam.length;
+          mesh.scale.z = rightThighThicknessScale * rightThighParam.scale.z;
+
+          mesh.translate = {0.0f, -legLength * 0.5f, 0.0f};
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, legAngleZ};
+        }
+      } else if (instance.partType == ModBodyPart::RightShin) {
+
+        int ownerPartId = instance.partId;
+
+        // 右すねの control owner は親の右腿
+        if (instance.parentId >= 0) {
+          ownerPartId = instance.parentId;
+        }
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *bendSnap = nullptr;
+        const ModControlPointSnapshot *endSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::Bend) {
+            bendSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::End) {
+            endSnap = snap;
+          }
+        }
+
+        if (bendSnap == nullptr || endSnap == nullptr) {
+
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+
+          Logger::Log("EXTRA RIGHT SHIN FAILED : partId=%d ownerId=%d",
+                      instance.partId, ownerPartId);
+
+        } else {
+          Vector3 legVector =
+              Sub(endSnap->localPosition, bendSnap->localPosition);
+          float legLength = Length(legVector);
+
+          if (legLength < 0.0001f) {
+            legLength = 0.0001f;
+            legVector = {0.0f, -1.0f, 0.0f};
+          }
+
+          Vector3 legDir = Normalize(legVector);
+          float legAngleZ = atan2(legDir.x, -legDir.y);
+
+          float bendRadius = bendSnap->radius;
+          float endRadius = endSnap->radius;
+
+          const auto &rightShinParam =
+              modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float rightShinThicknessScale =
+              (std::max)(bendRadius, endRadius) / baseRadius;
+
+          mesh.scale.x = rightShinThicknessScale * rightShinParam.scale.x;
+          mesh.scale.y =
+              legLength * rightShinParam.scale.y * rightShinParam.length;
+          mesh.scale.z = rightShinThicknessScale * rightShinParam.scale.z;
+
+          mesh.translate = {0.0f, -legLength * 0.5f, 0.0f};
+
+          Vector3 ownerTranslate = {0.0f, 0.0f, 0.0f};
+
+          for (const auto &ownerInstance : customizeData_->partInstances) {
+            if (ownerInstance.partId == ownerPartId) {
+              ownerTranslate = ownerInstance.localTransform.translate;
+              break;
+            }
+          }
+
+          const ModControlPointSnapshot *rootSnap = nullptr;
+          for (const auto *snap : snaps) {
+            if (snap->role == ModControlPointRole::Root) {
+              rootSnap = snap;
+              break;
+            }
+          }
+
+          if (rootSnap != nullptr) {
+            Vector3 kneeOffset =
+                Sub(bendSnap->localPosition, rootSnap->localPosition);
+
+            obj->mainPosition.transform.translate = {
+                ownerTranslate.x + kneeOffset.x,
+                ownerTranslate.y + kneeOffset.y,
+                ownerTranslate.z + kneeOffset.z};
+          } else {
+            obj->mainPosition.transform.translate = ownerTranslate;
+          }
+
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, legAngleZ};
+        }
+      }
+      if (instance.partType == ModBodyPart::Neck) {
+
+        int ownerPartId = -1;
+
+        for (const auto &childInstance : customizeData_->partInstances) {
+          if (childInstance.parentId == instance.partId &&
+              childInstance.partType == ModBodyPart::Head) {
+            ownerPartId = childInstance.partId;
+            break;
+          }
+        }
+
+        std::vector<const ModControlPointSnapshot *> snaps;
+        snaps.reserve(customizeData_->controlPointSnapshots.size());
+
+        for (const auto &snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId) {
+            snaps.push_back(&snap);
+          }
+        }
+
+        const ModControlPointSnapshot *lowerSnap = nullptr;
+        const ModControlPointSnapshot *upperSnap = nullptr;
+
+        for (const auto *snap : snaps) {
+          if (snap->role == ModControlPointRole::LowerNeck) {
+            lowerSnap = snap;
+          }
+          if (snap->role == ModControlPointRole::UpperNeck) {
+            upperSnap = snap;
+          }
+        }
+
+        if (lowerSnap == nullptr || upperSnap == nullptr) {
+          mesh.scale = baseScale;
+          mesh.translate = {0.0f, -baseScale.y * 0.5f, 0.0f};
+        } else {
+          Vector3 neckVector =
+              Sub(upperSnap->localPosition, lowerSnap->localPosition);
+          float neckLength = Length(neckVector);
+
+          if (neckLength < 0.0001f) {
+            neckLength = 0.0001f;
+            neckVector = {0.0f, -1.0f, 0.0f};
+          }
+
+          Vector3 neckDir = Normalize(neckVector);
+          float neckAngleZ = atan2(neckDir.x, -neckDir.y);
+
+          float lowerRadius = lowerSnap->radius;
+          float upperRadius = upperSnap->radius;
+
+          const auto &neckParam =
+              modBodies_[ToIndex(ModBodyPart::Neck)].GetParam();
+
+          const float baseRadius = 0.1f;
+          const float neckThicknessScale =
+              (std::max)(lowerRadius, upperRadius) / baseRadius;
+
+          mesh.scale.x = neckThicknessScale * neckParam.scale.x;
+          mesh.scale.y = neckLength * neckParam.scale.y * neckParam.length;
+          mesh.scale.z = neckThicknessScale * neckParam.scale.z;
+
+          mesh.translate = {0.0f, -neckLength * 0.5f, 0.0f};
+
+          obj->mainPosition.transform.translate =
+              instance.localTransform.translate;
+          obj->mainPosition.transform.rotate = {0.0f, 0.0f, neckAngleZ};
+        }
       }
     }
 
-    // 親設定
-    auto it = fixedPartIdToPart_.find(instance.parentId);
-    if (it != fixedPartIdToPart_.end()) {
-      obj->followObject_ = it->second;
-    }
+    builtPartIdToPart[instance.partId] = &obj->mainPosition;
 
     extraObjects_.push_back(obj);
   }
 }
 
 void TravelScene::UpdateExtraVisualParts() {
-  static bool logged = false;
+  Object *fixedHead = modObjects_[ToIndex(ModBodyPart::Head)];
+  Object *fixedNeck = modObjects_[ToIndex(ModBodyPart::Neck)];
+  Object *fixedLeftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object *fixedLeftForeArm = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
+  Object *fixedRightUpperArm = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object *fixedRightForeArm = modObjects_[ToIndex(ModBodyPart::RightForeArm)];
+  Object *fixedLeftThigh = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object *fixedLeftShin = modObjects_[ToIndex(ModBodyPart::LeftShin)];
+  Object *fixedRightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object *fixedRightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
   for (auto *obj : extraObjects_) {
     if (obj == nullptr) {
       continue;
     }
 
-    if (!logged) {
-
-      logged = true;
-    }
-
-    Object *fixedHead = modObjects_[ToIndex(ModBodyPart::Head)];
-
-    if (fixedHead != nullptr) {
+    if (fixedHead != nullptr &&
+        obj->followObject_ == &fixedHead->mainPosition) {
       obj->mainPosition.transform.rotate =
           fixedHead->mainPosition.transform.rotate;
 
       if (!obj->objectParts_.empty() && !fixedHead->objectParts_.empty()) {
         obj->objectParts_[0].transform.rotate =
             fixedHead->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedLeftUpperArm != nullptr &&
+               obj->followObject_ == &fixedLeftUpperArm->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedLeftUpperArm->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() &&
+          !fixedLeftUpperArm->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedLeftUpperArm->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedLeftForeArm != nullptr &&
+               obj->followObject_ == &fixedLeftForeArm->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedLeftForeArm->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() &&
+          !fixedLeftForeArm->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedLeftForeArm->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedRightUpperArm != nullptr &&
+               obj->followObject_ == &fixedRightUpperArm->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedRightUpperArm->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() &&
+          !fixedRightUpperArm->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedRightUpperArm->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedRightForeArm != nullptr &&
+               obj->followObject_ == &fixedRightForeArm->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedRightForeArm->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() &&
+          !fixedRightForeArm->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedRightForeArm->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedLeftThigh != nullptr &&
+               obj->followObject_ == &fixedLeftThigh->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedLeftThigh->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() && !fixedLeftThigh->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedLeftThigh->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedLeftShin != nullptr &&
+               obj->followObject_ == &fixedLeftShin->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedLeftShin->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() && !fixedLeftShin->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedLeftShin->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedRightThigh != nullptr &&
+               obj->followObject_ == &fixedRightThigh->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedRightThigh->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() &&
+          !fixedRightThigh->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedRightThigh->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedRightShin != nullptr &&
+               obj->followObject_ == &fixedRightShin->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedRightShin->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() && !fixedRightShin->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedRightShin->objectParts_[0].transform.rotate;
+      }
+    } else if (fixedNeck != nullptr &&
+               obj->followObject_ == &fixedNeck->mainPosition) {
+      obj->mainPosition.transform.rotate =
+          fixedNeck->mainPosition.transform.rotate;
+
+      if (!obj->objectParts_.empty() && !fixedNeck->objectParts_.empty()) {
+        obj->objectParts_[0].transform.rotate =
+            fixedNeck->objectParts_[0].transform.rotate;
       }
     }
 
@@ -1943,16 +3117,33 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   //     bodyNeckConnector.y + neckDir.y * neckLength,
   //     bodyNeckConnector.z + neckDir.z * neckLength};
 
-  Vector3 headTopOffset = Sub(cp->headCenterPos, cp->upperNeckPos);
-  Vector3 headMidOffset = {headTopOffset.x * 0.5f, headTopOffset.y * 0.5f,
-                           headTopOffset.z * 0.5f};
+  // Vector3 headTopOffset = Sub(cp->headCenterPos, cp->upperNeckPos);
+  // Vector3 headMidOffset = {headTopOffset.x * 0.5f, headTopOffset.y * 0.5f,
+  //                          headTopOffset.z * 0.5f};
 
-  head->mainPosition.transform.translate = {
-      neckDir.x * neckLength + headMidOffset.x,
-      neckDir.y * neckLength + headMidOffset.y,
-      neckDir.z * neckLength + headMidOffset.z};
+  // head->mainPosition.transform.translate = {
+  //     neckDir.x * neckLength + headMidOffset.x,
+  //     neckDir.y * neckLength + headMidOffset.y,
+  //     neckDir.z * neckLength + headMidOffset.z};
 
-  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  // head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  // 頭
+  // Head は UpperNeck -> HeadCenter の区間で作る
+  Vector3 headVector = Sub(cp->headCenterPos, cp->upperNeckPos);
+  float headLength = Length(headVector);
+
+  if (headLength < 0.0001f) {
+    headLength = 0.0001f;
+    headVector = {0.0f, 1.0f, 0.0f};
+  }
+
+  Vector3 headDir = Normalize(headVector);
+  float headAngleZ = atan2(headDir.x, -headDir.y);
+
+  // root は UpperNeck
+  head->mainPosition.transform.translate = cp->upperNeckPos;
+  head->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
 
   // 左前腕
   Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
@@ -2190,7 +3381,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos)) * 2.0f;
 
+  if (headHeight < 0.0001f) {
+    headHeight = 0.0001f;
+  }
+
   if (!head->objectParts_.empty()) {
+    head->objectParts_[0].transform.translate = {0.0f, -headHeight * 0.5f,
+                                                 0.0f};
+
     head->objectParts_[0].transform.scale.x =
         headThicknessScale * headParam.scale.x;
     head->objectParts_[0].transform.scale.y =

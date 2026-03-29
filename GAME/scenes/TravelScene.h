@@ -276,6 +276,8 @@ private:
   std::vector<int> extraParentIds_;
   std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
 
+  std::vector<ModControlPointSnapshot> controlPointSnapshots_;
+
 private:
   /// <summary>
   /// 使用するカメラを設定・更新する

@@ -873,6 +873,12 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.localTransform = node->localTransform;
     instance.param = modBodies_[id].GetParam();
 
+    Logger::Log("SAVE PARAM CHECK : id=%d partType=%d length=%.3f scale=(%.3f, "
+                "%.3f, %.3f)",
+                id, static_cast<int>(instance.partType), instance.param.length,
+                instance.param.scale.x, instance.param.scale.y,
+                instance.param.scale.z);
+
     // 新方式ではインスタンス単位で count は常に 1
     instance.param.count = 1;
 
@@ -956,6 +962,23 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 
         const std::vector<ModControlPoint>& points =
             modBodies_.at(id).GetControlPoints();
+
+        Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
+                    static_cast<int>(node->part),
+                    static_cast<int>(points.size()));
+
+        if (id == 13) {
+          for (size_t pointIndex = 0; pointIndex < points.size();
+               ++pointIndex) {
+            Logger::Log(
+                "  point[%d] role=%d pos=(%.3f, %.3f, %.3f) radius=%.3f",
+                static_cast<int>(pointIndex),
+                static_cast<int>(points[pointIndex].role),
+                points[pointIndex].localPosition.x,
+                points[pointIndex].localPosition.y,
+                points[pointIndex].localPosition.z, points[pointIndex].radius);
+          }
+        }
 
         for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
             const ModControlPoint& point = points[pointIndex];
