@@ -267,197 +267,197 @@ float GetWheelScaleFactorFromDelta(int wheelDelta) {
   return 1.0f;
 }
 
-bool GetPickSegmentRoles(ModBodyPart part, ModControlPointRole& startRole,
-    ModControlPointRole& endRole) {
-    switch (part) {
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-        startRole = ModControlPointRole::Root;
-        endRole = ModControlPointRole::Bend;
-        return true;
+bool GetPickSegmentRoles(ModBodyPart part, ModControlPointRole &startRole,
+                         ModControlPointRole &endRole) {
+  switch (part) {
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+    startRole = ModControlPointRole::Root;
+    endRole = ModControlPointRole::Bend;
+    return true;
 
-    case ModBodyPart::LeftForeArm:
-    case ModBodyPart::RightForeArm:
-    case ModBodyPart::LeftShin:
-    case ModBodyPart::RightShin:
-        startRole = ModControlPointRole::Bend;
-        endRole = ModControlPointRole::End;
-        return true;
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    startRole = ModControlPointRole::Bend;
+    endRole = ModControlPointRole::End;
+    return true;
 
-    case ModBodyPart::ChestBody:
-        startRole = ModControlPointRole::Chest;
-        endRole = ModControlPointRole::Belly;
-        return true;
+  case ModBodyPart::ChestBody:
+    startRole = ModControlPointRole::Chest;
+    endRole = ModControlPointRole::Belly;
+    return true;
 
-    case ModBodyPart::StomachBody:
-        startRole = ModControlPointRole::Belly;
-        endRole = ModControlPointRole::Waist;
-        return true;
+  case ModBodyPart::StomachBody:
+    startRole = ModControlPointRole::Belly;
+    endRole = ModControlPointRole::Waist;
+    return true;
 
-    case ModBodyPart::Neck:
-        startRole = ModControlPointRole::LowerNeck;
-        endRole = ModControlPointRole::UpperNeck;
-        return true;
+  case ModBodyPart::Neck:
+    startRole = ModControlPointRole::LowerNeck;
+    endRole = ModControlPointRole::UpperNeck;
+    return true;
 
-    case ModBodyPart::Head:
-        startRole = ModControlPointRole::UpperNeck;
-        endRole = ModControlPointRole::HeadCenter;
-        return true;
+  case ModBodyPart::Head:
+    startRole = ModControlPointRole::UpperNeck;
+    endRole = ModControlPointRole::HeadCenter;
+    return true;
 
-    default:
-        return false;
-    }
+  default:
+    return false;
+  }
 }
 
-float DistancePointToSegmentSq(const Vector3& point, const Vector3& a,
-    const Vector3& b) {
-    const Vector3 ab = Subtract(b, a);
-    const Vector3 ap = Subtract(point, a);
+float DistancePointToSegmentSq(const Vector3 &point, const Vector3 &a,
+                               const Vector3 &b) {
+  const Vector3 ab = Subtract(b, a);
+  const Vector3 ap = Subtract(point, a);
 
-    const float abLenSq = Dot(ab, ab);
-    if (abLenSq <= 0.000001f) {
-        const Vector3 diff = Subtract(point, a);
-        return Dot(diff, diff);
-    }
-
-    float t = Dot(ap, ab) / abLenSq;
-    t = ClampFloatLocal(t, 0.0f, 1.0f);
-
-    const Vector3 closest = Add(a, Multiply(t, ab));
-    const Vector3 diff = Subtract(point, closest);
+  const float abLenSq = Dot(ab, ab);
+  if (abLenSq <= 0.000001f) {
+    const Vector3 diff = Subtract(point, a);
     return Dot(diff, diff);
+  }
+
+  float t = Dot(ap, ab) / abLenSq;
+  t = ClampFloatLocal(t, 0.0f, 1.0f);
+
+  const Vector3 closest = Add(a, Multiply(t, ab));
+  const Vector3 diff = Subtract(point, closest);
+  return Dot(diff, diff);
 }
 
-bool IntersectRaySphereLocal(const Ray& ray, const Vector3& center, float radius,
-    float* outT) {
-    const Vector3 m = Subtract(ray.origin, center);
-    const float a = Dot(ray.direction, ray.direction);
-    const float b = Dot(m, ray.direction);
-    const float c = Dot(m, m) - radius * radius;
+bool IntersectRaySphereLocal(const Ray &ray, const Vector3 &center,
+                             float radius, float *outT) {
+  const Vector3 m = Subtract(ray.origin, center);
+  const float a = Dot(ray.direction, ray.direction);
+  const float b = Dot(m, ray.direction);
+  const float c = Dot(m, m) - radius * radius;
 
-    if (c <= 0.0f) {
-        if (outT != nullptr) {
-            *outT = 0.0f;
-        }
-        return true;
+  if (c <= 0.0f) {
+    if (outT != nullptr) {
+      *outT = 0.0f;
     }
+    return true;
+  }
 
-    if (a <= 0.000001f) {
-        return false;
-    }
+  if (a <= 0.000001f) {
+    return false;
+  }
 
-    const float discriminant = b * b - a * c;
-    if (discriminant < 0.0f) {
-        return false;
-    }
+  const float discriminant = b * b - a * c;
+  if (discriminant < 0.0f) {
+    return false;
+  }
 
-    float t = (-b - sqrtf(discriminant)) / a;
+  float t = (-b - sqrtf(discriminant)) / a;
+  if (t < 0.0f) {
+    t = (-b + sqrtf(discriminant)) / a;
     if (t < 0.0f) {
-        t = (-b + sqrtf(discriminant)) / a;
-        if (t < 0.0f) {
-            return false;
-        }
+      return false;
     }
+  }
 
-    if (outT != nullptr) {
-        *outT = t;
-    }
-    return true;
+  if (outT != nullptr) {
+    *outT = t;
+  }
+  return true;
 }
 
-bool IntersectRayCapsule(const Ray& ray, const Vector3& capsuleStart,
-    const Vector3& capsuleEnd, float capsuleRadius,
-    float* outT) {
-    const float epsilon = 0.0001f;
-    const float rayDirLenSq = Dot(ray.direction, ray.direction);
-    if (rayDirLenSq <= epsilon) {
-        return false;
-    }
+bool IntersectRayCapsule(const Ray &ray, const Vector3 &capsuleStart,
+                         const Vector3 &capsuleEnd, float capsuleRadius,
+                         float *outT) {
+  const float epsilon = 0.0001f;
+  const float rayDirLenSq = Dot(ray.direction, ray.direction);
+  if (rayDirLenSq <= epsilon) {
+    return false;
+  }
 
-    const Vector3 d = Subtract(capsuleEnd, capsuleStart);
-    const float segLenSq = Dot(d, d);
+  const Vector3 d = Subtract(capsuleEnd, capsuleStart);
+  const float segLenSq = Dot(d, d);
 
-    if (segLenSq <= epsilon) {
-        return IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, outT);
-    }
+  if (segLenSq <= epsilon) {
+    return IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, outT);
+  }
 
-    const Vector3 m = Subtract(ray.origin, capsuleStart);
-    const Vector3 n = ray.direction;
+  const Vector3 m = Subtract(ray.origin, capsuleStart);
+  const Vector3 n = ray.direction;
 
-    const float md = Dot(m, d);
-    const float nd = Dot(n, d);
-    const float dd = segLenSq;
-    const float mn = Dot(m, n);
-    const float nn = Dot(n, n);
+  const float md = Dot(m, d);
+  const float nd = Dot(n, d);
+  const float dd = segLenSq;
+  const float mn = Dot(m, n);
+  const float nn = Dot(n, n);
 
-    const float a = dd * nn - nd * nd;
-    const float k = Dot(m, m) - capsuleRadius * capsuleRadius;
-    const float c = dd * k - md * md;
+  const float a = dd * nn - nd * nd;
+  const float k = Dot(m, m) - capsuleRadius * capsuleRadius;
+  const float c = dd * k - md * md;
 
-    float bestT = FLT_MAX;
-    bool hit = false;
+  float bestT = FLT_MAX;
+  bool hit = false;
 
-    if (fabsf(a) > epsilon) {
-        const float b = dd * mn - nd * md;
-        const float discriminant = b * b - a * c;
+  if (fabsf(a) > epsilon) {
+    const float b = dd * mn - nd * md;
+    const float discriminant = b * b - a * c;
 
-        if (discriminant >= 0.0f) {
-            const float sqrtDiscriminant = sqrtf(discriminant);
+    if (discriminant >= 0.0f) {
+      const float sqrtDiscriminant = sqrtf(discriminant);
 
-            float t0 = (-b - sqrtDiscriminant) / a;
-            float t1 = (-b + sqrtDiscriminant) / a;
+      float t0 = (-b - sqrtDiscriminant) / a;
+      float t1 = (-b + sqrtDiscriminant) / a;
 
-            if (t0 > t1) {
-                const float temp = t0;
-                t0 = t1;
-                t1 = temp;
+      if (t0 > t1) {
+        const float temp = t0;
+        t0 = t1;
+        t1 = temp;
+      }
+
+      if (t1 >= 0.0f) {
+        if (t0 < 0.0f) {
+          t0 = 0.0f;
+        }
+
+        const float candidates[2] = {t0, t1};
+        for (int i = 0; i < 2; ++i) {
+          const float t = candidates[i];
+          const float s = md + t * nd;
+          if (s >= 0.0f && s <= dd) {
+            if (t < bestT) {
+              bestT = t;
+              hit = true;
             }
-
-            if (t1 >= 0.0f) {
-                if (t0 < 0.0f) {
-                    t0 = 0.0f;
-                }
-
-                const float candidates[2] = { t0, t1 };
-                for (int i = 0; i < 2; ++i) {
-                    const float t = candidates[i];
-                    const float s = md + t * nd;
-                    if (s >= 0.0f && s <= dd) {
-                        if (t < bestT) {
-                            bestT = t;
-                            hit = true;
-                        }
-                    }
-                }
-            }
+          }
         }
+      }
     }
+  }
 
-    float sphereT = 0.0f;
-    if (IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, &sphereT)) {
-        if (sphereT < bestT) {
-            bestT = sphereT;
-            hit = true;
-        }
+  float sphereT = 0.0f;
+  if (IntersectRaySphereLocal(ray, capsuleStart, capsuleRadius, &sphereT)) {
+    if (sphereT < bestT) {
+      bestT = sphereT;
+      hit = true;
     }
+  }
 
-    if (IntersectRaySphereLocal(ray, capsuleEnd, capsuleRadius, &sphereT)) {
-        if (sphereT < bestT) {
-            bestT = sphereT;
-            hit = true;
-        }
+  if (IntersectRaySphereLocal(ray, capsuleEnd, capsuleRadius, &sphereT)) {
+    if (sphereT < bestT) {
+      bestT = sphereT;
+      hit = true;
     }
+  }
 
-    if (!hit) {
-        return false;
-    }
+  if (!hit) {
+    return false;
+  }
 
-    if (outT != nullptr) {
-        *outT = bestT;
-    }
-    return true;
+  if (outT != nullptr) {
+    *outT = bestT;
+  }
+  return true;
 }
 
 } // namespace
@@ -871,49 +871,49 @@ void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
 }
 
 void ModScene::ApplyAssemblyToSceneHierarchy() {
-    for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
-        modObjects_.begin();
-        it != modObjects_.end(); ++it) {
-        Object* object = it->second.get();
-        if (object == nullptr) {
-            continue;
-        }
-
-        object->followObject_ = nullptr;
-        object->mainPosition.parentPart = nullptr;
+  for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
+           modObjects_.begin();
+       it != modObjects_.end(); ++it) {
+    Object *object = it->second.get();
+    if (object == nullptr) {
+      continue;
     }
 
-    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-        const int id = orderedPartIds_[i];
+    object->followObject_ = nullptr;
+    object->mainPosition.parentPart = nullptr;
+  }
 
-        const PartNode* node = assembly_.FindNode(id);
-        if (node == nullptr || modObjects_.count(id) == 0) {
-            continue;
-        }
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
 
-        Object* object = modObjects_[id].get();
-        if (object == nullptr) {
-            continue;
-        }
-
-        Vector3 localTranslate = node->localTransform.translate;
-        const Vector3 localRotate = { 0.0f, 0.0f, 0.0f };
-
-        if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
-            Object* parentObject = modObjects_[node->parentId].get();
-            if (parentObject != nullptr) {
-                object->followObject_ = &parentObject->mainPosition;
-                object->mainPosition.parentPart = &parentObject->mainPosition;
-            }
-
-            // すべての親子接続をここで統一的に解決する
-            localTranslate = ResolveAttachedLocalTranslate(*node);
-        }
-
-        object->mainPosition.transform.translate = localTranslate;
-        object->mainPosition.transform.rotate = localRotate;
-        object->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr || modObjects_.count(id) == 0) {
+      continue;
     }
+
+    Object *object = modObjects_[id].get();
+    if (object == nullptr) {
+      continue;
+    }
+
+    Vector3 localTranslate = node->localTransform.translate;
+    const Vector3 localRotate = {0.0f, 0.0f, 0.0f};
+
+    if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
+      Object *parentObject = modObjects_[node->parentId].get();
+      if (parentObject != nullptr) {
+        object->followObject_ = &parentObject->mainPosition;
+        object->mainPosition.parentPart = &parentObject->mainPosition;
+      }
+
+      // すべての親子接続をここで統一的に解決する
+      localTranslate = ResolveAttachedLocalTranslate(*node);
+    }
+
+    object->mainPosition.transform.translate = localTranslate;
+    object->mainPosition.transform.rotate = localRotate;
+    object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  }
 }
 
 void ModScene::LoadCustomizeData() {
@@ -1678,40 +1678,41 @@ void ModScene::ClearControlPointSelection() {
   hoveredPartId_ = -1;
 }
 
-void ModScene::UpdateHoveredPartFromMouseRay(const Ray& mouseRay) {
-    // ドラッグ中は選択部位を優先して表示する
-    if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
-        hoveredPartId_ = selectedPartId_;
-        return;
+void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
+  // ドラッグ中は選択部位を優先して表示する
+  if (isDraggingControlPoint_ && selectedControlPartId_ >= 0) {
+    hoveredPartId_ = selectedPartId_;
+    return;
+  }
+
+  float nearestT = FLT_MAX;
+  int nearestPartId = -1;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int partId = orderedPartIds_[i];
+
+    Vector3 capsuleStart{};
+    Vector3 capsuleEnd{};
+    float capsuleRadius = 0.0f;
+
+    if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd,
+                              capsuleRadius)) {
+      continue;
     }
 
-    float nearestT = FLT_MAX;
-    int nearestPartId = -1;
-
-    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-        const int partId = orderedPartIds_[i];
-
-        Vector3 capsuleStart{};
-        Vector3 capsuleEnd{};
-        float capsuleRadius = 0.0f;
-
-        if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd, capsuleRadius)) {
-            continue;
-        }
-
-        float t = 0.0f;
-        if (!IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
-            &t)) {
-            continue;
-        }
-
-        if (t < nearestT) {
-            nearestT = t;
-            nearestPartId = partId;
-        }
+    float t = 0.0f;
+    if (!IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+                             &t)) {
+      continue;
     }
 
-    hoveredPartId_ = nearestPartId;
+    if (t < nearestT) {
+      nearestT = t;
+      nearestPartId = partId;
+    }
+  }
+
+  hoveredPartId_ = nearestPartId;
 }
 
 void ModScene::EnsureControlPointGizmoCount(size_t requiredCount) {
@@ -1962,232 +1963,233 @@ int ModScene::FindTorsoControlPointIndex(ModControlPointRole role) const {
   return -1;
 }
 
-Vector3 ModScene::ResolveDynamicAttachBase(const PartNode& parentNode,
-    const PartNode& childNode) const {
-    const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
-        parentNode.part, childNode.part, childNode.side);
+Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
+                                           const PartNode &childNode) const {
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode.part, childNode.part, childNode.side);
 
-    // ------------------------------------------------------------
-    // torso 親
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::ChestBody ||
-        parentNode.part == ModBodyPart::StomachBody) {
-        const int chestIndex =
-            FindTorsoControlPointIndex(ModControlPointRole::Chest);
-        const int waistIndex =
-            FindTorsoControlPointIndex(ModControlPointRole::Waist);
+  // ------------------------------------------------------------
+  // torso 親
+  // ------------------------------------------------------------
+  if (parentNode.part == ModBodyPart::ChestBody ||
+      parentNode.part == ModBodyPart::StomachBody) {
+    const int chestIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Chest);
+    const int waistIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Waist);
 
-        const Vector3 defaultChest = { 0.0f, 0.45f, 0.0f };
-        const Vector3 defaultWaist = { 0.0f, -0.45f, 0.0f };
+    const Vector3 defaultChest = {0.0f, 0.45f, 0.0f};
+    const Vector3 defaultWaist = {0.0f, -0.45f, 0.0f};
 
-        const Vector3 currentChest =
-            (chestIndex >= 0)
+    const Vector3 currentChest =
+        (chestIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition
             : defaultChest;
 
-        const Vector3 currentWaist =
-            (waistIndex >= 0)
+    const Vector3 currentWaist =
+        (waistIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
             : defaultWaist;
 
-        const float defaultChestRadius = 0.12f;
-        const float defaultWaistRadius = 0.12f;
+    const float defaultChestRadius = 0.12f;
+    const float defaultWaistRadius = 0.12f;
 
-        const float currentChestRadius =
-            GetTorsoControlPointRadius(ModControlPointRole::Chest,
-                defaultChestRadius);
+    const float currentChestRadius = GetTorsoControlPointRadius(
+        ModControlPointRole::Chest, defaultChestRadius);
 
-        const float currentWaistRadius =
-            GetTorsoControlPointRadius(ModControlPointRole::Waist,
-                defaultWaistRadius);
+    const float currentWaistRadius = GetTorsoControlPointRadius(
+        ModControlPointRole::Waist, defaultWaistRadius);
 
-        const float chestRadiusRatio =
-            currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
+    const float chestRadiusRatio =
+        currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
 
-        const float waistRadiusRatio =
-            currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
+    const float waistRadiusRatio =
+        currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
 
-        switch (childNode.part) {
-        case ModBodyPart::Neck:
-        case ModBodyPart::Head: {
-            const Vector3 relative = Subtract(defaultAttach, defaultChest);
-            const Vector3 scaledRelative = ScaleVectorComponents(
-                relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
-            return Add(currentChest, scaledRelative);
-        }
-
-        case ModBodyPart::LeftUpperArm:
-        case ModBodyPart::RightUpperArm: {
-            const Vector3 relative = Subtract(defaultAttach, defaultChest);
-            const Vector3 scaledRelative = ScaleVectorComponents(
-                relative, { chestRadiusRatio, chestRadiusRatio, chestRadiusRatio });
-            return Add(currentChest, scaledRelative);
-        }
-
-        case ModBodyPart::LeftThigh:
-        case ModBodyPart::RightThigh: {
-            const Vector3 relative = Subtract(defaultAttach, defaultWaist);
-            const Vector3 scaledRelative = ScaleVectorComponents(
-                relative, { waistRadiusRatio, waistRadiusRatio, waistRadiusRatio });
-            return Add(currentWaist, scaledRelative);
-        }
-
-        default:
-            return defaultAttach;
-        }
+    switch (childNode.part) {
+    case ModBodyPart::Neck:
+    case ModBodyPart::Head: {
+      const Vector3 relative = Subtract(defaultAttach, defaultChest);
+      const Vector3 scaledRelative = ScaleVectorComponents(
+          relative, {chestRadiusRatio, chestRadiusRatio, chestRadiusRatio});
+      return Add(currentChest, scaledRelative);
     }
 
-    // ------------------------------------------------------------
-    // UpperArm 親 -> ForeArm 子
-    // Bend 点を基準にする
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::LeftUpperArm ||
-        parentNode.part == ModBodyPart::RightUpperArm) {
-        if (childNode.part == ModBodyPart::LeftForeArm ||
-            childNode.part == ModBodyPart::RightForeArm) {
-            auto it = modBodies_.find(parentNode.id);
-            if (it != modBodies_.end()) {
-                const int bendIndex =
-                    it->second.FindControlPointIndex(ModControlPointRole::Bend);
-                if (bendIndex >= 0) {
-                    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
-                    return points[static_cast<size_t>(bendIndex)].localPosition;
-                }
-            }
-            return defaultAttach;
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm: {
+      const Vector3 relative = Subtract(defaultAttach, defaultChest);
+      const Vector3 scaledRelative = ScaleVectorComponents(
+          relative, {chestRadiusRatio, chestRadiusRatio, chestRadiusRatio});
+      return Add(currentChest, scaledRelative);
+    }
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh: {
+      const Vector3 relative = Subtract(defaultAttach, defaultWaist);
+      const Vector3 scaledRelative = ScaleVectorComponents(
+          relative, {waistRadiusRatio, waistRadiusRatio, waistRadiusRatio});
+      return Add(currentWaist, scaledRelative);
+    }
+
+    default:
+      return defaultAttach;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // UpperArm 親 -> ForeArm 子
+  // Bend 点を基準にする
+  // ------------------------------------------------------------
+  if (parentNode.part == ModBodyPart::LeftUpperArm ||
+      parentNode.part == ModBodyPart::RightUpperArm) {
+    if (childNode.part == ModBodyPart::LeftForeArm ||
+        childNode.part == ModBodyPart::RightForeArm) {
+      auto it = modBodies_.find(parentNode.id);
+      if (it != modBodies_.end()) {
+        const int bendIndex =
+            it->second.FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          const std::vector<ModControlPoint> &points =
+              it->second.GetControlPoints();
+          return points[static_cast<size_t>(bendIndex)].localPosition;
         }
+      }
+      return defaultAttach;
     }
+  }
 
-    // ------------------------------------------------------------
-    // Thigh 親 -> Shin 子
-    // Bend 点を基準にする
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::LeftThigh ||
-        parentNode.part == ModBodyPart::RightThigh) {
-        if (childNode.part == ModBodyPart::LeftShin ||
-            childNode.part == ModBodyPart::RightShin) {
-            auto it = modBodies_.find(parentNode.id);
-            if (it != modBodies_.end()) {
-                const int bendIndex =
-                    it->second.FindControlPointIndex(ModControlPointRole::Bend);
-                if (bendIndex >= 0) {
-                    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
-                    return points[static_cast<size_t>(bendIndex)].localPosition;
-                }
-            }
-            return defaultAttach;
+  // ------------------------------------------------------------
+  // Thigh 親 -> Shin 子
+  // Bend 点を基準にする
+  // ------------------------------------------------------------
+  if (parentNode.part == ModBodyPart::LeftThigh ||
+      parentNode.part == ModBodyPart::RightThigh) {
+    if (childNode.part == ModBodyPart::LeftShin ||
+        childNode.part == ModBodyPart::RightShin) {
+      auto it = modBodies_.find(parentNode.id);
+      if (it != modBodies_.end()) {
+        const int bendIndex =
+            it->second.FindControlPointIndex(ModControlPointRole::Bend);
+        if (bendIndex >= 0) {
+          const std::vector<ModControlPoint> &points =
+              it->second.GetControlPoints();
+          return points[static_cast<size_t>(bendIndex)].localPosition;
         }
+      }
+      return defaultAttach;
     }
+  }
 
-    // ------------------------------------------------------------
-    // Neck 親 -> Head 子
-    // Head の LowerNeck を基準にしつつ、UpperNeck 側の変化も追従させる
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::Neck &&
-        childNode.part == ModBodyPart::Head) {
-        const int headId = childNode.id;
-        auto it = modBodies_.find(headId);
-        if (it != modBodies_.end()) {
-            const int lowerIndex =
-                it->second.FindControlPointIndex(ModControlPointRole::LowerNeck);
-            if (lowerIndex >= 0) {
-                const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
-                return points[static_cast<size_t>(lowerIndex)].localPosition;
-            }
-        }
-        return { 0.0f, 0.0f, 0.0f };
+  // ------------------------------------------------------------
+  // Neck 親 -> Head 子
+  // Head の LowerNeck を基準にしつつ、UpperNeck 側の変化も追従させる
+  // ------------------------------------------------------------
+  if (parentNode.part == ModBodyPart::Neck &&
+      childNode.part == ModBodyPart::Head) {
+    const int headId = childNode.id;
+    auto it = modBodies_.find(headId);
+    if (it != modBodies_.end()) {
+      const int lowerIndex =
+          it->second.FindControlPointIndex(ModControlPointRole::LowerNeck);
+      if (lowerIndex >= 0) {
+        const std::vector<ModControlPoint> &points =
+            it->second.GetControlPoints();
+        return points[static_cast<size_t>(lowerIndex)].localPosition;
+      }
     }
+    return {0.0f, 0.0f, 0.0f};
+  }
 
-    // ------------------------------------------------------------
-    // Head 親
-    // ------------------------------------------------------------
-    if (parentNode.part == ModBodyPart::Head) {
-        const float defaultHeadRadius = 0.11f;
-        const float currentHeadRadius =
-            GetPartControlPointRadius(parentNode.id, ModControlPointRole::HeadCenter,
-                defaultHeadRadius);
+  // ------------------------------------------------------------
+  // Head 親
+  // ------------------------------------------------------------
+  if (parentNode.part == ModBodyPart::Head) {
+    const float defaultHeadRadius = 0.11f;
+    const float currentHeadRadius = GetPartControlPointRadius(
+        parentNode.id, ModControlPointRole::HeadCenter, defaultHeadRadius);
 
-        const float headRadiusRatio =
-            currentHeadRadius / (std::max)(defaultHeadRadius, 0.0001f);
+    const float headRadiusRatio =
+        currentHeadRadius / (std::max)(defaultHeadRadius, 0.0001f);
 
-        return ScaleVectorComponents(defaultAttach,
-            { headRadiusRatio, headRadiusRatio, headRadiusRatio });
-    }
+    return ScaleVectorComponents(
+        defaultAttach, {headRadiusRatio, headRadiusRatio, headRadiusRatio});
+  }
 
-    // ------------------------------------------------------------
-    // その他
-    // ------------------------------------------------------------
-    if (modBodies_.count(parentNode.id) > 0) {
-        const Vector3 parentScale = modBodies_.at(parentNode.id).GetVisualScaleRatio();
-        return ScaleVectorComponents(defaultAttach, parentScale);
-    }
+  // ------------------------------------------------------------
+  // その他
+  // ------------------------------------------------------------
+  if (modBodies_.count(parentNode.id) > 0) {
+    const Vector3 parentScale =
+        modBodies_.at(parentNode.id).GetVisualScaleRatio();
+    return ScaleVectorComponents(defaultAttach, parentScale);
+  }
 
-    return defaultAttach;
+  return defaultAttach;
 }
 
 float ModScene::GetTorsoControlPointRadius(ModControlPointRole role,
-    float defaultRadius) const {
-    const int index = FindTorsoControlPointIndex(role);
-    if (index < 0) {
-        return defaultRadius;
-    }
+                                           float defaultRadius) const {
+  const int index = FindTorsoControlPointIndex(role);
+  if (index < 0) {
+    return defaultRadius;
+  }
 
-    return torsoControlPoints_[static_cast<size_t>(index)].radius;
+  return torsoControlPoints_[static_cast<size_t>(index)].radius;
 }
 
 float ModScene::GetPartControlPointRadius(int partId, ModControlPointRole role,
-    float defaultRadius) const {
-    auto it = modBodies_.find(partId);
-    if (it == modBodies_.end()) {
-        return defaultRadius;
-    }
+                                          float defaultRadius) const {
+  auto it = modBodies_.find(partId);
+  if (it == modBodies_.end()) {
+    return defaultRadius;
+  }
 
-    const int pointIndex = it->second.FindControlPointIndex(role);
-    if (pointIndex < 0) {
-        return defaultRadius;
-    }
+  const int pointIndex = it->second.FindControlPointIndex(role);
+  if (pointIndex < 0) {
+    return defaultRadius;
+  }
 
-    const std::vector<ModControlPoint>& points = it->second.GetControlPoints();
-    if (static_cast<size_t>(pointIndex) >= points.size()) {
-        return defaultRadius;
-    }
+  const std::vector<ModControlPoint> &points = it->second.GetControlPoints();
+  if (static_cast<size_t>(pointIndex) >= points.size()) {
+    return defaultRadius;
+  }
 
-    return points[static_cast<size_t>(pointIndex)].radius;
+  return points[static_cast<size_t>(pointIndex)].radius;
 }
 
-Vector3 ModScene::ScaleVectorComponents(const Vector3& value,
-    const Vector3& scale) const {
-    return {
-        value.x * scale.x,
-        value.y * scale.y,
-        value.z * scale.z,
-    };
+Vector3 ModScene::ScaleVectorComponents(const Vector3 &value,
+                                        const Vector3 &scale) const {
+  return {
+      value.x * scale.x,
+      value.y * scale.y,
+      value.z * scale.z,
+  };
 }
 
 Vector3
-ModScene::ResolveAttachedLocalTranslate(const PartNode& childNode) const {
-    if (childNode.parentId < 0) {
-        return childNode.localTransform.translate;
-    }
+ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
+  if (childNode.parentId < 0) {
+    return childNode.localTransform.translate;
+  }
 
-    const PartNode* parentNode = assembly_.FindNode(childNode.parentId);
-    if (parentNode == nullptr) {
-        return childNode.localTransform.translate;
-    }
+  const PartNode *parentNode = assembly_.FindNode(childNode.parentId);
+  if (parentNode == nullptr) {
+    return childNode.localTransform.translate;
+  }
 
-    const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
-        parentNode->part, childNode.part, childNode.side);
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode->part, childNode.part, childNode.side);
 
-    const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
+  const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
 
-    // 保存してある localTransform.translate はデフォルト接続基準からの編集差分
-    const Vector3 offsetFromDefault =
-        Subtract(childNode.localTransform.translate, defaultAttach);
+  // 保存してある localTransform.translate はデフォルト接続基準からの編集差分
+  const Vector3 offsetFromDefault =
+      Subtract(childNode.localTransform.translate, defaultAttach);
 
-    // 子自身の太さ・長さ増加ぶんだけ、親から外へ押し出す
-    const Vector3 childSelfOffset = ResolveChildSelfAttachOffset(childNode);
+  // 子自身の太さ・長さ増加ぶんだけ、親から外へ押し出す
+  const Vector3 childSelfOffset = ResolveChildSelfAttachOffset(childNode);
 
-    return Add(Add(dynamicBase, offsetFromDefault), childSelfOffset);
+  return Add(Add(dynamicBase, offsetFromDefault), childSelfOffset);
 }
 
 void ModScene::UpdateControlPointWheelScaling() {
@@ -2458,132 +2460,132 @@ bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
   return true;
 }
 
-bool ModScene::BuildPartPickCapsule(int partId, Vector3& outStart,
-    Vector3& outEnd, float& outRadius) const {
-    outStart = { 0.0f, 0.0f, 0.0f };
-    outEnd = { 0.0f, 0.0f, 0.0f };
-    outRadius = 0.0f;
+bool ModScene::BuildPartPickCapsule(int partId, Vector3 &outStart,
+                                    Vector3 &outEnd, float &outRadius) const {
+  outStart = {0.0f, 0.0f, 0.0f};
+  outEnd = {0.0f, 0.0f, 0.0f};
+  outRadius = 0.0f;
 
-    const PartNode* node = assembly_.FindNode(partId);
-    if (node == nullptr) {
-        return false;
-    }
+  const PartNode *node = assembly_.FindNode(partId);
+  if (node == nullptr) {
+    return false;
+  }
 
-    ModControlPointRole startRole = ModControlPointRole::None;
-    ModControlPointRole endRole = ModControlPointRole::None;
-    if (!GetPickSegmentRoles(node->part, startRole, endRole)) {
-        return false;
-    }
+  ModControlPointRole startRole = ModControlPointRole::None;
+  ModControlPointRole endRole = ModControlPointRole::None;
+  if (!GetPickSegmentRoles(node->part, startRole, endRole)) {
+    return false;
+  }
 
-    // torso は共有操作点から取る
-    if (node->part == ModBodyPart::ChestBody ||
-        node->part == ModBodyPart::StomachBody) {
-        const int startIndex = FindTorsoControlPointIndex(startRole);
-        const int endIndex = FindTorsoControlPointIndex(endRole);
+  // torso は共有操作点から取る
+  if (node->part == ModBodyPart::ChestBody ||
+      node->part == ModBodyPart::StomachBody) {
+    const int startIndex = FindTorsoControlPointIndex(startRole);
+    const int endIndex = FindTorsoControlPointIndex(endRole);
 
-        if (startIndex < 0 || endIndex < 0) {
-            return false;
-        }
-
-        outStart = GetTorsoControlPointWorldPosition(startRole);
-        outEnd = GetTorsoControlPointWorldPosition(endRole);
-
-        const float startRadius =
-            torsoControlPoints_[static_cast<size_t>(startIndex)].radius;
-        const float endRadius =
-            torsoControlPoints_[static_cast<size_t>(endIndex)].radius;
-
-        outRadius = (std::max)(startRadius, endRadius) * 1.05f;
-        outRadius = (std::max)(outRadius, 0.06f);
-        return true;
-    }
-
-    // それ以外は owner の操作点から取る
-    const int ownerId = ResolveControlOwnerPartId(assembly_, partId);
-    if (ownerId < 0) {
-        return false;
-    }
-
-    if (modBodies_.count(ownerId) == 0 || modObjects_.count(ownerId) == 0) {
-        return false;
-    }
-
-    const ModBody& body = modBodies_.at(ownerId);
-    const Object* object = modObjects_.at(ownerId).get();
-    if (object == nullptr) {
-        return false;
-    }
-
-    const int startIndex = body.FindControlPointIndex(startRole);
-    const int endIndex = body.FindControlPointIndex(endRole);
     if (startIndex < 0 || endIndex < 0) {
-        return false;
+      return false;
     }
 
-    const std::vector<ModControlPoint>& points = body.GetControlPoints();
+    outStart = GetTorsoControlPointWorldPosition(startRole);
+    outEnd = GetTorsoControlPointWorldPosition(endRole);
 
-    outStart =
-        body.GetControlPointWorldPosition(object, static_cast<size_t>(startIndex));
-    outEnd =
-        body.GetControlPointWorldPosition(object, static_cast<size_t>(endIndex));
-
-    const float startRadius = points[static_cast<size_t>(startIndex)].radius;
-    const float endRadius = points[static_cast<size_t>(endIndex)].radius;
+    const float startRadius =
+        torsoControlPoints_[static_cast<size_t>(startIndex)].radius;
+    const float endRadius =
+        torsoControlPoints_[static_cast<size_t>(endIndex)].radius;
 
     outRadius = (std::max)(startRadius, endRadius) * 1.05f;
-    outRadius = (std::max)(outRadius, 0.05f);
-
+    outRadius = (std::max)(outRadius, 0.06f);
     return true;
+  }
+
+  // それ以外は owner の操作点から取る
+  const int ownerId = ResolveControlOwnerPartId(assembly_, partId);
+  if (ownerId < 0) {
+    return false;
+  }
+
+  if (modBodies_.count(ownerId) == 0 || modObjects_.count(ownerId) == 0) {
+    return false;
+  }
+
+  const ModBody &body = modBodies_.at(ownerId);
+  const Object *object = modObjects_.at(ownerId).get();
+  if (object == nullptr) {
+    return false;
+  }
+
+  const int startIndex = body.FindControlPointIndex(startRole);
+  const int endIndex = body.FindControlPointIndex(endRole);
+  if (startIndex < 0 || endIndex < 0) {
+    return false;
+  }
+
+  const std::vector<ModControlPoint> &points = body.GetControlPoints();
+
+  outStart = body.GetControlPointWorldPosition(object,
+                                               static_cast<size_t>(startIndex));
+  outEnd =
+      body.GetControlPointWorldPosition(object, static_cast<size_t>(endIndex));
+
+  const float startRadius = points[static_cast<size_t>(startIndex)].radius;
+  const float endRadius = points[static_cast<size_t>(endIndex)].radius;
+
+  outRadius = (std::max)(startRadius, endRadius) * 1.05f;
+  outRadius = (std::max)(outRadius, 0.05f);
+
+  return true;
 }
 
-bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray& mouseRay) const {
-    if (selectedControlPointIndex_ < 0) {
-        return false;
+bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
+  if (selectedControlPointIndex_ < 0) {
+    return false;
+  }
+
+  // torso の共有点選択中は torso 全体のどちらかに当たっていれば有効
+  if (selectedControlPartId_ == -2) {
+    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+      const int partId = orderedPartIds_[i];
+      if (!IsTorsoVisiblePartId(partId)) {
+        continue;
+      }
+
+      Vector3 capsuleStart{};
+      Vector3 capsuleEnd{};
+      float capsuleRadius = 0.0f;
+
+      if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd,
+                                capsuleRadius)) {
+        continue;
+      }
+
+      float t = 0.0f;
+      if (IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+                              &t)) {
+        return true;
+      }
     }
 
-    // torso の共有点選択中は torso 全体のどちらかに当たっていれば有効
-    if (selectedControlPartId_ == -2) {
-        for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-            const int partId = orderedPartIds_[i];
-            if (!IsTorsoVisiblePartId(partId)) {
-                continue;
-            }
+    return false;
+  }
 
-            Vector3 capsuleStart{};
-            Vector3 capsuleEnd{};
-            float capsuleRadius = 0.0f;
+  if (selectedPartId_ < 0) {
+    return false;
+  }
 
-            if (!BuildPartPickCapsule(partId, capsuleStart, capsuleEnd,
-                capsuleRadius)) {
-                continue;
-            }
+  Vector3 capsuleStart{};
+  Vector3 capsuleEnd{};
+  float capsuleRadius = 0.0f;
 
-            float t = 0.0f;
-            if (IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
-                &t)) {
-                return true;
-            }
-        }
+  if (!BuildPartPickCapsule(selectedPartId_, capsuleStart, capsuleEnd,
+                            capsuleRadius)) {
+    return false;
+  }
 
-        return false;
-    }
-
-    if (selectedPartId_ < 0) {
-        return false;
-    }
-
-    Vector3 capsuleStart{};
-    Vector3 capsuleEnd{};
-    float capsuleRadius = 0.0f;
-
-    if (!BuildPartPickCapsule(selectedPartId_, capsuleStart, capsuleEnd,
-        capsuleRadius)) {
-        return false;
-    }
-
-    float t = 0.0f;
-    return IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
-        &t);
+  float t = 0.0f;
+  return IntersectRayCapsule(mouseRay, capsuleStart, capsuleEnd, capsuleRadius,
+                             &t);
 }
 
 int ModScene::ResolveFadeGroupId(int partId) const {
@@ -2605,192 +2607,195 @@ int ModScene::ResolveFadeGroupId(int partId) const {
   return ResolveControlOwnerPartId(assembly_, partId);
 }
 
-Vector3 ModScene::ResolveAttachOutwardDirection(const PartNode& childNode) const {
-    switch (childNode.part) {
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::LeftForeArm:
-        return NormalizeSafeV({ -1.0f, 0.0f, 0.0f }, { -1.0f, 0.0f, 0.0f });
+Vector3
+ModScene::ResolveAttachOutwardDirection(const PartNode &childNode) const {
+  switch (childNode.part) {
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::LeftForeArm:
+    return NormalizeSafeV({-1.0f, 0.0f, 0.0f}, {-1.0f, 0.0f, 0.0f});
 
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::RightForeArm:
-        return NormalizeSafeV({ 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f });
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::RightForeArm:
+    return NormalizeSafeV({1.0f, 0.0f, 0.0f}, {1.0f, 0.0f, 0.0f});
 
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::LeftShin:
-    case ModBodyPart::RightThigh:
-    case ModBodyPart::RightShin:
-        return NormalizeSafeV({ 0.0f, -1.0f, 0.0f }, { 0.0f, -1.0f, 0.0f });
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::RightShin:
+    return NormalizeSafeV({0.0f, -1.0f, 0.0f}, {0.0f, -1.0f, 0.0f});
 
-    case ModBodyPart::Neck:
-    case ModBodyPart::Head:
-        return NormalizeSafeV({ 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f, 0.0f });
+  case ModBodyPart::Neck:
+  case ModBodyPart::Head:
+    return NormalizeSafeV({0.0f, 1.0f, 0.0f}, {0.0f, 1.0f, 0.0f});
 
-    case ModBodyPart::ChestBody:
-    case ModBodyPart::StomachBody:
-    case ModBodyPart::Count:
-    default:
-        break;
-    }
+  case ModBodyPart::ChestBody:
+  case ModBodyPart::StomachBody:
+  case ModBodyPart::Count:
+  default:
+    break;
+  }
 
-    // fallback
-    if (childNode.localTransform.translate.x < 0.0f) {
-        return { -1.0f, 0.0f, 0.0f };
-    }
-    if (childNode.localTransform.translate.x > 0.0f) {
-        return { 1.0f, 0.0f, 0.0f };
-    }
-    if (childNode.localTransform.translate.y < 0.0f) {
-        return { 0.0f, -1.0f, 0.0f };
-    }
-    return { 0.0f, 1.0f, 0.0f };
+  // fallback
+  if (childNode.localTransform.translate.x < 0.0f) {
+    return {-1.0f, 0.0f, 0.0f};
+  }
+  if (childNode.localTransform.translate.x > 0.0f) {
+    return {1.0f, 0.0f, 0.0f};
+  }
+  if (childNode.localTransform.translate.y < 0.0f) {
+    return {0.0f, -1.0f, 0.0f};
+  }
+  return {0.0f, 1.0f, 0.0f};
 }
 
 float ModScene::GetChildDefaultAttachRadius(ModBodyPart part) const {
-    switch (part) {
-    case ModBodyPart::Neck:
-        return 0.09f;
+  switch (part) {
+  case ModBodyPart::Neck:
+    return 0.09f;
 
-    case ModBodyPart::Head:
-        return 0.11f;
+  case ModBodyPart::Head:
+    return 0.11f;
 
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::LeftForeArm:
-    case ModBodyPart::RightForeArm:
-        return 0.09f;
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+    return 0.09f;
 
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-    case ModBodyPart::LeftShin:
-    case ModBodyPart::RightShin:
-        return 0.10f;
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    return 0.10f;
 
-    case ModBodyPart::ChestBody:
-    case ModBodyPart::StomachBody:
-    case ModBodyPart::Count:
-    default:
-        return 0.10f;
-    }
+  case ModBodyPart::ChestBody:
+  case ModBodyPart::StomachBody:
+  case ModBodyPart::Count:
+  default:
+    return 0.10f;
+  }
 }
 
-float ModScene::GetChildCurrentAttachRadius(const PartNode& childNode) const {
-    const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
+float ModScene::GetChildCurrentAttachRadius(const PartNode &childNode) const {
+  const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
 
-    // owner 操作点を持つ部位は root / lowerNeck / headCenter などの半径を優先
-    if (modBodies_.count(childNode.id) > 0) {
-        switch (childNode.part) {
-        case ModBodyPart::LeftUpperArm:
-        case ModBodyPart::RightUpperArm:
-        case ModBodyPart::LeftThigh:
-        case ModBodyPart::RightThigh: {
-            const float pointRadius =
-                GetPartControlPointRadius(childNode.id, ModControlPointRole::Root, defaultRadius);
-            const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
-            return pointRadius * (std::max)(scale.x, scale.z);
-        }
-
-        case ModBodyPart::Head: {
-            const float pointRadius =
-                GetPartControlPointRadius(childNode.id, ModControlPointRole::LowerNeck, defaultRadius);
-            const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
-            return pointRadius * (std::max)(scale.x, scale.z);
-        }
-
-        default:
-            break;
-        }
+  // owner 操作点を持つ部位は root / lowerNeck / headCenter などの半径を優先
+  if (modBodies_.count(childNode.id) > 0) {
+    switch (childNode.part) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh: {
+      const float pointRadius = GetPartControlPointRadius(
+          childNode.id, ModControlPointRole::Root, defaultRadius);
+      const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+      return pointRadius * (std::max)(scale.x, scale.z);
     }
 
-    // owner を持たない部位は親 owner 側の接続元半径を使う
-    if (childNode.part == ModBodyPart::LeftForeArm ||
-        childNode.part == ModBodyPart::RightForeArm ||
-        childNode.part == ModBodyPart::LeftShin ||
-        childNode.part == ModBodyPart::RightShin) {
-        const int ownerId = ResolveControlOwnerPartId(assembly_, childNode.id);
-        if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
-            const float pointRadius =
-                GetPartControlPointRadius(ownerId, ModControlPointRole::Bend, defaultRadius);
-            const Vector3 scale = modBodies_.at(ownerId).GetVisualScaleRatio();
-            return pointRadius * (std::max)(scale.x, scale.z);
-        }
+    case ModBodyPart::Head: {
+      const float pointRadius = GetPartControlPointRadius(
+          childNode.id, ModControlPointRole::LowerNeck, defaultRadius);
+      const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+      return pointRadius * (std::max)(scale.x, scale.z);
     }
 
-    if (childNode.part == ModBodyPart::Neck) {
-        const int headId = FindFirstChildPartId(assembly_, childNode.id, ModBodyPart::Head);
-        if (headId >= 0 && modBodies_.count(headId) > 0) {
-            const float pointRadius =
-                GetPartControlPointRadius(headId, ModControlPointRole::LowerNeck, defaultRadius);
-            const Vector3 scale = modBodies_.at(headId).GetVisualScaleRatio();
-            return pointRadius * (std::max)(scale.x, scale.z);
-        }
+    default:
+      break;
     }
+  }
 
-    if (modBodies_.count(childNode.id) > 0) {
-        const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
-        return defaultRadius * (std::max)(scale.x, scale.z);
+  // owner を持たない部位は親 owner 側の接続元半径を使う
+  if (childNode.part == ModBodyPart::LeftForeArm ||
+      childNode.part == ModBodyPart::RightForeArm ||
+      childNode.part == ModBodyPart::LeftShin ||
+      childNode.part == ModBodyPart::RightShin) {
+    const int ownerId = ResolveControlOwnerPartId(assembly_, childNode.id);
+    if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
+      const float pointRadius = GetPartControlPointRadius(
+          ownerId, ModControlPointRole::Bend, defaultRadius);
+      const Vector3 scale = modBodies_.at(ownerId).GetVisualScaleRatio();
+      return pointRadius * (std::max)(scale.x, scale.z);
     }
+  }
 
-    return defaultRadius;
+  if (childNode.part == ModBodyPart::Neck) {
+    const int headId =
+        FindFirstChildPartId(assembly_, childNode.id, ModBodyPart::Head);
+    if (headId >= 0 && modBodies_.count(headId) > 0) {
+      const float pointRadius = GetPartControlPointRadius(
+          headId, ModControlPointRole::LowerNeck, defaultRadius);
+      const Vector3 scale = modBodies_.at(headId).GetVisualScaleRatio();
+      return pointRadius * (std::max)(scale.x, scale.z);
+    }
+  }
+
+  if (modBodies_.count(childNode.id) > 0) {
+    const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+    return defaultRadius * (std::max)(scale.x, scale.z);
+  }
+
+  return defaultRadius;
 }
 
 float ModScene::GetChildDefaultLength(ModBodyPart part) const {
-    switch (part) {
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::LeftForeArm:
-    case ModBodyPart::RightForeArm:
-        return 1.10f;
+  switch (part) {
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+    return 1.10f;
 
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-    case ModBodyPart::LeftShin:
-    case ModBodyPart::RightShin:
-        return 1.40f;
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    return 1.40f;
 
-    case ModBodyPart::Neck:
-        return 0.28f;
+  case ModBodyPart::Neck:
+    return 0.28f;
 
-    case ModBodyPart::Head:
-        return 0.80f;
+  case ModBodyPart::Head:
+    return 0.80f;
 
-    case ModBodyPart::ChestBody:
-    case ModBodyPart::StomachBody:
-    case ModBodyPart::Count:
-    default:
-        return 1.0f;
-    }
+  case ModBodyPart::ChestBody:
+  case ModBodyPart::StomachBody:
+  case ModBodyPart::Count:
+  default:
+    return 1.0f;
+  }
 }
 
-float ModScene::GetChildCurrentLength(const PartNode& childNode) const {
-    const float defaultLength = GetChildDefaultLength(childNode.part);
+float ModScene::GetChildCurrentLength(const PartNode &childNode) const {
+  const float defaultLength = GetChildDefaultLength(childNode.part);
 
-    if (modBodies_.count(childNode.id) > 0) {
-        const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
-        return defaultLength * scale.y;
-    }
+  if (modBodies_.count(childNode.id) > 0) {
+    const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
+    return defaultLength * scale.y;
+  }
 
-    return defaultLength;
+  return defaultLength;
 }
 
-Vector3 ModScene::ResolveChildSelfAttachOffset(const PartNode& childNode) const {
-    const Vector3 outward = ResolveAttachOutwardDirection(childNode);
+Vector3
+ModScene::ResolveChildSelfAttachOffset(const PartNode &childNode) const {
+  const Vector3 outward = ResolveAttachOutwardDirection(childNode);
 
-    const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
-    const float currentRadius = GetChildCurrentAttachRadius(childNode);
-    const float extraRadius = (std::max)(0.0f, currentRadius - defaultRadius);
+  const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
+  const float currentRadius = GetChildCurrentAttachRadius(childNode);
+  const float extraRadius = (std::max)(0.0f, currentRadius - defaultRadius);
 
-    const float defaultLength = GetChildDefaultLength(childNode.part);
-    const float currentLength = GetChildCurrentLength(childNode);
-    const float extraLength = (std::max)(0.0f, currentLength - defaultLength);
+  const float defaultLength = GetChildDefaultLength(childNode.part);
+  const float currentLength = GetChildCurrentLength(childNode);
+  const float extraLength = (std::max)(0.0f, currentLength - defaultLength);
 
-    // 太さ増加はそのまま押し出し
-    float pushDistance = extraRadius;
+  // 太さ増加はそのまま押し出し
+  float pushDistance = extraRadius;
 
-    // 長さ増加で根元側にもはみ出すタイプを少し前へ逃がす
-    // 半分全部やると動きすぎるので 0.35f 程度に抑える
-    pushDistance += extraLength * 0.35f;
+  // 長さ増加で根元側にもはみ出すタイプを少し前へ逃がす
+  // 半分全部やると動きすぎるので 0.35f 程度に抑える
+  pushDistance += extraLength * 0.35f;
 
-    return Multiply(pushDistance, outward);
+  return Multiply(pushDistance, outward);
 }
 
 bool ModScene::IsTorsoPart(ModBodyPart part) const {
@@ -2931,20 +2936,20 @@ void ModScene::UpdateModObjects() {
 
   // カーソルが実際に部位へ当たっているときだけ hover フェードする
   if (hoveredPartId_ >= 0) {
-      fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
+    fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
   }
 
   // 操作点を選択している、またはドラッグ中なら
   // その部位グループを維持してフェードする
   if (selectedControlPointIndex_ >= 0) {
-      if (selectedControlPartId_ == -2) {
-          const int chestId = assembly_.GetBodyId();
-          if (chestId >= 0) {
-              fadedGroupId = ResolveFadeGroupId(chestId);
-          }
-      } else if (selectedPartId_ >= 0) {
-          fadedGroupId = ResolveFadeGroupId(selectedPartId_);
+    if (selectedControlPartId_ == -2) {
+      const int chestId = assembly_.GetBodyId();
+      if (chestId >= 0) {
+        fadedGroupId = ResolveFadeGroupId(chestId);
       }
+    } else if (selectedPartId_ >= 0) {
+      fadedGroupId = ResolveFadeGroupId(selectedPartId_);
+    }
   }
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -3438,7 +3443,16 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::LeftShoulder) {
     for (const auto &[id, node] : assembly_.GetNodes()) {
       if (node.part == ModBodyPart::LeftUpperArm) {
-        return assembly_.ComputeWorldPosition(id);
+        if (modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
       }
     }
   }
@@ -3486,7 +3500,16 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::RightShoulder) {
     for (const auto &[id, node] : assembly_.GetNodes()) {
       if (node.part == ModBodyPart::RightUpperArm) {
-        return assembly_.ComputeWorldPosition(id);
+        if (modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
       }
     }
   }
@@ -3534,7 +3557,16 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::LeftHip) {
     for (const auto &[id, node] : assembly_.GetNodes()) {
       if (node.part == ModBodyPart::LeftThigh) {
-        return assembly_.ComputeWorldPosition(id);
+        if (modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
       }
     }
   }
@@ -3582,7 +3614,16 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::RightHip) {
     for (const auto &[id, node] : assembly_.GetNodes()) {
       if (node.part == ModBodyPart::RightThigh) {
-        return assembly_.ComputeWorldPosition(id);
+        if (modObjects_.count(id) == 0) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        Object *object = modObjects_.at(id).get();
+        if (object == nullptr) {
+          return {0.0f, 0.0f, 0.0f};
+        }
+
+        return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
       }
     }
   }
