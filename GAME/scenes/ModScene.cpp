@@ -511,7 +511,10 @@ ModScene::ModScene(kEngine *system) {
       system_->LoadTexture("GAME/resources/texture/white100x100.png");
 
   // 共有データから制限時間を復元する
-  timeLimit_ = customizeData_->timeLimit_;
+  timeLimit_ = 180.0f;
+  totalTimeLimit_ = 180.0f;
+  customizeData_->timeLimit_ = timeLimit_;
+  customizeData_->totalTimeLimit_ = totalTimeLimit_;
   isTimeUp_ = customizeData_->isTimeUp_;
 }
 
@@ -1237,7 +1240,7 @@ void ModScene::ResetSelectedPartParams() {
 void ModScene::ResetToDefaultHumanoid() {
 
   // 制限時間も初期化する
-  timeLimit_ = 30.0f;
+  timeLimit_ = totalTimeLimit_;
   isTimeUp_ = false;
 
   // 構造を初期人型へ戻す
@@ -1258,8 +1261,8 @@ void ModScene::ResetToDefaultHumanoid() {
   SyncCustomizeDataFromScene();
 
   if (customizeData_ != nullptr) {
-    customizeData_->totalTimeLimit_ = 30.0f;
-    customizeData_->timeLimit_ = 30.0f;
+    customizeData_->totalTimeLimit_ = totalTimeLimit_;
+    customizeData_->timeLimit_ = timeLimit_;
     customizeData_->isTimeUp_ = false;
   }
 }

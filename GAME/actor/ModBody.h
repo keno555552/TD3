@@ -143,8 +143,8 @@ struct ModBodyCustomizeData {
   ModControlPointData controlPoints;
 
   // 共通進行データ
-  float timeLimit_ = 300.0f;      // 残り制限時間（秒）
-  float totalTimeLimit_ = 300.0f; // 制限時間の初期値（秒）
+  float timeLimit_ = 180.0f;      // 残り制限時間（秒）
+  float totalTimeLimit_ = 180.0f; // 制限時間の初期値（秒）
   bool isTimeUp_ = false;        // 時間切れになったか
 };
 

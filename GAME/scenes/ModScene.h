@@ -486,7 +486,7 @@ private:
 
 public:
 	// 改造シーンでも移動シーンと共通の制限時間を使う
-	float timeLimit_ = 30.0f;      // 制限時間（秒）
-	float totalTimeLimit_ = 30.0f; // 制限時間の初期値（秒）。リセット用
+	float timeLimit_ = 180.0f;      // 制限時間（秒）
+	float totalTimeLimit_ = 180.0f; // 制限時間の初期値（秒）。リセット用
 	bool isTimeUp_ = false;        // 時間切れになったか
 };
