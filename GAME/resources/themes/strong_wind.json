@@ -2,7 +2,7 @@
   "theme_id": "strong_wind",
   "theme_name": "強風注意",
   "category": "body_trait",
-  "texture_path": "GAME/resources/texture/prompt.png",
+  "texture_path": "GAME/resources/texture/themes/strong_wind.png",
 
   "score_sets": [
     {

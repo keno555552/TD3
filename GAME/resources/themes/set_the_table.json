@@ -2,7 +2,7 @@
   "theme_id": "set_the_table",
   "theme_name": "お皿を並べて",
   "category": "abstract",
-  "texture_path": "GAME/resources/texture/prompt.png",
+  "texture_path": "GAME/resources/texture/themes/set_the_table.png",
 
   "score_sets": [
     {

@@ -399,10 +399,6 @@ Vector3 ScoreCalculator::CalcPartChangeFromControlPoints(
 		radiusRatio = rSum / static_cast<float>(rc);
 	}
 
-	// return の直前（関数の最後）に追加
-	Logger::Log("[CalcPartChange] partType=%d scale=(%.3f, %.3f, %.3f)",
-		static_cast<int>(partType), radiusRatio, lengthRatio, radiusRatio);
-
 	return { radiusRatio, lengthRatio, radiusRatio };
 }
 /*   パーツごとの基本スコア計算   */

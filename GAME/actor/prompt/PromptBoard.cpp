@@ -22,7 +22,8 @@ void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
   flapTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/ReversibleFlap.png");
   promptTextureHandle_ =
-      system_->LoadTexture("GAME/resources/texture/prompt.png");
+      system_->LoadTexture("GAME/resources/texture/themes/prompt.png");
+  //promptTextureHandle_ = 0;
 
   frameSprite_ = CreateSprite(frameTextureHandle_,
                               {position.x, position.y, 20.0f},
@@ -62,6 +63,7 @@ SimpleSprite *PromptBoard::CreateSprite(int textureHandle,
   sprite->mainPosition.transform.translate = translate;
   sprite->objectParts_[0].anchorPoint = anchorPoint;
   sprite->objectParts_[0].materialConfig->textureHandle = textureHandle;
+  sprite->objectParts_[0].materialConfig->useModelTexture = false;
   return sprite;
 }
 
@@ -98,11 +100,20 @@ void PromptBoard::Draw() {
 }
 
 void PromptBoard::SetPromptTexture(int textureHandle) {
-  promptTextureHandle_ = textureHandle;
+ promptTextureHandle_ = textureHandle;
+
+ promptSprite_= CreateSprite(promptTextureHandle_, { 0.0f, 0.0f, 10.0f }, { 0.0f, 0.0f });
+ promptSprite_->followObject_ = frameSprite_;
+
+  Logger::Log("[PromptBoard] SetPromptTexture handle=%d", textureHandle);
 
   if (promptSprite_ != nullptr && !promptSprite_->objectParts_.empty()) {
+    Logger::Log("[PromptBoard] Before: handle=%d",
+        promptSprite_->objectParts_[0].materialConfig->textureHandle);
     promptSprite_->objectParts_[0].materialConfig->textureHandle =
         promptTextureHandle_;
+    Logger::Log("[PromptBoard] After: handle=%d",
+        promptSprite_->objectParts_[0].materialConfig->textureHandle);
   }
 }
 

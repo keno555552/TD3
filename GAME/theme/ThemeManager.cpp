@@ -164,13 +164,14 @@ bool ThemeManager::ParseThemeData(const nlohmann::json& json,
 		outData.themeId = json.at("theme_id").get<std::string>();
 		outData.themeName = json.at("theme_name").get<std::string>();
 		outData.category = json.at("category").get<std::string>();
+		outData.texturePath = json.at("texture_path").get<std::string>();
 
 		// テクスチャパスを取得
-		if (json.contains("texture_path")) {
+	/*	if (json.contains("texture_path")) {
 			outData.texturePath = json.at("texture_path").get<std::string>();
 		} else {
 			outData.texturePath = "GAME/resources/texture/prompt.png";
-		}
+		}*/
 
 		// スコアセット
 		const auto& scoreSets = json.at("score_sets");
