@@ -817,8 +817,32 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   //==============================
   // 太さ
   //==============================
-  const float leftLegThickness = (AvgXZ(leftThigh) + AvgXZ(leftShin)) * 0.5f;
-  const float rightLegThickness = (AvgXZ(rightThigh) + AvgXZ(rightShin)) * 0.5f;
+  const float baseRadius = 0.1f;
+
+  const float leftThighStartR = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
+  const float leftThighBendR = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
+  const float leftThighEndR = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+
+  const float rightThighStartR = GetSnapshotRadius(ModBodyPart::RightThigh, 1);
+  const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
+  const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+
+  // 太さは見た目と同じく snapshot 半径ベースで取る
+  const float leftThighThickness =
+      (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
+  const float leftShinThickness =
+      (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
+
+  const float rightThighThickness =
+      (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
+  const float rightShinThickness =
+      (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
+
+  const float leftLegThickness =
+      (leftThighThickness + leftShinThickness) * 0.5f;
+  const float rightLegThickness =
+      (rightThighThickness + rightShinThickness) * 0.5f;
+
   const float legThicknessScale = (leftLegThickness + rightLegThickness) * 0.5f;
 
   const float leftArmThickness =
@@ -941,11 +965,11 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
 
-  leftLegReturnScale_ =
-      std::clamp(1.0f - (leftLegThickness - 1.0f) * 3.6f, 0.02f, 1.2f);
+leftLegReturnScale_ =
+      std::clamp(1.0f - (leftLegThickness - 1.0f) * 0.20f, 0.55f, 1.0f);
 
   rightLegReturnScale_ =
-      std::clamp(1.0f - (rightLegThickness - 1.0f) * 3.6f, 0.02f, 1.2f);
+      std::clamp(1.0f - (rightLegThickness - 1.0f) * 0.20f, 0.55f, 1.0f);
 
   // 安定してる体ほどタイミング判定を広く
   timingWindowScale_ = std::clamp(0.8f + tuning_.stability * 0.25f -
@@ -954,6 +978,15 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   // 安定してる体ほど起き上がりやすい
   recoveryAssist_ = std::clamp(0.7f + tuning_.stability * 0.25f, 0.6f, 1.4f);
+
+  Logger::Log("==== LEG RETURN SCALE CHECK ====\n");
+  Logger::Log("leftLegThickness : " + std::to_string(leftLegThickness) + "\n");
+  Logger::Log("rightLegThickness : " + std::to_string(rightLegThickness) +
+              "\n");
+  Logger::Log("leftLegReturnScale_ : " + std::to_string(leftLegReturnScale_) +
+              "\n");
+  Logger::Log("rightLegReturnScale_ : " + std::to_string(rightLegReturnScale_) +
+              "\n");
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -1082,12 +1115,14 @@ void TravelScene::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
 
   // 脚を前へ戻す時だけ重さを強く反映
   if (!leftNowInput) {
-    leftFollow *= (0.10f + leftLegReturnScale_ * 0.90f);
+    leftFollow *=
+        leftLegReturnScale_ * leftLegReturnScale_ * leftLegReturnScale_ * 0.25f;
     leftMaxSpeed *=
         leftLegReturnScale_ * leftLegReturnScale_ * leftLegReturnScale_;
   }
   if (!rightNowInput) {
-    rightFollow *= (0.10f + rightLegReturnScale_ * 0.90f);
+    rightFollow *= rightLegReturnScale_ * rightLegReturnScale_ *
+                   rightLegReturnScale_ * 0.25f;
     rightMaxSpeed *=
         rightLegReturnScale_ * rightLegReturnScale_ * rightLegReturnScale_;
   }
@@ -1110,6 +1145,25 @@ void TravelScene::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
 
   leftLegBend_ = std::clamp(leftLegBend_, -0.8f, 1.0f);
   rightLegBend_ = std::clamp(rightLegBend_, -0.8f, 1.0f);
+
+  static int legReturnLogFrame = 0;
+  legReturnLogFrame++;
+  if (legReturnLogFrame % 20 == 0) {
+    Logger::Log("==== LEG RETURN MOTION CHECK ====\n");
+    Logger::Log("leftNowInput : " + std::to_string(leftNowInput) + "\n");
+    Logger::Log("rightNowInput : " + std::to_string(rightNowInput) + "\n");
+    Logger::Log("leftFollow : " + std::to_string(leftFollow) + "\n");
+    Logger::Log("rightFollow : " + std::to_string(rightFollow) + "\n");
+    Logger::Log("leftMaxSpeed : " + std::to_string(leftMaxSpeed) + "\n");
+    Logger::Log("rightMaxSpeed : " + std::to_string(rightMaxSpeed) + "\n");
+    Logger::Log("leftLegBend_ : " + std::to_string(leftLegBend_) + "\n");
+    Logger::Log("rightLegBend_ : " + std::to_string(rightLegBend_) + "\n");
+    Logger::Log("leftLegBendSpeed_ : " + std::to_string(leftLegBendSpeed_) +
+                "\n");
+    Logger::Log("rightLegBendSpeed_ : " + std::to_string(rightLegBendSpeed_) +
+                "\n");
+  }
+
   bodyStretch_ = std::clamp(bodyStretch_, -0.5f, 1.0f);
 }
 
@@ -1273,6 +1327,28 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       leftDriveAccum_ *= 0.85f;
     }
   }
+
+  //==============================
+  // 脚の戻り具合で蹴り威力を補正
+  //==============================
+  float kickLegBendNow = 0.0f;
+
+  if (useLeftPush) {
+    kickLegBendNow = leftLegBend_;
+  } else if (useRightPush) {
+    kickLegBendNow = rightLegBend_;
+  }
+
+  // 戻り具合（0〜1）
+  float kickReadyRatio = std::clamp((kickLegBendNow - legKickAngle_) /
+                                        (legRecoverAngle_ - legKickAngle_),
+                                    0.0f, 1.0f);
+
+  // 最低保証付き（完全に死なない）
+  float kickReadyPower = 0.35f + kickReadyRatio * 0.65f;
+
+  // 威力に反映
+  totalPush *= kickReadyPower;
 
   //==============================
   // 着地タイミングで push を補正
