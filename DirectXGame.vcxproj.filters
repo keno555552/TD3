@@ -172,6 +172,8 @@
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Segment.cpp" />
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Sphere.cpp" />
     <ClCompile Include="GAME\actor\ModCustomizeDataStore.cpp" />
+    <ClCompile Include="GAME\audience\AudienceManager.cpp" />
+    <ClCompile Include="GAME\judges\comment\JudgeCommentManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\actor\ControlPointChain.h" />
@@ -410,6 +412,10 @@
     <ClInclude Include="GAME\actor\ModObjectUtil.h" />
     <ClInclude Include="GAME\actor\ModBodyCustomizeDataUtil.h" />
     <ClInclude Include="GAME\actor\ModCustomizeDataStore.h" />
+    <ClInclude Include="GAME\audience\AudienceData.h" />
+    <ClInclude Include="GAME\audience\AudienceManager.h" />
+    <ClInclude Include="GAME\judges\comment\JudgeCommentData.h" />
+    <ClInclude Include="GAME\judges\comment\JudgeCommentManager.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
@@ -449,5 +455,11 @@
     <None Include="resources\map\map2.csv" />
     <None Include="resources\map\map3.csv" />
     <None Include="resources\Shader\Tile2D.hlsli" />
+    <None Include="GAME\resources\judges\comments\dr_mad.json" />
+    <None Include="GAME\resources\judges\comments\himekawa.json" />
+    <None Include="GAME\resources\judges\comments\onizuka.json" />
+    <None Include="GAME\resources\judges\comments\ono.json" />
+    <None Include="GAME\resources\judges\comments\sato.json" />
+    <None Include="GAME\resources\judges\comments\takeda.json" />
   </ItemGroup>
 </Project>

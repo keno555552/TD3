@@ -107,14 +107,6 @@ void PromptBoard::SetPromptTexture(int textureHandle) {
 
   Logger::Log("[PromptBoard] SetPromptTexture handle=%d", textureHandle);
 
-  if (promptSprite_ != nullptr && !promptSprite_->objectParts_.empty()) {
-    Logger::Log("[PromptBoard] Before: handle=%d",
-        promptSprite_->objectParts_[0].materialConfig->textureHandle);
-    promptSprite_->objectParts_[0].materialConfig->textureHandle =
-        promptTextureHandle_;
-    Logger::Log("[PromptBoard] After: handle=%d",
-        promptSprite_->objectParts_[0].materialConfig->textureHandle);
-  }
 }
 
 void PromptBoard::StartStopAnimation() {

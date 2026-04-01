@@ -258,8 +258,10 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\actor\ModCustomizeDataStore.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptBoard.cpp" />
     <ClCompile Include="GAME\actor\prompt\PromptData.cpp" />
+    <ClCompile Include="GAME\audience\AudienceManager.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\json\JsonManager.cpp" />
+    <ClCompile Include="GAME\judges\comment\JudgeCommentManager.cpp" />
     <ClCompile Include="GAME\judges\JudgeManager.cpp" />
     <ClCompile Include="GAME\nickname\NicknameManager.cpp" />
     <ClCompile Include="GAME\Object\Panel\Panel.cpp" />
@@ -420,8 +422,12 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModCustomizeDataStore.h" />
     <ClInclude Include="GAME\actor\prompt\PromptBoard.h" />
     <ClInclude Include="GAME\actor\prompt\PromptData.h" />
+    <ClInclude Include="GAME\audience\AudienceData.h" />
+    <ClInclude Include="GAME\audience\AudienceManager.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\json\JsonManager.h" />
+    <ClInclude Include="GAME\judges\comment\JudgeCommentData.h" />
+    <ClInclude Include="GAME\judges\comment\JudgeCommentManager.h" />
     <ClInclude Include="GAME\judges\JudgeData.h" />
     <ClInclude Include="GAME\judges\JudgeManager.h" />
     <ClInclude Include="GAME\nickname\NicknameData.h" />
@@ -866,6 +872,12 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </None>
+    <None Include="GAME\resources\judges\comments\dr_mad.json" />
+    <None Include="GAME\resources\judges\comments\himekawa.json" />
+    <None Include="GAME\resources\judges\comments\onizuka.json" />
+    <None Include="GAME\resources\judges\comments\ono.json" />
+    <None Include="GAME\resources\judges\comments\sato.json" />
+    <None Include="GAME\resources\judges\comments\takeda.json" />
     <None Include="GAME\resources\judges\dr_mad.json" />
     <None Include="GAME\resources\judges\himekawa.json" />
     <None Include="GAME\resources\judges\onizuka.json" />

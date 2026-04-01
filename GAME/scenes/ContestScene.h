@@ -10,6 +10,12 @@
 #include "GAME/nickname/NicknameData.h"
 #include "GAME/userData/UserDataManager.h"
 
+#include "GAME/judges/comment/JudgeCommentManager.h"
+#include "GAME/judges/comment/JudgeCommentData.h"
+
+#include "GAME/audience/AudienceManager.h"
+#include "GAME/audience/AudienceData.h"
+
 class ContestScene : public BaseScene {
 public:
   ContestScene(kEngine *system);
@@ -43,6 +49,14 @@ private:
   NicknameTableData nicknameTable_{};
   UserDataManager* userDataManager_ = nullptr;
   EarnedNickname earnedNickname_{};
+
+  // 審査員コメント
+  JudgeCommentTable judgeCommentTable_{};
+  std::vector<JudgeCommentResult> judgeCommentResults_;
+
+  // 観客のコメント
+  AudienceCommentData audienceCommentData_{};
+  AudienceResult audienceResult_{};
 
 private:
   /// <summary>

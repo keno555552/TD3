@@ -15,11 +15,6 @@ namespace {
 
 ContestScene::ContestScene(kEngine* system) {
     const ModBodyCustomizeData* earlyCheck = ModBody::GetSharedCustomizeData();
-    if (earlyCheck != nullptr && !earlyCheck->controlPointSnapshots.empty()) {
-        const auto& s = earlyCheck->controlPointSnapshots[5];
-        Logger::Log("[ContestScene EARLY] snapshot[5] radius=%.3f pos=(%.3f,%.3f,%.3f)",
-            s.radius, s.localPosition.x, s.localPosition.y, s.localPosition.z);
-    }
 
     system_ = system;
 
@@ -43,35 +38,6 @@ ContestScene::ContestScene(kEngine* system) {
     const ThemeData* theme = PromptData::GetThemeData();
     const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
 
-    if (playerData != nullptr) {
-        Logger::Log("[ContestScene] LeftUpperArm count=%d RightUpperArm count=%d",
-            playerData->partParams[static_cast<size_t>(ModBodyPart::LeftUpperArm)].count,
-            playerData->partParams[static_cast<size_t>(ModBodyPart::RightUpperArm)].count);
-        Logger::Log("[ContestScene] LeftThigh count=%d RightThigh count=%d",
-            playerData->partParams[static_cast<size_t>(ModBodyPart::LeftThigh)].count,
-            playerData->partParams[static_cast<size_t>(ModBodyPart::RightThigh)].count);
-    }
-
-    if (playerData != nullptr) {
-        Logger::Log("[ContestScene] snapshots=%d default=%d",
-            static_cast<int>(playerData->controlPointSnapshots.size()),
-            static_cast<int>(playerData->defaultControlPointSnapshots.size()));
-        if (!playerData->controlPointSnapshots.empty()) {
-            const auto& s = playerData->controlPointSnapshots[4]; // 首のUpperNeck
-            Logger::Log("[ContestScene] snapshot[4] pos=(%.3f,%.3f,%.3f)",
-                s.localPosition.x, s.localPosition.y, s.localPosition.z);
-        }
-        if (!playerData->defaultControlPointSnapshots.empty()) {
-            const auto& d = playerData->defaultControlPointSnapshots[4];
-            Logger::Log("[ContestScene] default[4] pos=(%.3f,%.3f,%.3f)",
-                d.localPosition.x, d.localPosition.y, d.localPosition.z);
-        }
-    }
-    if (playerData != nullptr) {
-        Logger::Log("[ContestScene] controlPointSnapshots=%d defaultControlPointSnapshots=%d",
-            static_cast<int>(playerData->controlPointSnapshots.size()),
-            static_cast<int>(playerData->defaultControlPointSnapshots.size()));
-    }
     const std::vector<JudgeData>* judges = PromptData::GetJudges();
 
     if (theme != nullptr && playerData != nullptr) {
@@ -85,6 +51,15 @@ ContestScene::ContestScene(kEngine* system) {
 
     // ユーザーデータ読み込み
     userDataManager_ = new UserDataManager();
+
+    // 審査員コメント読み込み＆生成
+    JudgeCommentManager::LoadCommentTable(
+        "GAME/resources/judges/comments/", judgeCommentTable_);
+
+    if (isScoreCalculated_) {
+        judgeCommentResults_ = JudgeCommentManager::GenerateComments(
+            judgeCommentTable_, scoreResult_);
+    }
 
     // 二つ名テーブル読み込み
     NicknameManager::LoadNicknameTable(
@@ -102,6 +77,16 @@ ContestScene::ContestScene(kEngine* system) {
         userDataManager_->UpdateBestRank(scoreResult_.overallRank);
         userDataManager_->AddNickname(earnedNickname_);
         userDataManager_->Save();
+    }
+
+    // 観客コメント読み込み＆生成
+    AudienceManager::LoadCommentData(
+        "GAME/resources/audience/audience_comments.json",
+        audienceCommentData_);
+
+    if (isScoreCalculated_) {
+        audienceResult_ = AudienceManager::GenerateComments(
+            audienceCommentData_, *playerData);
     }
 }
 
@@ -169,6 +154,14 @@ void ContestScene::Draw() {
     if (!isScoreCalculated_) {
         ImGui::Text("Score not calculated");
     } else {
+
+        // 観客コメント
+        ImGui::Separator();
+        ImGui::Text("Audience:");
+        for (int i = 0; i < 3; ++i) {
+            ImGui::Text("  %d: %s", i + 1, audienceResult_.comments[i].c_str());
+        }
+
         // 総合ランク
         ImGui::Text("Overall Rank: %s", scoreResult_.overallRank.c_str());
 
@@ -210,6 +203,11 @@ void ContestScene::Draw() {
                         je.judgeTitle.c_str());
                     ImGui::Text("    %s (%d)",
                         StarsToString(je.star).c_str(), je.star);
+                    // コメント表示
+                    if (i < judgeCommentResults_.size()) {
+                        ImGui::Text("    \"%s\"",
+                            judgeCommentResults_[i].comment.c_str());
+                    }
                     ImGui::Spacing();
                 }
             }
