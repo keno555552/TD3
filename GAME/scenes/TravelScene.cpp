@@ -19,7 +19,7 @@ TravelScene::TravelScene(kEngine *system) {
   // ライト
   //===============================
   light1_ = new Light;
-  light1_->direction = {-0.5f, -1.0f, -0.3f};
+  light1_->direction = {0.3f, -1.0f, 0.5f};
   light1_->color = {1.0f, 1.0f, 1.0f};
   light1_->intensity = 1.0f;
   system_->AddLight(light1_);
@@ -31,12 +31,14 @@ TravelScene::TravelScene(kEngine *system) {
   camera_ = system_->CreateCamera();
 
   // デバッグカメラ初期位置
-  debugCamera_->SetTranslate({0.0f, 0.0f, -48.0f});
+  debugCamera_->SetTranslate({48.0f, 0.0f, 0.0f});
   debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
+  debugCamera_->SetRotation({0.0f, -1.57f, 0.0f});
 
   // 通常カメラ初期位置
-  camera_->SetTranslate({0.0f, 0.0f, -48.0f});
+  camera_->SetTranslate({48.0f, 0.0f, 0.0f});
   camera_->SetDefaultTransform(camera_->GetTransform());
+  camera_->SetRotation({0.0f, -1.57f, 0.0f});
 
   usingCamera_ = camera_;
   system_->SetCamera(usingCamera_);
@@ -89,6 +91,9 @@ TravelScene::TravelScene(kEngine *system) {
 
   moveX_ = -18.0f;
 
+  gaitTiltTarget_ = 0.0f;
+  landTimer_ = 999.0f;
+
   // bodyで代用中
   groundModelHandle_ =
       system_->SetModelObj("GAME/resources/modBody/body/body.obj");
@@ -100,7 +105,7 @@ TravelScene::TravelScene(kEngine *system) {
 
   ground_->mainPosition.transform.translate = {0.0f, groundY_ - 3.5f, 0.0f};
   ground_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  ground_->mainPosition.transform.scale = {50.0f, 0.3f, 10.0f};
+  ground_->mainPosition.transform.scale = {1.0f, 0.3f, 50.0f};
 
   //===============================
   // 2D
@@ -824,6 +829,7 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   const float neckThicknessScale = AvgXZ(neck);
   const float headSizeScale = AvgXYZ(head);
+  headSizeScale_ = headSizeScale;
 
   //==============================
   // 胴体の大きさ
@@ -894,7 +900,7 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   // 脚長いと跳ねる
   // 太い脚・重い胴体・大きい頭で落ちる
   //==============================
-  tuning_.lift += (avgLegLength - 1.0f) * 3.0f;
+  tuning_.lift += (avgLegLength - 1.0f) * 2.3f;
   tuning_.lift -= (legThicknessScale - 1.0f) * 0.7f;
   tuning_.lift -= (torsoScaleAvg - 1.0f) * 0.8f;
   tuning_.lift -= (headSizeScale - 1.0f) * 0.3f;
@@ -934,6 +940,20 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.stability = std::clamp(tuning_.stability, 0.1f, 3.5f);
   tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
+
+  leftLegReturnScale_ =
+      std::clamp(1.0f - (leftLegThickness - 1.0f) * 3.6f, 0.02f, 1.2f);
+
+  rightLegReturnScale_ =
+      std::clamp(1.0f - (rightLegThickness - 1.0f) * 3.6f, 0.02f, 1.2f);
+
+  // 安定してる体ほどタイミング判定を広く
+  timingWindowScale_ = std::clamp(0.8f + tuning_.stability * 0.25f -
+                                      tuning_.turnResponse * 0.08f,
+                                  0.55f, 1.25f);
+
+  // 安定してる体ほど起き上がりやすい
+  recoveryAssist_ = std::clamp(0.7f + tuning_.stability * 0.25f, 0.6f, 1.4f);
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -1054,29 +1074,40 @@ void TravelScene::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
   float leftTargetLegAngle = leftNowInput ? legKickAngle_ : legRecoverAngle_;
   float rightTargetLegAngle = rightNowInput ? legKickAngle_ : legRecoverAngle_;
 
-  leftLegBendSpeed_ += (leftTargetLegAngle - leftLegBend_) * legFollowPower_;
-  rightLegBendSpeed_ += (rightTargetLegAngle - rightLegBend_) * legFollowPower_;
+  float leftFollow = legFollowPower_;
+  float rightFollow = legFollowPower_;
+
+  float leftMaxSpeed = legMaxSpeed_;
+  float rightMaxSpeed = legMaxSpeed_;
+
+  // 脚を前へ戻す時だけ重さを強く反映
+  if (!leftNowInput) {
+    leftFollow *= (0.10f + leftLegReturnScale_ * 0.90f);
+    leftMaxSpeed *=
+        leftLegReturnScale_ * leftLegReturnScale_ * leftLegReturnScale_;
+  }
+  if (!rightNowInput) {
+    rightFollow *= (0.10f + rightLegReturnScale_ * 0.90f);
+    rightMaxSpeed *=
+        rightLegReturnScale_ * rightLegReturnScale_ * rightLegReturnScale_;
+  }
+
+  leftLegBendSpeed_ += (leftTargetLegAngle - leftLegBend_) * leftFollow;
+  rightLegBendSpeed_ += (rightTargetLegAngle - rightLegBend_) * rightFollow;
 
   leftLegBendSpeed_ =
-      std::clamp(leftLegBendSpeed_, -legMaxSpeed_, legMaxSpeed_);
+      std::clamp(leftLegBendSpeed_, -leftMaxSpeed, leftMaxSpeed);
   rightLegBendSpeed_ =
-      std::clamp(rightLegBendSpeed_, -legMaxSpeed_, legMaxSpeed_);
+      std::clamp(rightLegBendSpeed_, -rightMaxSpeed, rightMaxSpeed);
 
-  //--------------------------------
-  // 減衰
-  //--------------------------------
   leftLegBendSpeed_ *= jointDamping_;
   rightLegBendSpeed_ *= jointDamping_;
   bodyStretchSpeed_ *= jointDamping_;
 
-  //--------------------------------
-  // 値更新
-  //--------------------------------
   leftLegBend_ += leftLegBendSpeed_;
   rightLegBend_ += rightLegBendSpeed_;
   bodyStretch_ += bodyStretchSpeed_;
 
-  // 曲げ量は大きくなりすぎないように軽く制限
   leftLegBend_ = std::clamp(leftLegBend_, -0.8f, 1.0f);
   rightLegBend_ = std::clamp(rightLegBend_, -0.8f, 1.0f);
   bodyStretch_ = std::clamp(bodyStretch_, -0.5f, 1.0f);
@@ -1086,82 +1117,65 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   bool bothInput = leftNowInput && rightNowInput;
 
-  //--------------------------------
-  // 姿勢更新
-  //--------------------------------
-
-  float forwardTorque = 0.0f;
-  float backwardTorque = 0.0f;
-  float pushTorque = 0.0f;
-
-  //==============================
-  // 脚回収による後傾トルク
-  // 「離している間ずっと」ではなく
-  // 「前に戻す加速」が出た時だけ反動を入れる
-  //==============================
-
   float stability = useCustomizeMove_ ? tuning_.stability : 1.0f;
   float turnResponse = useCustomizeMove_ ? tuning_.turnResponse : 1.0f;
 
-  float instability = (std::max)(0.0f, 1.0f - stability);
-  float overResponse = (std::max)(0.0f, turnResponse - 1.0f);
+  const float recoverStartTilt = 0.42f;
+  const float recoverTargetTilt = -0.12f;
+  const float heavyFallTilt = 0.65f;
 
-  // 不安定な体型は、何もしてなくても少しずつ崩れる
-  bodyTiltVelocity_ += instability * 0.010f;
+  isRecoveringFromTilt_ = (std::abs(bodyTilt_) > recoverStartTilt);
 
-  // 傾きやすすぎる体型は、前回蹴った側へ流れやすい
-  if (lastKickSide_ != 0) {
-    float sideBias = (lastKickSide_ < 0) ? -1.0f : 1.0f;
-    bodyTiltVelocity_ += sideBias * overResponse * 0.006f;
-  }
+  //==============================
+  // 姿勢目標へ寄せる
+  //==============================
+  // gaitTiltTarget_ = std::clamp(gaitTiltTarget_, -0.75f, 0.75f);
 
-  if (!leftNowInput) {
-    float leftRecoveryAccel = leftLegBendSpeed_ - leftLegPrevBendSpeed_;
+  // const float neutralTilt = -0.03f;
+  // const float bestTilt = -0.08f;
+  // const float lateTilt = 0.03f;
+  // const float veryLateTilt = 0.08f;
 
-    if (leftRecoveryAccel > 0.0f) {
-      float torque = leftRecoveryAccel * 0.6f / stability;
-      backwardTorque += torque;
-    }
-  }
+  // gaitTiltTarget_ += (neutralTilt - gaitTiltTarget_) * 0.08f;
 
-  if (!rightNowInput) {
-    float rightRecoveryAccel = rightLegBendSpeed_ - rightLegPrevBendSpeed_;
+  //// 何もなければ少しずつ中立へ戻る
+  // float targetTilt = gaitTiltTarget_;
+  // if (bothInput) {
+  //   targetTilt -= 0.03f;
+  // }
 
-    if (rightRecoveryAccel > 0.0f) {
-      float torque = rightRecoveryAccel * 0.6f / stability;
-      backwardTorque += torque;
-    }
-  }
+  // float tiltError = targetTilt - bodyTilt_;
+  // bodyTiltVelocity_ += tiltError * 0.12f * turnResponse;
 
-  float targetTilt = 0.0f;
+  // float restoreTorque = -bodyTilt_ * 0.004f * stability;
+  // bodyTiltVelocity_ += restoreTorque;
 
-  // 両押し：前傾
+  //==============================
+  // 姿勢：通常時は中立へ戻すだけ
+  // 蹴った瞬間にだけ bodyTiltVelocity_ を入れる
+  //==============================
+  const float neutralTilt = -0.03f;
+
+  float headRecoveryPenalty =
+      std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.30f, 0.65f, 1.0f);
+
+  float neutralReturnPower = 0.050f * stability * headRecoveryPenalty;
   if (bothInput) {
-    targetTilt = -0.15f;
+    neutralReturnPower *= 0.85f;
   }
 
-  float tiltError = targetTilt - bodyTilt_;
-  bodyTiltVelocity_ += tiltError * 0.1f * turnResponse;
+  bodyTiltVelocity_ += (neutralTilt - bodyTilt_) * neutralReturnPower;
 
-  float restoreTorque = -bodyTilt_ * 0.01f * stability;
-  bodyTiltVelocity_ += restoreTorque;
-
-  //--------------------------------
-  // 姿勢の良し悪しを作る
-  //--------------------------------
-
+  //==============================
+  // 姿勢の良し悪し
+  //==============================
   float postureError = std::abs(bodyTilt_ - idealRunTilt_);
   float badPosture = std::clamp(postureError / postureTolerance_, 0.0f, 1.0f);
-
-  // 良い姿勢ほど前進しやすい
   float forwardRate = 1.0f - badPosture;
 
-  // 悪い姿勢ほど上に逃げやすい
-  float upwardRate = 0.30f + badPosture * 0.70f;
-
-  //--------------------------------
-  // 押している間に drive を使って前進する
-  //--------------------------------
+  //==============================
+  // 入力保持
+  //==============================
   bool leftHoldEnough = (leftHoldTime_ >= minHoldTimeToKick_);
   bool rightHoldEnough = (rightHoldTime_ >= minHoldTimeToKick_);
 
@@ -1172,14 +1186,16 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   bool useRightPush = false;
   float adoptedDriveUse = 0.0f;
 
-  float singleStepBasePush = 0.22f;
-  float singleStepJumpScale = 0.55f;
+  float singleStepBasePush = 0.12f;
+  float singleStepJumpScale = 0.7f;
 
+  //==============================
+  // 左脚候補
+  //==============================
   if (leftNowInput && isGrounded_ && velocityY_ <= 0.0f &&
       !requireReleaseAfterLandLeft_) {
 
     float sequenceBonus = 1.0f;
-
     if (lastKickSide_ == 1) {
       sequenceBonus = alternateKickBonus_;
     } else if (lastKickSide_ == -1) {
@@ -1199,8 +1215,12 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     leftPushCandidate = (std::max)(basePush, drivePush);
   }
 
+  //==============================
+  // 右脚候補
+  //==============================
   if (rightNowInput && isGrounded_ && velocityY_ <= 0.0f &&
       !requireReleaseAfterLandRight_) {
+
     float sequenceBonus = 1.0f;
     if (lastKickSide_ == -1) {
       sequenceBonus = alternateKickBonus_;
@@ -1221,6 +1241,9 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     rightPushCandidate = (std::max)(basePush, drivePush);
   }
 
+  //==============================
+  // 採用する蹴りを決定
+  //==============================
   float totalPush = 0.0f;
 
   if (leftPushCandidate >= rightPushCandidate && leftPushCandidate > 0.0f) {
@@ -1232,7 +1255,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     leftDriveAccum_ -= adoptedDriveUse;
     leftDriveAccum_ = (std::max)(0.0f, leftDriveAccum_);
 
-    // 同時押しで反対側が溜まり続けるのを少し抑える
     if (rightNowInput) {
       rightDriveAccum_ *= 0.85f;
     }
@@ -1252,15 +1274,101 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     }
   }
 
+  //==============================
+  // 着地タイミングで push を補正
+  //==============================
   if (totalPush > 0.0f) {
-    //==============================
-    // 体の前傾で前進効率を強く変える
-    //==============================
-    float tiltForwardFactor =
-        std::clamp((-bodyTilt_ - 0.02f) * 3.5f, 0.0f, 1.5f);
+
+    // gaitTiltTarget_ = std::clamp(gaitTiltTarget_, -0.75f, 0.75f);
+
+    // const float bestTimingEnd = 0.08f;
+    // const float lateTimingEnd = 0.22f;
+
+    // if (!isGrounded_) {
+    //   // 空中入力：ほぼ無効
+    //   totalPush *= 0.20f;
+
+    //} else if (landTimer_ <= bestTimingEnd) {
+    //  // ベスト：少し前傾寄り
+    //  gaitTiltTarget_ += (bestTilt - gaitTiltTarget_) * 0.25f;
+
+    //} else if (landTimer_ <= lateTimingEnd) {
+    //  // 遅い：少し後ろ寄り
+    //  float lateRatio =
+    //      (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
+    //  lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
+
+    //  totalPush *= (0.90f - lateRatio * 0.20f);
+
+    //  float targetLateTilt = lateTilt + lateRatio * 0.03f;
+    //  gaitTiltTarget_ += (targetLateTilt - gaitTiltTarget_) * 0.20f;
+
+    //} else {
+    //  // 遅すぎる：かなり後ろ寄り
+    //  totalPush *= 0.20f;
+    //  gaitTiltTarget_ += (veryLateTilt - gaitTiltTarget_) * 0.20f;
+    //}
+
+    const float bestTimingEnd = 0.08f;
+    const float lateTimingEnd = 0.22f;
+
+    float tiltImpulse = 0.0f;
+
+    if (!isGrounded_) {
+      // 空中入力：ほぼ無効
+      totalPush *= 0.20f;
+      tiltImpulse = 0.0f;
+
+    } else if (landTimer_ <= bestTimingEnd) {
+      // ベスト：蹴った瞬間に少し前傾へ入る
+      tiltImpulse = -0.020f;
+
+    } else if (landTimer_ <= lateTimingEnd) {
+      // 遅い：少しずつ後傾へ
+      float lateRatio =
+          (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
+      lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
+
+      totalPush *= (0.90f - lateRatio * 0.20f);
+      tiltImpulse = 0.010f + lateRatio * 0.020f;
+
+    } else {
+      // 遅すぎる：かなり後傾、前進も弱い
+      totalPush *= 0.20f;
+      tiltImpulse = 0.035f;
+    }
+
+    float headHeavyFactor =
+        std::clamp(1.0f + (headSizeScale_ - 1.0f) * 1.8f, 1.0f, 3.2f);
+
+    bodyTiltVelocity_ += tiltImpulse * turnResponse * headHeavyFactor;
+
+    const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+                           ->objectParts_[0]
+                           .transform.scale;
+    const Vector3 rt = modObjects_[ToIndex(ModBodyPart::RightThigh)]
+                           ->objectParts_[0]
+                           .transform.scale;
+    const Vector3 ls = modObjects_[ToIndex(ModBodyPart::LeftShin)]
+                           ->objectParts_[0]
+                           .transform.scale;
+    const Vector3 rs = modObjects_[ToIndex(ModBodyPart::RightShin)]
+                           ->objectParts_[0]
+                           .transform.scale;
+
+    float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
+
+    float legLengthUpwardScale =
+        std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.85f, 0.45f, 2.0f);
 
     //==============================
-    // 採用された脚が前にあるかどうかで push の向きを補正する
+    // 体の前傾で前進効率を変える
+    //==============================
+    // float tiltForwardFactor =
+    //    std::clamp((-bodyTilt_ - 0.02f) * 3.5f, 0.0f, 1.5f);
+
+    //==============================
+    // 採用脚の前後位置で push 補正
     //==============================
     float kickLegBend = 0.0f;
     if (useLeftPush) {
@@ -1269,143 +1377,152 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       kickLegBend = rightLegBend_;
     }
 
-    // 0.0 = 蹴り姿勢側 / 1.0 = 回収姿勢側
     float kickLegForwardness =
         1.0f - std::clamp((kickLegBend - legKickAngle_) /
                               (legRecoverAngle_ - legKickAngle_),
                           0.0f, 1.0f);
 
-    // 脚が前にあるほど前向きの蹴りになりやすい
     float footForwardBonus = 0.75f + kickLegForwardness * 0.75f;
     float footUpwardSuppress = 1.15f - kickLegForwardness * 0.55f;
     float groundBoost = isGrounded_ ? 1.2f : 0.6f;
 
     float runPower = useCustomizeMove_ ? tuning_.runPower : 1.0f;
     float lift = useCustomizeMove_ ? tuning_.lift : 1.0f;
-    float maxSpeed = useCustomizeMove_ ? tuning_.maxSpeed : 1.0f;
 
-    float upwardSuppressByTilt =
-        std::clamp(1.0f - tiltForwardFactor * 0.25f, 0.75f, 1.0f);
+    // float upwardSuppressByTilt =
+    //     std::clamp(1.0f - tiltForwardFactor * 0.25f, 0.75f, 1.0f);
 
     const Vector3 lua = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
                             ->objectParts_[0]
                             .transform.scale;
-
     const Vector3 lfa = modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
                             ->objectParts_[0]
                             .transform.scale;
-
     const Vector3 rua = modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
                             ->objectParts_[0]
                             .transform.scale;
-
     const Vector3 rfa = modObjects_[ToIndex(ModBodyPart::RightForeArm)]
                             ->objectParts_[0]
                             .transform.scale;
 
-    // 脚と同じで、描画に使ってる実際の長さをそのまま使う
     float avgArmScaleY = (lua.y + lfa.y + rua.y + rfa.y) * 0.25f;
 
-    // 無改造1.0基準
     float armLengthPenalty = 1.0f - (avgArmScaleY - 1.0f) * 0.5f;
     armLengthPenalty = std::clamp(armLengthPenalty, 0.45f, 1.0f);
 
-    Logger::Log("==== ARM UPDATE CHECK ====");
-    Logger::Log("lua.y : %.3f", lua.y);
-    Logger::Log("lfa.y : %.3f", lfa.y);
-    Logger::Log("rua.y : %.3f", rua.y);
-    Logger::Log("rfa.y : %.3f", rfa.y);
-    Logger::Log("avgArmScaleY : %.3f", avgArmScaleY);
-    Logger::Log("armLengthPenalty : %.3f", armLengthPenalty);
+    float tiltDiff = bodyTilt_ - idealRunTilt_;
 
-    // 前進は脚長の影響をかなり感じるように強め
-    float pushX = totalPush *
-                  (0.15f + runPower * 1.05f + forwardRate * 0.20f +
-                   tiltForwardFactor * 0.35f) *
-                  footForwardBonus * groundBoost * armLengthPenalty;
+    float forwardLean = (std::max)(0.0f, -tiltDiff);
+    float backwardLean = (std::max)(0.0f, tiltDiff);
 
-    // float legLengthBoost = 1.0f;
+    float postureEfficiency = 1.0f - (forwardLean + backwardLean) * 0.8f;
+    postureEfficiency = std::clamp(postureEfficiency, 0.2f, 1.0f);
 
-    // if (useCustomizeMove_) {
-    //   const auto &lt =
-    //   modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetParam(); const auto &rt
-    //   = modBodies_[ToIndex(ModBodyPart::RightThigh)].GetParam(); const auto
-    //   &ls = modBodies_[ToIndex(ModBodyPart::LeftShin)].GetParam(); const auto
-    //   &rs = modBodies_[ToIndex(ModBodyPart::RightShin)].GetParam();
+    // const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
+    //                        ->objectParts_[0]
+    //                        .transform.scale;
+    // const Vector3 rt = modObjects_[ToIndex(ModBodyPart::RightThigh)]
+    //                        ->objectParts_[0]
+    //                        .transform.scale;
+    // const Vector3 ls = modObjects_[ToIndex(ModBodyPart::LeftShin)]
+    //                        ->objectParts_[0]
+    //                        .transform.scale;
+    // const Vector3 rs = modObjects_[ToIndex(ModBodyPart::RightShin)]
+    //                        ->objectParts_[0]
+    //                        .transform.scale;
 
-    //  // 平均（無改造で1.0想定）
-    //  float avgLegScaleY =
-    //      (lt.scale.y + rt.scale.y + ls.scale.y + rs.scale.y) * 0.25f;
+    // float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
 
-    //  legLengthBoost += (avgLegScaleY - 1.0f) * 1.6f;
-    //}
+    float leftLegThicknessNow =
+        ((lt.x + lt.z) * 0.5f + (ls.x + ls.z) * 0.5f) * 0.5f;
+    float rightLegThicknessNow =
+        ((rt.x + rt.z) * 0.5f + (rs.x + rs.z) * 0.5f) * 0.5f;
+    float avgLegThicknessNow =
+        (leftLegThicknessNow + rightLegThicknessNow) * 0.5f;
 
-    // legLengthBoost = std::clamp(legLengthBoost, 1.0f, 2.5f);
+    float legThicknessPenalty = 1.0f - (avgLegThicknessNow - 1.0f) * 0.55f;
+    legThicknessPenalty = std::clamp(legThicknessPenalty, 0.30f, 1.15f);
 
-    const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
-                           ->objectParts_[0]
-                           .transform.scale;
+    float headForwardPenalty =
+        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.45f, 0.35f, 1.0f);
 
-    const Vector3 rt = modObjects_[ToIndex(ModBodyPart::RightThigh)]
-                           ->objectParts_[0]
-                           .transform.scale;
+    float pushX = totalPush * (0.15f + runPower * 1.05f + forwardRate * 0.20f) *
+                  footForwardBonus * groundBoost * armLengthPenalty *
+                  headForwardPenalty;
 
-    const Vector3 ls = modObjects_[ToIndex(ModBodyPart::LeftShin)]
-                           ->objectParts_[0]
-                           .transform.scale;
+    pushX *= postureEfficiency;
 
-    const Vector3 rs = modObjects_[ToIndex(ModBodyPart::RightShin)]
-                           ->objectParts_[0]
-                           .transform.scale;
+    // 前傾しすぎるほどつんのめって前進効率低下
+    pushX *= std::clamp(1.0f - forwardLean * 0.5f, 0.4f, 1.0f);
 
-    // 基本の2本だけ
-    float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
+    float timingForwardScale = 1.0f;
 
-    float pushY = totalPush * (0.12f + lift * 0.22f) *
-                      (avgLegScaleY * avgLegScaleY) * jumpRatio_ *
-                      upwardSuppressByTilt * footUpwardSuppress +
-                  0.02f;
+    if (landTimer_ <= bestTimingEnd) {
+      timingForwardScale = 1.35f;
 
-    if (!bothInput) {
-      pushY *= singleStepJumpScale;
+    } else if (landTimer_ <= lateTimingEnd) {
+      float lateRatio =
+          (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
+      lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
+
+      timingForwardScale = 1.0f - lateRatio * 0.25f;
+
+    } else {
+      timingForwardScale = 0.55f;
     }
 
-    // 不安定すぎる体は蹴った時も余計に傾く
-    bodyTiltVelocity_ += instability * 0.010f;
+    pushX *= timingForwardScale;
 
-    // turnResponse が高い体は、蹴った瞬間にさらにブレる
-    if (turnResponse > 1.2f) {
-      float sideBias = 0.0f;
-      if (useLeftPush) {
-        sideBias = -1.0f;
-      } else if (useRightPush) {
-        sideBias = 1.0f;
+    float pushY = totalPush * (0.14f + lift * 0.22f) * jumpRatio_ *
+                      footUpwardSuppress * legLengthUpwardScale +
+                  0.02f;
+
+    // 後傾してるほど上に逃げる
+    pushY += backwardLean * 0.15f * legLengthUpwardScale;
+
+    float headUpwardBias =
+        std::clamp((headSizeScale_ - 1.0f) * 0.08f, 0.0f, 0.12f);
+    pushY += headUpwardBias;
+
+    // 遅い入力による上方向ボーナスも脚長依存にする
+    if (isGrounded_) {
+      if (landTimer_ > bestTimingEnd && landTimer_ <= lateTimingEnd) {
+        float lateRatio =
+            (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
+        lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
+
+        pushY += (0.05f + lateRatio * 0.10f) * legLengthUpwardScale;
+      } else if (landTimer_ > lateTimingEnd) {
+        pushY += 0.16f * legLengthUpwardScale;
       }
+    }
 
-      bodyTiltVelocity_ += sideBias * (turnResponse - 1.2f) * 0.010f;
+    float timingUpwardScale = 1.0f;
+    if (landTimer_ <= bestTimingEnd) {
+      timingUpwardScale = 0.60f;
+    } else if (landTimer_ <= lateTimingEnd) {
+      float lateRatio =
+          (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
+      lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
+      timingUpwardScale = 1.15f + lateRatio * 0.75f;
+    } else {
+      timingUpwardScale = 2.10f;
+    }
+    pushY *= timingUpwardScale;
+
+    if (bothInput) {
+      pushY *= 0.60f;
+    } else {
+      pushY *= singleStepJumpScale;
     }
 
     velocityX_ += pushX;
     velocityY_ += pushY;
-
-    // 押した瞬間にも反動を入れる
-    // 片足押しでも揺れるようにする
-    pushTorque = pushTiltKick_ * adoptedDriveUse * 1.2f;
-
-    // 両押しはさらに強く揺らす
-    if (bothInput) {
-      pushTorque *= 1.5f;
-    }
-
-    // どっちの脚で蹴ったかで少し差をつけたいならここで補正
-    if (useLeftPush) {
-      pushTorque *= 1.0f;
-    } else if (useRightPush) {
-      pushTorque *= 1.0f;
-    }
   }
 
-  // 蹴りにならなかった側は少しずつ減衰
+  //==============================
+  // 蹴りにならなかった側は減衰
+  //==============================
   if (!(leftNowInput && isGrounded_ && velocityY_ <= 0.0f &&
         !requireReleaseAfterLandLeft_)) {
     leftDriveAccum_ = (std::max)(0.0f, leftDriveAccum_ - driveDecay_);
@@ -1416,41 +1533,45 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     rightDriveAccum_ = (std::max)(0.0f, rightDriveAccum_ - driveDecay_);
   }
 
-  if (pushTorque < 0.0f) {
-    forwardTorque += -pushTorque;
-  } else {
-    backwardTorque += pushTorque;
-  }
-
-  float netTorque = backwardTorque - forwardTorque;
-  bodyTiltVelocity_ += netTorque;
-
-  // 減衰
-  float tiltDamping = 0.88f - instability * 0.25f;
-  tiltDamping = std::clamp(tiltDamping, 0.55f, 0.92f);
+  //==============================
+  // 姿勢更新
+  //==============================
+  float tiltDamping = 0.82f;
   bodyTiltVelocity_ *= tiltDamping;
 
-  // 更新
+  float headTiltRangeFactor =
+      std::clamp(1.0f + (headSizeScale_ - 1.0f) * 0.70f, 1.0f, 1.80f);
+
+  float dynamicForwardTilt = maxForwardTilt_ * headTiltRangeFactor;
+  float dynamicBackwardTilt = maxBackwardTilt_ * headTiltRangeFactor;
+
   bodyTilt_ += bodyTiltVelocity_;
+  bodyTilt_ = std::clamp(bodyTilt_, dynamicForwardTilt, dynamicBackwardTilt);
 
-  // 限界角で止める
-  bodyTilt_ = std::clamp(bodyTilt_, maxForwardTilt_, maxBackwardTilt_);
-
-  // デバッグ：姿勢固定
   if (debugForceTilt_) {
     bodyTilt_ = debugTiltValue_;
   }
 
-  //--------------------------------
-  // 接地中に押し込み量を蓄積する
-  //--------------------------------
+  if (isRecoveringFromTilt_) {
+    float recoverPower = 0.010f * recoveryAssist_;
+
+    if (std::abs(bodyTilt_) > heavyFallTilt) {
+      recoverPower *= 1.6f;
+      velocityX_ *= 0.96f;
+    }
+
+    float tiltToTarget = recoverTargetTilt - bodyTilt_;
+    bodyTiltVelocity_ += tiltToTarget * recoverPower;
+  }
+
+  //==============================
+  // 接地中の drive 蓄積
+  //==============================
   float leftExtendAmount = 0.0f;
   float rightExtendAmount = 0.0f;
-
   float leftRecoverAmount = 0.0f;
   float rightRecoverAmount = 0.0f;
 
-  // 接地中に「ちゃんと押し込めている量」を溜める
   if (leftNowInput && isGrounded_ && velocityY_ <= 0.0f) {
     leftExtendAmount = (std::max)(0.0f, leftLegPrevBend_ - leftLegBend_);
 
@@ -1491,29 +1612,10 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     rightDriveAccum_ = std::clamp(rightDriveAccum_, 0.0f, maxDriveAccum_);
   }
 
+  //==============================
+  // 速度更新
+  //==============================
   bool wasGrounded = isGrounded_;
-  //--------------------------------
-  // 速度減衰
-  //--------------------------------
-  // velocityX_ *= inertia_;
-
-  // float maxSpeed = useCustomizeMove_ ? tuning_.maxSpeed : 1.0f;
-  // velocityX_ = std::clamp(velocityX_, -1.2f * maxSpeed, 1.2f * maxSpeed);
-
-  // moveX_ += velocityX_;
-
-  // velocityY_ -= gravity_;
-  // moveY_ += velocityY_;
-
-  // if (moveY_ <= groundY_) {
-  //   isGrounded_ = true;
-  //   moveY_ = groundY_;
-  //   velocityY_ = 0.0f;
-  // } else {
-  //   isGrounded_ = false;
-  // }
-
-  // bool justLanded = (!wasGrounded && isGrounded_);
 
   velocityX_ *= inertia_;
 
@@ -1525,9 +1627,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   velocityY_ -= gravity_;
   moveY_ += velocityY_;
 
-  // 着地する直前の落下速度を保存
-  float preLandVelocityY = velocityY_;
-
   if (moveY_ <= groundY_) {
     isGrounded_ = true;
     moveY_ = groundY_;
@@ -1538,10 +1637,12 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   bool justLanded = (!wasGrounded && isGrounded_);
 
-  static int logFrame = 0;
-  logFrame++;
-
-  if (logFrame % 10 == 0) {
+  if (justLanded) {
+    landTimer_ = 0.0f;
+  } else if (isGrounded_) {
+    landTimer_ += system_->GetDeltaTime();
+  } else {
+    landTimer_ = 999.0f;
   }
 
   if (justLanded) {
@@ -1555,9 +1656,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     requireReleaseAfterLandRight_ = rightNowInput;
   }
 
-  //--------------------------------
-  // 自然に元へ戻る
-  //--------------------------------
   bodyStretch_ *= 0.90f;
 }
 
@@ -1690,16 +1788,16 @@ void TravelScene::ApplyVisualState() {
     rightForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!leftThigh->objectParts_.empty()) {
-    leftThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // leftThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!leftShin->objectParts_.empty()) {
-    leftShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // leftShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!rightThigh->objectParts_.empty()) {
-    rightThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // rightThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!rightShin->objectParts_.empty()) {
-    rightShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // rightShin->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
 
   //================================
@@ -3211,6 +3309,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                   rightUpperArmAngleZ};
 
   // 左腿
+  const float leftThighLength = Length(Sub(cp->leftKneePos, cp->leftHipPos));
+
   leftThigh->mainPosition.transform.translate =
       Sub(cp->leftHipPos, cp->bellyPos);
 
@@ -3219,9 +3319,18 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float leftThighAngleZ = atan2(leftThighDir.x, -leftThighDir.y);
 
-  leftThigh->mainPosition.transform.rotate = {0.0f, 0.0f, leftThighAngleZ};
+  // leftThigh->mainPosition.transform.rotate = {0.0f, 0.0f, leftThighAngleZ};
+  leftThigh->mainPosition.transform.rotate = {-leftLegBend_ * 0.7f, 0.0f,
+                                              leftThighAngleZ};
+
+  float animatedLeftThighAngleX = -leftLegBend_ * 0.7f;
+  Vector3 leftKneeOffset = {
+      0.0f, -std::cos(animatedLeftThighAngleX) * leftThighLength,
+      -std::sin(animatedLeftThighAngleX) * leftThighLength};
 
   // 右腿
+  const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
+
   rightThigh->mainPosition.transform.translate =
       Sub(cp->rightHipPos, cp->bellyPos);
 
@@ -3230,7 +3339,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float rightThighAngleZ = atan2(rightThighDir.x, -rightThighDir.y);
 
-  rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, rightThighAngleZ};
+  // rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, rightThighAngleZ};
+  rightThigh->mainPosition.transform.rotate = {-rightLegBend_ * 0.7f, 0.0f,
+                                               rightThighAngleZ};
+
+  float animatedRightThighAngleX = -rightLegBend_ * 0.7f;
+  Vector3 rightKneeOffset = {
+      0.0f, -std::cos(animatedRightThighAngleX) * rightThighLength,
+      -std::sin(animatedRightThighAngleX) * rightThighLength};
 
   //==============================
   // 2段目 : 親の子
@@ -3326,10 +3442,20 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float leftShinAngleZ = atan2(leftShinDir.x, -leftShinDir.y);
 
+  // leftShin->mainPosition.transform.translate =
+  //     Sub(cp->leftKneePos, cp->bellyPos);
   leftShin->mainPosition.transform.translate =
-      Sub(cp->leftKneePos, cp->bellyPos);
+      leftThigh->mainPosition.transform.translate + leftKneeOffset;
 
-  leftShin->mainPosition.transform.rotate = {0.0f, 0.0f, leftShinAngleZ};
+  float leftThighSwing = -leftLegBend_ * 0.7f;
+
+  float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                      (legRecoverAngle_ - legKickAngle_),
+                                  0.0f, 1.0f);
+
+  float leftShinX = leftThighSwing * 0.35f + leftKneeFold * 0.6f + 0.3f;
+
+  leftShin->mainPosition.transform.rotate = {leftShinX, 0.0f, 0.0f};
 
   // 右脛
   Vector3 rightShinDir = Sub(cp->rightAnklePos, cp->rightKneePos);
@@ -3337,10 +3463,21 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float rightShinAngleZ = atan2(rightShinDir.x, -rightShinDir.y);
 
-  rightShin->mainPosition.transform.translate =
-      Sub(cp->rightKneePos, cp->bellyPos);
+  // rightShin->mainPosition.transform.translate =
+  //     Sub(cp->rightKneePos, cp->bellyPos);
 
-  rightShin->mainPosition.transform.rotate = {0.0f, 0.0f, rightShinAngleZ};
+  rightShin->mainPosition.transform.translate =
+      rightThigh->mainPosition.transform.translate + rightKneeOffset;
+
+  float rightThighSwing = -rightLegBend_ * 0.7f;
+
+  float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                       (legRecoverAngle_ - legKickAngle_),
+                                   0.0f, 1.0f);
+
+  float rightShinX = rightThighSwing * 0.35f + rightKneeFold * 0.6f + 0.3f;
+
+  rightShin->mainPosition.transform.rotate = {rightShinX, 0.0f, 0.0f};
 
   if (leftUpperArm->objectParts_.empty() || leftForeArm->objectParts_.empty() ||
       rightUpperArm->objectParts_.empty() ||
@@ -3447,10 +3584,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float rightForeArmLength =
       Length(Sub(cp->rightWristPos, cp->rightElbowPos));
 
-  const float leftThighLength = Length(Sub(cp->leftKneePos, cp->leftHipPos));
   const float leftShinLength = Length(Sub(cp->leftAnklePos, cp->leftKneePos));
 
-  const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
   const float rightShinLength =
       Length(Sub(cp->rightAnklePos, cp->rightKneePos));
 
@@ -3460,10 +3595,15 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // 胸部
   //============================
   // chestBody->mainPosition.transform.translate = chestCenterWorld;
-  chestBody->mainPosition.transform.translate = {moveX_ + chestCenterWorld.x,
+  // chestBody->mainPosition.transform.translate = {moveX_ + chestCenterWorld.x,
+  //                                               moveY_ + chestCenterWorld.y,
+  //                                               chestCenterWorld.z};
+
+  chestBody->mainPosition.transform.translate = {chestCenterWorld.x,
                                                  moveY_ + chestCenterWorld.y,
-                                                 chestCenterWorld.z};
-  chestBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+                                                 moveX_ + chestCenterWorld.z};
+
+  chestBody->mainPosition.transform.rotate = {-bodyTilt_, 0.0f, 0.0f};
 
   if (!chestBody->objectParts_.empty()) {
     chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength * 0.5f,
@@ -3474,6 +3614,9 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
         chestLength * chestParam.scale.y;
     chestBody->objectParts_[0].transform.scale.z =
         chestThicknessScale * chestParam.scale.z;
+    //    chestBody->objectParts_[0].transform.rotate = {bodyTilt_, -0.0f,
+    //    0.0f};
+    chestBody->objectParts_[0].transform.rotate = {0.0f, -0.0f, 0.0f};
   }
 
   //============================
@@ -3493,6 +3636,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
         stomachLength * stomachParam.scale.y;
     stomachBody->objectParts_[0].transform.scale.z =
         stomachThicknessScale * stomachParam.scale.z;
+    // stomachBody->objectParts_[0].transform.rotate = {bodyTilt_, -0.0f, 0.0f};
+    stomachBody->objectParts_[0].transform.rotate = {0.0f, -0.0f, 0.0f};
   }
 
   if (!neck->objectParts_.empty()) {
@@ -3590,6 +3735,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       leftThighLength * leftThighParam.scale.y * leftThighParam.length;
   leftThigh->objectParts_[0].transform.scale.z =
       leftThighThicknessScale * leftThighParam.scale.z;
+  // leftThigh->objectParts_[0].transform.rotate = {0.0f, -1.57f,
+  //                                              leftLegBend_ * 0.7f};
 
   //================================================
   // 左脛
@@ -3614,6 +3761,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       rightThighLength * rightThighParam.scale.y * rightThighParam.length;
   rightThigh->objectParts_[0].transform.scale.z =
       rightThighThicknessScale * rightThighParam.scale.z;
+  // rightThigh->objectParts_[0].transform.rotate = {0.0f, -1.57f,
+  //                                              rightLegBend_ * 0.7f};
 
   //================================================
   // 右脛

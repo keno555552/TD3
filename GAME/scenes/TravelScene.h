@@ -122,7 +122,7 @@ private:
 
   float moveY_ = 0.0f;     // プレイヤーの高さ
   float velocityY_ = 0.0f; // 縦速度
-  float gravity_ = 0.006f; // 重力
+  float gravity_ = 0.0045f; // 重力
   float groundY_ = 0.0f;   // 地面の高さ
   bool isGrounded_ = true; // 接地中か
   float jumpRatio_ = 3.0f; // ジャンプ係数
@@ -277,6 +277,20 @@ private:
   std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
 
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;
+
+  float leftLegReturnScale_ = 1.0f;
+  float rightLegReturnScale_ = 1.0f;
+  float timingWindowScale_ = 1.0f;
+  float recoveryAssist_ = 1.0f;
+
+  bool isRecoveringFromTilt_ = false;
+  float tiltRecoveryTimer_ = 0.0f;
+
+  float gaitTiltTarget_ = 0.0f;
+
+  float landTimer_ = 999.0f;
+
+  float headSizeScale_ = 1.0f;
 
 private:
   /// <summary>
