@@ -42,6 +42,16 @@ ContestScene::ContestScene(kEngine* system) {
     // PromptData からお題と審査員を取得してスコア計算
     const ThemeData* theme = PromptData::GetThemeData();
     const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
+
+    if (playerData != nullptr) {
+        Logger::Log("[ContestScene] LeftUpperArm count=%d RightUpperArm count=%d",
+            playerData->partParams[static_cast<size_t>(ModBodyPart::LeftUpperArm)].count,
+            playerData->partParams[static_cast<size_t>(ModBodyPart::RightUpperArm)].count);
+        Logger::Log("[ContestScene] LeftThigh count=%d RightThigh count=%d",
+            playerData->partParams[static_cast<size_t>(ModBodyPart::LeftThigh)].count,
+            playerData->partParams[static_cast<size_t>(ModBodyPart::RightThigh)].count);
+    }
+
     if (playerData != nullptr) {
         Logger::Log("[ContestScene] snapshots=%d default=%d",
             static_cast<int>(playerData->controlPointSnapshots.size()),

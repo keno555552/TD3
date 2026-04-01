@@ -113,6 +113,10 @@ void PromptScene::DecidePrompt() {
         return;
     }
 
+    Logger::Log("[PromptScene] texturePath: %s", selectedTheme_->texturePath.c_str());
+    int textureHandle = system_->LoadTexture(selectedTheme_->texturePath);
+    Logger::Log("[PromptScene] textureHandle: %d", textureHandle);
+
     // 審査員を 3 人選出して PromptData に保存
     auto selectedJudges = judgeManager_->SelectRandom(3);
     std::vector<JudgeData> judgesCopy;
@@ -152,6 +156,7 @@ void PromptScene::Draw() {
         ImGui::Text("Theme: %s", selectedTheme_->themeName.c_str());
         ImGui::Text("ID: %s", selectedTheme_->themeId.c_str());
         ImGui::Text("Category: %s", selectedTheme_->category.c_str());
+        ImGui::Text("TexturePath: %s", selectedTheme_->texturePath.c_str());
     } else {
         ImGui::Text("Press SPACE to decide theme");
     }
