@@ -292,6 +292,15 @@ private:
 
   float headSizeScale_ = 1.0f;
 
+  bool leftPrevInput_ = false;
+  bool rightPrevInput_ = false;
+
+  float torsoStabilityScale_ = 1.0f;
+  float torsoTiltResistance_ = 1.0f;
+  float torsoAgilityScale_ = 1.0f;
+
+  float torsoSizeScale_ = 1.0f;
+
 private:
   /// <summary>
   /// 使用するカメラを設定・更新する

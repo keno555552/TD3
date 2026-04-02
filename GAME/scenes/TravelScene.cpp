@@ -852,15 +852,57 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   const float armThicknessScale = (leftArmThickness + rightArmThickness) * 0.5f;
 
   const float neckThicknessScale = AvgXZ(neck);
-  const float headSizeScale = AvgXYZ(head);
+
+  //==============================
+  // 頭サイズは snapshot + control point ベースで取る
+  //==============================
+  const float upperNeckR = GetSnapshotRadius(ModBodyPart::Head, 8);
+  const float headCenterR = GetSnapshotRadius(ModBodyPart::Head, 9);
+
+  const float headThicknessScale =
+      (std::max)(upperNeckR, headCenterR) / baseRadius;
+
+  const Vector3 &upperNeckPos = customizeData_->controlPoints.upperNeckPos;
+  const Vector3 &headCenterPos = customizeData_->controlPoints.headCenterPos;
+
+  Vector3 headVec = {headCenterPos.x - upperNeckPos.x,
+                     headCenterPos.y - upperNeckPos.y,
+                     headCenterPos.z - upperNeckPos.z};
+
+  const float currentHeadLength = Length(headVec);
+  const float baseHeadLength = 0.55f;
+
+  float headLengthScale = 1.0f;
+  if (currentHeadLength > 0.0001f) {
+    headLengthScale = currentHeadLength / baseHeadLength;
+  }
+
+  // 太さ寄りで平均
+  const float headSizeScale =
+      (headThicknessScale * 2.0f + headLengthScale) / 3.0f;
+
   headSizeScale_ = headSizeScale;
 
   //==============================
   // 胴体の大きさ
   //==============================
-  const float chestScaleAvg = AvgXYZ(chest);
-  const float stomachScaleAvg = AvgXYZ(stomach);
-  const float torsoScaleAvg = (chestScaleAvg + stomachScaleAvg) * 0.5f;
+  const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
+  const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
+  const float waistR = GetControlPointRadius(ModControlPointRole::Waist);
+
+  const float chestThicknessScale = (std::max)(chestR, bellyR) / baseRadius;
+  const float stomachThicknessScale = (std::max)(bellyR, waistR) / baseRadius;
+
+  const float torsoScaleAvg =
+      (chestThicknessScale + stomachThicknessScale) * 0.5f;
+
+  torsoSizeScale_ = torsoScaleAvg;
+
+  torsoStabilityScale_ =
+      std::clamp(1.0f + (torsoScaleAvg - 1.0f) * 1.40f, 0.45f, 2.30f);
+
+  torsoTiltResistance_ =
+      std::clamp(1.0f - (torsoScaleAvg - 1.0f) * 0.85f, 0.35f, 1.15f);
 
   //==============================
   // 左右差
@@ -889,7 +931,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   //==============================
   tuning_.runPower += (avgLegLength - 1.0f) * 2.2f;
   tuning_.runPower -= (legThicknessScale - 1.0f) * 1.2f;
-  tuning_.runPower -= (torsoScaleAvg - 1.0f) * 1.0f;
   tuning_.runPower -= legDiff * 1.8f;
 
   //==============================
@@ -899,7 +940,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   //==============================
   tuning_.maxSpeed += (avgLegLength - 1.0f) * 2.7f;
   tuning_.maxSpeed -= (legThicknessScale - 1.0f) * 0.9f;
-  tuning_.maxSpeed -= (torsoScaleAvg - 1.0f) * 0.8f;
   tuning_.maxSpeed -= (headSizeScale - 1.0f) * 0.5f;
   tuning_.maxSpeed -= legDiff * 1.6f;
 
@@ -926,7 +966,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   //==============================
   tuning_.lift += (avgLegLength - 1.0f) * 2.3f;
   tuning_.lift -= (legThicknessScale - 1.0f) * 0.7f;
-  tuning_.lift -= (torsoScaleAvg - 1.0f) * 0.8f;
   tuning_.lift -= (headSizeScale - 1.0f) * 0.3f;
 
   float comOffset = std::clamp(features_.centerOfMassY, -3.0f, 3.0f);
@@ -941,7 +980,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   // tuning_.turnResponse += armDiff * 0.3f;
   tuning_.turnResponse += (neckLengthScale - 1.0f) * 0.8f;
   tuning_.turnResponse += features_.asymmetry * 0.5f;
-  tuning_.turnResponse -= (torsoScaleAvg - 1.0f) * 0.5f;
 
   //==============================
   // 追加パーツの影響
@@ -965,7 +1003,7 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
 
-leftLegReturnScale_ =
+  leftLegReturnScale_ =
       std::clamp(1.0f - (leftLegThickness - 1.0f) * 0.20f, 0.55f, 1.0f);
 
   rightLegReturnScale_ =
@@ -978,15 +1016,6 @@ leftLegReturnScale_ =
 
   // 安定してる体ほど起き上がりやすい
   recoveryAssist_ = std::clamp(0.7f + tuning_.stability * 0.25f, 0.6f, 1.4f);
-
-  Logger::Log("==== LEG RETURN SCALE CHECK ====\n");
-  Logger::Log("leftLegThickness : " + std::to_string(leftLegThickness) + "\n");
-  Logger::Log("rightLegThickness : " + std::to_string(rightLegThickness) +
-              "\n");
-  Logger::Log("leftLegReturnScale_ : " + std::to_string(leftLegReturnScale_) +
-              "\n");
-  Logger::Log("rightLegReturnScale_ : " + std::to_string(rightLegReturnScale_) +
-              "\n");
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
@@ -1146,24 +1175,6 @@ void TravelScene::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
   leftLegBend_ = std::clamp(leftLegBend_, -0.8f, 1.0f);
   rightLegBend_ = std::clamp(rightLegBend_, -0.8f, 1.0f);
 
-  static int legReturnLogFrame = 0;
-  legReturnLogFrame++;
-  if (legReturnLogFrame % 20 == 0) {
-    Logger::Log("==== LEG RETURN MOTION CHECK ====\n");
-    Logger::Log("leftNowInput : " + std::to_string(leftNowInput) + "\n");
-    Logger::Log("rightNowInput : " + std::to_string(rightNowInput) + "\n");
-    Logger::Log("leftFollow : " + std::to_string(leftFollow) + "\n");
-    Logger::Log("rightFollow : " + std::to_string(rightFollow) + "\n");
-    Logger::Log("leftMaxSpeed : " + std::to_string(leftMaxSpeed) + "\n");
-    Logger::Log("rightMaxSpeed : " + std::to_string(rightMaxSpeed) + "\n");
-    Logger::Log("leftLegBend_ : " + std::to_string(leftLegBend_) + "\n");
-    Logger::Log("rightLegBend_ : " + std::to_string(rightLegBend_) + "\n");
-    Logger::Log("leftLegBendSpeed_ : " + std::to_string(leftLegBendSpeed_) +
-                "\n");
-    Logger::Log("rightLegBendSpeed_ : " + std::to_string(rightLegBendSpeed_) +
-                "\n");
-  }
-
   bodyStretch_ = std::clamp(bodyStretch_, -0.5f, 1.0f);
 }
 
@@ -1181,39 +1192,17 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   isRecoveringFromTilt_ = (std::abs(bodyTilt_) > recoverStartTilt);
 
   //==============================
-  // 姿勢目標へ寄せる
-  //==============================
-  // gaitTiltTarget_ = std::clamp(gaitTiltTarget_, -0.75f, 0.75f);
-
-  // const float neutralTilt = -0.03f;
-  // const float bestTilt = -0.08f;
-  // const float lateTilt = 0.03f;
-  // const float veryLateTilt = 0.08f;
-
-  // gaitTiltTarget_ += (neutralTilt - gaitTiltTarget_) * 0.08f;
-
-  //// 何もなければ少しずつ中立へ戻る
-  // float targetTilt = gaitTiltTarget_;
-  // if (bothInput) {
-  //   targetTilt -= 0.03f;
-  // }
-
-  // float tiltError = targetTilt - bodyTilt_;
-  // bodyTiltVelocity_ += tiltError * 0.12f * turnResponse;
-
-  // float restoreTorque = -bodyTilt_ * 0.004f * stability;
-  // bodyTiltVelocity_ += restoreTorque;
-
-  //==============================
   // 姿勢：通常時は中立へ戻すだけ
   // 蹴った瞬間にだけ bodyTiltVelocity_ を入れる
   //==============================
   const float neutralTilt = -0.03f;
 
   float headRecoveryPenalty =
-      std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.30f, 0.65f, 1.0f);
+      std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.55f, 0.25f, 1.0f);
 
-  float neutralReturnPower = 0.050f * stability * headRecoveryPenalty;
+  float neutralReturnPower =
+      0.050f * stability * headRecoveryPenalty * torsoStabilityScale_;
+
   if (bothInput) {
     neutralReturnPower *= 0.85f;
   }
@@ -1350,6 +1339,8 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   // 威力に反映
   totalPush *= kickReadyPower;
 
+  bool startStepTrigger = isGrounded_ && landTimer_ > 0.30f && totalPush > 0.0f;
+
   //==============================
   // 着地タイミングで push を補正
   //==============================
@@ -1390,7 +1381,10 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
     float tiltImpulse = 0.0f;
 
-    if (!isGrounded_) {
+    if (startStepTrigger) {
+      tiltImpulse = 0.0f;
+
+    } else if (!isGrounded_) {
       // 空中入力：ほぼ無効
       totalPush *= 0.20f;
       tiltImpulse = 0.0f;
@@ -1415,9 +1409,10 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     }
 
     float headHeavyFactor =
-        std::clamp(1.0f + (headSizeScale_ - 1.0f) * 1.8f, 1.0f, 3.2f);
+        std::clamp(1.0f + (headSizeScale_ - 1.0f) * 2.0f, 1.0f, 3.5f);
 
-    bodyTiltVelocity_ += tiltImpulse * turnResponse * headHeavyFactor;
+    bodyTiltVelocity_ +=
+        tiltImpulse * turnResponse * headHeavyFactor * torsoTiltResistance_;
 
     const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
                            ->objectParts_[0]
@@ -1520,20 +1515,35 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     legThicknessPenalty = std::clamp(legThicknessPenalty, 0.30f, 1.15f);
 
     float headForwardPenalty =
-        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.45f, 0.35f, 1.0f);
+        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.12f, 0.75f, 1.0f);
+
+    float torsoForwardSupport =
+        std::clamp(1.0f + (torsoSizeScale_ - 1.0f) * 0.10f, 1.0f, 1.18f);
+
+    float legLengthForwardScale =
+        std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.65f, 0.75f, 1.80f);
 
     float pushX = totalPush * (0.15f + runPower * 1.05f + forwardRate * 0.20f) *
                   footForwardBonus * groundBoost * armLengthPenalty *
-                  headForwardPenalty;
+                  headForwardPenalty * torsoForwardSupport *
+                  legLengthForwardScale;
 
-    pushX *= postureEfficiency;
+    float postureXScale = 0.75f + postureEfficiency * 0.25f;
+    pushX *= postureXScale;
 
     // 前傾しすぎるほどつんのめって前進効率低下
-    pushX *= std::clamp(1.0f - forwardLean * 0.5f, 0.4f, 1.0f);
+    float headLeanPenaltyScale =
+        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.20f, 0.65f, 1.0f);
+
+    pushX *= std::clamp(1.0f - forwardLean * 0.22f * headLeanPenaltyScale,
+                        0.65f, 1.0f);
 
     float timingForwardScale = 1.0f;
 
-    if (landTimer_ <= bestTimingEnd) {
+    if (startStepTrigger) {
+      timingForwardScale = 1.0f;
+
+    } else if (landTimer_ <= bestTimingEnd) {
       timingForwardScale = 1.35f;
 
     } else if (landTimer_ <= lateTimingEnd) {
@@ -1557,32 +1567,34 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     pushY += backwardLean * 0.15f * legLengthUpwardScale;
 
     float headUpwardBias =
-        std::clamp((headSizeScale_ - 1.0f) * 0.08f, 0.0f, 0.12f);
+        std::clamp((headSizeScale_ - 1.0f) * 0.04f, 0.0f, 0.06f);
     pushY += headUpwardBias;
 
     // 遅い入力による上方向ボーナスも脚長依存にする
-    if (isGrounded_) {
+    if (!startStepTrigger && isGrounded_) {
       if (landTimer_ > bestTimingEnd && landTimer_ <= lateTimingEnd) {
         float lateRatio =
             (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
         lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
 
-        pushY += (0.05f + lateRatio * 0.10f) * legLengthUpwardScale;
+        pushY += (0.04f + lateRatio * 0.07f) * legLengthUpwardScale;
       } else if (landTimer_ > lateTimingEnd) {
-        pushY += 0.16f * legLengthUpwardScale;
+        pushY += 0.12f * legLengthUpwardScale;
       }
     }
 
     float timingUpwardScale = 1.0f;
-    if (landTimer_ <= bestTimingEnd) {
-      timingUpwardScale = 0.60f;
+    if (startStepTrigger) {
+      timingUpwardScale = 1.0f;
+    } else if (landTimer_ <= bestTimingEnd) {
+      timingUpwardScale = 0.65f;
     } else if (landTimer_ <= lateTimingEnd) {
       float lateRatio =
           (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
       lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
-      timingUpwardScale = 1.15f + lateRatio * 0.75f;
+      timingUpwardScale = 1.05f + lateRatio * 0.60f;
     } else {
-      timingUpwardScale = 2.10f;
+      timingUpwardScale = 1.75f;
     }
     pushY *= timingUpwardScale;
 
@@ -1590,6 +1602,12 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       pushY *= 0.60f;
     } else {
       pushY *= singleStepJumpScale;
+    }
+
+    if (startStepTrigger) {
+      float pushMagnitude = std::sqrt(pushX * pushX + pushY * pushY);
+      pushX = pushMagnitude * 0.707f;
+      pushY = pushMagnitude * 0.707f;
     }
 
     velocityX_ += pushX;
@@ -1612,14 +1630,20 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   //==============================
   // 姿勢更新
   //==============================
-  float tiltDamping = 0.82f;
+  float tiltDamping =
+      std::clamp(0.82f + (torsoSizeScale_ - 1.0f) * 0.08f, 0.76f, 0.92f);
   bodyTiltVelocity_ *= tiltDamping;
 
   float headTiltRangeFactor =
-      std::clamp(1.0f + (headSizeScale_ - 1.0f) * 0.70f, 1.0f, 1.80f);
+      std::clamp(1.0f + (headSizeScale_ - 1.0f) * 1.00f, 1.0f, 2.40f);
 
-  float dynamicForwardTilt = maxForwardTilt_ * headTiltRangeFactor;
-  float dynamicBackwardTilt = maxBackwardTilt_ * headTiltRangeFactor;
+  float torsoTiltRangeFactor =
+      std::clamp(1.0f - (torsoSizeScale_ - 1.0f) * 0.45f, 0.65f, 1.10f);
+
+  float dynamicForwardTilt =
+      maxForwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor;
+  float dynamicBackwardTilt =
+      maxBackwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor;
 
   bodyTilt_ += bodyTiltVelocity_;
   bodyTilt_ = std::clamp(bodyTilt_, dynamicForwardTilt, dynamicBackwardTilt);
@@ -1629,10 +1653,11 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   }
 
   if (isRecoveringFromTilt_) {
-    float recoverPower = 0.010f * recoveryAssist_;
+    float recoverPower =
+        0.010f * recoveryAssist_ * headRecoveryPenalty * torsoStabilityScale_;
 
     if (std::abs(bodyTilt_) > heavyFallTilt) {
-      recoverPower *= 1.6f;
+      recoverPower *= 1.4f;
       velocityX_ *= 0.96f;
     }
 
@@ -1733,6 +1758,9 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   }
 
   bodyStretch_ *= 0.90f;
+
+  leftPrevInput_ = leftNowInput;
+  rightPrevInput_ = rightNowInput;
 }
 
 void TravelScene::ApplyVisualState() {
@@ -3336,6 +3364,16 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const float chestLength = Length(Sub(cp->chestPos, cp->bellyPos));
   const float stomachLength = Length(Sub(cp->bellyPos, cp->waistPos));
 
+  const float leftUpperArmLength =
+      Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
+  const float leftForeArmLength =
+      Length(Sub(cp->leftWristPos, cp->leftElbowPos));
+
+  const float rightUpperArmLength =
+      Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
+  const float rightForeArmLength =
+      Length(Sub(cp->rightWristPos, cp->rightElbowPos));
+
   //==============================
   // 1段目 : body の子
   //==============================
@@ -3358,8 +3396,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   neck->mainPosition.transform.rotate = {0.0f, 0.0f, neckAngleZ};
 
   // 左上腕
-  // leftUpperArm->mainPosition.transform.translate =
-  //    Sub(cp->leftShoulderPos, cp->chestPos);
+  const float armSwingScale = 0.60f;
+
   Vector3 chestOffset = Sub(cp->chestPos, chestCenterWorld);
   leftUpperArm->mainPosition.transform.translate =
       Sub(cp->leftShoulderPos, cp->chestPos) + chestOffset;
@@ -3369,8 +3407,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float leftUpperArmAngleZ = atan2(leftUpperArmDir.x, -leftUpperArmDir.y);
 
-  leftUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f,
-                                                 leftUpperArmAngleZ};
+  leftUpperArm->mainPosition.transform.rotate = {-rightLegBend_ * armSwingScale,
+                                                 0.0f, leftUpperArmAngleZ};
 
   // 右上腕
   rightUpperArm->mainPosition.transform.translate =
@@ -3381,8 +3419,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float rightUpperArmAngleZ = atan2(rightUpperArmDir.x, -rightUpperArmDir.y);
 
-  rightUpperArm->mainPosition.transform.rotate = {0.0f, 0.0f,
-                                                  rightUpperArmAngleZ};
+  rightUpperArm->mainPosition.transform.rotate = {-leftLegBend_ * armSwingScale,
+                                                  0.0f, rightUpperArmAngleZ};
 
   // 左腿
   const float leftThighLength = Length(Sub(cp->leftKneePos, cp->leftHipPos));
@@ -3415,7 +3453,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float rightThighAngleZ = atan2(rightThighDir.x, -rightThighDir.y);
 
-  // rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f, rightThighAngleZ};
+  // rightThigh->mainPosition.transform.rotate = {0.0f, 0.0f,
+  // rightThighAngleZ};
   rightThigh->mainPosition.transform.rotate = {-rightLegBend_ * 0.7f, 0.0f,
                                                rightThighAngleZ};
 
@@ -3486,17 +3525,35 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   head->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
 
   // 左前腕
+  float animatedLeftUpperArmAngleX = -rightLegBend_ * armSwingScale;
+  Vector3 leftElbowOffset = {
+      0.0f, -std::cos(animatedLeftUpperArmAngleX) * leftUpperArmLength,
+      -std::sin(animatedLeftUpperArmAngleX) * leftUpperArmLength};
+
+  float animatedRightUpperArmAngleX = -leftLegBend_ * armSwingScale;
+  Vector3 rightElbowOffset = {
+      0.0f, -std::cos(animatedRightUpperArmAngleX) * rightUpperArmLength,
+      -std::sin(animatedRightUpperArmAngleX) * rightUpperArmLength};
+
   Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
   leftForeArmDir = Normalize(leftForeArmDir);
 
-  // float leftUpperArmLength = Length(Sub(cp->leftElbowPos,
-  // cp->leftShoulderPos));
   float leftForeArmAngleZ = atan2(leftForeArmDir.x, -leftForeArmDir.y);
 
-  leftForeArm->mainPosition.transform.translate =
-      Sub(cp->leftElbowPos, cp->chestPos);
+  float leftUpperArmSwing = -rightLegBend_ * armSwingScale;
 
-  leftForeArm->mainPosition.transform.rotate = {0.0f, 0.0f, leftForeArmAngleZ};
+  float leftElbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                       (legRecoverAngle_ - legKickAngle_),
+                                   0.0f, 1.0f);
+
+  float leftForeArmX =
+      -(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f + 0.20f);
+
+  leftForeArm->mainPosition.transform.translate =
+      leftUpperArm->mainPosition.transform.translate + leftElbowOffset;
+
+  leftForeArm->mainPosition.transform.rotate = {leftForeArmX, 0.0f,
+                                                leftForeArmAngleZ};
 
   // 右前腕
   Vector3 rightForeArmDir = Sub(cp->rightWristPos, cp->rightElbowPos);
@@ -3506,10 +3563,19 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   //     Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
   float rightForeArmAngleZ = atan2(rightForeArmDir.x, -rightForeArmDir.y);
 
-  rightForeArm->mainPosition.transform.translate =
-      Sub(cp->rightElbowPos, cp->chestPos);
+  float rightUpperArmSwing = -leftLegBend_ * armSwingScale;
 
-  rightForeArm->mainPosition.transform.rotate = {0.0f, 0.0f,
+  float rightElbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                        (legRecoverAngle_ - legKickAngle_),
+                                    0.0f, 1.0f);
+
+  float rightForeArmX =
+      -(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f + 0.20f);
+
+  rightForeArm->mainPosition.transform.translate =
+      rightUpperArm->mainPosition.transform.translate + rightElbowOffset;
+
+  rightForeArm->mainPosition.transform.rotate = {rightForeArmX, 0.0f,
                                                  rightForeArmAngleZ};
 
   // 左脛
@@ -3650,15 +3716,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   //================================================
   // 長さ
   //================================================
-  const float leftUpperArmLength =
-      Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
-  const float leftForeArmLength =
-      Length(Sub(cp->leftWristPos, cp->leftElbowPos));
-
-  const float rightUpperArmLength =
-      Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
-  const float rightForeArmLength =
-      Length(Sub(cp->rightWristPos, cp->rightElbowPos));
 
   const float leftShinLength = Length(Sub(cp->leftAnklePos, cp->leftKneePos));
 
@@ -3671,8 +3728,10 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // 胸部
   //============================
   // chestBody->mainPosition.transform.translate = chestCenterWorld;
-  // chestBody->mainPosition.transform.translate = {moveX_ + chestCenterWorld.x,
-  //                                               moveY_ + chestCenterWorld.y,
+  // chestBody->mainPosition.transform.translate = {moveX_ +
+  // chestCenterWorld.x,
+  //                                               moveY_ +
+  //                                               chestCenterWorld.y,
   //                                               chestCenterWorld.z};
 
   chestBody->mainPosition.transform.translate = {chestCenterWorld.x,
@@ -3684,12 +3743,15 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   if (!chestBody->objectParts_.empty()) {
     chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength * 0.5f,
                                                       0.0f};
-    chestBody->objectParts_[0].transform.scale.x =
-        chestThicknessScale * chestParam.scale.x;
+    // chestBody->objectParts_[0].transform.scale.x =
+    //     chestThicknessScale * chestParam.scale.x;
+    // chestBody->objectParts_[0].transform.scale.y =
+    //     chestLength * chestParam.scale.y;
+    // chestBody->objectParts_[0].transform.scale.z =
+    //     chestThicknessScale * chestParam.scale.z;
+
     chestBody->objectParts_[0].transform.scale.y =
-        chestLength * chestParam.scale.y;
-    chestBody->objectParts_[0].transform.scale.z =
-        chestThicknessScale * chestParam.scale.z;
+        chestLength * chestParam.scale.y * chestParam.length;
     //    chestBody->objectParts_[0].transform.rotate = {bodyTilt_, -0.0f,
     //    0.0f};
     chestBody->objectParts_[0].transform.rotate = {0.0f, -0.0f, 0.0f};
@@ -3706,13 +3768,18 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   if (!stomachBody->objectParts_.empty()) {
     stomachBody->objectParts_[0].transform.translate = {
         0.0f, -stomachLength * 0.5f, 0.0f};
-    stomachBody->objectParts_[0].transform.scale.x =
-        stomachThicknessScale * stomachParam.scale.x;
+    // stomachBody->objectParts_[0].transform.scale.x =
+    //     stomachThicknessScale * stomachParam.scale.x;
+    // stomachBody->objectParts_[0].transform.scale.y =
+    //     stomachLength * stomachParam.scale.y;
+    // stomachBody->objectParts_[0].transform.scale.z =
+    //     stomachThicknessScale * stomachParam.scale.z;
+
     stomachBody->objectParts_[0].transform.scale.y =
-        stomachLength * stomachParam.scale.y;
-    stomachBody->objectParts_[0].transform.scale.z =
-        stomachThicknessScale * stomachParam.scale.z;
-    // stomachBody->objectParts_[0].transform.rotate = {bodyTilt_, -0.0f, 0.0f};
+        stomachLength * stomachParam.scale.y * stomachParam.length;
+
+    // stomachBody->objectParts_[0].transform.rotate = {bodyTilt_, -0.0f,
+    // 0.0f};
     stomachBody->objectParts_[0].transform.rotate = {0.0f, -0.0f, 0.0f};
   }
 
@@ -3720,19 +3787,22 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     neck->objectParts_[0].transform.translate = {0.0f, -neckLength * 0.5f,
                                                  0.0f};
 
-    neck->objectParts_[0].transform.scale.x =
-        neckThicknessScale * neckParam.scale.x;
-    neck->objectParts_[0].transform.scale.y = neckLength * neckParam.scale.y;
-    neck->objectParts_[0].transform.scale.z =
-        neckThicknessScale * neckParam.scale.z;
+    // neck->objectParts_[0].transform.scale.x =
+    //     neckThicknessScale * neckParam.scale.x;
+    // neck->objectParts_[0].transform.scale.y = neckLength * neckParam.scale.y;
+    // neck->objectParts_[0].transform.scale.z =
+    //     neckThicknessScale * neckParam.scale.z;
+
+    neck->objectParts_[0].transform.scale.y =
+        neckLength * neckParam.scale.y * neckParam.length;
   }
 
   float headHeight = 0.0001f;
 
   if (hasBaseUpperNeck && hasBaseHeadCenter) {
-    headHeight = Length(Sub(baseHeadCenterPos, baseUpperNeckPos));
+    headHeight = Length(Sub(baseHeadCenterPos, baseUpperNeckPos) * 2.0f);
   } else {
-    headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos));
+    headHeight = Length(Sub(cp->headCenterPos, cp->upperNeckPos) * 2.0f);
   }
 
   if (headHeight < 0.0001f) {
@@ -3750,6 +3820,25 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     head->objectParts_[0].transform.scale.z =
         headThicknessScale * headParam.scale.z;
   }
+
+Logger::Log("head final scale.y : " +
+              std::to_string(head->objectParts_[0].transform.scale.y) + "\n");
+
+  Logger::Log("leftUpperArm final scale.y : " +
+              std::to_string(leftUpperArm->objectParts_[0].transform.scale.y) +
+              "\n");
+
+  Logger::Log("leftForeArm final scale.y : " +
+              std::to_string(leftForeArm->objectParts_[0].transform.scale.y) +
+              "\n");
+
+  Logger::Log("chest final scale.y : " +
+              std::to_string(chestBody->objectParts_[0].transform.scale.y) +
+              "\n");
+
+  Logger::Log("stomach final scale.y : " +
+              std::to_string(stomachBody->objectParts_[0].transform.scale.y) +
+              "\n");
 
   //================================================
   // 左上腕
