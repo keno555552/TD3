@@ -2933,6 +2933,21 @@ void ModScene::UpdateModObjects() {
     if (object != nullptr) {
       modBodies_[id].Apply(object);
     }
+    if (object != nullptr && !object->objectParts_.empty()) {
+      const PartNode *node = assembly_.FindNode(id);
+      if (node != nullptr) {
+        if (node->part == ModBodyPart::Head ||
+            node->part == ModBodyPart::ChestBody ||
+            node->part == ModBodyPart::StomachBody ||
+            node->part == ModBodyPart::LeftUpperArm ||
+            node->part == ModBodyPart::LeftForeArm) {
+
+          Logger::Log("MOD FINAL SCALE Y : part=%d scaleY=%.6f",
+                      static_cast<int>(node->part),
+                      object->objectParts_[0].transform.scale.y);
+        }
+      }
+    }
   }
 
   int fadedGroupId = -1;
