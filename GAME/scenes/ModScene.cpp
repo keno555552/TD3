@@ -2941,10 +2941,6 @@ void ModScene::UpdateModObjects() {
             node->part == ModBodyPart::StomachBody ||
             node->part == ModBodyPart::LeftUpperArm ||
             node->part == ModBodyPart::LeftForeArm) {
-
-          Logger::Log("MOD FINAL SCALE Y : part=%d scaleY=%.6f",
-                      static_cast<int>(node->part),
-                      object->objectParts_[0].transform.scale.y);
         }
       }
     }
