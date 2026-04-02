@@ -3437,11 +3437,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   leftThigh->mainPosition.transform.rotate = {-leftLegBend_ * 0.7f, 0.0f,
                                               leftThighAngleZ};
 
-  float animatedLeftThighAngleX = -leftLegBend_ * 0.7f;
-  Vector3 leftKneeOffset = {
-      0.0f, -std::cos(animatedLeftThighAngleX) * leftThighLength,
-      -std::sin(animatedLeftThighAngleX) * leftThighLength};
-
   // 右腿
   const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
 
@@ -3457,11 +3452,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // rightThighAngleZ};
   rightThigh->mainPosition.transform.rotate = {-rightLegBend_ * 0.7f, 0.0f,
                                                rightThighAngleZ};
-
-  float animatedRightThighAngleX = -rightLegBend_ * 0.7f;
-  Vector3 rightKneeOffset = {
-      0.0f, -std::cos(animatedRightThighAngleX) * rightThighLength,
-      -std::sin(animatedRightThighAngleX) * rightThighLength};
 
   //==============================
   // 2段目 : 親の子
@@ -3524,24 +3514,43 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   head->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
 
-  // 左前腕
+  //================================
+  // 前腕：上腕アニメ後の肘位置を毎フレーム使う
+  //================================
+
   float animatedLeftUpperArmAngleX = -rightLegBend_ * armSwingScale;
-  Vector3 leftElbowOffset = {
-      0.0f, -std::cos(animatedLeftUpperArmAngleX) * leftUpperArmLength,
-      -std::sin(animatedLeftUpperArmAngleX) * leftUpperArmLength};
-
   float animatedRightUpperArmAngleX = -leftLegBend_ * armSwingScale;
-  Vector3 rightElbowOffset = {
-      0.0f, -std::cos(animatedRightUpperArmAngleX) * rightUpperArmLength,
-      -std::sin(animatedRightUpperArmAngleX) * rightUpperArmLength};
 
+  // 左上腕アニメ後の肘位置（chestローカル）
+  Vector3 leftAnimatedElbowPos = leftUpperArm->mainPosition.transform.translate;
+  leftAnimatedElbowPos.x += std::sin(leftUpperArmAngleZ) *
+                            std::cos(animatedLeftUpperArmAngleX) *
+                            leftUpperArmLength;
+  leftAnimatedElbowPos.y += -std::cos(leftUpperArmAngleZ) *
+                            std::cos(animatedLeftUpperArmAngleX) *
+                            leftUpperArmLength;
+  leftAnimatedElbowPos.z +=
+      -std::sin(animatedLeftUpperArmAngleX) * leftUpperArmLength;
+
+  // 右上腕アニメ後の肘位置（chestローカル）
+  Vector3 rightAnimatedElbowPos =
+      rightUpperArm->mainPosition.transform.translate;
+  rightAnimatedElbowPos.x += std::sin(rightUpperArmAngleZ) *
+                             std::cos(animatedRightUpperArmAngleX) *
+                             rightUpperArmLength;
+  rightAnimatedElbowPos.y += -std::cos(rightUpperArmAngleZ) *
+                             std::cos(animatedRightUpperArmAngleX) *
+                             rightUpperArmLength;
+  rightAnimatedElbowPos.z +=
+      -std::sin(animatedRightUpperArmAngleX) * rightUpperArmLength;
+
+  // 左前腕
   Vector3 leftForeArmDir = Sub(cp->leftWristPos, cp->leftElbowPos);
   leftForeArmDir = Normalize(leftForeArmDir);
 
   float leftForeArmAngleZ = atan2(leftForeArmDir.x, -leftForeArmDir.y);
 
   float leftUpperArmSwing = -rightLegBend_ * armSwingScale;
-
   float leftElbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
                                        (legRecoverAngle_ - legKickAngle_),
                                    0.0f, 1.0f);
@@ -3549,9 +3558,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   float leftForeArmX =
       -(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f + 0.20f);
 
-  leftForeArm->mainPosition.transform.translate =
-      leftUpperArm->mainPosition.transform.translate + leftElbowOffset;
-
+  leftForeArm->mainPosition.transform.translate = leftAnimatedElbowPos;
   leftForeArm->mainPosition.transform.rotate = {leftForeArmX, 0.0f,
                                                 leftForeArmAngleZ};
 
@@ -3559,12 +3566,9 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   Vector3 rightForeArmDir = Sub(cp->rightWristPos, cp->rightElbowPos);
   rightForeArmDir = Normalize(rightForeArmDir);
 
-  // float rightUpperArmLength =
-  //     Length(Sub(cp->rightElbowPos, cp->rightShoulderPos));
   float rightForeArmAngleZ = atan2(rightForeArmDir.x, -rightForeArmDir.y);
 
   float rightUpperArmSwing = -leftLegBend_ * armSwingScale;
-
   float rightElbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
@@ -3572,11 +3576,35 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   float rightForeArmX =
       -(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f + 0.20f);
 
-  rightForeArm->mainPosition.transform.translate =
-      rightUpperArm->mainPosition.transform.translate + rightElbowOffset;
-
+  rightForeArm->mainPosition.transform.translate = rightAnimatedElbowPos;
   rightForeArm->mainPosition.transform.rotate = {rightForeArmX, 0.0f,
                                                  rightForeArmAngleZ};
+
+  //================================
+  // 脛：腿アニメ後の膝位置を毎フレーム使う
+  //================================
+
+  float animatedLeftThighAngleX = -leftLegBend_ * 0.7f;
+  float animatedRightThighAngleX = -rightLegBend_ * 0.7f;
+
+  // 左腿アニメ後の膝位置（stomachローカル）
+  Vector3 leftAnimatedKneePos = leftThigh->mainPosition.transform.translate;
+  leftAnimatedKneePos.x += std::sin(leftThighAngleZ) *
+                           std::cos(animatedLeftThighAngleX) * leftThighLength;
+  leftAnimatedKneePos.y += -std::cos(leftThighAngleZ) *
+                           std::cos(animatedLeftThighAngleX) * leftThighLength;
+  leftAnimatedKneePos.z += -std::sin(animatedLeftThighAngleX) * leftThighLength;
+
+  // 右腿アニメ後の膝位置（stomachローカル）
+  Vector3 rightAnimatedKneePos = rightThigh->mainPosition.transform.translate;
+  rightAnimatedKneePos.x += std::sin(rightThighAngleZ) *
+                            std::cos(animatedRightThighAngleX) *
+                            rightThighLength;
+  rightAnimatedKneePos.y += -std::cos(rightThighAngleZ) *
+                            std::cos(animatedRightThighAngleX) *
+                            rightThighLength;
+  rightAnimatedKneePos.z +=
+      -std::sin(animatedRightThighAngleX) * rightThighLength;
 
   // 左脛
   Vector3 leftShinDir = Sub(cp->leftAnklePos, cp->leftKneePos);
@@ -3584,20 +3612,15 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float leftShinAngleZ = atan2(leftShinDir.x, -leftShinDir.y);
 
-  // leftShin->mainPosition.transform.translate =
-  //     Sub(cp->leftKneePos, cp->bellyPos);
-  leftShin->mainPosition.transform.translate =
-      leftThigh->mainPosition.transform.translate + leftKneeOffset;
-
   float leftThighSwing = -leftLegBend_ * 0.7f;
-
   float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
                                       (legRecoverAngle_ - legKickAngle_),
                                   0.0f, 1.0f);
 
   float leftShinX = leftThighSwing * 0.35f + leftKneeFold * 0.6f + 0.3f;
 
-  leftShin->mainPosition.transform.rotate = {leftShinX, 0.0f, 0.0f};
+  leftShin->mainPosition.transform.translate = leftAnimatedKneePos;
+  leftShin->mainPosition.transform.rotate = {leftShinX, 0.0f, leftShinAngleZ};
 
   // 右脛
   Vector3 rightShinDir = Sub(cp->rightAnklePos, cp->rightKneePos);
@@ -3605,21 +3628,16 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   float rightShinAngleZ = atan2(rightShinDir.x, -rightShinDir.y);
 
-  // rightShin->mainPosition.transform.translate =
-  //     Sub(cp->rightKneePos, cp->bellyPos);
-
-  rightShin->mainPosition.transform.translate =
-      rightThigh->mainPosition.transform.translate + rightKneeOffset;
-
   float rightThighSwing = -rightLegBend_ * 0.7f;
-
   float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
                                        (legRecoverAngle_ - legKickAngle_),
                                    0.0f, 1.0f);
 
   float rightShinX = rightThighSwing * 0.35f + rightKneeFold * 0.6f + 0.3f;
 
-  rightShin->mainPosition.transform.rotate = {rightShinX, 0.0f, 0.0f};
+  rightShin->mainPosition.transform.translate = rightAnimatedKneePos;
+  rightShin->mainPosition.transform.rotate = {rightShinX, 0.0f,
+                                              rightShinAngleZ};
 
   if (leftUpperArm->objectParts_.empty() || leftForeArm->objectParts_.empty() ||
       rightUpperArm->objectParts_.empty() ||
