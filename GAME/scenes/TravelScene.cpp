@@ -3821,25 +3821,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
         headThicknessScale * headParam.scale.z;
   }
 
-Logger::Log("head final scale.y : " +
-              std::to_string(head->objectParts_[0].transform.scale.y) + "\n");
-
-  Logger::Log("leftUpperArm final scale.y : " +
-              std::to_string(leftUpperArm->objectParts_[0].transform.scale.y) +
-              "\n");
-
-  Logger::Log("leftForeArm final scale.y : " +
-              std::to_string(leftForeArm->objectParts_[0].transform.scale.y) +
-              "\n");
-
-  Logger::Log("chest final scale.y : " +
-              std::to_string(chestBody->objectParts_[0].transform.scale.y) +
-              "\n");
-
-  Logger::Log("stomach final scale.y : " +
-              std::to_string(stomachBody->objectParts_[0].transform.scale.y) +
-              "\n");
-
   //================================================
   // 左上腕
   //================================================
