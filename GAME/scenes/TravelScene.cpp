@@ -1725,45 +1725,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   //   isGrounded_ = false;
   // }
 
-  static int groundCheckLogFrame = 0;
-  groundCheckLogFrame++;
-
-  if (groundCheckLogFrame % 20 == 0) {
-    const ModControlPointData *logCp = GetControlPoints();
-
-    if (logCp != nullptr) {
-      auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
-        return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
-      };
-
-      const Vector3 chestCenterWorld = Mid(logCp->chestPos, logCp->bellyPos);
-
-      const float lowestFootLocalY =
-          (std::min)(logCp->leftAnklePos.y, logCp->rightAnklePos.y);
-
-      const float contactMoveY =
-          groundY_ - (chestCenterWorld.y + lowestFootLocalY);
-
-      const float lowestFootWorldY =
-          moveY_ + chestCenterWorld.y + lowestFootLocalY;
-
-      Logger::Log("==== GROUND CHECK ====\n");
-      Logger::Log("groundY_ : %.3f\n", groundY_);
-      Logger::Log("moveY_ : %.3f\n", moveY_);
-      Logger::Log("chestCenterWorld.y : %.3f\n", chestCenterWorld.y);
-      Logger::Log("leftAnkleLocalY : %.3f\n", logCp->leftAnklePos.y);
-      Logger::Log("rightAnkleLocalY : %.3f\n", logCp->rightAnklePos.y);
-      Logger::Log("lowestFootLocalY : %.3f\n", lowestFootLocalY);
-      Logger::Log("contactMoveY : %.3f\n", contactMoveY);
-      Logger::Log("lowestFootWorldY(current) : %.3f\n", lowestFootWorldY);
-      Logger::Log("isGrounded_ : %d\n", isGrounded_ ? 1 : 0);
-      Logger::Log("velocityY_ : %.3f\n", velocityY_);
-    } else {
-      Logger::Log("==== GROUND CHECK ====\n");
-      Logger::Log("control point is nullptr\n");
-    }
-  }
-
   const ModControlPointData *cp = GetControlPoints();
 
   if (cp != nullptr) {
@@ -1972,47 +1933,6 @@ void TravelScene::ApplyVisualState() {
   UpdateModObjects();
 
   UpdateExtraVisualParts();
-
-  static int groundCheckLogFrame = 0;
-  groundCheckLogFrame++;
-
-  if (groundCheckLogFrame % 20 == 0) {
-    const ModControlPointData *logCp = GetControlPoints();
-
-    if (logCp != nullptr) {
-      const float lowestFootLocalY =
-          (std::min)(logCp->leftAnklePos.y, logCp->rightAnklePos.y);
-
-      const float contactMoveY = groundY_ - lowestFootLocalY;
-      const float lowestFootWorldY = moveY_ + lowestFootLocalY;
-
-      Logger::Log("==== GROUND CHECK ====\n");
-      Logger::Log("groundY_ : %.3f\n", groundY_);
-      Logger::Log("moveY_ : %.3f\n", moveY_);
-      Logger::Log("leftAnkleLocalY : %.3f\n", logCp->leftAnklePos.y);
-      Logger::Log("rightAnkleLocalY : %.3f\n", logCp->rightAnklePos.y);
-      Logger::Log("lowestFootLocalY : %.3f\n", lowestFootLocalY);
-      Logger::Log("contactMoveY : %.3f\n", contactMoveY);
-      Logger::Log("lowestFootWorldY(current) : %.3f\n", lowestFootWorldY);
-      Logger::Log("isGrounded_ : %d\n", isGrounded_ ? 1 : 0);
-      Logger::Log("velocityY_ : %.3f\n", velocityY_);
-    } else {
-      Logger::Log("==== GROUND CHECK ====\n");
-      Logger::Log("control point is nullptr\n");
-    }
-  }
-
-  static int groundVisualLogFrame = 0;
-  groundVisualLogFrame++;
-
-  if (groundVisualLogFrame % 20 == 0) {
-    Logger::Log("==== GROUND VISUAL ====\n");
-    Logger::Log("groundY_ : %.3f\n", groundY_);
-    Logger::Log("groundObjTranslateY : %.3f\n",
-                ground_->mainPosition.transform.translate.y);
-    Logger::Log("groundObjScaleY : %.3f\n",
-                ground_->mainPosition.transform.scale.y);
-  }
 
   // 地面のUpdate　一旦仮でここに配置
   if (ground_ != nullptr) {
