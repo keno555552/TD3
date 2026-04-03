@@ -247,6 +247,7 @@ void TravelScene::Draw() {
   ImGui::Begin("Time");
 
   ImGui::Text("Remaining Time : %.2f", timeLimit_);
+  ImGui::Text("TimeLimit : %.2f", travelTimeLimit_);
   ImGui::Text("Time Up : %s", isTimeUp_ ? "YES" : "NO");
 
   ImGui::End();
@@ -538,6 +539,7 @@ void TravelScene::LoadCustomizeData() {
 
   // ModScene から引き継いだ残り時間を復元する
   timeLimit_ = customizeData_->timeLimit_;
+  travelTimeLimit_ = timeLimit_;
   isTimeUp_ = customizeData_->isTimeUp_;
 
   bodyJointOffsets_ = customizeData_->bodyJointOffsets;
@@ -1085,7 +1087,9 @@ void TravelScene::SavePreviousFrameState() {
 
 void TravelScene::UpdateTimeLimit(float deltaTime) {
   if (!isTimeUp_ && !isGoalReached_) {
-    timeLimit_ -= deltaTime;
+    if (!fade_.IsBusy()) {
+      timeLimit_ -= deltaTime;
+    }
 
     if (timeLimit_ <= 0.0f) {
       timeLimit_ = 0.0f;
@@ -1965,7 +1969,8 @@ void TravelScene::UpdateSceneTransition() {
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::RETRY;
 
-    timeLimit_ = customizeData_->totalTimeLimit_;
+    // timeLimit_ = customizeData_->totalTimeLimit_;
+    timeLimit_ = travelTimeLimit_;
     isTimeUp_ = false;
   }
 
@@ -1983,6 +1988,8 @@ void TravelScene::UpdateSceneTransition() {
     fade_.StartFadeOut();
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::RETRY;
+
+    timeLimit_ = travelTimeLimit_;
   }
 
 #endif

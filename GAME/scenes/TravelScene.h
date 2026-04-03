@@ -120,12 +120,12 @@ private:
 
   float inertia_ = 0.96f; // 高いほど流れが残る
 
-  float moveY_ = 0.0f;     // プレイヤーの高さ
-  float velocityY_ = 0.0f; // 縦速度
+  float moveY_ = 0.0f;      // プレイヤーの高さ
+  float velocityY_ = 0.0f;  // 縦速度
   float gravity_ = 0.0045f; // 重力
-  float groundY_ = 0.0f;   // 地面の高さ
-  bool isGrounded_ = true; // 接地中か
-  float jumpRatio_ = 3.0f; // ジャンプ係数
+  float groundY_ = 0.0f;    // 地面の高さ
+  bool isGrounded_ = true;  // 接地中か
+  float jumpRatio_ = 3.0f;  // ジャンプ係数
 
   /* プレイヤー姿勢用変数
 　------------------------------*/
@@ -269,6 +269,7 @@ private:
 
   // 制限時間
   float timeLimit_ = 30.0f;
+  float travelTimeLimit_ = 1.0f;
   bool isTimeUp_ = false;
 
   // 追加オブジェクト
