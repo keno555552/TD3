@@ -1936,7 +1936,7 @@ void TravelScene::ApplyVisualState() {
 
   // 地面のUpdate　一旦仮でここに配置
   if (ground_ != nullptr) {
-    constexpr float groundTopOffset = 0.15f;
+    constexpr float groundTopOffset = 0.5f;
 
     ground_->mainPosition.transform.translate.x = 0.0f;
     ground_->mainPosition.transform.translate.y = groundY_ - groundTopOffset;
