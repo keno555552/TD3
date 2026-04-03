@@ -489,4 +489,6 @@ public:
 	float timeLimit_ = 180.0f;      // 制限時間（秒）
 	float totalTimeLimit_ = 180.0f; // 制限時間の初期値（秒）。リセット用
 	bool isTimeUp_ = false;        // 時間切れになったか
+
+	bool ShouldBlockDebugCameraMouseControl() const;
 };
