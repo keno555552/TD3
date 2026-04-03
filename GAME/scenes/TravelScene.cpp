@@ -31,12 +31,12 @@ TravelScene::TravelScene(kEngine *system) {
   camera_ = system_->CreateCamera();
 
   // デバッグカメラ初期位置
-  debugCamera_->SetTranslate({48.0f, 0.0f, 0.0f});
+  debugCamera_->SetTranslate({48.0f, 5.0f, 0.0f});
   debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
   debugCamera_->SetRotation({0.0f, -1.57f, 0.0f});
 
   // 通常カメラ初期位置
-  camera_->SetTranslate({48.0f, 0.0f, 0.0f});
+  camera_->SetTranslate({48.0f, 5.0f, 0.0f});
   camera_->SetDefaultTransform(camera_->GetTransform());
   camera_->SetRotation({0.0f, -1.57f, 0.0f});
 
@@ -1019,43 +1019,32 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 }
 
 float TravelScene::ComputeLegHeightOffset() const {
-  const Vector3 bodyScale =
-      modBodies_[ToIndex(ModBodyPart::Body)].GetVisualScaleRatio();
+  const ModControlPointData *cp = GetControlPoints();
+  if (cp == nullptr) {
+    return 0.0f;
+  }
 
-  const Vector3 leftThighScale =
-      modBodies_[ToIndex(ModBodyPart::LeftThigh)].GetVisualScaleRatio();
-  const Vector3 rightThighScale =
-      modBodies_[ToIndex(ModBodyPart::RightThigh)].GetVisualScaleRatio();
-  const Vector3 leftShinScale =
-      modBodies_[ToIndex(ModBodyPart::LeftShin)].GetVisualScaleRatio();
-  const Vector3 rightShinScale =
-      modBodies_[ToIndex(ModBodyPart::RightShin)].GetVisualScaleRatio();
+  auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return {a.x - b.x, a.y - b.y, a.z - b.z};
+  };
 
-  //==============================
-  // 基準値（無改造時）
-  //==============================
-  const float baseBodyHeight = 1.0f;
-  const float baseThighLength = 1.25f;
-  const float baseShinLength = 1.0f;
+  const float leftThighLength = Length(Sub(cp->leftKneePos, cp->leftHipPos));
+  const float leftShinLength = Length(Sub(cp->leftAnklePos, cp->leftKneePos));
 
-  //==============================
-  // 現在の脚長
-  //==============================
-  const float leftLegLength = leftThighScale.y + leftShinScale.y;
-  const float rightLegLength = rightThighScale.y + rightShinScale.y;
+  const float rightThighLength = Length(Sub(cp->rightKneePos, cp->rightHipPos));
+  const float rightShinLength =
+      Length(Sub(cp->rightAnklePos, cp->rightKneePos));
+
+  const float leftLegLength = leftThighLength + leftShinLength;
+  const float rightLegLength = rightThighLength + rightShinLength;
   const float avgLegLength = (leftLegLength + rightLegLength) * 0.5f;
 
+  // 無改造基準
+  const float baseThighLength = 1.25f;
+  const float baseShinLength = 1.0f;
   const float baseLegLength = baseThighLength + baseShinLength;
-  const float legOffset = avgLegLength - baseLegLength;
 
-  //==============================
-  // 胴体の縦補正
-  // 胴体は原点中心スケールの可能性が高いので
-  // 伸びたぶんの半分だけ高さ補正に使う
-  //==============================
-  const float bodyOffset = (bodyScale.y - baseBodyHeight) * 1.2f;
-
-  return legOffset + bodyOffset;
+  return avgLegLength - baseLegLength;
 }
 
 bool TravelScene::HasRequiredParts() const {
@@ -1728,12 +1717,85 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   velocityY_ -= gravity_;
   moveY_ += velocityY_;
 
-  if (moveY_ <= groundY_) {
-    isGrounded_ = true;
-    moveY_ = groundY_;
-    velocityY_ = 0.0f;
+  // if (moveY_ <= groundY_) {
+  //   isGrounded_ = true;
+  //   moveY_ = groundY_;
+  //   velocityY_ = 0.0f;
+  // } else {
+  //   isGrounded_ = false;
+  // }
+
+  static int groundCheckLogFrame = 0;
+  groundCheckLogFrame++;
+
+  if (groundCheckLogFrame % 20 == 0) {
+    const ModControlPointData *logCp = GetControlPoints();
+
+    if (logCp != nullptr) {
+      auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+        return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
+      };
+
+      const Vector3 chestCenterWorld = Mid(logCp->chestPos, logCp->bellyPos);
+
+      const float lowestFootLocalY =
+          (std::min)(logCp->leftAnklePos.y, logCp->rightAnklePos.y);
+
+      const float contactMoveY =
+          groundY_ - (chestCenterWorld.y + lowestFootLocalY);
+
+      const float lowestFootWorldY =
+          moveY_ + chestCenterWorld.y + lowestFootLocalY;
+
+      Logger::Log("==== GROUND CHECK ====\n");
+      Logger::Log("groundY_ : %.3f\n", groundY_);
+      Logger::Log("moveY_ : %.3f\n", moveY_);
+      Logger::Log("chestCenterWorld.y : %.3f\n", chestCenterWorld.y);
+      Logger::Log("leftAnkleLocalY : %.3f\n", logCp->leftAnklePos.y);
+      Logger::Log("rightAnkleLocalY : %.3f\n", logCp->rightAnklePos.y);
+      Logger::Log("lowestFootLocalY : %.3f\n", lowestFootLocalY);
+      Logger::Log("contactMoveY : %.3f\n", contactMoveY);
+      Logger::Log("lowestFootWorldY(current) : %.3f\n", lowestFootWorldY);
+      Logger::Log("isGrounded_ : %d\n", isGrounded_ ? 1 : 0);
+      Logger::Log("velocityY_ : %.3f\n", velocityY_);
+    } else {
+      Logger::Log("==== GROUND CHECK ====\n");
+      Logger::Log("control point is nullptr\n");
+    }
+  }
+
+  const ModControlPointData *cp = GetControlPoints();
+
+  if (cp != nullptr) {
+    auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+      return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
+    };
+
+    const Vector3 chestCenterWorld = Mid(cp->chestPos, cp->bellyPos);
+
+    const float lowestFootLocalY =
+        (std::min)(cp->leftAnklePos.y, cp->rightAnklePos.y);
+
+    // 見た目で実際に描画される足首のYは
+    // moveY_ + chestCenterWorld.y + lowestFootLocalY
+    const float contactMoveY =
+        groundY_ - (chestCenterWorld.y + lowestFootLocalY);
+
+    if (moveY_ <= contactMoveY) {
+      isGrounded_ = true;
+      moveY_ = contactMoveY;
+      velocityY_ = 0.0f;
+    } else {
+      isGrounded_ = false;
+    }
   } else {
-    isGrounded_ = false;
+    if (moveY_ <= groundY_) {
+      isGrounded_ = true;
+      moveY_ = groundY_;
+      velocityY_ = 0.0f;
+    } else {
+      isGrounded_ = false;
+    }
   }
 
   bool justLanded = (!wasGrounded && isGrounded_);
@@ -1911,8 +1973,55 @@ void TravelScene::ApplyVisualState() {
 
   UpdateExtraVisualParts();
 
+  static int groundCheckLogFrame = 0;
+  groundCheckLogFrame++;
+
+  if (groundCheckLogFrame % 20 == 0) {
+    const ModControlPointData *logCp = GetControlPoints();
+
+    if (logCp != nullptr) {
+      const float lowestFootLocalY =
+          (std::min)(logCp->leftAnklePos.y, logCp->rightAnklePos.y);
+
+      const float contactMoveY = groundY_ - lowestFootLocalY;
+      const float lowestFootWorldY = moveY_ + lowestFootLocalY;
+
+      Logger::Log("==== GROUND CHECK ====\n");
+      Logger::Log("groundY_ : %.3f\n", groundY_);
+      Logger::Log("moveY_ : %.3f\n", moveY_);
+      Logger::Log("leftAnkleLocalY : %.3f\n", logCp->leftAnklePos.y);
+      Logger::Log("rightAnkleLocalY : %.3f\n", logCp->rightAnklePos.y);
+      Logger::Log("lowestFootLocalY : %.3f\n", lowestFootLocalY);
+      Logger::Log("contactMoveY : %.3f\n", contactMoveY);
+      Logger::Log("lowestFootWorldY(current) : %.3f\n", lowestFootWorldY);
+      Logger::Log("isGrounded_ : %d\n", isGrounded_ ? 1 : 0);
+      Logger::Log("velocityY_ : %.3f\n", velocityY_);
+    } else {
+      Logger::Log("==== GROUND CHECK ====\n");
+      Logger::Log("control point is nullptr\n");
+    }
+  }
+
+  static int groundVisualLogFrame = 0;
+  groundVisualLogFrame++;
+
+  if (groundVisualLogFrame % 20 == 0) {
+    Logger::Log("==== GROUND VISUAL ====\n");
+    Logger::Log("groundY_ : %.3f\n", groundY_);
+    Logger::Log("groundObjTranslateY : %.3f\n",
+                ground_->mainPosition.transform.translate.y);
+    Logger::Log("groundObjScaleY : %.3f\n",
+                ground_->mainPosition.transform.scale.y);
+  }
+
   // 地面のUpdate　一旦仮でここに配置
   if (ground_ != nullptr) {
+    constexpr float groundTopOffset = 0.15f;
+
+    ground_->mainPosition.transform.translate.x = 0.0f;
+    ground_->mainPosition.transform.translate.y = groundY_ - groundTopOffset;
+    ground_->mainPosition.transform.translate.z = 0.0f;
+
     ground_->Update(usingCamera_);
   }
 }
