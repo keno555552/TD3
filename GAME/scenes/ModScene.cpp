@@ -702,24 +702,24 @@ void ModScene::Draw() {
 }
 
 void ModScene::CameraPart() {
-  // デバッグカメラ使用時は操作も含めて更新する
-
   if (useDebugCamera_) {
     usingCamera_ = debugCamera_;
-#ifdef USE_IMGUI
-    if (!ImGui::GetIO().WantCaptureMouse) {
-      debugCamera_->MouseControlUpdate();
+
+    const bool blockDebugCameraMouse = ShouldBlockDebugCameraMouseControl();
+
+#ifdef USEIMGUI
+    if (!ImGui::GetIO().WantCaptureMouse && !blockDebugCameraMouse) {
+      debugCamera->MouseControlUpdate();
     }
 #else
-    debugCamera_->MouseControlUpdate();
+    if (!blockDebugCameraMouse) {
+      debugCamera_->MouseControlUpdate();
+    }
 #endif
-  }
-  // 通常カメラ使用時はこちらへ切り替える
-  else {
+  } else {
     usingCamera_ = camera_;
   }
 
-  // エンジン側へ現在の使用カメラを設定する
   system_->SetCamera(usingCamera_);
 }
 
@@ -1978,10 +1978,13 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       parentNode.part == ModBodyPart::StomachBody) {
     const int chestIndex =
         FindTorsoControlPointIndex(ModControlPointRole::Chest);
+    const int bellyIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Belly);
     const int waistIndex =
         FindTorsoControlPointIndex(ModControlPointRole::Waist);
 
     const Vector3 defaultChest = {0.0f, 0.45f, 0.0f};
+    const Vector3 defaultBelly = {0.0f, 0.0f, 0.0f};
     const Vector3 defaultWaist = {0.0f, -0.45f, 0.0f};
 
     const Vector3 currentChest =
@@ -1989,16 +1992,25 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
             ? torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition
             : defaultChest;
 
+    const Vector3 currentBelly =
+        (bellyIndex >= 0)
+            ? torsoControlPoints_[static_cast<size_t>(bellyIndex)].localPosition
+            : defaultBelly;
+
     const Vector3 currentWaist =
         (waistIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
             : defaultWaist;
 
     const float defaultChestRadius = 0.12f;
+    const float defaultBellyRadius = 0.10f;
     const float defaultWaistRadius = 0.12f;
 
     const float currentChestRadius = GetTorsoControlPointRadius(
         ModControlPointRole::Chest, defaultChestRadius);
+
+    const float currentBellyRadius = GetTorsoControlPointRadius(
+        ModControlPointRole::Belly, defaultBellyRadius);
 
     const float currentWaistRadius = GetTorsoControlPointRadius(
         ModControlPointRole::Waist, defaultWaistRadius);
@@ -2006,31 +2018,88 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     const float chestRadiusRatio =
         currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
 
+    const float bellyRadiusRatio =
+        currentBellyRadius / (std::max)(defaultBellyRadius, 0.0001f);
+
     const float waistRadiusRatio =
         currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
+
+    // 上半身上端の押し出し量
+    // 胴体メッシュは Chest-Belly
+    // のセグメント太さを大きい方の半径で描いているので、
+    // 首の接続位置も同じ考え方で押し出す
+    const float defaultUpperTorsoRadius =
+        (std::max)(defaultChestRadius, defaultBellyRadius);
+    const float defaultLowerTorsoRadius =
+        (std::max)(defaultBellyRadius, defaultWaistRadius);
+    const float currentUpperTorsoRadius =
+        (std::max)(currentChestRadius, currentBellyRadius);
+    const float currentLowerTorsoRadius =
+        (std::max)(currentBellyRadius, currentWaistRadius);
+
+    Vector3 upperOutwardDir = {0.0f, 1.0f, 0.0f};
+    {
+      const Vector3 chestToBelly = Subtract(currentBelly, currentChest);
+      if (Length(chestToBelly) > 0.0001f) {
+        upperOutwardDir =
+            NormalizeSafeV(Multiply(-1.0f, chestToBelly), {0.0f, 1.0f, 0.0f});
+      }
+    }
+
+    const Vector3 upperTorsoSurfacePush = Multiply(
+        currentUpperTorsoRadius - defaultUpperTorsoRadius, upperOutwardDir);
 
     switch (childNode.part) {
     case ModBodyPart::Neck:
     case ModBodyPart::Head: {
       const Vector3 relative = Subtract(defaultAttach, defaultChest);
+
+      // 中央接続でも Belly 側の拡縮が効くように、
+      // 上半身全体の太さとして Chest/Belly の大きい方を使う
+      const float upperTorsoRadiusRatio =
+          currentUpperTorsoRadius /
+          (std::max)(defaultUpperTorsoRadius, 0.0001f);
+
       const Vector3 scaledRelative = ScaleVectorComponents(
-          relative, {chestRadiusRatio, chestRadiusRatio, chestRadiusRatio});
-      return Add(currentChest, scaledRelative);
+          relative, {upperTorsoRadiusRatio, upperTorsoRadiusRatio,
+                     upperTorsoRadiusRatio});
+
+      return Add(Add(currentChest, scaledRelative), upperTorsoSurfacePush);
     }
 
     case ModBodyPart::LeftUpperArm:
     case ModBodyPart::RightUpperArm: {
       const Vector3 relative = Subtract(defaultAttach, defaultChest);
+
+      const float upperTorsoRadiusRatio =
+          currentUpperTorsoRadius /
+          (std::max)(defaultUpperTorsoRadius, 0.0001f);
+
+      // 腕は Chest に接続しているが、
+      // 胴体見た目は Chest-Belly の上半分全体で太くなるので、
+      // 横方向は upperTorsoRadiusRatio を使って Belly の拡縮も反映する
       const Vector3 scaledRelative = ScaleVectorComponents(
-          relative, {chestRadiusRatio, chestRadiusRatio, chestRadiusRatio});
+          relative,
+          {upperTorsoRadiusRatio, chestRadiusRatio, upperTorsoRadiusRatio});
+
       return Add(currentChest, scaledRelative);
     }
 
     case ModBodyPart::LeftThigh:
     case ModBodyPart::RightThigh: {
       const Vector3 relative = Subtract(defaultAttach, defaultWaist);
+
+      const float lowerTorsoRadiusRatio =
+          currentLowerTorsoRadius /
+          (std::max)(defaultLowerTorsoRadius, 0.0001f);
+
+      // 脚は Waist 接続だが、
+      // 胴体見た目は Belly-Waist の下半分全体で太くなるので、
+      // 横方向は lowerTorsoRadiusRatio を使って Belly の拡縮も反映する
       const Vector3 scaledRelative = ScaleVectorComponents(
-          relative, {waistRadiusRatio, waistRadiusRatio, waistRadiusRatio});
+          relative,
+          {lowerTorsoRadiusRatio, waistRadiusRatio, lowerTorsoRadiusRatio});
+
       return Add(currentWaist, scaledRelative);
     }
 
@@ -2051,10 +2120,31 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       if (it != modBodies_.end()) {
         const int bendIndex =
             it->second.FindControlPointIndex(ModControlPointRole::Bend);
+        const int endIndex =
+            it->second.FindControlPointIndex(ModControlPointRole::End);
+
         if (bendIndex >= 0) {
           const std::vector<ModControlPoint> &points =
               it->second.GetControlPoints();
-          return points[static_cast<size_t>(bendIndex)].localPosition;
+
+          const Vector3 bendPos =
+              points[static_cast<size_t>(bendIndex)].localPosition;
+          const float defaultBendRadius = 0.09f;
+          const float currentBendRadius =
+              points[static_cast<size_t>(bendIndex)].radius;
+          const float extraBendRadius =
+              (std::max)(0.0f, currentBendRadius - defaultBendRadius);
+
+          Vector3 outward = {0.0f, -1.0f, 0.0f};
+          if (endIndex >= 0) {
+            const Vector3 bendToEnd = Subtract(
+                points[static_cast<size_t>(endIndex)].localPosition, bendPos);
+            if (Length(bendToEnd) > 0.0001f) {
+              outward = NormalizeSafeV(bendToEnd, outward);
+            }
+          }
+
+          return Add(bendPos, Multiply(extraBendRadius, outward));
         }
       }
       return defaultAttach;
@@ -2073,10 +2163,31 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       if (it != modBodies_.end()) {
         const int bendIndex =
             it->second.FindControlPointIndex(ModControlPointRole::Bend);
+        const int endIndex =
+            it->second.FindControlPointIndex(ModControlPointRole::End);
+
         if (bendIndex >= 0) {
           const std::vector<ModControlPoint> &points =
               it->second.GetControlPoints();
-          return points[static_cast<size_t>(bendIndex)].localPosition;
+
+          const Vector3 bendPos =
+              points[static_cast<size_t>(bendIndex)].localPosition;
+          const float defaultBendRadius = 0.10f;
+          const float currentBendRadius =
+              points[static_cast<size_t>(bendIndex)].radius;
+          const float extraBendRadius =
+              (std::max)(0.0f, currentBendRadius - defaultBendRadius);
+
+          Vector3 outward = {0.0f, -1.0f, 0.0f};
+          if (endIndex >= 0) {
+            const Vector3 bendToEnd = Subtract(
+                points[static_cast<size_t>(endIndex)].localPosition, bendPos);
+            if (Length(bendToEnd) > 0.0001f) {
+              outward = NormalizeSafeV(bendToEnd, outward);
+            }
+          }
+
+          return Add(bendPos, Multiply(extraBendRadius, outward));
         }
       }
       return defaultAttach;
@@ -2094,10 +2205,32 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     if (it != modBodies_.end()) {
       const int lowerIndex =
           it->second.FindControlPointIndex(ModControlPointRole::LowerNeck);
+      const int upperIndex =
+          it->second.FindControlPointIndex(ModControlPointRole::UpperNeck);
+
       if (lowerIndex >= 0) {
         const std::vector<ModControlPoint> &points =
             it->second.GetControlPoints();
-        return points[static_cast<size_t>(lowerIndex)].localPosition;
+
+        const Vector3 lowerPos =
+            points[static_cast<size_t>(lowerIndex)].localPosition;
+
+        const float defaultLowerRadius = 0.09f;
+        const float currentLowerRadius =
+            points[static_cast<size_t>(lowerIndex)].radius;
+        const float extraLowerRadius =
+            (std::max)(0.0f, currentLowerRadius - defaultLowerRadius);
+
+        Vector3 outward = {0.0f, 1.0f, 0.0f};
+        if (upperIndex >= 0) {
+          const Vector3 lowerToUpper = Subtract(
+              points[static_cast<size_t>(upperIndex)].localPosition, lowerPos);
+          if (Length(lowerToUpper) > 0.0001f) {
+            outward = NormalizeSafeV(lowerToUpper, outward);
+          }
+        }
+
+        return Add(lowerPos, Multiply(extraLowerRadius, outward));
       }
     }
     return {0.0f, 0.0f, 0.0f};
@@ -2689,10 +2822,34 @@ float ModScene::GetChildCurrentAttachRadius(const PartNode &childNode) const {
     case ModBodyPart::RightUpperArm:
     case ModBodyPart::LeftThigh:
     case ModBodyPart::RightThigh: {
-      const float pointRadius = GetPartControlPointRadius(
+      const float rootRadius = GetPartControlPointRadius(
           childNode.id, ModControlPointRole::Root, defaultRadius);
+
+      float bendDefault = defaultRadius;
+
+      switch (childNode.part) {
+      case ModBodyPart::LeftUpperArm:
+      case ModBodyPart::RightUpperArm:
+        bendDefault = 0.09f;
+        break;
+
+      case ModBodyPart::LeftThigh:
+      case ModBodyPart::RightThigh:
+        bendDefault = 0.10f;
+        break;
+
+      default:
+        bendDefault = defaultRadius;
+        break;
+      }
+
+      const float bendRadius = GetPartControlPointRadius(
+          childNode.id, ModControlPointRole::Bend, bendDefault);
+
+      const float effectiveRadius = (std::max)(rootRadius, bendRadius);
+
       const Vector3 scale = modBodies_.at(childNode.id).GetVisualScaleRatio();
-      return pointRadius * (std::max)(scale.x, scale.z);
+      return effectiveRadius * (std::max)(scale.x, scale.z);
     }
 
     case ModBodyPart::Head: {
@@ -2781,7 +2938,113 @@ float ModScene::GetChildCurrentLength(const PartNode &childNode) const {
 
 Vector3
 ModScene::ResolveChildSelfAttachOffset(const PartNode &childNode) const {
-  const Vector3 outward = ResolveAttachOutwardDirection(childNode);
+  Vector3 outward = ResolveAttachOutwardDirection(childNode);
+
+  // 接続部から子メッシュが伸びていく実方向をできるだけ使う
+  // 取れない場合だけ既存の固定方向へフォールバックする
+  if (modBodies_.count(childNode.id) > 0) {
+    const ModBody &body = modBodies_.at(childNode.id);
+
+    switch (childNode.part) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh: {
+      const int rootIndex =
+          body.FindControlPointIndex(ModControlPointRole::Root);
+      const int bendIndex =
+          body.FindControlPointIndex(ModControlPointRole::Bend);
+
+      if (rootIndex >= 0 && bendIndex >= 0) {
+        const std::vector<ModControlPoint> &points = body.GetControlPoints();
+        const Vector3 dir =
+            Subtract(points[static_cast<size_t>(bendIndex)].localPosition,
+                     points[static_cast<size_t>(rootIndex)].localPosition);
+
+        if (Length(dir) > 0.0001f) {
+          outward = NormalizeSafeV(dir, outward);
+        }
+      }
+      break;
+    }
+
+    case ModBodyPart::Head: {
+      const int lowerIndex =
+          body.FindControlPointIndex(ModControlPointRole::LowerNeck);
+      const int upperIndex =
+          body.FindControlPointIndex(ModControlPointRole::UpperNeck);
+
+      if (lowerIndex >= 0 && upperIndex >= 0) {
+        const std::vector<ModControlPoint> &points = body.GetControlPoints();
+        const Vector3 dir =
+            Subtract(points[static_cast<size_t>(upperIndex)].localPosition,
+                     points[static_cast<size_t>(lowerIndex)].localPosition);
+
+        if (Length(dir) > 0.0001f) {
+          outward = NormalizeSafeV(dir, outward);
+        }
+      }
+      break;
+    }
+
+    default:
+      break;
+    }
+  }
+
+  // owner を持たない前腕/脛は親 owner の Bend -> End 方向を使う
+  if (childNode.part == ModBodyPart::LeftForeArm ||
+      childNode.part == ModBodyPart::RightForeArm ||
+      childNode.part == ModBodyPart::LeftShin ||
+      childNode.part == ModBodyPart::RightShin) {
+    const int ownerId = ResolveControlOwnerPartId(assembly_, childNode.id);
+    if (ownerId >= 0 && modBodies_.count(ownerId) > 0) {
+      const ModBody &ownerBody = modBodies_.at(ownerId);
+
+      const int bendIndex =
+          ownerBody.FindControlPointIndex(ModControlPointRole::Bend);
+      const int endIndex =
+          ownerBody.FindControlPointIndex(ModControlPointRole::End);
+
+      if (bendIndex >= 0 && endIndex >= 0) {
+        const std::vector<ModControlPoint> &points =
+            ownerBody.GetControlPoints();
+        const Vector3 dir =
+            Subtract(points[static_cast<size_t>(endIndex)].localPosition,
+                     points[static_cast<size_t>(bendIndex)].localPosition);
+
+        if (Length(dir) > 0.0001f) {
+          outward = NormalizeSafeV(dir, outward);
+        }
+      }
+    }
+  }
+
+  // Neck は head 側の LowerNeck -> UpperNeck を使う
+  if (childNode.part == ModBodyPart::Neck) {
+    const int headId =
+        FindFirstChildPartId(assembly_, childNode.id, ModBodyPart::Head);
+    if (headId >= 0 && modBodies_.count(headId) > 0) {
+      const ModBody &headBody = modBodies_.at(headId);
+
+      const int lowerIndex =
+          headBody.FindControlPointIndex(ModControlPointRole::LowerNeck);
+      const int upperIndex =
+          headBody.FindControlPointIndex(ModControlPointRole::UpperNeck);
+
+      if (lowerIndex >= 0 && upperIndex >= 0) {
+        const std::vector<ModControlPoint> &points =
+            headBody.GetControlPoints();
+        const Vector3 dir =
+            Subtract(points[static_cast<size_t>(upperIndex)].localPosition,
+                     points[static_cast<size_t>(lowerIndex)].localPosition);
+
+        if (Length(dir) > 0.0001f) {
+          outward = NormalizeSafeV(dir, outward);
+        }
+      }
+    }
+  }
 
   const float defaultRadius = GetChildDefaultAttachRadius(childNode.part);
   const float currentRadius = GetChildCurrentAttachRadius(childNode);
@@ -2791,11 +3054,7 @@ ModScene::ResolveChildSelfAttachOffset(const PartNode &childNode) const {
   const float currentLength = GetChildCurrentLength(childNode);
   const float extraLength = (std::max)(0.0f, currentLength - defaultLength);
 
-  // 太さ増加はそのまま押し出し
   float pushDistance = extraRadius;
-
-  // 長さ増加で根元側にもはみ出すタイプを少し前へ逃がす
-  // 半分全部やると動きすぎるので 0.35f 程度に抑える
   pushDistance += extraLength * 0.35f;
 
   return Multiply(pushDistance, outward);
@@ -3717,4 +3976,23 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   }
 
   return {0.0f, 0.0f, 0.0f};
+}
+
+bool ModScene::ShouldBlockDebugCameraMouseControl() const {
+  // 操作点ドラッグ中
+  if (isDraggingControlPoint_) {
+    return true;
+  }
+
+  // 操作点を選択中
+  if (selectedControlPointIndex_ >= 0) {
+    return true;
+  }
+
+  // マウスが部位メッシュ上にある
+  if (hoveredPartId_ >= 0) {
+    return true;
+  }
+
+  return false;
 }

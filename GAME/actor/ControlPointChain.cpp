@@ -307,7 +307,7 @@ bool ControlPointChain::MovePoint(size_t index,
     Vector3 direction = NormalizeSafe(lowerToCandidate, {0.0f, 1.0f, 0.0f});
 
     float radius = Length(lowerToCandidate);
-    radius = ClampFloat(radius, 0.15f, 0.80f);
+    radius = ClampFloat(radius, 0.15f, 1.80f);
 
     const Vector3 clampedUpper = Add(lowerPos, Multiply(radius, direction));
     nodes_[index].localPosition = ToLocalFromWorld(index, clampedUpper);

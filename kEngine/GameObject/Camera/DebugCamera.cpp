@@ -48,9 +48,12 @@ void DebugCamera::MouseControlUpdate() {
   }
 
   /// マウスホイール移動
-  float before = cameraTransform.translate.z;
-  if (before != cameraTransform.translate.z) {
-    isMoved = true;
+  {
+    float wheel = system_->GetMouseScroll();
+    if (wheel != 0.0f) {
+      cameraTransform.translate.z += wheel;
+      isMoved = true;
+    }
   }
 
   /// マウス操作
@@ -58,7 +61,6 @@ void DebugCamera::MouseControlUpdate() {
   if (system_->GetMouseIsPush(2) && isMouseM_) {
     cameraTransform.translate.x += (float)system_->GetMousePosXIns() * -0.005f;
     cameraTransform.translate.y += (float)system_->GetMousePosYIns() * 0.005f;
-    cameraTransform.translate.z += system_->GetMouseScroll();
     isMoved = true;
   }
   // 右鍵視覚移動

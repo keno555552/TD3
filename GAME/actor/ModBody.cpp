@@ -116,6 +116,25 @@ float GetDefaultPointRadius(ModBodyPart part, ModControlPointRole role) {
   }
 }
 
+Vector3 GetLateralOutwardDirection(ModBodyPart part) {
+  switch (part) {
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::LeftShin:
+    return {-1.0f, 0.0f, 0.0f};
+
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::RightShin:
+    return {1.0f, 0.0f, 0.0f};
+
+  default:
+    return {0.0f, 0.0f, 0.0f};
+  }
+}
+
 float GetDefaultSegmentRadius(ModBodyPart part, ModControlPointRole startRole,
                               ModControlPointRole endRole) {
   const float startDefault = GetDefaultPointRadius(part, startRole);
@@ -578,34 +597,169 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
 }
 
 bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
-    if (index >= controlPoints_.size()) {
-        return false;
-    }
+  if (index >= controlPoints_.size()) {
+    return false;
+  }
 
-    if (scaleFactor <= 0.0f) {
-        return false;
-    }
+  if (scaleFactor <= 0.0f) {
+    return false;
+  }
 
-    const ModControlPointRole role = controlPoints_[index].role;
-    const float defaultRadius = GetDefaultPointRadius(part_, role);
-    const float minRadius = defaultRadius * 0.60f;
-    const float maxRadius = defaultRadius * 2.50f;
+  ModControlPoint &point = controlPoints_[index];
+  const ModControlPointRole role = point.role;
 
-    float newRadius = controlPoints_[index].radius * scaleFactor;
-    newRadius = ClampFloat(newRadius, minRadius, maxRadius);
+  const float defaultRadius = GetDefaultPointRadius(part_, role);
+  const float minRadius = defaultRadius * 0.60f;
+  const float maxRadius = defaultRadius * 2.50f;
 
-    controlPoints_[index].radius = newRadius;
+  const float oldRadius = point.radius;
 
-    if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
-        const int chainIndex = chain_.FindIndex(role);
-        if (chainIndex >= 0) {
-            std::vector<ControlPointNode>& nodes = chain_.GetNodes();
-            nodes[static_cast<size_t>(chainIndex)].radius = newRadius;
-        }
-    }
+  float newRadius = point.radius * scaleFactor;
+  newRadius = ClampFloat(newRadius, minRadius, maxRadius);
 
-    UpdateControlPointHierarchy();
+  const float radiusDelta = newRadius - oldRadius;
+  if (fabsf(radiusDelta) < 0.0001f) {
     return true;
+  }
+
+  point.radius = newRadius;
+
+  if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+    const int chainIndex = chain_.FindIndex(role);
+    if (chainIndex >= 0) {
+      std::vector<ControlPointNode> &nodes = chain_.GetNodes();
+      nodes[static_cast<size_t>(chainIndex)].radius = newRadius;
+    }
+  }
+
+  // ------------------------------------------------------------
+  // 半径変化に応じて、下流側の操作点を明示的に押し出す
+  // EnforceAdjacentPointSpacing() だけだと最小距離ぶんしか動かず、
+  // 見た目変化が弱いのでここで先に押し出す
+  // ------------------------------------------------------------
+  if (role == ModControlPointRole::Root) {
+    const int bendIndex = FindControlPointIndex(ModControlPointRole::Bend);
+    const int endIndex = FindControlPointIndex(ModControlPointRole::End);
+
+    if (bendIndex >= 0) {
+      const Vector3 bendPos =
+          controlPoints_[static_cast<size_t>(bendIndex)].localPosition;
+
+      Vector3 segmentDir = Subtract(bendPos, point.localPosition);
+      segmentDir = NormalizeSafe(segmentDir, {0.0f, -1.0f, 0.0f});
+
+      const Vector3 lateralDir = GetLateralOutwardDirection(part_);
+
+      // Y方向側の逃がし
+      const float axialPush = radiusDelta * 1.10f;
+
+      // X方向側の逃がし
+      // 拡大時だけ強めに横へ逃がす。縮小時は戻し過ぎないよう弱めにする。
+      float lateralPush = 0.0f;
+      if (radiusDelta > 0.0f) {
+        lateralPush = radiusDelta * 1.00f;
+      } else {
+        lateralPush = radiusDelta * 0.35f;
+      }
+
+      const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
+                                    Multiply(lateralPush, lateralDir));
+
+      controlPoints_[static_cast<size_t>(bendIndex)].localPosition =
+          Add(controlPoints_[static_cast<size_t>(bendIndex)].localPosition,
+              totalPush);
+
+      if (endIndex >= 0) {
+        controlPoints_[static_cast<size_t>(endIndex)].localPosition =
+            Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
+                totalPush);
+      }
+    }
+  }
+
+  if (role == ModControlPointRole::Bend) {
+    const int endIndex = FindControlPointIndex(ModControlPointRole::End);
+
+    if (endIndex >= 0) {
+      const Vector3 endPos =
+          controlPoints_[static_cast<size_t>(endIndex)].localPosition;
+
+      Vector3 segmentDir = Subtract(endPos, point.localPosition);
+      segmentDir = NormalizeSafe(segmentDir, {0.0f, -1.0f, 0.0f});
+
+      const Vector3 lateralDir = GetLateralOutwardDirection(part_);
+
+      // Bend は End だけを逃がす。Root 側は動かさない。
+      const float axialPush = radiusDelta * 1.00f;
+
+      float lateralPush = 0.0f;
+      if (radiusDelta > 0.0f) {
+        lateralPush = radiusDelta * 0.90f;
+      } else {
+        lateralPush = radiusDelta * 0.30f;
+      }
+
+      const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
+                                    Multiply(lateralPush, lateralDir));
+
+      controlPoints_[static_cast<size_t>(endIndex)].localPosition =
+          Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
+              totalPush);
+    }
+  }
+
+  if (role == ModControlPointRole::UpperNeck) {
+    const int headIndex =
+        FindControlPointIndex(ModControlPointRole::HeadCenter);
+
+    if (headIndex >= 0) {
+      Vector3 dir =
+          Subtract(controlPoints_[static_cast<size_t>(headIndex)].localPosition,
+                   point.localPosition);
+      dir = NormalizeSafe(dir, {0.0f, 1.0f, 0.0f});
+
+      const float neckPush = radiusDelta * 1.20f;
+
+      controlPoints_[static_cast<size_t>(headIndex)].localPosition =
+          Add(controlPoints_[static_cast<size_t>(headIndex)].localPosition,
+              Multiply(neckPush, dir));
+    }
+  }
+
+  if (role == ModControlPointRole::LowerNeck) {
+    const int upperIndex =
+        FindControlPointIndex(ModControlPointRole::UpperNeck);
+    const int headIndex =
+        FindControlPointIndex(ModControlPointRole::HeadCenter);
+
+    if (upperIndex >= 0) {
+      Vector3 dir = Subtract(
+          controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
+          point.localPosition);
+      dir = NormalizeSafe(dir, {0.0f, 1.0f, 0.0f});
+
+      const float neckRootPush = radiusDelta * 1.30f;
+
+      controlPoints_[static_cast<size_t>(upperIndex)].localPosition =
+          Add(controlPoints_[static_cast<size_t>(upperIndex)].localPosition,
+              Multiply(neckRootPush, dir));
+
+      if (headIndex >= 0) {
+        controlPoints_[static_cast<size_t>(headIndex)].localPosition =
+            Add(controlPoints_[static_cast<size_t>(headIndex)].localPosition,
+                Multiply(neckRootPush, dir));
+      }
+    }
+  }
+
+  UpdateControlPointHierarchy();
+
+  // chain 側も最後に同期し直す
+  if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+    SyncControlPointsFromChain(&controlPoints_, chain_);
+  }
+
+  return true;
 }
 
 Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
