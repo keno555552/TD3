@@ -224,7 +224,9 @@ void Panel::Update() {
 
 void Panel::Render() {
 	DrawPanel(panelState_);
+#ifdef DEBUG
 	ImGuiPart();
+#endif // DEBUG
 }
 
 void Panel::DrawPanel(int buttonStatic) {
