@@ -2250,10 +2250,10 @@ void TravelScene::BuildExtraVisualParts() {
         const ModControlPointSnapshot *headCenterSnap = nullptr;
 
         for (const auto *snap : snaps) {
-          if (snap->role == ModControlPointRole::UpperNeck) {
+          if (snap->role == ModControlPointRole::Bend) {
             upperSnap = snap;
           }
-          if (snap->role == ModControlPointRole::HeadCenter) {
+          if (snap->role == ModControlPointRole::End) {
             headCenterSnap = snap;
           }
         }
@@ -3120,10 +3120,10 @@ void TravelScene::BuildExtraVisualParts() {
         const ModControlPointSnapshot *upperSnap = nullptr;
 
         for (const auto *snap : snaps) {
-          if (snap->role == ModControlPointRole::LowerNeck) {
+          if (snap->role == ModControlPointRole::Root) {
             lowerSnap = snap;
           }
-          if (snap->role == ModControlPointRole::UpperNeck) {
+          if (snap->role == ModControlPointRole::Bend) {
             upperSnap = snap;
           }
         }
@@ -3362,15 +3362,15 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
         continue;
       }
 
-      if (snap.role == ModControlPointRole::LowerNeck) {
+      if (snap.role == ModControlPointRole::Root) {
         baseLowerNeckPos = snap.localPosition;
         lowerNeckR = snap.radius;
         hasBaseLowerNeck = true;
-      } else if (snap.role == ModControlPointRole::UpperNeck) {
+      } else if (snap.role == ModControlPointRole::Bend) {
         baseUpperNeckPos = snap.localPosition;
         upperNeckR = snap.radius;
         hasBaseUpperNeck = true;
-      } else if (snap.role == ModControlPointRole::HeadCenter) {
+      } else if (snap.role == ModControlPointRole::End) {
         baseHeadCenterPos = snap.localPosition;
         headRadius = snap.radius;
         hasBaseHeadCenter = true;

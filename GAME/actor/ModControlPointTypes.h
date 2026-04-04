@@ -10,9 +10,11 @@ enum class ModControlPointRole {
   Root,       // 接続元となる根元点
   Bend,       // 肘・膝などの曲げ点
   End,        // 手首・足首などの末端点
+
   Chest,      // 胸
   Belly,      // 腹
   Waist,      // 腰
+
   LowerNeck,  // 下首
   UpperNeck,  // 上首
   HeadCenter, // 頭中心

@@ -341,7 +341,6 @@ bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
   if (parent == ModBodyPart::ChestBody) {
     switch (child) {
     case ModBodyPart::Neck:
-    case ModBodyPart::Head:
     case ModBodyPart::LeftUpperArm:
     case ModBodyPart::RightUpperArm:
     case ModBodyPart::LeftThigh:
@@ -364,18 +363,6 @@ bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
 
   if (parent == ModBodyPart::Neck) {
     return child == ModBodyPart::Head;
-  }
-
-  if (parent == ModBodyPart::Head) {
-    switch (child) {
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-      return true;
-    default:
-      return false;
-    }
   }
 
   if (parent == ModBodyPart::LeftUpperArm ||
@@ -816,9 +803,6 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     case ModBodyPart::Neck:
       return {0.0f, 0.45f, 0.0f};
 
-    case ModBodyPart::Head:
-      return {0.0f, 0.75f, 0.0f};
-
     case ModBodyPart::LeftUpperArm:
       return {-0.75f, 0.30f, 0.0f};
 
@@ -851,26 +835,6 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     break;
   }
 
-  case ModBodyPart::Head: {
-    switch (childPart) {
-    case ModBodyPart::LeftUpperArm:
-      return {-0.55f, 0.10f, 0.0f};
-
-    case ModBodyPart::RightUpperArm:
-      return {0.55f, 0.10f, 0.0f};
-
-    case ModBodyPart::LeftThigh:
-      return {-0.28f, -0.55f, 0.0f};
-
-    case ModBodyPart::RightThigh:
-      return {0.28f, -0.55f, 0.0f};
-
-    default:
-      break;
-    }
-    break;
-  }
-
   case ModBodyPart::Neck: {
     if (childPart == ModBodyPart::Head) {
       return {0.0f, 0.0f, 0.0f};
@@ -896,6 +860,7 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     break;
   }
 
+  case ModBodyPart::Head:
   case ModBodyPart::LeftForeArm:
   case ModBodyPart::RightForeArm:
   case ModBodyPart::LeftShin:
@@ -1008,8 +973,7 @@ void ModAssemblyGraph::NormalizeHeadLinks() {
 }
 
 bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
-  // 上腕と腿は子とセットで削除する
-  return part == ModBodyPart::LeftUpperArm ||
+  return part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
          part == ModBodyPart::RightUpperArm || part == ModBodyPart::LeftThigh ||
          part == ModBodyPart::RightThigh;
 }
@@ -1065,7 +1029,23 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return false;
   }
 
-  const PartNode target = it->second;
+  PartNode target = it->second;
+
+  if (target.part == ModBodyPart::Head) {
+    if (target.parentId >= 0 && nodes_.count(target.parentId) > 0) {
+      std::unordered_map<int, PartNode>::const_iterator parentIt =
+          nodes_.find(target.parentId);
+      if (parentIt != nodes_.end() &&
+          parentIt->second.part == ModBodyPart::Neck) {
+        partId = parentIt->second.id;
+        it = nodes_.find(partId);
+        if (it == nodes_.end()) {
+          return false;
+        }
+        target = it->second;
+      }
+    }
+  }
 
   if (target.required) {
     return false;
@@ -1079,7 +1059,6 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return false;
   }
 
-  // Body は特別扱い
   if (target.part == ModBodyPart::ChestBody ||
       target.part == ModBodyPart::StomachBody) {
     if (!RemoveBodyAttachedLimbsAndReattachOthers(partId)) {
@@ -1092,7 +1071,6 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return true;
   }
 
-  // 腕根元・脚根元は子もまとめて削除する
   if (ShouldCascadeDeleteChildren(target.part)) {
     if (!RemoveChildrenRecursive(partId)) {
       return false;
@@ -1104,7 +1082,6 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return true;
   }
 
-  // それ以外は子を付け替えてから削除する
   if (!ReattachChildrenOf(partId)) {
     return false;
   }
@@ -1387,30 +1364,20 @@ bool ModAssemblyGraph::AddNeckPart() {
     return false;
   }
 
-  NormalizeHeadLinks();
-  return true;
-}
+  const int headId =
+      AddPart(ModBodyPart::Head, PartSide::Center, neckId, false);
 
-bool ModAssemblyGraph::AddHeadPart() {
-  int parentId = -1;
-
-  const int neckId = FindFirstPartId(ModBodyPart::Neck);
-  if (neckId >= 0) {
-    parentId = neckId;
-  } else if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
-    parentId = bodyId_;
-  }
-
-  const int newHeadId =
-      AddPart(ModBodyPart::Head, PartSide::Center, parentId, false);
-
-  if (newHeadId < 0) {
+  if (headId < 0) {
     return false;
   }
 
   RefreshManagedPartIds();
   NormalizeHeadLinks();
   return true;
+}
+
+bool ModAssemblyGraph::AddHeadPart() {
+  return false;
 }
 
 bool ModAssemblyGraph::AddBodyPart() {

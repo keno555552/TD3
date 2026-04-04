@@ -133,13 +133,14 @@ public:
   /// </summary>
   bool AddLegAssembly(PartSide side);
 
-  /// <summary>
-  /// Neck 部位を追加する
+    /// <summary>
+  /// Neck + Head セットを追加する
   /// </summary>
   bool AddNeckPart();
 
   /// <summary>
-  /// Head 部位を追加する
+  /// Head 単体追加は行わない
+  /// 互換用に残すが内部では false を返す
   /// </summary>
   bool AddHeadPart();
 

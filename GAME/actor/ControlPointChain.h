@@ -22,8 +22,8 @@ struct ControlPointNode {
 };
 
 /// <summary>
-/// 肩→肘→手首、股関節→膝→足首のような親子付き関節チェーンを管理するクラス
-/// - 各ノードは `parentIndex` と `localPosition` により階層を構成する
+/// 肩→肘→手首、股関節→膝→足首、首元→首先→頭先のような親子付き関節チェーンを管理するクラス
+/// - 各ノードは parentIndex と localPosition により階層を構成する
 /// - Move時は役割に応じた制約（長さ/半径/向き）を適用できる
 /// </summary>
 class ControlPointChain {
@@ -49,9 +49,10 @@ public:
   void BuildTorsoChain();
 
   /// <summary>
-  /// 頭チェーンを既定値で構築する（LowerNeck -> UpperNeck -> HeadCenter）
+  /// 首チェーンを既定値で構築する（Root -> Bend -> End）
+  /// Neck が owner となる
   /// </summary>
-  void BuildHeadChain();
+  void BuildNeckChain();
 
   /// <summary>
   /// 指定roleのノードindexを返す。見つからない場合は -1
@@ -71,7 +72,7 @@ public:
 
   /// <summary>
   /// 指定ノードのワールド座標（チェーン内）を返す
-  /// 親をたどって `localPosition` を加算する
+  /// 親をたどって localPosition を加算する
   /// </summary>
   Vector3 GetWorldPosition(size_t index) const;
 

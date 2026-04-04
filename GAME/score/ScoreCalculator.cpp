@@ -252,21 +252,21 @@ Vector3 ScoreCalculator::CalcPartChangeFromControlPoints(
 		found = true;
 		break;
 
-		// 首: LowerNeck→UpperNeck
-	case ModBodyPart::Neck:
-		segment = { ModBodyPart::Head, ModControlPointRole::LowerNeck,
-				   ModControlPointRole::UpperNeck, ModControlPointRole::LowerNeck,
-				   ModControlPointRole::UpperNeck };
-		found = true;
-		break;
+	    // 首: Root→Bend
+        case ModBodyPart::Neck:
+          segment = {ModBodyPart::Neck, ModControlPointRole::Root,
+                     ModControlPointRole::Bend, ModControlPointRole::Root,
+                     ModControlPointRole::Bend};
+          found = true;
+          break;
 
-		// 頭: UpperNeck→HeadCenter
-	case ModBodyPart::Head:
-		segment = { ModBodyPart::Head, ModControlPointRole::UpperNeck,
-				   ModControlPointRole::HeadCenter, ModControlPointRole::UpperNeck,
-				   ModControlPointRole::HeadCenter };
-		found = true;
-		break;
+          // 頭: Bend→End
+        case ModBodyPart::Head:
+          segment = {ModBodyPart::Neck, ModControlPointRole::Bend,
+                     ModControlPointRole::End, ModControlPointRole::Bend,
+                     ModControlPointRole::End};
+          found = true;
+          break;
 
 		// 左上腕: Root→Bend
 	case ModBodyPart::LeftUpperArm:
