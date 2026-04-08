@@ -330,4 +330,14 @@ private:
   float GetControlPointRadius(ModControlPointRole role) const;
 
   float GetSnapshotRadius(ModBodyPart ownerPart, int localRole) const;
+
+  struct SegmentVisual {
+    Vector3 root;
+    float angleZ;
+    float length;
+    float thickness;
+  };
+
+  bool BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
+                                SegmentVisual &out);
 };
