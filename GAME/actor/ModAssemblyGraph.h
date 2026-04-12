@@ -1,17 +1,8 @@
 #pragma once
 #include "ModBody.h"
+#include "GAME/actor/ModAssemblyTypes.h"
 #include <unordered_map>
 #include <vector>
-
-/// <summary>
-/// 部位がどの左右属性を持つかを表す
-/// 親子接続時に、左用・右用・中央用の接続判定に使う
-/// </summary>
-enum class PartSide {
-  Center = 0, // 中央部位
-  Left,       // 左側部位
-  Right,      // 右側部位
-};
 
 /// <summary>
 /// 接続点の役割を表す
@@ -172,6 +163,8 @@ public:
   /// 指定種類の最初の部位IDを返す
   /// </summary>
   int FindFirstPartId(ModBodyPart part, int excludeId = -1) const;
+
+  bool SetPartLocalRotate(int partId, const Vector3 &localRotate);
 
 private:
   /// <summary>

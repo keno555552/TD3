@@ -294,17 +294,17 @@ bool ModBody::HasOwnControlPoints() const {
 }
 
 void ModBody::SetExternalSegmentSource(
-    const std::vector<ModControlPoint>* points, ModControlPointRole startRole,
+    const std::vector<ModControlPoint> *points, ModControlPointRole startRole,
     ModControlPointRole endRole) {
-    externalControlPoints_ = points;
-    externalStartRole_ = startRole;
-    externalEndRole_ = endRole;
+  externalControlPoints_ = points;
+  externalStartRole_ = startRole;
+  externalEndRole_ = endRole;
 }
 
 void ModBody::ClearExternalSegmentSource() {
-    externalControlPoints_ = nullptr;
-    externalStartRole_ = ModControlPointRole::None;
-    externalEndRole_ = ModControlPointRole::None;
+  externalControlPoints_ = nullptr;
+  externalStartRole_ = ModControlPointRole::None;
+  externalEndRole_ = ModControlPointRole::None;
 }
 
 void ModBody::CacheBaseTransforms(Object *target) {
@@ -529,7 +529,7 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
 
   controlPoints_[index].localPosition = newLocalPosition;
 
-    switch (role) {
+  switch (role) {
   case ModControlPointRole::Chest: {
     const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
     const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
@@ -692,7 +692,10 @@ Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
   }
 
   const Vector3 rootWorld = ComputeMainPositionWorldTranslate(target);
-  return Add(rootWorld, controlPoints_[index].localPosition);
+  const Vector3 rotatedLocal = RotateLocalPointByRootTransform(
+      target, controlPoints_[index].localPosition);
+
+  return Add(rootWorld, rotatedLocal);
 }
 
 void ModBody::BuildDefaultControlPoints() {
@@ -786,36 +789,86 @@ void ModBody::BuildDefaultControlPoints() {
 }
 
 void ModBody::PushPointToMinimumDistance(int fixedIndex, int movableIndex,
-    float extraMargin) {
-    if (fixedIndex < 0 || movableIndex < 0) {
-        return;
-    }
+                                         float extraMargin) {
+  if (fixedIndex < 0 || movableIndex < 0) {
+    return;
+  }
 
-    if (static_cast<size_t>(fixedIndex) >= controlPoints_.size() ||
-        static_cast<size_t>(movableIndex) >= controlPoints_.size()) {
-        return;
-    }
+  if (static_cast<size_t>(fixedIndex) >= controlPoints_.size() ||
+      static_cast<size_t>(movableIndex) >= controlPoints_.size()) {
+    return;
+  }
 
-    const Vector3 fixedPos = controlPoints_[static_cast<size_t>(fixedIndex)].localPosition;
-    Vector3 movablePos = controlPoints_[static_cast<size_t>(movableIndex)].localPosition;
+  const Vector3 fixedPos =
+      controlPoints_[static_cast<size_t>(fixedIndex)].localPosition;
+  Vector3 movablePos =
+      controlPoints_[static_cast<size_t>(movableIndex)].localPosition;
 
-    const float fixedRadius = controlPoints_[static_cast<size_t>(fixedIndex)].radius;
-    const float movableRadius = controlPoints_[static_cast<size_t>(movableIndex)].radius;
+  const float fixedRadius =
+      controlPoints_[static_cast<size_t>(fixedIndex)].radius;
+  const float movableRadius =
+      controlPoints_[static_cast<size_t>(movableIndex)].radius;
 
-    const float minDistance = fixedRadius + movableRadius + extraMargin;
+  const float minDistance = fixedRadius + movableRadius + extraMargin;
 
-    Vector3 diff = Subtract(movablePos, fixedPos);
-    float length = Length(diff);
+  Vector3 diff = Subtract(movablePos, fixedPos);
+  float length = Length(diff);
 
-    Vector3 dir = { 0.0f, -1.0f, 0.0f };
-    if (length > 0.0001f) {
-        dir = NormalizeSafe(diff, dir);
-    }
+  Vector3 dir = {0.0f, -1.0f, 0.0f};
+  if (length > 0.0001f) {
+    dir = NormalizeSafe(diff, dir);
+  }
 
-    if (length < minDistance) {
-        movablePos = Add(fixedPos, Multiply(minDistance, dir));
-        controlPoints_[static_cast<size_t>(movableIndex)].localPosition = movablePos;
-    }
+  if (length < minDistance) {
+    movablePos = Add(fixedPos, Multiply(minDistance, dir));
+    controlPoints_[static_cast<size_t>(movableIndex)].localPosition =
+        movablePos;
+  }
+}
+
+Vector3
+ModBody::RotateLocalPointByRootTransform(const Object *target,
+                                         const Vector3 &localPoint) const {
+  if (target == nullptr) {
+    return localPoint;
+  }
+
+  const Vector3 rot = target->mainPosition.transform.rotate;
+
+  const float cx = cosf(rot.x);
+  const float sx = sinf(rot.x);
+  const float cy = cosf(rot.y);
+  const float sy = sinf(rot.y);
+  const float cz = cosf(rot.z);
+  const float sz = sinf(rot.z);
+
+  Vector3 v = localPoint;
+
+  // X
+  {
+    const float y = v.y * cx - v.z * sx;
+    const float z = v.y * sx + v.z * cx;
+    v.y = y;
+    v.z = z;
+  }
+
+  // Y
+  {
+    const float x = v.x * cy + v.z * sy;
+    const float z = -v.x * sy + v.z * cy;
+    v.x = x;
+    v.z = z;
+  }
+
+  // Z
+  {
+    const float x = v.x * cz - v.y * sz;
+    const float y = v.x * sz + v.y * cz;
+    v.x = x;
+    v.y = y;
+  }
+
+  return v;
 }
 
 void ModBody::EnforceAdjacentPointSpacing() {
@@ -964,9 +1017,11 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
   target->objectParts_[partIndex].transform = mesh;
 }
 
-void ModBody::ApplySingleMeshFallback(Object *target, const Transform &baseMeshTransform,
-                             const std::vector<Transform> &baseParts,
-                             ModBodyPart part, const ModBodyPartParam &param) {
+void ModBody::ApplySingleMeshFallback(Object *target,
+                                      const Transform &baseMeshTransform,
+                                      const std::vector<Transform> &baseParts,
+                                      ModBodyPart part,
+                                      const ModBodyPartParam &param) {
   if (target == nullptr || target->objectParts_.empty()) {
     return;
   }
@@ -981,8 +1036,9 @@ void ModBody::ApplySingleMeshFallback(Object *target, const Transform &baseMeshT
   HideUnusedMeshes(target, baseParts, 1);
 }
 
-void ModBody::HideUnusedMeshes(Object *target, const std::vector<Transform> &baseParts,
-                      size_t startIndex) {
+void ModBody::HideUnusedMeshes(Object *target,
+                               const std::vector<Transform> &baseParts,
+                               size_t startIndex) {
   if (target == nullptr) {
     return;
   }

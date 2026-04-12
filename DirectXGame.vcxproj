@@ -640,6 +640,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModControlPointTypes.h" />
     <ClInclude Include="GAME\actor\ModObjectUtil.h" />
     <ClInclude Include="GAME\actor\ModBodyCustomizeDataUtil.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyDragState.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyResolver.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyTypes.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyUtil.h" />
+    <ClInclude Include="GAME\actor\ModAttachCandidate.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />
     <ClInclude Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.h" />

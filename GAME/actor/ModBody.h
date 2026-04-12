@@ -145,7 +145,7 @@ struct ModBodyCustomizeData {
   // 共通進行データ
   float timeLimit_ = 180.0f;      // 残り制限時間（秒）
   float totalTimeLimit_ = 180.0f; // 制限時間の初期値（秒）
-  bool isTimeUp_ = false;        // 時間切れになったか
+  bool isTimeUp_ = false;         // 時間切れになったか
 };
 
 /// <summary>
@@ -381,16 +381,22 @@ private:
                                   const ControlPointChain &chain);
 
   /// <summary>
-/// 隣接する操作点同士が半径ぶんめり込まないように距離を補正する
-/// Root-Bend、Bend-End、LowerNeck-UpperNeck、UpperNeck-HeadCenter に適用する
-/// </summary>
+  /// 隣接する操作点同士が半径ぶんめり込まないように距離を補正する
+  /// Root-Bend、Bend-End、LowerNeck-UpperNeck、UpperNeck-HeadCenter に適用する
+  /// </summary>
   void EnforceAdjacentPointSpacing();
 
   /// <summary>
   /// 2点間が最小距離以上になるように後ろ側の点を押し出す
   /// </summary>
   void PushPointToMinimumDistance(int fixedIndex, int movableIndex,
-      float extraMargin);
+                                  float extraMargin);
+
+  /// <summary>
+  /// 部位 root の回転を local 点へ適用した座標を返す
+  /// </summary>
+  Vector3 RotateLocalPointByRootTransform(const Object *target,
+                                          const Vector3 &localPoint) const;
 
 private:
   ModBodyPart part_ = ModBodyPart::ChestBody;

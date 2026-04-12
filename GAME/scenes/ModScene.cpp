@@ -1,8 +1,11 @@
 #include "ModScene.h"
+#include "GAME/actor/ModAssemblyResolver.h"
+#include "GAME/actor/ModAssemblyUtil.h"
 #include "GAME/actor/ModObjectUtil.h"
 #include "GAME/actor/prompt/PromptData.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
+#include <cfloat>
 #include <unordered_set>
 
 namespace {
@@ -181,26 +184,6 @@ int ResolveControlOwnerPartId(const ModAssemblyGraph &assembly, int partId) {
 }
 
 bool IsSelectablePart(ModBodyPart part) { return part != ModBodyPart::Count; }
-
-bool IsMouseLeftPressed() {
-  return (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
-}
-
-bool IsMouseLeftTriggered() {
-  static bool wasPressed = false;
-  const bool nowPressed = IsMouseLeftPressed();
-  const bool triggered = (!wasPressed && nowPressed);
-  wasPressed = nowPressed;
-  return triggered;
-}
-
-bool IsMouseLeftReleased() {
-  static bool wasPressed = false;
-  const bool nowPressed = IsMouseLeftPressed();
-  const bool released = (wasPressed && !nowPressed);
-  wasPressed = nowPressed;
-  return released;
-}
 
 bool RayPlaneIntersectionZ(const Ray &ray, float planeZ, Vector3 *hitPoint) {
   const float epsilon = 0.0001f;
@@ -450,6 +433,56 @@ bool IntersectRayCapsule(const Ray &ray, const Vector3 &capsuleStart,
     *outT = bestT;
   }
   return true;
+}
+
+Vector3 NegateV(const Vector3 &v) { return {-v.x, -v.y, -v.z}; }
+
+float Clamp01Local(float t) {
+  if (t < 0.0f) {
+    return 0.0f;
+  }
+  if (t > 1.0f) {
+    return 1.0f;
+  }
+  return t;
+}
+
+Vector3 RotateByEulerXYZ(const Vector3 &point, const Vector3 &rot) {
+  const float cx = cosf(rot.x);
+  const float sx = sinf(rot.x);
+  const float cy = cosf(rot.y);
+  const float sy = sinf(rot.y);
+  const float cz = cosf(rot.z);
+  const float sz = sinf(rot.z);
+
+  Vector3 v = point;
+
+  {
+    const float y = v.y * cx - v.z * sx;
+    const float z = v.y * sx + v.z * cx;
+    v.y = y;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cy + v.z * sy;
+    const float z = -v.x * sy + v.z * cy;
+    v.x = x;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cz - v.y * sz;
+    const float y = v.x * sz + v.y * cz;
+    v.x = x;
+    v.y = y;
+  }
+
+  return v;
+}
+
+Vector3 InverseRotateByEulerXYZ(const Vector3 &point, const Vector3 &rot) {
+  return RotateByEulerXYZ(point, {-rot.x, -rot.y, -rot.z});
 }
 
 } // namespace
@@ -894,7 +927,7 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
     }
 
     Vector3 localTranslate = node->localTransform.translate;
-    const Vector3 localRotate = {0.0f, 0.0f, 0.0f};
+    Vector3 localRotate = node->localTransform.rotate;
 
     if (node->parentId >= 0 && modObjects_.count(node->parentId) > 0) {
       Object *parentObject = modObjects_[node->parentId].get();
@@ -1427,7 +1460,7 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
 void ModScene::UpdateControlPointEditing() {
 #ifdef USE_IMGUI
   if (ImGui::GetIO().WantCaptureMouse) {
-    if (!IsMouseLeftPressed()) {
+    if (!IsMouseLeftPressedNow()) {
       isDraggingControlPoint_ = false;
     }
     hoveredPartId_ = -1;
@@ -1441,11 +1474,31 @@ void ModScene::UpdateControlPointEditing() {
 
   Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
 
-  // まずマウスが当たっている部位を更新する
+  // Assembly ドラッグ中はそちらを最優先
+  if (assemblyDrag_.isDragging) {
+    UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
+    ApplyAssemblyDragPreview();
+
+    if (IsMouseLeftReleasedNow()) {
+      if (assemblyDrag_.isPlacementValid) {
+        ConfirmAssemblyDragPlacement();
+      } else {
+        CancelAssemblyDragPlacement();
+      }
+      return;
+    }
+
+    if (system_->GetTriggerOn(DIK_ESCAPE)) {
+      CancelAssemblyDragPlacement();
+      return;
+    }
+
+    return;
+  }
+
+  // 通常時の hover 更新
   UpdateHoveredPartFromMouseRay(mouseRay);
 
-  // すでに操作点を選択している場合、
-  // マウスがその部位メッシュ範囲から外れたら選択解除する
   if (selectedControlPointIndex_ >= 0 && !isDraggingControlPoint_) {
     if (!IsMouseRayInsideSelectedControlMesh(mouseRay)) {
       ClearControlPointSelection();
@@ -1453,23 +1506,29 @@ void ModScene::UpdateControlPointEditing() {
     }
   }
 
-  // ホイールで操作点の半径を拡縮する
   UpdateControlPointWheelScaling();
 
-  // 左クリック開始時に操作点を拾う
-  if (IsMouseLeftTriggered()) {
+  // 左クリック開始時
+  if (IsMouseLeftTriggeredNow()) {
+    // まず操作点を優先。ただし Root は PickControlPointFromMouseRay() 側で弾く
     if (PickControlPointFromMouseRay(mouseRay)) {
       isDraggingControlPoint_ = true;
+      return;
+    }
+
+    // 操作点でなければ部位ドラッグ開始
+    if (TryBeginAssemblyDragFromMouseRay(mouseRay)) {
+      return;
     }
   }
 
-  // ドラッグ中は現在の Ray から操作点位置を更新する
-  if (isDraggingControlPoint_ && IsMouseLeftPressed()) {
+  // 操作点ドラッグ中
+  if (isDraggingControlPoint_ && IsMouseLeftPressedNow()) {
     MoveSelectedControlPointFromMouseRay(mouseRay);
   }
 
-  // 左ボタンを離したらドラッグ終了
-  if (IsMouseLeftReleased()) {
+  // 左ボタンを離したら操作点ドラッグ終了
+  if (IsMouseLeftReleasedNow()) {
     isDraggingControlPoint_ = false;
   }
 }
@@ -1577,7 +1636,8 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
     }
   }
 
-  if (nearestPointIndex < 0) {
+  if (nearestPointIndex >= 0 &&
+      IsAssemblyDragPriorityControlPoint(controlOwnerId, nearestPointIndex)) {
     return false;
   }
 
@@ -1630,7 +1690,9 @@ void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
 
     const Vector3 rootWorld =
         ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
-    const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
+    const Vector3 targetFromRoot = Subtract(targetWorld, rootWorld);
+    const Vector3 targetLocal = InverseRotateByEulerXYZ(
+        targetFromRoot, bodyObject->mainPosition.transform.rotate);
 
     MoveTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
                           targetLocal);
@@ -1662,9 +1724,11 @@ void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
     return;
   }
 
-  const Vector3 rootWorld =
+    const Vector3 rootWorld =
       ModObjectUtil::ComputeObjectRootWorldTranslate(object);
-  const Vector3 targetLocal = Subtract(targetWorld, rootWorld);
+  const Vector3 targetFromRoot = Subtract(targetWorld, rootWorld);
+  const Vector3 targetLocal = InverseRotateByEulerXYZ(
+      targetFromRoot, object->mainPosition.transform.rotate);
 
   body.MoveControlPoint(static_cast<size_t>(selectedControlPointIndex_),
                         targetLocal);
@@ -2918,6 +2982,749 @@ float ModScene::GetChildCurrentLength(const PartNode &childNode) const {
   return defaultLength;
 }
 
+int ModScene::ResolveSelectedAssemblyRootPartId(int partId) const {
+  return ModAssemblyResolver::ResolveAssemblyRootPartId(assembly_, partId);
+}
+
+void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
+  const PartNode *pickedNode = assembly_.FindNode(pickedPartId);
+  if (pickedNode == nullptr) {
+    assemblyDrag_.Clear();
+    return;
+  }
+
+  const int rootPartId = ResolveSelectedAssemblyRootPartId(pickedPartId);
+  const PartNode *rootNode = assembly_.FindNode(rootPartId);
+  if (rootNode == nullptr) {
+    assemblyDrag_.Clear();
+    return;
+  }
+
+  assemblyDrag_.Clear();
+  assemblyDrag_.isDragging = true;
+  assemblyDrag_.pickedPartId = pickedPartId;
+  assemblyDrag_.assemblyRootPartId = rootPartId;
+  assemblyDrag_.assemblyType = ModAssemblyUtil::GetAssemblyType(rootNode->part);
+  assemblyDrag_.side = ModAssemblyUtil::GetAssemblySide(rootNode->part);
+
+  assemblyDrag_.beforeParentId = rootNode->parentId;
+  assemblyDrag_.beforeParentConnectorId = rootNode->parentConnectorId;
+  assemblyDrag_.beforeSelfConnectorId = rootNode->selfConnectorId;
+  assemblyDrag_.beforeLocalTranslate = rootNode->localTransform.translate;
+  assemblyDrag_.beforeLocalRotate = rootNode->localTransform.rotate;
+
+  assemblyDrag_.previewLocalTranslate = rootNode->localTransform.translate;
+  assemblyDrag_.previewLocalRotate = rootNode->localTransform.rotate;
+
+  assemblyDrag_.dragPlaneNormal = {0.0f, 0.0f, 1.0f};
+  assemblyDrag_.dragPlanePoint = GetAssemblyRootWorldPosition(rootPartId);
+
+  assemblyDrag_.previewLocalTranslate = assemblyDrag_.beforeLocalTranslate;
+  assemblyDrag_.previewLocalRotate = assemblyDrag_.beforeLocalRotate;
+
+  assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
+}
+
+bool ModScene::IsAssemblyRootPartId(int partId) const {
+  const PartNode *node = assembly_.FindNode(partId);
+  if (node == nullptr) {
+    return false;
+  }
+
+  return ModAssemblyUtil::IsAssemblyRootPart(node->part);
+}
+
+Vector3 ModScene::GetPartWorldPosition(int partId) const {
+  auto it = modObjects_.find(partId);
+  if (it == modObjects_.end() || it->second == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  return ModObjectUtil::ComputeObjectRootWorldTranslate(it->second.get());
+}
+
+Vector3 ModScene::GetAssemblyRootWorldPosition(int rootPartId) const {
+  return GetPartWorldPosition(rootPartId);
+}
+
+bool ModScene::CanAttachAssemblyRootToParentPart(int childRootPartId,
+                                                 int parentPartId) const {
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  const PartNode *parentNode = assembly_.FindNode(parentPartId);
+  if (childNode == nullptr || parentNode == nullptr) {
+    return false;
+  }
+
+  if (!ModAssemblyUtil::IsAssemblyRootPart(childNode->part)) {
+    return false;
+  }
+
+  if (!ModAssemblyUtil::IsAssemblyRootPart(parentNode->part)) {
+    return false;
+  }
+
+  if (childRootPartId == parentPartId) {
+    return false;
+  }
+
+  const int childResolvedRoot = ModAssemblyResolver::ResolveAssemblyRootPartId(
+      assembly_, childRootPartId);
+  const int parentResolvedRoot =
+      ModAssemblyResolver::ResolveAssemblyRootPartId(assembly_, parentPartId);
+
+  if (childResolvedRoot == parentResolvedRoot) {
+    return false;
+  }
+
+  if (!ModAssemblyUtil::CanPartParentChild(parentNode->part, childNode->part)) {
+    return false;
+  }
+
+  const PartSide childSide = ModAssemblyUtil::GetAssemblySide(childNode->part);
+  const PartSide parentSide =
+      ModAssemblyUtil::GetAssemblySide(parentNode->part);
+
+  if (!ModAssemblyUtil::IsSideCompatible(parentSide, childSide)) {
+    return false;
+  }
+
+  return true;
+}
+
+Vector3 ModScene::GetParentFaceLocalPosition(const PartNode &parentNode,
+                                             ModAttachFace face) const {
+  switch (parentNode.part) {
+  case ModBodyPart::ChestBody:
+    switch (face) {
+    case ModAttachFace::PosY:
+      return {0.0f, 0.45f, 0.0f};
+    case ModAttachFace::NegY:
+      return {0.0f, -0.45f, 0.0f};
+    case ModAttachFace::NegX:
+      return {-0.75f, 0.15f, 0.0f};
+    case ModAttachFace::PosX:
+      return {0.75f, 0.15f, 0.0f};
+    case ModAttachFace::PosZ:
+      return {0.0f, 0.0f, 0.35f};
+    case ModAttachFace::NegZ:
+      return {0.0f, 0.0f, -0.35f};
+    default:
+      return {0.0f, 0.45f, 0.0f};
+    }
+
+  case ModBodyPart::Neck:
+    switch (face) {
+    case ModAttachFace::PosY:
+      return {0.0f, 0.65f, 0.0f};
+    case ModAttachFace::NegY:
+      return {0.0f, -0.20f, 0.0f};
+    case ModAttachFace::NegX:
+      return {-0.16f, 0.18f, 0.0f};
+    case ModAttachFace::PosX:
+      return {0.16f, 0.18f, 0.0f};
+    case ModAttachFace::PosZ:
+      return {0.0f, 0.18f, 0.16f};
+    case ModAttachFace::NegZ:
+      return {0.0f, 0.18f, -0.16f};
+    default:
+      return {0.0f, 0.65f, 0.0f};
+    }
+
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+    switch (face) {
+    case ModAttachFace::NegY:
+      return {0.0f, -0.75f, 0.0f};
+    case ModAttachFace::PosY:
+      return {0.0f, 0.10f, 0.0f};
+    case ModAttachFace::NegX:
+      return {-0.18f, -0.35f, 0.0f};
+    case ModAttachFace::PosX:
+      return {0.18f, -0.35f, 0.0f};
+    case ModAttachFace::PosZ:
+      return {0.0f, -0.35f, 0.18f};
+    case ModAttachFace::NegZ:
+      return {0.0f, -0.35f, -0.18f};
+    default:
+      return {0.0f, -0.75f, 0.0f};
+    }
+
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+    switch (face) {
+    case ModAttachFace::NegY:
+      return {0.0f, -0.75f, 0.0f};
+    case ModAttachFace::PosY:
+      return {0.0f, 0.10f, 0.0f};
+    case ModAttachFace::NegX:
+      return {-0.18f, -0.35f, 0.0f};
+    case ModAttachFace::PosX:
+      return {0.18f, -0.35f, 0.0f};
+    case ModAttachFace::PosZ:
+      return {0.0f, -0.35f, 0.18f};
+    case ModAttachFace::NegZ:
+      return {0.0f, -0.35f, -0.18f};
+    default:
+      return {0.0f, -0.75f, 0.0f};
+    }
+
+  case ModBodyPart::StomachBody:
+  case ModBodyPart::Head:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+  case ModBodyPart::Count:
+  default:
+    return {0.0f, 0.0f, 0.0f};
+  }
+}
+
+Vector3 ModScene::GetParentFaceWorldPosition(const PartNode &parentNode,
+                                             ModAttachFace face) const {
+  const Vector3 worldRoot = GetPartWorldPosition(parentNode.id);
+  const Vector3 localFace = GetParentFaceLocalPosition(parentNode, face);
+  return Add(worldRoot, localFace);
+}
+
+Vector3 ModScene::GetParentFaceWorldNormal(const PartNode &parentNode,
+                                           ModAttachFace face) const {
+  (void)parentNode;
+  return ModAssemblyUtil::GetFaceLocalNormal(face);
+}
+
+int ModScene::FindBestParentConnectorIdForFace(const PartNode &parentNode,
+                                               ModAttachFace face) const {
+  const Vector3 faceNormal = ModAssemblyUtil::GetFaceLocalNormal(face);
+
+  float bestScore = -FLT_MAX;
+  int bestConnectorId = -1;
+
+  for (size_t i = 0; i < parentNode.connectors.size(); ++i) {
+    const ConnectorNode &connector = parentNode.connectors[i];
+
+    Vector3 dir = connector.localPosition;
+    const float len = Length(dir);
+    if (len > 0.0001f) {
+      dir = NormalizeSafeV(dir, faceNormal);
+    } else {
+      dir = faceNormal;
+    }
+
+    const float score = Dot(dir, faceNormal);
+    if (score > bestScore) {
+      bestScore = score;
+      bestConnectorId = connector.id;
+    }
+  }
+
+  return bestConnectorId;
+}
+
+bool ModScene::BuildAttachFaceCandidate(
+    int childRootPartId, int parentPartId, ModAttachFace face,
+    ModAttachFaceCandidate *outCandidate) const {
+  if (outCandidate == nullptr) {
+    return false;
+  }
+
+  outCandidate->isValid = false;
+
+  if (!CanAttachAssemblyRootToParentPart(childRootPartId, parentPartId)) {
+    return false;
+  }
+
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  const PartNode *parentNode = assembly_.FindNode(parentPartId);
+  if (childNode == nullptr || parentNode == nullptr) {
+    return false;
+  }
+
+  const Vector3 childWorld = GetAssemblyRootWorldPosition(childRootPartId);
+  const Vector3 faceWorld = GetParentFaceWorldPosition(*parentNode, face);
+  const Vector3 diff = Subtract(childWorld, faceWorld);
+
+  ModAttachFaceCandidate candidate;
+  candidate.parentPartId = parentPartId;
+  candidate.parentConnectorId =
+      FindBestParentConnectorIdForFace(*parentNode, face);
+  candidate.face = face;
+  candidate.worldPosition = faceWorld;
+  candidate.worldNormal = GetParentFaceWorldNormal(*parentNode, face);
+  candidate.distanceSq = Dot(diff, diff);
+  candidate.isValid = (candidate.parentConnectorId >= 0);
+
+  if (!candidate.isValid) {
+    return false;
+  }
+
+  *outCandidate = candidate;
+  return true;
+}
+
+ModAttachSearchResult
+ModScene::FindBestAttachCandidate(int childRootPartId,
+                                  const Vector3 &dragWorldPosition) const {
+  ModAttachSearchResult result{};
+
+  const float maxDistSq =
+      assemblyAttachSearchRadius_ * assemblyAttachSearchRadius_;
+
+  const std::vector<int> ids = assembly_.GetNodeIdsSorted();
+
+  for (size_t i = 0; i < ids.size(); ++i) {
+    const int parentId = ids[i];
+
+    if (!IsAssemblyRootPartId(parentId)) {
+      continue;
+    }
+
+    if (parentId == childRootPartId) {
+      continue;
+    }
+
+    const ModAttachFace allFaces[6] = {
+        ModAttachFace::PosX, ModAttachFace::NegX, ModAttachFace::PosY,
+        ModAttachFace::NegY, ModAttachFace::PosZ, ModAttachFace::NegZ};
+
+    for (int fi = 0; fi < 6; ++fi) {
+      ModAttachFaceCandidate candidate;
+      if (!BuildAttachFaceCandidate(childRootPartId, parentId, allFaces[fi],
+                                    &candidate)) {
+        continue;
+      }
+
+      const Vector3 diff = Subtract(dragWorldPosition, candidate.worldPosition);
+      candidate.distanceSq = Dot(diff, diff);
+
+      if (candidate.distanceSq > maxDistSq) {
+        continue;
+      }
+
+      if (!result.found ||
+          candidate.distanceSq < result.bestCandidate.distanceSq) {
+        result.bestCandidate = candidate;
+        result.found = true;
+      }
+    }
+  }
+
+  return result;
+}
+
+Vector3 ModScene::ComputeAssemblyPreviewLocalTranslate(
+    int childRootPartId, const ModAttachFaceCandidate &candidate) const {
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  const PartNode *parentNode = assembly_.FindNode(candidate.parentPartId);
+  if (childNode == nullptr || parentNode == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+      parentNode->part, childNode->part, childNode->side);
+
+  const Vector3 baseAttach = ResolveDynamicAttachBase(*parentNode, *childNode);
+  const Vector3 currentRootWorld =
+      GetAssemblyRootWorldPosition(childRootPartId);
+  const Vector3 desiredRootWorld = candidate.worldPosition;
+
+  Vector3 worldDelta = Subtract(desiredRootWorld, currentRootWorld);
+
+  // 現状エンジンは親回転を接続計算へ強く入れていないので、
+  // ここでは world delta をそのまま local delta として扱う
+  const Vector3 currentLocal = childNode->localTransform.translate;
+  const Vector3 offsetFromDefault = Subtract(currentLocal, defaultAttach);
+
+  return Add(Add(baseAttach, offsetFromDefault), worldDelta);
+}
+
+void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    return;
+  }
+
+  Vector3 hitPoint{};
+  if (!RayPlaneIntersectionZ(mouseRay, assemblyDrag_.dragPlanePoint.z,
+                             &hitPoint)) {
+    assemblyDrag_.hoveredParentPartId = -1;
+    assemblyDrag_.hoveredParentConnectorId = -1;
+    assemblyDrag_.isPlacementValid = false;
+    assemblyDrag_.previewLocalTranslate = assemblyDrag_.beforeLocalTranslate;
+    assemblyDrag_.previewLocalRotate = assemblyDrag_.beforeLocalRotate;
+    return;
+  }
+
+  const Vector3 desiredRootWorld = Add(hitPoint, assemblyDrag_.dragRootOffset);
+
+  // まずは常にマウスへ自由追従
+  assemblyDrag_.previewLocalTranslate = ComputeAssemblyFreeDragLocalTranslate(
+      assemblyDrag_.assemblyRootPartId, desiredRootWorld);
+  assemblyDrag_.previewLocalRotate = assemblyDrag_.beforeLocalRotate;
+
+  ModAttachSearchResult search = FindBestAttachCandidate(
+      assemblyDrag_.assemblyRootPartId, desiredRootWorld);
+
+  if (!search.found) {
+    assemblyDrag_.hoveredParentPartId = -1;
+    assemblyDrag_.hoveredParentConnectorId = -1;
+    assemblyDrag_.isPlacementValid = false;
+    return;
+  }
+
+  assemblyDrag_.hoveredParentPartId = search.bestCandidate.parentPartId;
+  assemblyDrag_.hoveredParentConnectorId =
+      search.bestCandidate.parentConnectorId;
+  assemblyDrag_.hoveredFace = search.bestCandidate.face;
+
+  const float snapDistSq =
+      assemblyAttachSnapRadius_ * assemblyAttachSnapRadius_;
+  assemblyDrag_.isPlacementValid =
+      (search.bestCandidate.distanceSq <= snapDistSq);
+
+  // 回転だけは候補面に向けてブレンド
+  assemblyDrag_.previewLocalRotate.z = ComputeAssemblyPreviewRotateZ(
+      assemblyDrag_.assemblyRootPartId, search.bestCandidate, desiredRootWorld);
+}
+
+void ModScene::ApplyAssemblyDragPreview() {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    return;
+  }
+
+  assembly_.SetPartLocalTranslate(assemblyDrag_.assemblyRootPartId,
+                                  assemblyDrag_.previewLocalTranslate);
+
+  assembly_.SetPartLocalRotate(assemblyDrag_.assemblyRootPartId,
+                               assemblyDrag_.previewLocalRotate);
+}
+
+void ModScene::UpdateAssemblyDragTest() {
+#ifdef USE_IMGUI
+  if (ImGui::GetIO().WantCaptureMouse) {
+    return;
+  }
+#endif
+
+  if (usingCamera_ == nullptr) {
+    return;
+  }
+
+  if (selectedPartId_ < 0) {
+    return;
+  }
+
+  if (system_->GetTriggerOn(DIK_G) && !assemblyDrag_.isDragging) {
+    BeginAssemblyDragFromPart(selectedPartId_);
+  }
+
+  if (!assemblyDrag_.isDragging) {
+    return;
+  }
+
+  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+
+  UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
+  ApplyAssemblyDragPreview();
+
+  // 左クリックを離したら配置確定判定
+  if (IsMouseLeftReleasedNow()) {
+    if (assemblyDrag_.isPlacementValid) {
+      ConfirmAssemblyDragPlacement();
+    } else {
+      CancelAssemblyDragPlacement();
+    }
+    return;
+  }
+
+  // Esc は常にキャンセル
+  if (system_->GetTriggerOn(DIK_ESCAPE)) {
+    CancelAssemblyDragPlacement();
+    return;
+  }
+}
+
+bool ModScene::IsPartInDraggingAssembly(int partId) const {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    return false;
+  }
+
+  return ModAssemblyResolver::BelongsToAssemblyRoot(
+      assembly_, assemblyDrag_.assemblyRootPartId, partId);
+}
+
+void ModScene::CancelAssemblyDragPlacement() {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    assemblyDrag_.Clear();
+    return;
+  }
+
+  const int rootPartId = assemblyDrag_.assemblyRootPartId;
+  const PartNode *rootNode = assembly_.FindNode(rootPartId);
+  if (rootNode == nullptr) {
+    assemblyDrag_.Clear();
+    return;
+  }
+
+  if (assemblyDrag_.beforeParentId >= 0) {
+    assembly_.MovePart(rootPartId, assemblyDrag_.beforeParentId,
+                       assemblyDrag_.beforeParentConnectorId);
+  }
+
+  assembly_.SetPartLocalTranslate(rootPartId,
+                                  assemblyDrag_.beforeLocalTranslate);
+  assembly_.SetPartLocalRotate(rootPartId, assemblyDrag_.beforeLocalRotate);
+
+  SelectPart(assemblyDrag_.pickedPartId >= 0 ? assemblyDrag_.pickedPartId
+                                             : rootPartId);
+
+  assemblyDrag_.Clear();
+}
+
+void ModScene::ConfirmAssemblyDragPlacement() {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    assemblyDrag_.Clear();
+    return;
+  }
+
+  if (!assemblyDrag_.isPlacementValid ||
+      assemblyDrag_.hoveredParentPartId < 0) {
+    CancelAssemblyDragPlacement();
+    return;
+  }
+
+  const int rootPartId = assemblyDrag_.assemblyRootPartId;
+  const int newParentId = assemblyDrag_.hoveredParentPartId;
+  const int newParentConnectorId = assemblyDrag_.hoveredParentConnectorId;
+
+  const PartNode *childNode = assembly_.FindNode(rootPartId);
+  const PartNode *parentNode = assembly_.FindNode(newParentId);
+  if (childNode == nullptr || parentNode == nullptr) {
+    CancelAssemblyDragPlacement();
+    return;
+  }
+
+  ModAttachFaceCandidate snappedCandidate{};
+  snappedCandidate.parentPartId = newParentId;
+  snappedCandidate.parentConnectorId = newParentConnectorId;
+  snappedCandidate.face = assemblyDrag_.hoveredFace;
+  snappedCandidate.worldPosition =
+      GetParentFaceWorldPosition(*parentNode, assemblyDrag_.hoveredFace);
+  snappedCandidate.worldNormal =
+      GetParentFaceWorldNormal(*parentNode, assemblyDrag_.hoveredFace);
+  snappedCandidate.isValid = true;
+
+  // 現在の自由追従位置から最終接続位置へ寄せた local を作る
+  const Vector3 snappedLocalTranslate =
+      ComputeAssemblyPreviewLocalTranslate(rootPartId, snappedCandidate);
+
+  if (!assembly_.MovePart(rootPartId, newParentId, newParentConnectorId)) {
+    CancelAssemblyDragPlacement();
+    return;
+  }
+
+  assembly_.SetPartLocalTranslate(rootPartId, snappedLocalTranslate);
+  assembly_.SetPartLocalRotate(rootPartId, assemblyDrag_.previewLocalRotate);
+
+  SelectPart(rootPartId);
+  assemblyDrag_.Clear();
+}
+
+void ModScene::ApplyAssemblyDragVisualFeedback() {
+  if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
+    return;
+  }
+
+  const bool valid = assemblyDrag_.isPlacementValid;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+    if (!IsPartInDraggingAssembly(id)) {
+      continue;
+    }
+
+    auto it = modObjects_.find(id);
+    if (it == modObjects_.end() || it->second == nullptr) {
+      continue;
+    }
+
+    Object *object = it->second.get();
+    if (object == nullptr) {
+      continue;
+    }
+
+    for (size_t partIndex = 0; partIndex < object->objectParts_.size();
+         ++partIndex) {
+      if (object->objectParts_[partIndex].materialConfig == nullptr) {
+        continue;
+      }
+
+      Vector4 &color =
+          object->objectParts_[partIndex].materialConfig->textureColor;
+
+      if (valid) {
+        color.x = 0.25f;
+        color.y = 1.0f;
+        color.z = 0.35f;
+      } else {
+        color.x = 1.0f;
+        color.y = 0.25f;
+        color.z = 0.25f;
+      }
+    }
+  }
+}
+
+float ModScene::NormalizeAngleRad(float angle) const {
+  const float pi = 3.14f;
+  const float twoPi = pi * 2.0f;
+
+  while (angle > pi) {
+    angle -= twoPi;
+  }
+  while (angle < -pi) {
+    angle += twoPi;
+  }
+
+  return angle;
+}
+
+float ModScene::LerpAngleRad(float from, float to, float t) const {
+  const float delta = NormalizeAngleRad(to - from);
+  return NormalizeAngleRad(from + delta * t);
+}
+
+Vector3
+ModScene::GetAssemblyRootAttachWorldNormal(int rootPartId,
+                                           const Vector3 &localRotate) const {
+  const PartNode *rootNode = assembly_.FindNode(rootPartId);
+  if (rootNode == nullptr) {
+    return {0.0f, 1.0f, 0.0f};
+  }
+
+  const Vector3 localNormal =
+      ModAssemblyUtil::GetRootAttachLocalNormal(rootNode->part);
+
+  const float c = cosf(localRotate.z);
+  const float s = sinf(localRotate.z);
+
+  Vector3 rotated{};
+  rotated.x = localNormal.x * c - localNormal.y * s;
+  rotated.y = localNormal.x * s + localNormal.y * c;
+  rotated.z = localNormal.z;
+
+  return NormalizeSafeV(rotated, {0.0f, 1.0f, 0.0f});
+}
+
+float ModScene::ComputeAssemblyPreviewRotateZ(
+    int childRootPartId, const ModAttachFaceCandidate &candidate,
+    const Vector3 &dragWorldPosition) const {
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  if (childNode == nullptr) {
+    return 0.0f;
+  }
+
+  const float currentZ = childNode->localTransform.rotate.z;
+
+  // 子の root 接続面法線は「親へ向く面」なので、
+  // 親面法線と向かい合わせるため target は -parentNormal
+  const Vector3 desiredChildNormal = NegateV(candidate.worldNormal);
+
+  // いまは roll 禁止で Z 回転のみ
+  const float targetZ =
+      atan2f(desiredChildNormal.y, desiredChildNormal.x) -
+      atan2f(ModAssemblyUtil::GetRootAttachLocalNormal(childNode->part).y,
+             ModAssemblyUtil::GetRootAttachLocalNormal(childNode->part).x);
+
+  const Vector3 diff = Subtract(dragWorldPosition, candidate.worldPosition);
+  const float distance = Length(diff);
+
+  const float blendT =
+      1.0f - Clamp01Local(distance /
+                          (std::max)(assemblyRotateBlendDistance_, 0.0001f));
+
+  return LerpAngleRad(currentZ, targetZ, blendT);
+}
+
+bool ModScene::IsMouseLeftPressedNow() const {
+  return system_ != nullptr && system_->GetMouseIsPush(0);
+}
+
+bool ModScene::IsMouseLeftTriggeredNow() const {
+  return system_ != nullptr && system_->GetMouseTriggerOn(0);
+}
+
+bool ModScene::IsMouseLeftReleasedNow() const {
+  return system_ != nullptr && system_->GetMouseTriggerOff(0);
+}
+
+bool ModScene::IsAssemblyDragPriorityControlPoint(int ownerPartId,
+                                                  int pointIndex) const {
+  if (ownerPartId == -2) {
+    return false;
+  }
+
+  auto bodyIt = modBodies_.find(ownerPartId);
+  if (bodyIt == modBodies_.end()) {
+    return false;
+  }
+
+  const std::vector<ModControlPoint> &points =
+      bodyIt->second.GetControlPoints();
+  if (pointIndex < 0 || static_cast<size_t>(pointIndex) >= points.size()) {
+    return false;
+  }
+
+  const ModControlPointRole role = points[static_cast<size_t>(pointIndex)].role;
+
+  // 根元接続点は部位ドラッグ開始を優先する
+  return role == ModControlPointRole::Root;
+}
+
+bool ModScene::TryBeginAssemblyDragFromMouseRay(const Ray &mouseRay) {
+  if (assemblyDrag_.isDragging) {
+    return false;
+  }
+
+  const int visiblePartId =
+      (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
+  if (visiblePartId < 0) {
+    return false;
+  }
+
+  const int rootPartId = ResolveSelectedAssemblyRootPartId(visiblePartId);
+  if (rootPartId < 0) {
+    return false;
+  }
+
+  const Vector3 rootWorld = GetAssemblyRootWorldPosition(rootPartId);
+
+  BeginAssemblyDragFromPart(visiblePartId);
+  SelectPart(visiblePartId);
+
+  Vector3 hitPoint{};
+  if (RayPlaneIntersectionZ(mouseRay, assemblyDrag_.dragPlanePoint.z,
+                            &hitPoint)) {
+    assemblyDrag_.dragRootOffset = Subtract(rootWorld, hitPoint);
+  } else {
+    assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
+  }
+
+  return true;
+}
+
+Vector3 ModScene::ComputeAssemblyFreeDragLocalTranslate(
+    int childRootPartId, const Vector3 &desiredRootWorld) const {
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  if (childNode == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  const Vector3 startRootWorld = assemblyDrag_.dragPlanePoint;
+  const Vector3 worldDelta = Subtract(desiredRootWorld, startRootWorld);
+
+  return Add(assemblyDrag_.beforeLocalTranslate, worldDelta);
+}
+
 Vector3
 ModScene::ResolveChildSelfAttachOffset(const PartNode &childNode) const {
   Vector3 outward = ResolveAttachOutwardDirection(childNode);
@@ -3025,9 +3832,13 @@ ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
     return ZeroV();
   }
 
-  return Add(
-      bodyObject->mainPosition.transform.translate,
-      torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition);
+  const Vector3 rootWorld =
+      ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
+  const Vector3 rotatedLocal = RotateByEulerXYZ(
+      torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition,
+      bodyObject->mainPosition.transform.rotate);
+
+  return Add(rootWorld, rotatedLocal);
 }
 
 void ModScene::UpdateModObjects() {
@@ -3149,11 +3960,33 @@ void ModScene::UpdateModObjects() {
     for (size_t partIndex = 0; partIndex < object->objectParts_.size();
          ++partIndex) {
       if (object->objectParts_[partIndex].materialConfig != nullptr) {
-        object->objectParts_[partIndex].materialConfig->textureColor.w = alpha;
+        Vector4 &color =
+            object->objectParts_[partIndex].materialConfig->textureColor;
+
+        // まず通常色へ戻す
+        color.x = 1.0f;
+        color.y = 1.0f;
+        color.z = 1.0f;
+        color.w = alpha;
       }
     }
 
     object->Update(usingCamera_);
+  }
+
+  ApplyAssemblyDragVisualFeedback();
+
+  // 色変更後にもう一度更新して反映
+  if (assemblyDrag_.isDragging) {
+    for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+      const int id = orderedPartIds_[i];
+      auto it = modObjects_.find(id);
+      if (it == modObjects_.end() || it->second == nullptr) {
+        continue;
+      }
+
+      it->second->Update(usingCamera_);
+    }
   }
 
   UpdateControlPointGizmos();
@@ -3870,6 +4703,11 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
 }
 
 bool ModScene::ShouldBlockDebugCameraMouseControl() const {
+  // 部位付け替えドラッグ中
+  if (assemblyDrag_.isDragging) {
+    return true;
+  }
+
   // 操作点ドラッグ中
   if (isDraggingControlPoint_) {
     return true;
