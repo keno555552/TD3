@@ -340,4 +340,26 @@ private:
 
   bool BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
                                 SegmentVisual &out);
+
+private:
+  // 沼
+  std::unique_ptr<Object> swamp_ = nullptr;
+  uint32_t swampModelHandle_ = 0;
+
+  float swampZ_ = 0.0f;          // 沼の中心Z
+  float swampWidth_ = 1.0f;      // 沼の幅
+  float swampJumpScale_ = 0.1f;  // 沼に入った時の減速率
+  float swampSlowScale_ = 0.33f; // 沼に入った時の減速率
+  bool isInSwamp_ = false;
+
+  // タイミング
+  enum class KickFeedbackType {
+    None,
+    Good,
+    Perfect,
+  };
+
+private:
+  KickFeedbackType kickFeedbackType_ = KickFeedbackType::None;
+  float kickFeedbackTimer_ = 0.0f;
 };
