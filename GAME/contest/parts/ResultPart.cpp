@@ -54,11 +54,11 @@ void ResultPart::Draw() {
 	ImGui::Text("[Result]");
 	ImGui::Separator();
 
-	// ★5項目は常に全部表示
+	// ★5項目を全部表示
 	DrawStarItem("Theme Match", scoreResult_.starThemeMatch, true);
 	DrawStarItem("Impact", scoreResult_.starImpact, true);
-	DrawStarItem("Efficiency", scoreResult_.starEfficiency, true);
 	DrawStarItem("Commitment", scoreResult_.starCommitment, true);
+	DrawStarItem("Efficiency", scoreResult_.starEfficiency, true);
 	DrawStarItem("Judge Eval", scoreResult_.starJudgeBonus, true);
 
 	// ★合計

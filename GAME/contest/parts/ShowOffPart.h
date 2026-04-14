@@ -1,6 +1,7 @@
 #pragma once
 #include "IContestPart.h"
 #include "GAME/audience/AudienceData.h"
+#include"GAME/font/BitmapFont.h"
 
 /// <summary>
 /// お披露目パートのサブステート
