@@ -398,6 +398,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Ray.cpp" />
     <ClCompile Include="kEngine\Data\Geometry\CrashData\OldHitBox.cpp" />
     <ClCompile Include="kEngine\Data\Geometry\CrashData\OBB.cpp" />
+    <ClCompile Include="GAME\actor\ModCapsuleUtil.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
     <ClCompile Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.cpp" />
@@ -645,6 +646,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModAssemblyTypes.h" />
     <ClInclude Include="GAME\actor\ModAssemblyUtil.h" />
     <ClInclude Include="GAME\actor\ModAttachCandidate.h" />
+    <ClInclude Include="GAME\actor\ModCapsuleUtil.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />
     <ClInclude Include="kEngine\Scenes\CG3_HK_2\SceneCGHK2.h" />

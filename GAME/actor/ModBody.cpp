@@ -1,5 +1,6 @@
 #include "ModBody.h"
 #include "ModCustomizeDataStore.h"
+#include "GAME/actor/ModObjectUtil.h"
 #include <cmath>
 
 namespace {
@@ -223,6 +224,43 @@ void ClearLegacyPartParams(ModBodyCustomizeData &data) {
     data.partParams[i].enabled = false;
   }
 }
+Vector3 RotateByEulerXYZLocal(const Vector3 &point, const Vector3 &rot) {
+  const float cx = cosf(rot.x);
+  const float sx = sinf(rot.x);
+  const float cy = cosf(rot.y);
+  const float sy = sinf(rot.y);
+  const float cz = cosf(rot.z);
+  const float sz = sinf(rot.z);
+
+  Vector3 v = point;
+
+  {
+    const float y = v.y * cx - v.z * sx;
+    const float z = v.y * sx + v.z * cx;
+    v.y = y;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cy + v.z * sy;
+    const float z = -v.x * sy + v.z * cy;
+    v.x = x;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cz - v.y * sz;
+    const float y = v.x * sz + v.y * cz;
+    v.x = x;
+    v.y = y;
+  }
+
+  return v;
+}
+
+Vector3 InverseRotateByEulerXYZLocal(const Vector3 &point, const Vector3 &rot) {
+  return RotateByEulerXYZLocal(point, {-rot.x, -rot.y, -rot.z});
+}
 
 } // namespace
 
@@ -249,6 +287,39 @@ Vector3 ModBody::GetVisualScaleRatio() const {
   }
 
   return ratio;
+}
+
+float ModBody::GetVisualSegmentRadius(ModControlPointRole startRole,
+                                      ModControlPointRole endRole) const {
+  const int startIndex = FindControlPointIndex(startRole);
+  const int endIndex = FindControlPointIndex(endRole);
+
+  if (startIndex < 0 || endIndex < 0) {
+    return 0.0f;
+  }
+
+  const float startRadius =
+      controlPoints_[static_cast<size_t>(startIndex)].radius;
+  const float endRadius = controlPoints_[static_cast<size_t>(endIndex)].radius;
+
+  const float safeStartRadius = (std::max)(startRadius, 0.01f);
+  const float safeEndRadius = (std::max)(endRadius, 0.01f);
+
+  // ApplySegmentToObjectPart() と同じ考え方
+  const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);
+
+  const float defaultSegmentRadius =
+      GetDefaultSegmentRadius(part_, startRole, endRole);
+
+  const float thicknessScale =
+      segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
+
+  // 実際の見た目幅は base mesh の太さ × thicknessScale × param.scale
+  // カプセル半径は最終的な見た目の外半径に合わせたいので
+  // X/Z の大きい方を掛ける
+  const float lateralScale = (std::max)(param_.scale.x, param_.scale.z);
+
+  return defaultSegmentRadius * thicknessScale * lateralScale;
 }
 
 std::unique_ptr<ModBodyCustomizeData> ModBody::CreateDefaultCustomizeData() {
@@ -407,8 +478,8 @@ void ModBody::Apply(Object *target) {
         (part_ == ModBodyPart::ChestBody || part_ == ModBodyPart::StomachBody);
 
     if (!isTorso) {
-      endPos = Subtract(endPos, startPos);
-      startPos = ZeroV();
+      startPos = ConvertExternalPointToThisObjectLocal(target, startPos);
+      endPos = ConvertExternalPointToThisObjectLocal(target, endPos);
     }
   }
 
@@ -691,11 +762,8 @@ Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
     return {0.0f, 0.0f, 0.0f};
   }
 
-  const Vector3 rootWorld = ComputeMainPositionWorldTranslate(target);
-  const Vector3 rotatedLocal = RotateLocalPointByRootTransform(
-      target, controlPoints_[index].localPosition);
-
-  return Add(rootWorld, rotatedLocal);
+  return TransformControlPointLocalToWorld(target,
+                                           controlPoints_[index].localPosition);
 }
 
 void ModBody::BuildDefaultControlPoints() {
@@ -723,15 +791,15 @@ void ModBody::BuildDefaultControlPoints() {
 
   case ModBodyPart::Neck: {
     controlPoints_.push_back(MakePoint(ModControlPointRole::Root,
-                                       {0.0f, 0.0f, 0.0f}, 0.09f, false, true,
+                                       {0.0f, 0.1f, 0.0f}, 0.09f, false, true,
                                        true, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Bend,
-                                       {0.0f, 0.28f, 0.0f}, 0.08f, true, true,
+                                       {0.0f, 0.38f, 0.0f}, 0.08f, true, true,
                                        false, true));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::End,
-                                       {0.0f, 0.80f, 0.0f}, 0.11f, true, true,
+                                       {0.0f, 1.00f, 0.0f}, 0.11f, true, true,
                                        false, true));
     break;
   }
@@ -827,48 +895,29 @@ void ModBody::PushPointToMinimumDistance(int fixedIndex, int movableIndex,
 }
 
 Vector3
-ModBody::RotateLocalPointByRootTransform(const Object *target,
-                                         const Vector3 &localPoint) const {
+ModBody::TransformControlPointLocalToWorld(const Object *target,
+                                           const Vector3 &localPoint) const {
   if (target == nullptr) {
     return localPoint;
   }
 
-  const Vector3 rot = target->mainPosition.transform.rotate;
+  return ModObjectUtil::TransformLocalPointToWorld(target, localPoint);
+}
 
-  const float cx = cosf(rot.x);
-  const float sx = sinf(rot.x);
-  const float cy = cosf(rot.y);
-  const float sy = sinf(rot.y);
-  const float cz = cosf(rot.z);
-  const float sz = sinf(rot.z);
-
-  Vector3 v = localPoint;
-
-  // X
-  {
-    const float y = v.y * cx - v.z * sx;
-    const float z = v.y * sx + v.z * cx;
-    v.y = y;
-    v.z = z;
+Vector3 ModBody::ConvertExternalPointToThisObjectLocal(
+    const Object *target, const Vector3 &externalOwnerLocalPoint) const {
+  if (target == nullptr) {
+    return externalOwnerLocalPoint;
   }
 
-  // Y
-  {
-    const float x = v.x * cy + v.z * sy;
-    const float z = -v.x * sy + v.z * cy;
-    v.x = x;
-    v.z = z;
-  }
+  // child の親空間で表現された点を、child 自身の local へ変換する
+  const Vector3 childLocalOrigin = target->mainPosition.transform.translate;
+  const Vector3 offsetInParent =
+      Subtract(externalOwnerLocalPoint, childLocalOrigin);
 
-  // Z
-  {
-    const float x = v.x * cz - v.y * sz;
-    const float y = v.x * sz + v.y * cz;
-    v.x = x;
-    v.y = y;
-  }
-
-  return v;
+  // ここが重要: ZだけでなくXYZを逆回転する
+  return InverseRotateByEulerXYZLocal(offsetInParent,
+                                      target->mainPosition.transform.rotate);
 }
 
 void ModBody::EnforceAdjacentPointSpacing() {

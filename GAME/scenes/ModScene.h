@@ -13,6 +13,19 @@
 #include <unordered_map>
 #include <vector>
 
+struct ModCapsule;
+
+struct ModSceneCapsuleSegment {
+  Vector3 start{0.0f, 0.0f, 0.0f};
+  Vector3 end{0.0f, 0.0f, 0.0f};
+  float radius = 0.0f;
+};
+
+struct ModSceneCapsuleSet {
+  ModSceneCapsuleSegment segments[2];
+  int count = 0;
+};
+
 /// <summary>
 /// 改造シーン本体
 /// 部位の追加、削除、付け替え、パラメータ編集を行い、次のシーンへ渡す改造結果を作る
@@ -109,9 +122,6 @@ private:
 
   float assemblyAttachSearchRadius_ = 1.35f; // 接続有効範囲
   float assemblyAttachSnapRadius_ = 0.55f;   // 接続時スナップ距離
-
-  float assemblyRotateBlendDistance_ =
-      1.10f; // 回転プレビューのブレンド開始距離
 
 private:
   /// <summary>
@@ -364,6 +374,25 @@ private:
                                   float defaultRadius) const;
 
   /// <summary>
+  /// 指定部位の指定役割操作点の半径を取得する
+  /// </summary>
+  /// <param name="partId">対象部位ID</param>
+  /// <param name="startRole">開始役割</param>
+  /// <param name="endRole">終了役割</param>
+  /// <returns>操作点の半径。存在しない場合は 0 を返す</returns>
+  float GetPartVisualSegmentRadius(int partId, ModControlPointRole startRole,
+                                   ModControlPointRole endRole) const;
+
+  /// <summary>
+  /// 指定した役割の操作点同士を結ぶセグメントの半径を取得する
+  /// </summary>
+  /// <param name="startRole">開始役割</param>
+  /// <param name="endRole">終了役割</param>
+  /// <returns>操作点の半径。存在しない場合は 0 を返す</returns>
+  float GetTorsoVisualSegmentRadius(ModControlPointRole startRole,
+                                    ModControlPointRole endRole) const;
+
+  /// <summary>
   /// ベクトルを軸ごとの倍率で拡縮する
   /// </summary>
   Vector3 ScaleVectorComponents(const Vector3 &value,
@@ -391,16 +420,12 @@ private:
   bool ScaleTorsoControlPoint(size_t index, float scaleFactor);
 
   /// <summary>
-  /// 指定部位のメッシュ近傍ピック用カプセルを作る
-  /// hovered 判定や選択維持判定で共通利用する
+  /// 指定部位の操作点を拡縮する
   /// </summary>
-  /// <param name="partId">対象部位ID</param>
-  /// <param name="outStart">カプセル始点</param>
-  /// <param name="outEnd">カプセル終点</param>
-  /// <param name="outRadius">カプセル半径</param>
-  /// <returns>生成できたら true</returns>
-  bool BuildPartPickCapsule(int partId, Vector3 &outStart, Vector3 &outEnd,
-                            float &outRadius) const;
+  /// <param name="partId">拡縮対象の部位ID</param>
+  /// <param name="outCapsules">拡縮後のカプセルセットを受け取る参照</param>
+  /// <returns></returns>
+  bool BuildPartPickCapsules(int partId, ModSceneCapsuleSet &outCapsules) const;
 
   /// <summary>
   /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
@@ -473,20 +498,6 @@ private:
   bool CanAttachAssemblyRootToParentPart(int childRootPartId,
                                          int parentPartId) const;
 
-  Vector3 GetParentFaceLocalPosition(const PartNode &parentNode,
-                                     ModAttachFace face) const;
-  Vector3 GetParentFaceWorldPosition(const PartNode &parentNode,
-                                     ModAttachFace face) const;
-  Vector3 GetParentFaceWorldNormal(const PartNode &parentNode,
-                                   ModAttachFace face) const;
-
-  int FindBestParentConnectorIdForFace(const PartNode &parentNode,
-                                       ModAttachFace face) const;
-
-  bool BuildAttachFaceCandidate(int childRootPartId, int parentPartId,
-                                ModAttachFace face,
-                                ModAttachFaceCandidate *outCandidate) const;
-
   ModAttachSearchResult
   FindBestAttachCandidate(int childRootPartId,
                           const Vector3 &dragWorldPosition) const;
@@ -500,22 +511,12 @@ private:
 
   void UpdateAssemblyDragTest();
 
-    void ConfirmAssemblyDragPlacement();
+  void ConfirmAssemblyDragPlacement();
   void CancelAssemblyDragPlacement();
   bool IsPartInDraggingAssembly(int partId) const;
   void ApplyAssemblyDragVisualFeedback();
 
-  float NormalizeAngleRad(float angle) const;
-  float LerpAngleRad(float from, float to, float t) const;
-
-  Vector3 GetAssemblyRootAttachWorldNormal(int rootPartId,
-                                           const Vector3 &localRotate) const;
-
-  float ComputeAssemblyPreviewRotateZ(int childRootPartId,
-                                      const ModAttachFaceCandidate &candidate,
-                                      const Vector3 &dragWorldPosition) const;
-
-    bool IsMouseLeftPressedNow() const;
+  bool IsMouseLeftPressedNow() const;
   bool IsMouseLeftTriggeredNow() const;
   bool IsMouseLeftReleasedNow() const;
 
@@ -527,6 +528,16 @@ private:
   Vector3
   ComputeAssemblyFreeDragLocalTranslate(int childRootPartId,
                                         const Vector3 &desiredRootWorld) const;
+
+  bool IsAssemblyPreviewOverlapping(int movingAssemblyRootPartId,
+                                    int ignoreParentPartId) const;
+
+  int FindBestParentConnectorIdForPosition(const PartNode &parentNode,
+                                           const Vector3 &worldPosition) const;
+
+  bool BuildAttachCapsuleCandidate(int childRootPartId, int parentPartId,
+                                   const Vector3 &dragWorldPosition,
+                                   ModAttachFaceCandidate *outCandidate) const;
 
 #ifdef USE_IMGUI
   /// <summary>

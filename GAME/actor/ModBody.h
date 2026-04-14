@@ -322,6 +322,13 @@ public:
   /// </summary>
   const ControlPointChain &GetChain() const { return chain_; }
 
+  /// <summary>
+  /// 指定した2点役割から、この部位で実際に見た目へ使われるセグメント半径を返す
+  /// 判定用カプセル半径を見た目に合わせるために使う
+  /// </summary>
+  float GetVisualSegmentRadius(ModControlPointRole startRole,
+                               ModControlPointRole endRole) const;
+
 private:
   /// <summary>
   /// 対象Objectの基準transformを必要に応じてキャッシュする
@@ -393,10 +400,20 @@ private:
                                   float extraMargin);
 
   /// <summary>
-  /// 部位 root の回転を local 点へ適用した座標を返す
+  /// 部位ローカルの操作点位置を、Objectの親子transformを加味してワールド位置へ変換する
   /// </summary>
-  Vector3 RotateLocalPointByRootTransform(const Object *target,
-                                          const Vector3 &localPoint) const;
+  /// <param name="target"></param>
+  /// <param name="localPoint"></param>
+  /// <returns></returns>
+  Vector3 TransformControlPointLocalToWorld(const Object *target,
+                                            const Vector3 &localPoint) const;
+
+    /// <summary>
+  /// 外部参照している操作点ローカル座標を、この部位 Object
+  /// のローカル座標へ変換する
+  /// </summary>
+  Vector3 ConvertExternalPointToThisObjectLocal(
+      const Object *target, const Vector3 &externalOwnerLocalPoint) const;
 
 private:
   ModBodyPart part_ = ModBodyPart::ChestBody;
