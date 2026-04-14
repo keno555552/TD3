@@ -107,15 +107,6 @@ TravelScene::TravelScene(kEngine *system) {
   ground_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
   ground_->mainPosition.transform.scale = {1.0f, 0.3f, 50.0f};
 
-  swampModelHandle_ =
-      system_->SetModelObj("GAME/resources/modBody/head/head.obj");
-  swamp_ = std::make_unique<Object>();
-  swamp_->IntObject(system_);
-  swamp_->CreateModelData(swampModelHandle_);
-  swamp_->mainPosition.transform = CreateDefaultTransform();
-
-  swamp_->mainPosition.transform.translate = {0.0f, groundY_ - 3.5f, 0.0f};
-
   //===============================
   // 2D
   //===============================
@@ -197,8 +188,6 @@ void TravelScene::Draw() {
   DrawExtraVisualParts();
 
   ground_->Draw();
-
-  swamp_->Draw();
 
 #ifdef USE_IMGUI
   // 現在シーン表示
@@ -1218,12 +1207,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   kickFeedbackType_ = KickFeedbackType::None;
 
-  //==============================
-  // 今フレームの push 計算で使う沼状態
-  // isInSwamp_ は前フレーム終端で更新済みの値を使う
-  //==============================
-  bool swampActive = isInSwamp_;
-
   float stability = useCustomizeMove_ ? tuning_.stability : 1.0f;
   float turnResponse = useCustomizeMove_ ? tuning_.turnResponse : 1.0f;
 
@@ -1551,10 +1534,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                           (0.55f + runPower * 1.10f + lift * 0.75f) *
                           legLengthScale * kickEfficiency * groundBoost;
 
-    if (swampActive) {
-      pushMagnitude *= swampSlowScale_;
-    }
-
     if (bothInput) {
       pushMagnitude *= 0.85f;
     } else {
@@ -1752,21 +1731,6 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     }
   }
 
-  //==============================
-  // 次フレーム用の沼判定
-  // 接地判定を更新したあとで判定する
-  //==============================
-  {
-    float swampLeft = swampZ_ - swampWidth_ * 0.5f;
-    float swampRight = swampZ_ + swampWidth_ * 0.5f;
-
-    if (isGrounded_ && moveX_ >= swampLeft && moveX_ <= swampRight) {
-      isInSwamp_ = true;
-    } else {
-      isInSwamp_ = false;
-    }
-  }
-
   bool justLanded = (!wasGrounded && isGrounded_);
 
   if (justLanded) {
@@ -1951,17 +1915,6 @@ void TravelScene::ApplyVisualState() {
     ground_->mainPosition.transform.translate.z = 0.0f;
 
     ground_->Update(usingCamera_);
-  }
-
-  if (swamp_ != nullptr) {
-    swamp_->mainPosition.transform.translate.x = 0.0f;
-    swamp_->mainPosition.transform.translate.y = groundY_ - 0.2f;
-    swamp_->mainPosition.transform.translate.z = swampZ_;
-
-    swamp_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-    swamp_->mainPosition.transform.scale.z = swampWidth_;
-
-    swamp_->Update(usingCamera_);
   }
 }
 
