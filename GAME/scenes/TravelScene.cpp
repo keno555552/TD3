@@ -10,9 +10,28 @@ Vector3 ScaleByRatio(const Vector3 &base, const Vector3 &ratio) {
   return {base.x * ratio.x, base.y * ratio.y, base.z * ratio.z};
 }
 
+float RandomFloat(float minValue, float maxValue) {
+  float t = static_cast<float>(rand()) / static_cast<float>(RAND_MAX);
+  return minValue + (maxValue - minValue) * t;
+}
+
+std::string GetRankText(int rank) {
+  switch (rank) {
+  case 1:
+    return "1ST";
+  case 2:
+    return "2ND";
+  case 3:
+    return "3RD";
+  default:
+    return std::to_string(rank) + "TH";
+  }
+}
+
 } // namespace
 
 TravelScene::TravelScene(kEngine *system) {
+  Logger::Log("TravelScene ctor");
   system_ = system;
 
   //===============================
@@ -42,6 +61,11 @@ TravelScene::TravelScene(kEngine *system) {
 
   usingCamera_ = camera_;
   system_->SetCamera(usingCamera_);
+
+  //===============================
+  // ビットマップフォント
+  //===============================
+  bitmapFont.Initialize(system_);
 
   //===============================
   // 3Dオブジェクト
@@ -114,9 +138,17 @@ TravelScene::TravelScene(kEngine *system) {
   //===============================
   fade_.Initialize(system_);
   fade_.StartFadeIn();
+
+  //===============================
+  // NPC
+  //===============================
+  npcModelHandle_ =
+      system_->SetModelObj("GAME/resources/modBody/body/body.obj");
+  InitializeNpcRunners();
 }
 
 TravelScene::~TravelScene() {
+  Logger::Log("TravelScene dtor");
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
 
@@ -131,6 +163,8 @@ TravelScene::~TravelScene() {
   system_->RemoveLight(light1_);
 
   delete light1_;
+
+  bitmapFont.Cleanup();
 }
 
 void TravelScene::Update() {
@@ -160,11 +194,20 @@ void TravelScene::Update() {
 
   UpdateTimeLimit(deltaTime);
 
-  UpdateHoldState(leftNowInput, rightNowInput, deltaTime);
+  if (!isRaceFinished_) {
 
-  UpdateLegBendState(leftNowInput, rightNowInput);
+    UpdateHoldState(leftNowInput, rightNowInput, deltaTime);
 
-  UpdateMovementState(leftNowInput, rightNowInput);
+    UpdateLegBendState(leftNowInput, rightNowInput);
+
+    UpdateMovementState(leftNowInput, rightNowInput);
+
+    UpdateNpcRunners(deltaTime);
+
+    UpdateRaceRanking();
+
+    UpdateRaceFinishState();
+  }
 
   if (kickFeedbackTimer_ > 0.0f) {
     kickFeedbackTimer_ -= deltaTime;
@@ -188,6 +231,12 @@ void TravelScene::Draw() {
   DrawModObjects();
 
   DrawExtraVisualParts();
+
+  for (auto &npc : npcRunners_) {
+    if (npc.debugObject != nullptr) {
+      npc.debugObject->Draw();
+    }
+  }
 
   ground_->Draw();
 
@@ -262,6 +311,41 @@ void TravelScene::Draw() {
 
   ImGui::End();
 #endif
+
+#ifdef USE_IMGUI
+  {
+    LowestBodyPart lowestPart = LowestBodyPart::None;
+    float lowestBodyLocalY = GetLowestVisualBodyY(&lowestPart);
+    float lowestBodyWorldY = moveY_ + visualLiftY_ + lowestBodyLocalY;
+    float penetration = groundY_ - lowestBodyWorldY;
+
+    ImGui::Begin("LowestBodyCheck");
+    ImGui::Text("LowestBodyLocalY : %.3f", lowestBodyLocalY);
+    ImGui::Text("LowestBodyWorldY : %.3f", lowestBodyWorldY);
+    ImGui::Text("LowestPart       : %s", GetLowestBodyPartName(lowestPart));
+    ImGui::Text("GroundY          : %.3f", groundY_);
+    ImGui::Text("Penetration      : %.3f", penetration);
+    ImGui::Text("VisualLiftY      : %.3f", visualLiftY_);
+    ImGui::End();
+  }
+#endif
+
+  // 順位を表示
+  std::string rankText = GetRankText(playerRank_);
+
+  bitmapFont.RenderText(rankText, {1100, 600}, 96, BitmapFont::Align::Left);
+
+  // 残り枠表示
+  std::string goalText = "GOAL " + std::to_string(goalCount_) + "/" +
+                         std::to_string(qualifyCount_);
+
+  bitmapFont.RenderText(goalText, {1000, 60}, 48, BitmapFont::Align::Left);
+
+  if (raceResultState_ == RaceResultState::Clear) {
+    bitmapFont.RenderText("CLEAR", {900, 300}, 96, BitmapFont::Align::Left);
+  } else if (raceResultState_ == RaceResultState::GameOver) {
+    bitmapFont.RenderText("GAME OVER", {800, 300}, 96, BitmapFont::Align::Left);
+  }
 
   // フェード描画
   fade_.Draw();
@@ -1882,7 +1966,7 @@ void TravelScene::ApplyVisualState() {
 
   if (chestBody != nullptr) {
     chestBody->mainPosition.transform.translate.x = 0.0f;
-    chestBody->mainPosition.transform.translate.y = moveY_;
+    chestBody->mainPosition.transform.translate.y = moveY_ + visualLiftY_;
     chestBody->mainPosition.transform.translate.z = moveX_;
 
     chestBody->mainPosition.transform.rotate = {-bodyTilt_, 0.0f, 0.0f};
@@ -2001,6 +2085,8 @@ void TravelScene::ApplyVisualState() {
 
   UpdateExtraVisualParts();
 
+  ResolveVisualGroundPenetration();
+
   // 地面のUpdate　一旦仮でここに配置
   if (ground_ != nullptr) {
     constexpr float groundTopOffset = 0.5f;
@@ -2015,56 +2101,72 @@ void TravelScene::ApplyVisualState() {
 
 void TravelScene::UpdateSceneTransition() {
 
-  // ゴール到達で次シーンへ
-  if (!isGoalReached_ && moveX_ >= goalX_) {
-    isGoalReached_ = true;
-
-    if (!fade_.IsBusy()) {
+  //================================
+  // レース結果による遷移
+  // Clear    -> 次シーン
+  // GameOver -> リトライ
+  //================================
+  if (isRaceFinished_ && !fade_.IsBusy() && !isStartTransition_) {
+    if (raceResultState_ == RaceResultState::Clear) {
       fade_.StartFadeOut();
       isStartTransition_ = true;
       nextOutcome_ = SceneOutcome::NEXT;
+    } else if (raceResultState_ == RaceResultState::GameOver) {
+      fade_.StartFadeOut();
+      isStartTransition_ = true;
+      nextOutcome_ = SceneOutcome::RETRY;
+
+      // リトライ用に時間だけ戻しておく
+      timeLimit_ = travelTimeLimit_;
+      isTimeUp_ = false;
     }
   }
 
-  // 時間制限で強制リトライ(仮)
-  if (isTimeUp_ && !fade_.IsBusy()) {
+  //================================
+  // 時間切れでもリトライ
+  //================================
+  if (!isRaceFinished_ && isTimeUp_ && !fade_.IsBusy() && !isStartTransition_) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::RETRY;
 
-    // timeLimit_ = customizeData_->totalTimeLimit_;
     timeLimit_ = travelTimeLimit_;
     isTimeUp_ = false;
   }
 
 #ifdef _DEBUG
 
-  // デバッグ用次シーン移行処理
-  if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_N)) {
+  // デバッグ用次シーン移行
+  if (!fade_.IsBusy() && !isStartTransition_ && system_->GetTriggerOn(DIK_N)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::NEXT;
   }
 
   // デバッグ用リトライ
-  if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_RETURN)) {
+  if (!fade_.IsBusy() && !isStartTransition_ &&
+      system_->GetTriggerOn(DIK_RETURN)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
     nextOutcome_ = SceneOutcome::RETRY;
 
     timeLimit_ = travelTimeLimit_;
+    isTimeUp_ = false;
   }
 
 #endif
 
+  //================================
   // フェード更新
+  //================================
   fade_.Update(usingCamera_);
 
+  //================================
   // フェード終了後シーン遷移
+  //================================
   if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = nextOutcome_;
 
-    // シーン遷移前にカスタマイズデータに時間制限関連の情報を反映させる
     if (customizeData_ != nullptr) {
       customizeData_->timeLimit_ = timeLimit_;
       customizeData_->isTimeUp_ = isTimeUp_;
@@ -3489,21 +3591,13 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     if (!chestBody->objectParts_.empty()) {
       const Vector3 &chestBaseTranslate =
           chestBody->objectParts_[0].transform.translate;
-      Logger::Log("CHEST_BASE_TRANSLATE : (%.3f, %.3f, %.3f)",
-                  chestBaseTranslate.x, chestBaseTranslate.y,
-                  chestBaseTranslate.z);
     } else {
-      Logger::Log("CHEST_BASE_TRANSLATE : objectParts empty");
     }
 
     if (!stomachBody->objectParts_.empty()) {
       const Vector3 &stomachBaseTranslate =
           stomachBody->objectParts_[0].transform.translate;
-      Logger::Log("STOMACH_BASE_TRANSLATE : (%.3f, %.3f, %.3f)",
-                  stomachBaseTranslate.x, stomachBaseTranslate.y,
-                  stomachBaseTranslate.z);
     } else {
-      Logger::Log("STOMACH_BASE_TRANSLATE : objectParts empty");
     }
 
     torsoBaseLogOnce = true;
@@ -4187,14 +4281,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     static bool torsoReadLogOnce = false;
     if (!torsoReadLogOnce) {
-      Logger::Log("TORSO_OWNER_ID : %d", torsoOwnerId);
-
-      Logger::Log("CHEST_SEG root=(%.3f, %.3f, %.3f) len=%.3f", chestSeg.root.x,
-                  chestSeg.root.y, chestSeg.root.z, chestSeg.length);
-
-      Logger::Log("STOMACH_SEG root=(%.3f, %.3f, %.3f) len=%.3f",
-                  stomachSeg.root.x, stomachSeg.root.y, stomachSeg.root.z,
-                  stomachSeg.length);
 
       torsoReadLogOnce = true;
     }
@@ -4251,49 +4337,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     static bool torsoPlacementLogOnce = false;
     if (!torsoPlacementLogOnce) {
-      Logger::Log("=== TORSO PLACEMENT CHECK ===");
-
-      Logger::Log("cp chest      : (%.3f, %.3f, %.3f)", chestTopWorld.x,
-                  chestTopWorld.y, chestTopWorld.z);
-      Logger::Log("cp belly      : (%.3f, %.3f, %.3f)", bellyWorld.x,
-                  bellyWorld.y, bellyWorld.z);
-      Logger::Log("cp waist      : (%.3f, %.3f, %.3f)", waistWorld.x,
-                  waistWorld.y, waistWorld.z);
-
-      Logger::Log("chestSeg root : (%.3f, %.3f, %.3f)", chestSeg.root.x,
-                  chestSeg.root.y, chestSeg.root.z);
-      Logger::Log("stomachSeg root : (%.3f, %.3f, %.3f)", stomachSeg.root.x,
-                  stomachSeg.root.y, stomachSeg.root.z);
-
-      Logger::Log("chestSeg len/ax/az : %.3f / %.3f / %.3f", chestSeg.length,
-                  chestSeg.angleX, chestSeg.angleZ);
-      Logger::Log("stomachSeg len/ax/az : %.3f / %.3f / %.3f",
-                  stomachSeg.length, stomachSeg.angleX, stomachSeg.angleZ);
-
-      Logger::Log("chest main local : (%.3f, %.3f, %.3f)",
-                  chestBody->mainPosition.transform.translate.x,
-                  chestBody->mainPosition.transform.translate.y,
-                  chestBody->mainPosition.transform.translate.z);
-
-      Logger::Log("stomach main local : (%.3f, %.3f, %.3f)",
-                  stomachBody->mainPosition.transform.translate.x,
-                  stomachBody->mainPosition.transform.translate.y,
-                  stomachBody->mainPosition.transform.translate.z);
-
-      if (!chestBody->objectParts_.empty()) {
-        Logger::Log("chest mesh local : (%.3f, %.3f, %.3f)",
-                    chestBody->objectParts_[0].transform.translate.x,
-                    chestBody->objectParts_[0].transform.translate.y,
-                    chestBody->objectParts_[0].transform.translate.z);
-      }
-
-      if (!stomachBody->objectParts_.empty()) {
-        Logger::Log("stomach mesh local : (%.3f, %.3f, %.3f)",
-                    stomachBody->objectParts_[0].transform.translate.x,
-                    stomachBody->objectParts_[0].transform.translate.y,
-                    stomachBody->objectParts_[0].transform.translate.z);
-      }
-
       torsoPlacementLogOnce = true;
     }
   }
@@ -4422,32 +4465,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     static bool anchorCompareLogOnce = false;
     if (!anchorCompareLogOnce) {
-      Logger::Log("=== TORSO / ANCHOR CHECK ===");
-
-      Logger::Log("cp->chestPos          : (%.3f, %.3f, %.3f)", cp->chestPos.x,
-                  cp->chestPos.y, cp->chestPos.z);
-      Logger::Log("cp->bellyPos          : (%.3f, %.3f, %.3f)", cp->bellyPos.x,
-                  cp->bellyPos.y, cp->bellyPos.z);
-      Logger::Log("cp->waistPos          : (%.3f, %.3f, %.3f)", cp->waistPos.x,
-                  cp->waistPos.y, cp->waistPos.z);
-
-      Logger::Log("anchor leftShoulder   : (%.3f, %.3f, %.3f)",
-                  leftShoulderAnchorLocal.x, leftShoulderAnchorLocal.y,
-                  leftShoulderAnchorLocal.z);
-      Logger::Log("anchor rightShoulder  : (%.3f, %.3f, %.3f)",
-                  rightShoulderAnchorLocal.x, rightShoulderAnchorLocal.y,
-                  rightShoulderAnchorLocal.z);
-      Logger::Log("anchor leftHip        : (%.3f, %.3f, %.3f)",
-                  leftHipAnchorLocal.x, leftHipAnchorLocal.y,
-                  leftHipAnchorLocal.z);
-      Logger::Log("anchor rightHip       : (%.3f, %.3f, %.3f)",
-                  rightHipAnchorLocal.x, rightHipAnchorLocal.y,
-                  rightHipAnchorLocal.z);
-
-      Logger::Log("leftUpperArmOwnerId   : %d", leftUpperArmOwnerId);
-      Logger::Log("rightUpperArmOwnerId  : %d", rightUpperArmOwnerId);
-      Logger::Log("leftThighOwnerId      : %d", leftThighOwnerId);
-      Logger::Log("rightThighOwnerId     : %d", rightThighOwnerId);
 
       anchorCompareLogOnce = true;
     }
@@ -4626,15 +4643,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     static bool neckAnchorCheckOnce = false;
     if (!neckAnchorCheckOnce) {
-      Logger::Log("=== NECK ANCHOR CHECK ===");
-      Logger::Log("neckBaseAnchorLocal : (%.3f, %.3f, %.3f)",
-                  neckBaseAnchorLocal.x, neckBaseAnchorLocal.y,
-                  neckBaseAnchorLocal.z);
-      Logger::Log("neckRootLocal       : (%.3f, %.3f, %.3f)", neckRootLocal.x,
-                  neckRootLocal.y, neckRootLocal.z);
-      Logger::Log("neckBendLocal       : (%.3f, %.3f, %.3f)", neckBendLocal.x,
-                  neckBendLocal.y, neckBendLocal.z);
-      Logger::Log("neckLength          : %.3f", neckLength);
       neckAnchorCheckOnce = true;
     }
   }
@@ -4681,14 +4689,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     static bool headAnchorCheckOnce = false;
     if (!headAnchorCheckOnce) {
-      Logger::Log("=== HEAD ANCHOR CHECK ===");
-      Logger::Log("headAnchorLocal : (%.3f, %.3f, %.3f)", headAnchorLocal.x,
-                  headAnchorLocal.y, headAnchorLocal.z);
-      Logger::Log("neckBendLocal   : (%.3f, %.3f, %.3f)", neckBendLocal.x,
-                  neckBendLocal.y, neckBendLocal.z);
-      Logger::Log("neckEndLocal    : (%.3f, %.3f, %.3f)", neckEndLocal.x,
-                  neckEndLocal.y, neckEndLocal.z);
-      Logger::Log("headLength      : %.3f", headLength);
       headAnchorCheckOnce = true;
     }
   }
@@ -4764,20 +4764,6 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   static bool rightArmCheckOnce = false;
   if (!rightArmCheckOnce) {
-    Logger::Log("=== RIGHT ARM CHECK ===");
-    Logger::Log("rightShoulderAnchorLocal : (%.3f, %.3f, %.3f)",
-                rightShoulderAnchorLocal.x, rightShoulderAnchorLocal.y,
-                rightShoulderAnchorLocal.z);
-
-    Logger::Log("chestTopWorld : (%.3f, %.3f, %.3f)", chestTopWorld.x,
-                chestTopWorld.y, chestTopWorld.z);
-
-    Logger::Log("rightShoulderFromChest : (%.3f, %.3f, %.3f)",
-                rightShoulderFromChest.x, rightShoulderFromChest.y,
-                rightShoulderFromChest.z);
-
-    Vector3 test = Add(chestTopWorld, rightShoulderFromChest);
-    Logger::Log("Add result : (%.3f, %.3f, %.3f)", test.x, test.y, test.z);
 
     rightArmCheckOnce = true;
   }
@@ -4806,7 +4792,10 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     // rightShoulderAnchorLocal;
     // rightUpperArm->mainPosition.transform.translate =
     //    Add(chestTopWorld, rightShoulderFromChest);
-    rightUpperArm->mainPosition.transform.translate = rightShoulderAnchorLocal;
+    // rightUpperArm->mainPosition.transform.translate =
+    // rightShoulderAnchorLocal;
+    rightUpperArm->mainPosition.transform.translate =
+        Add(chestTopWorld, rightShoulderFromChest);
     rightUpperArm->mainPosition.transform.rotate = {rightUpperArmAngleX, 0.0f,
                                                     rightUpperArmAngleZ};
 
@@ -4837,7 +4826,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     // Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
     // Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
     Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
-    Vector3 rightUpperArmRoot = rightShoulderAnchorLocal;
+    Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
     Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
 
     rightForeArm->mainPosition.transform.translate = rightForeArmRoot;
@@ -5829,4 +5818,557 @@ void TravelScene::PrepareTorsoApplySource() {
   modBodies_[ToIndex(ModBodyPart::StomachBody)].SetExternalSegmentSource(
       &torsoSharedPointsBuffer_, ModControlPointRole::Belly,
       ModControlPointRole::Waist);
+}
+
+float TravelScene::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
+  auto UpdateLowest = [&](float candidateY, LowestBodyPart part, float &lowestY,
+                          LowestBodyPart &lowestPart) {
+    if (candidateY < lowestY) {
+      lowestY = candidateY;
+      lowestPart = part;
+    }
+  };
+
+  float lowestY = 999999.0f;
+  LowestBodyPart lowestPart = LowestBodyPart::None;
+
+  auto PartBottomY = [&](Object *obj, float radius) -> float {
+    if (obj == nullptr) {
+      return 999999.0f;
+    }
+
+    const Vector3 &p = obj->mainPosition.transform.translate;
+    return p.y - radius;
+  };
+
+  auto Add = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return Vector3{a.x + b.x, a.y + b.y, a.z + b.z};
+  };
+
+  auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return Vector3{a.x - b.x, a.y - b.y, a.z - b.z};
+  };
+
+  if (customizeData_ != nullptr) {
+    //================================
+    // anchor と snapshot を集める
+    //================================
+    int torsoAnchorOwnerId = -1;
+    int leftUpperArmOwnerId = -1;
+    int rightUpperArmOwnerId = -1;
+    int leftThighOwnerId = -1;
+    int rightThighOwnerId = -1;
+
+    Vector3 leftShoulderAnchorLocal = {-1.25f, 1.0f, 0.0f};
+    Vector3 rightShoulderAnchorLocal = {1.25f, 1.0f, 0.0f};
+    Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
+    Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
+
+    Vector3 leftArmRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 leftArmEndLocal = {0.0f, -1.10f, 0.0f};
+
+    Vector3 rightArmRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 rightArmEndLocal = {0.0f, -1.10f, 0.0f};
+
+    Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
+
+    Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
+
+    bool hasLeftArmRoot = false;
+    bool hasLeftArmEnd = false;
+    bool hasRightArmRoot = false;
+    bool hasRightArmEnd = false;
+    bool hasLeftLegRoot = false;
+    bool hasLeftLegEnd = false;
+    bool hasRightLegRoot = false;
+    bool hasRightLegEnd = false;
+
+    for (const auto &instance : customizeData_->partInstances) {
+      if (torsoAnchorOwnerId < 0 &&
+          instance.partType == ModBodyPart::ChestBody) {
+        torsoAnchorOwnerId = instance.partId;
+      } else if (leftUpperArmOwnerId < 0 &&
+                 instance.partType == ModBodyPart::LeftUpperArm) {
+        leftUpperArmOwnerId = instance.partId;
+      } else if (rightUpperArmOwnerId < 0 &&
+                 instance.partType == ModBodyPart::RightUpperArm) {
+        rightUpperArmOwnerId = instance.partId;
+      } else if (leftThighOwnerId < 0 &&
+                 instance.partType == ModBodyPart::LeftThigh) {
+        leftThighOwnerId = instance.partId;
+      } else if (rightThighOwnerId < 0 &&
+                 instance.partType == ModBodyPart::RightThigh) {
+        rightThighOwnerId = instance.partId;
+      }
+    }
+
+    for (const auto &snap : customizeData_->controlPointSnapshots) {
+      if (snap.ownerPartId == torsoAnchorOwnerId) {
+        if (snap.role == ModControlPointRole::LeftShoulder) {
+          leftShoulderAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::RightShoulder) {
+          rightShoulderAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::LeftHip) {
+          leftHipAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::RightHip) {
+          rightHipAnchorLocal = snap.localPosition;
+        }
+      }
+
+      if (snap.ownerPartId == leftUpperArmOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          leftArmRootLocal = snap.localPosition;
+          hasLeftArmRoot = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          leftArmEndLocal = snap.localPosition;
+          hasLeftArmEnd = true;
+        }
+      }
+
+      if (snap.ownerPartId == rightUpperArmOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          rightArmRootLocal = snap.localPosition;
+          hasRightArmRoot = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          rightArmEndLocal = snap.localPosition;
+          hasRightArmEnd = true;
+        }
+      }
+
+      if (snap.ownerPartId == leftThighOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          leftLegRootLocal = snap.localPosition;
+          hasLeftLegRoot = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          leftLegEndLocal = snap.localPosition;
+          hasLeftLegEnd = true;
+        }
+      }
+
+      if (snap.ownerPartId == rightThighOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          rightLegRootLocal = snap.localPosition;
+          hasRightLegRoot = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          rightLegEndLocal = snap.localPosition;
+          hasRightLegEnd = true;
+        }
+      }
+    }
+
+    //================================
+    // 前腕：anchor + (end - root) - radius
+    // grounded 側と同じ考え方
+    //================================
+    if (hasLeftArmRoot && hasLeftArmEnd) {
+      const float r = GetSnapshotRadius(ModBodyPart::LeftUpperArm, 3);
+      float y = leftShoulderAnchorLocal.y +
+                (leftArmEndLocal.y - leftArmRootLocal.y) - r;
+      UpdateLowest(y, LowestBodyPart::LeftForeArm, lowestY, lowestPart);
+    }
+
+    if (hasRightArmRoot && hasRightArmEnd) {
+      const float r = GetSnapshotRadius(ModBodyPart::RightUpperArm, 3);
+      float y = rightShoulderAnchorLocal.y +
+                (rightArmEndLocal.y - rightArmRootLocal.y) - r;
+      UpdateLowest(y, LowestBodyPart::RightForeArm, lowestY, lowestPart);
+    }
+
+    //================================
+    // 脚：anchor + (end - root) - radius
+    // これは grounded 側と完全に揃える
+    //================================
+    if (hasLeftLegRoot && hasLeftLegEnd) {
+      const float r = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+      float y =
+          leftHipAnchorLocal.y + (leftLegEndLocal.y - leftLegRootLocal.y) - r;
+      UpdateLowest(y, LowestBodyPart::LeftShin, lowestY, lowestPart);
+    }
+
+    if (hasRightLegRoot && hasRightLegEnd) {
+      const float r = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+      float y = rightHipAnchorLocal.y +
+                (rightLegEndLocal.y - rightLegRootLocal.y) - r;
+      UpdateLowest(y, LowestBodyPart::RightShin, lowestY, lowestPart);
+    }
+  }
+
+  //================================
+  // 頭・胴体は今はいったん簡易でOK
+  //================================
+  {
+    Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
+    const float upperR = GetSnapshotRadius(ModBodyPart::Neck, 2);
+    const float endR = GetSnapshotRadius(ModBodyPart::Neck, 3);
+    const float r = (std::max)(upperR, endR);
+    float y = PartBottomY(head, r);
+    UpdateLowest(y, LowestBodyPart::Head, lowestY, lowestPart);
+  }
+
+  {
+    Object *chest = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+    const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
+    const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
+    const float r = (std::max)(chestR, bellyR);
+    float y = PartBottomY(chest, r);
+    UpdateLowest(y, LowestBodyPart::Chest, lowestY, lowestPart);
+  }
+
+  {
+    Object *stomach = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+    const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
+    const float waistR = GetControlPointRadius(ModControlPointRole::Waist);
+    const float r = (std::max)(bellyR, waistR);
+    float y = PartBottomY(stomach, r);
+    UpdateLowest(y, LowestBodyPart::Stomach, lowestY, lowestPart);
+  }
+
+  if (outPart != nullptr) {
+    *outPart = lowestPart;
+  }
+
+  return lowestY;
+}
+
+const char *TravelScene::GetLowestBodyPartName(LowestBodyPart part) const {
+  switch (part) {
+  case LowestBodyPart::LeftForeArm:
+    return "LeftForeArm";
+  case LowestBodyPart::RightForeArm:
+    return "RightForeArm";
+  case LowestBodyPart::LeftShin:
+    return "LeftShin";
+  case LowestBodyPart::RightShin:
+    return "RightShin";
+  case LowestBodyPart::Head:
+    return "Head";
+  case LowestBodyPart::Chest:
+    return "Chest";
+  case LowestBodyPart::Stomach:
+    return "Stomach";
+  default:
+    return "None";
+  }
+}
+
+void TravelScene::ResolveVisualGroundPenetration() {
+
+  LowestBodyPart lowestPart = LowestBodyPart::None;
+  float lowestBodyLocalY = GetLowestVisualBodyY(&lowestPart);
+  float lowestBodyWorldY = moveY_ + visualLiftY_ + lowestBodyLocalY;
+  float penetration = groundY_ - lowestBodyWorldY;
+
+  const bool lowestIsLeg = (lowestPart == LowestBodyPart::LeftShin ||
+                            lowestPart == LowestBodyPart::RightShin);
+
+  static int visualGroundCheckFrame = 0;
+  visualGroundCheckFrame++;
+
+  if (lowestIsLeg) {
+    visualLiftY_ *= 0.60f;
+
+    if (std::abs(visualLiftY_) < 0.0001f) {
+      visualLiftY_ = 0.0f;
+    }
+    return;
+  }
+
+  if (penetration <= 0.0f) {
+    visualLiftY_ *= 0.80f;
+    if (std::abs(visualLiftY_) < 0.0001f) {
+      visualLiftY_ = 0.0f;
+    }
+    return;
+  }
+
+  float follow = 0.40f;
+  if (penetration > 0.30f) {
+    follow = 0.55f;
+  }
+  if (penetration > 0.80f) {
+    follow = 0.75f;
+  }
+
+  const float maxVisualLift = 2.50f;
+  float targetLift = std::min(penetration, maxVisualLift);
+  visualLiftY_ += (targetLift - visualLiftY_) * follow;
+}
+
+void TravelScene::InitializeNpcRunners() {
+  npcRunners_.clear();
+  npcRunners_.resize(4);
+
+  for (size_t i = 0; i < npcRunners_.size(); ++i) {
+    npcRunners_[i].moveX = -18.0f;
+    npcRunners_[i].laneX = -3.0f + static_cast<float>(i) * 2.0f;
+
+    npcRunners_[i].moveY = 1.94f;
+    npcRunners_[i].velocityX = 0.0f;
+    npcRunners_[i].velocityY = 0.0f;
+    npcRunners_[i].leftLegBend = 0.0f;
+    npcRunners_[i].rightLegBend = 0.0f;
+    npcRunners_[i].leftLegBendSpeed = 0.0f;
+    npcRunners_[i].rightLegBendSpeed = 0.0f;
+    npcRunners_[i].leftInput = false;
+    npcRunners_[i].rightInput = false;
+    npcRunners_[i].isGrounded = true;
+    npcRunners_[i].finished = false;
+    npcRunners_[i].started = true;
+    npcRunners_[i].startDelay = 0.0f;
+    npcRunners_[i].finishRank = -1;
+
+    npcRunners_[i].phaseTimer = 0.0f;
+    npcRunners_[i].phase = static_cast<int>(i % 4);
+
+    // 操作の上手さ
+    // 0:下手 1:やや下手 2:普通 3:上手
+    switch (i) {
+    case 0:
+      npcRunners_[i].timingSkill = 0.85f;
+      break;
+    case 1:
+      npcRunners_[i].timingSkill = 0.95f;
+      break;
+    case 2:
+      npcRunners_[i].timingSkill = 1.00f;
+      break;
+    default:
+      npcRunners_[i].timingSkill = 1.10f;
+      break;
+    }
+
+    npcRunners_[i].debugObject = std::make_unique<Object>();
+    npcRunners_[i].debugObject->IntObject(system_);
+    npcRunners_[i].debugObject->CreateModelData(npcModelHandle_);
+    npcRunners_[i].debugObject->mainPosition.transform =
+        CreateDefaultTransform();
+    npcRunners_[i].debugObject->mainPosition.transform.scale = {0.6f, 0.6f,
+                                                                0.6f};
+  }
+}
+
+void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
+  npc.phaseTimer += deltaTime;
+
+  const float skill = std::clamp(npc.timingSkill, 0.70f, 1.30f);
+
+  // 上手いほど押しが少し短く、離しも少し短い
+  // 下手いほど押しすぎたり、間がもたつく
+  const float pressTime = std::clamp(0.10f / skill, 0.08f, 0.14f);
+  const float releaseTime = std::clamp(0.08f / skill, 0.06f, 0.12f);
+
+  switch (npc.phase) {
+  case 0: // 左押し
+    npc.leftInput = true;
+    npc.rightInput = false;
+    if (npc.phaseTimer >= pressTime) {
+      npc.phaseTimer = 0.0f;
+      npc.phase = 1;
+    }
+    break;
+
+  case 1: // 左離し
+    npc.leftInput = false;
+    npc.rightInput = false;
+    if (npc.phaseTimer >= releaseTime) {
+      npc.phaseTimer = 0.0f;
+      npc.phase = 2;
+    }
+    break;
+
+  case 2: // 右押し
+    npc.leftInput = false;
+    npc.rightInput = true;
+    if (npc.phaseTimer >= pressTime) {
+      npc.phaseTimer = 0.0f;
+      npc.phase = 3;
+    }
+    break;
+
+  case 3: // 右離し
+    npc.leftInput = false;
+    npc.rightInput = false;
+    if (npc.phaseTimer >= releaseTime) {
+      npc.phaseTimer = 0.0f;
+      npc.phase = 0;
+    }
+    break;
+
+  default:
+    npc.phase = 0;
+    npc.phaseTimer = 0.0f;
+    npc.leftInput = false;
+    npc.rightInput = false;
+    break;
+  }
+}
+
+void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
+  float leftTargetLegAngle = npc.leftInput ? legKickAngle_ : legRecoverAngle_;
+  float rightTargetLegAngle = npc.rightInput ? legKickAngle_ : legRecoverAngle_;
+
+  npc.leftLegBendSpeed +=
+      (leftTargetLegAngle - npc.leftLegBend) * legFollowPower_;
+  npc.rightLegBendSpeed +=
+      (rightTargetLegAngle - npc.rightLegBend) * legFollowPower_;
+
+  npc.leftLegBendSpeed =
+      std::clamp(npc.leftLegBendSpeed, -legMaxSpeed_, legMaxSpeed_);
+  npc.rightLegBendSpeed =
+      std::clamp(npc.rightLegBendSpeed, -legMaxSpeed_, legMaxSpeed_);
+
+  npc.leftLegBendSpeed *= jointDamping_;
+  npc.rightLegBendSpeed *= jointDamping_;
+
+  npc.leftLegBend += npc.leftLegBendSpeed;
+  npc.rightLegBend += npc.rightLegBendSpeed;
+
+  npc.leftLegBend = std::clamp(npc.leftLegBend, -0.8f, 1.0f);
+  npc.rightLegBend = std::clamp(npc.rightLegBend, -0.8f, 1.0f);
+
+  if (npc.moveY <= 1.94f) {
+    npc.moveY = 1.94f;
+    npc.velocityY = 0.0f;
+    npc.isGrounded = true;
+  } else {
+    npc.isGrounded = false;
+  }
+
+  if (npc.isGrounded && (npc.leftInput || npc.rightInput)) {
+    npc.velocityX += 0.020f;
+    npc.velocityY += 0.045f;
+  }
+
+  npc.velocityX *= 0.98f;
+  npc.velocityY -= gravity_;
+
+  npc.velocityX = std::clamp(npc.velocityX, -0.5f, 0.7f);
+
+  npc.moveX += npc.velocityX;
+  npc.moveY += npc.velocityY;
+}
+
+void TravelScene::UpdateNpcRunners(float deltaTime) {
+  for (auto &npc : npcRunners_) {
+
+    if (!npc.started) {
+      npc.startDelay -= deltaTime;
+      if (npc.startDelay <= 0.0f) {
+        npc.started = true;
+      }
+      continue;
+    }
+
+    if (npc.finished) {
+      continue;
+    }
+
+    UpdateNpcInput(npc, deltaTime);
+    UpdateNpcMovement(npc);
+
+    if (npc.moveX >= goalX_) {
+      npc.finished = true;
+    }
+
+    if (npc.debugObject) {
+      npc.debugObject->mainPosition.transform.translate = {npc.laneX, npc.moveY,
+                                                           npc.moveX};
+      npc.debugObject->Update(usingCamera_);
+    }
+  }
+}
+
+void TravelScene::UpdateRaceRanking() {
+  std::vector<RaceEntry> entries;
+  entries.reserve(npcRunners_.size() + 1);
+
+  // プレイヤー
+  {
+    RaceEntry entry;
+    entry.isPlayer = true;
+    entry.npcIndex = -1;
+    entry.progress = moveX_;
+    entries.push_back(entry);
+  }
+
+  // NPC
+  for (size_t i = 0; i < npcRunners_.size(); ++i) {
+    RaceEntry entry;
+    entry.isPlayer = false;
+    entry.npcIndex = static_cast<int>(i);
+    entry.progress = npcRunners_[i].moveX;
+    entries.push_back(entry);
+  }
+
+  std::sort(entries.begin(), entries.end(),
+            [](const RaceEntry &a, const RaceEntry &b) {
+              return a.progress > b.progress;
+            });
+
+  playerRank_ = 1;
+
+  for (size_t i = 0; i < entries.size(); ++i) {
+    if (entries[i].isPlayer) {
+      playerRank_ = static_cast<int>(i) + 1;
+      isPlayerQualified_ = (playerRank_ <= qualifyCount_);
+      break;
+    }
+  }
+
+  goalCount_ = 0;
+
+  if (moveX_ >= goalX_) {
+    goalCount_++;
+  }
+
+  for (const auto &npc : npcRunners_) {
+    if (npc.moveX >= goalX_) {
+      goalCount_++;
+    }
+  }
+}
+
+void TravelScene::UpdateRaceFinishState() {
+  if (isRaceFinished_) {
+    return;
+  }
+
+  //==============================
+  // プレイヤーのゴール判定
+  //==============================
+  if (!isPlayerFinished_ && moveX_ >= goalX_) {
+    isPlayerFinished_ = true;
+    finishCount_++;
+    playerFinishRank_ = finishCount_;
+
+    if (playerFinishRank_ <= qualifyCount_) {
+      raceResultState_ = RaceResultState::Clear;
+    } else {
+      raceResultState_ = RaceResultState::GameOver;
+    }
+
+    isRaceFinished_ = true;
+    return;
+  }
+
+  //==============================
+  // NPCのゴール判定
+  //==============================
+  for (auto &npc : npcRunners_) {
+    if (npc.finished && npc.finishRank < 0) {
+      finishCount_++;
+      npc.finishRank = finishCount_;
+    }
+  }
+
+  //==============================
+  // プレイヤー到着前に枠が埋まったらゲームオーバー
+  //==============================
+  if (!isPlayerFinished_ && finishCount_ >= qualifyCount_) {
+    raceResultState_ = RaceResultState::GameOver;
+    isRaceFinished_ = true;
+    return;
+  }
 }
