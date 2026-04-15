@@ -1241,6 +1241,84 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 
         customizeData_->controlPointSnapshots.push_back(snapshot);
       }
+
+      auto PushTorsoAnchorSnapshot = [&](ModControlPointRole role,
+                                         const Vector3 &localPosition,
+                                         float radius) {
+        ModControlPointSnapshot snapshot;
+        snapshot.ownerPartId = chestPartId;
+        snapshot.ownerPartType = ModBodyPart::ChestBody;
+        snapshot.role = role;
+        snapshot.localPosition = localPosition;
+        snapshot.radius = radius;
+        snapshot.movable = false;
+        snapshot.isConnectionPoint = true;
+        snapshot.acceptsParent = false;
+        snapshot.acceptsChild = true;
+
+        customizeData_->controlPointSnapshots.push_back(snapshot);
+      };
+
+      auto FindTorsoLocal = [&](ModControlPointRole role,
+                                const Vector3 &fallback) -> Vector3 {
+        for (const auto &point : torsoControlPoints_) {
+          if (point.role == role) {
+            return point.localPosition;
+          }
+        }
+        return fallback;
+      };
+
+      auto NormalizeSafe = [&](const Vector3 &v,
+                               const Vector3 &fallback) -> Vector3 {
+        float len = Length(v);
+        if (len < 0.0001f) {
+          return fallback;
+        }
+        return {v.x / len, v.y / len, v.z / len};
+      };
+
+      auto MulScalar = [&](const Vector3 &v, float s) -> Vector3 {
+        return {v.x * s, v.y * s, v.z * s};
+      };
+
+      auto AddV = [&](const Vector3 &a, const Vector3 &b) -> Vector3 {
+        return {a.x + b.x, a.y + b.y, a.z + b.z};
+      };
+
+      auto SubV = [&](const Vector3 &a, const Vector3 &b) -> Vector3 {
+        return {a.x - b.x, a.y - b.y, a.z - b.z};
+      };
+
+      Vector3 chestLocal = {0.0f, 0.45f, 0.0f};
+      for (const auto &point : torsoControlPoints_) {
+        if (point.role == ModControlPointRole::Chest) {
+          chestLocal = point.localPosition;
+          break;
+        }
+      }
+
+      PushTorsoAnchorSnapshot(ModControlPointRole::NeckBase, chestLocal, 0.08f);
+
+      // 肩・股関節アンカーは再計算せず、control point
+      // の現在位置をそのまま保存する
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::LeftShoulder,
+          GetControlPointLocalPosition(ModControlPointRole::LeftShoulder),
+          0.09f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::RightShoulder,
+          GetControlPointLocalPosition(ModControlPointRole::RightShoulder),
+          0.09f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::LeftHip,
+          GetControlPointLocalPosition(ModControlPointRole::LeftHip), 0.10f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::RightHip,
+          GetControlPointLocalPosition(ModControlPointRole::RightHip), 0.10f);
     }
   }
 
@@ -1286,6 +1364,16 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
       snapshot.acceptsChild = point.acceptsChild;
 
       customizeData_->controlPointSnapshots.push_back(snapshot);
+
+      if (node->part == ModBodyPart::Neck || node->part == ModBodyPart::Head) {
+        Logger::Log("=== MODSCENE SNAP CHECK ===");
+        Logger::Log("partType   : %d", static_cast<int>(node->part));
+        Logger::Log("ownerPartId: %d", id);
+        Logger::Log("role       : %d", static_cast<int>(snapshot.role));
+        Logger::Log("localPos   : (%.3f, %.3f, %.3f)", snapshot.localPosition.x,
+                    snapshot.localPosition.y, snapshot.localPosition.z);
+        Logger::Log("radius     : %.3f", snapshot.radius);
+      }
     }
   }
 }
