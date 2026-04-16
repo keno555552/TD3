@@ -1,5 +1,6 @@
 #define NOMINMAX
 #include "ModAssemblyGraph.h"
+#include "GAME/actor/ModAssemblyUtil.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -338,55 +339,12 @@ ModAssemblyGraph::MakeDefaultConnectors(ModBodyPart part, PartSide side) {
 
 bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
                                       ModBodyPart child) const {
-  if (parent == ModBodyPart::ChestBody) {
-    switch (child) {
-    case ModBodyPart::Neck:
-    case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  if (parent == ModBodyPart::StomachBody) {
-    switch (child) {
-    case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
-      return true;
-    default:
-      return false;
-    }
-  }
-
-  if (parent == ModBodyPart::Neck) {
-    return child == ModBodyPart::Head;
-  }
-
-  if (parent == ModBodyPart::LeftUpperArm ||
-      parent == ModBodyPart::RightUpperArm) {
-    return child == ModBodyPart::LeftForeArm ||
-           child == ModBodyPart::RightForeArm;
-  }
-
-  if (parent == ModBodyPart::LeftThigh || parent == ModBodyPart::RightThigh) {
-    return child == ModBodyPart::LeftShin || child == ModBodyPart::RightShin;
-  }
-
-  return false;
+  return ModAssemblyUtil::CanPartParentChild(parent, child);
 }
 
 bool ModAssemblyGraph::IsSideCompatible(PartSide parentSide,
                                         PartSide childSide) const {
-  // 子が中央部位なら左右制約なしで接続可能
-  if (childSide == PartSide::Center) {
-    return true;
-  }
-
-  // 左右が一致しているか、親が中央なら接続可能
-  return parentSide == childSide || parentSide == PartSide::Center;
+  return ModAssemblyUtil::IsSideCompatible(parentSide, childSide);
 }
 
 int ModAssemblyGraph::FindConnectorIdForChild(int parentId,
@@ -1255,6 +1213,17 @@ bool ModAssemblyGraph::SetPartLocalTranslate(int partId,
 
   // ローカル位置を更新する
   nodes_[partId].localTransform.translate = localTranslate;
+  return true;
+}
+
+bool ModAssemblyGraph::SetPartLocalRotate(int partId,
+                                          const Vector3 &localRotate) {
+  std::unordered_map<int, PartNode>::iterator it = nodes_.find(partId);
+  if (it == nodes_.end()) {
+    return false;
+  }
+
+  it->second.localTransform.rotate = localRotate;
   return true;
 }
 

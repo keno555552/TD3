@@ -1,5 +1,6 @@
 #include "ModBody.h"
 #include "ModCustomizeDataStore.h"
+#include "GAME/actor/ModObjectUtil.h"
 #include <cmath>
 
 namespace {
@@ -228,6 +229,47 @@ void ClearLegacyPartParams(ModBodyCustomizeData &data) {
     data.partParams[i].enabled = false;
   }
 }
+Vector3 RotateByEulerXYZLocal(const Vector3 &point, const Vector3 &rot) {
+  const float cx = cosf(rot.x);
+  const float sx = sinf(rot.x);
+  const float cy = cosf(rot.y);
+  const float sy = sinf(rot.y);
+  const float cz = cosf(rot.z);
+  const float sz = sinf(rot.z);
+
+  Vector3 v = point;
+
+  {
+    const float y = v.y * cx - v.z * sx;
+    const float z = v.y * sx + v.z * cx;
+    v.y = y;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cy + v.z * sy;
+    const float z = -v.x * sy + v.z * cy;
+    v.x = x;
+    v.z = z;
+  }
+
+  {
+    const float x = v.x * cz - v.y * sz;
+    const float y = v.x * sz + v.y * cz;
+    v.x = x;
+    v.y = y;
+  }
+
+  return v;
+}
+
+Vector3 InverseRotateByEulerXYZLocal(const Vector3 &point, const Vector3 &rot) {
+  return RotateByEulerXYZLocal(point, {-rot.x, -rot.y, -rot.z});
+}
+
+void DebugLogVector3(const char *label, const Vector3 &v) {
+  Logger::Log("%s=(%.3f, %.3f, %.3f)", label, v.x, v.y, v.z);
+}
 
 } // namespace
 
@@ -254,6 +296,39 @@ Vector3 ModBody::GetVisualScaleRatio() const {
   }
 
   return ratio;
+}
+
+float ModBody::GetVisualSegmentRadius(ModControlPointRole startRole,
+                                      ModControlPointRole endRole) const {
+  const int startIndex = FindControlPointIndex(startRole);
+  const int endIndex = FindControlPointIndex(endRole);
+
+  if (startIndex < 0 || endIndex < 0) {
+    return 0.0f;
+  }
+
+  const float startRadius =
+      controlPoints_[static_cast<size_t>(startIndex)].radius;
+  const float endRadius = controlPoints_[static_cast<size_t>(endIndex)].radius;
+
+  const float safeStartRadius = (std::max)(startRadius, 0.01f);
+  const float safeEndRadius = (std::max)(endRadius, 0.01f);
+
+  // ApplySegmentToObjectPart() と同じ考え方
+  const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);
+
+  const float defaultSegmentRadius =
+      GetDefaultSegmentRadius(part_, startRole, endRole);
+
+  const float thicknessScale =
+      segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
+
+  // 実際の見た目幅は base mesh の太さ × thicknessScale × param.scale
+  // カプセル半径は最終的な見た目の外半径に合わせたいので
+  // X/Z の大きい方を掛ける
+  const float lateralScale = (std::max)(param_.scale.x, param_.scale.z);
+
+  return defaultSegmentRadius * thicknessScale * lateralScale;
 }
 
 std::unique_ptr<ModBodyCustomizeData> ModBody::CreateDefaultCustomizeData() {
@@ -412,8 +487,8 @@ void ModBody::Apply(Object *target) {
         (part_ == ModBodyPart::ChestBody || part_ == ModBodyPart::StomachBody);
 
     if (!isTorso) {
-      endPos = Subtract(endPos, startPos);
-      startPos = ZeroV();
+      startPos = ConvertExternalPointToThisObjectLocal(target, startPos);
+      endPos = ConvertExternalPointToThisObjectLocal(target, endPos);
     }
   }
 
@@ -596,6 +671,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
 
   point.radius = newRadius;
 
+  Logger::Log("========== ScaleControlPoint START ==========");
+  Logger::Log("part=%d role=%d index=%d", static_cast<int>(part_),
+              static_cast<int>(role), static_cast<int>(index));
+  Logger::Log("oldRadius=%.3f newRadius=%.3f radiusDelta=%.3f scaleFactor=%.3f",
+              oldRadius, newRadius, radiusDelta, scaleFactor);
+  Logger::Log("param.scale=(%.3f, %.3f, %.3f) length=%.3f", param_.scale.x,
+              param_.scale.y, param_.scale.z, param_.length);
+  DebugLogVector3("point.localPosition", point.localPosition);
+
   if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
     const int chainIndex = chain_.FindIndex(role);
     if (chainIndex >= 0) {
@@ -637,6 +721,19 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
       const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
                                     Multiply(lateralPush, lateralDir));
 
+      Logger::Log("[RootScalePush] axialPush=%.3f lateralPush=%.3f", axialPush,
+                  lateralPush);
+      DebugLogVector3("segmentDir", segmentDir);
+      DebugLogVector3("lateralDir", lateralDir);
+      DebugLogVector3("totalPush", totalPush);
+
+      DebugLogVector3("bend.before", bendPos);
+      if (endIndex >= 0) {
+        DebugLogVector3(
+            "end.before",
+            controlPoints_[static_cast<size_t>(endIndex)].localPosition);
+      }
+
       controlPoints_[static_cast<size_t>(bendIndex)].localPosition =
           Add(controlPoints_[static_cast<size_t>(bendIndex)].localPosition,
               totalPush);
@@ -645,6 +742,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
         controlPoints_[static_cast<size_t>(endIndex)].localPosition =
             Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
                 totalPush);
+      }
+
+      DebugLogVector3(
+          "bend.after",
+          controlPoints_[static_cast<size_t>(bendIndex)].localPosition);
+      if (endIndex >= 0) {
+        DebugLogVector3(
+            "end.after",
+            controlPoints_[static_cast<size_t>(endIndex)].localPosition);
       }
     }
   }
@@ -674,9 +780,20 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
       const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
                                     Multiply(lateralPush, lateralDir));
 
+      Logger::Log("[BendScalePush] axialPush=%.3f lateralPush=%.3f", axialPush,
+                  lateralPush);
+      DebugLogVector3("segmentDir", segmentDir);
+      DebugLogVector3("lateralDir", lateralDir);
+      DebugLogVector3("totalPush", totalPush);
+      DebugLogVector3("end.before", endPos);
+
       controlPoints_[static_cast<size_t>(endIndex)].localPosition =
           Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
               totalPush);
+
+      DebugLogVector3(
+          "end.after",
+          controlPoints_[static_cast<size_t>(endIndex)].localPosition);
     }
   }
 
@@ -687,6 +804,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
     SyncControlPointsFromChain(&controlPoints_, chain_);
   }
 
+  for (size_t i = 0; i < controlPoints_.size(); ++i) {
+    Logger::Log("point[%d] role=%d radius=%.3f pos=(%.3f, %.3f, %.3f)",
+                static_cast<int>(i), static_cast<int>(controlPoints_[i].role),
+                controlPoints_[i].radius, controlPoints_[i].localPosition.x,
+                controlPoints_[i].localPosition.y,
+                controlPoints_[i].localPosition.z);
+  }
+  Logger::Log("========== ScaleControlPoint END ==========");
+
   return true;
 }
 
@@ -696,8 +822,8 @@ Vector3 ModBody::GetControlPointWorldPosition(const Object *target,
     return {0.0f, 0.0f, 0.0f};
   }
 
-  const Vector3 rootWorld = ComputeMainPositionWorldTranslate(target);
-  return Add(rootWorld, controlPoints_[index].localPosition);
+  return TransformControlPointLocalToWorld(target,
+                                           controlPoints_[index].localPosition);
 }
 
 void ModBody::BuildDefaultControlPoints() {
@@ -725,15 +851,15 @@ void ModBody::BuildDefaultControlPoints() {
 
   case ModBodyPart::Neck: {
     controlPoints_.push_back(MakePoint(ModControlPointRole::Root,
-                                       {0.0f, 0.0f, 0.0f}, 0.09f, false, true,
+                                       {0.0f, 0.1f, 0.0f}, 0.09f, false, true,
                                        true, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Bend,
-                                       {0.0f, 0.28f, 0.0f}, 0.08f, true, true,
+                                       {0.0f, 0.38f, 0.0f}, 0.08f, true, true,
                                        false, true));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::End,
-                                       {0.0f, 0.80f, 0.0f}, 0.11f, true, true,
+                                       {0.0f, 1.00f, 0.0f}, 0.11f, true, true,
                                        false, true));
     break;
   }
@@ -826,6 +952,32 @@ void ModBody::PushPointToMinimumDistance(int fixedIndex, int movableIndex,
     controlPoints_[static_cast<size_t>(movableIndex)].localPosition =
         movablePos;
   }
+}
+
+Vector3
+ModBody::TransformControlPointLocalToWorld(const Object *target,
+                                           const Vector3 &localPoint) const {
+  if (target == nullptr) {
+    return localPoint;
+  }
+
+  return ModObjectUtil::TransformLocalPointToWorld(target, localPoint);
+}
+
+Vector3 ModBody::ConvertExternalPointToThisObjectLocal(
+    const Object *target, const Vector3 &externalOwnerLocalPoint) const {
+  if (target == nullptr) {
+    return externalOwnerLocalPoint;
+  }
+
+  // child の親空間で表現された点を、child 自身の local へ変換する
+  const Vector3 childLocalOrigin = target->mainPosition.transform.translate;
+  const Vector3 offsetInParent =
+      Subtract(externalOwnerLocalPoint, childLocalOrigin);
+
+  // ここが重要: ZだけでなくXYZを逆回転する
+  return InverseRotateByEulerXYZLocal(offsetInParent,
+                                      target->mainPosition.transform.rotate);
 }
 
 void ModBody::EnforceAdjacentPointSpacing() {
@@ -928,6 +1080,15 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
     return;
   }
 
+  Logger::Log("========== ApplySegmentToObjectPart START ==========");
+  Logger::Log("part=%d partIndex=%d", static_cast<int>(part_),
+              static_cast<int>(partIndex));
+  DebugLogVector3("startPos", startPos);
+  DebugLogVector3("endPos", endPos);
+  Logger::Log("startRadius=%.3f endRadius=%.3f", startRadius, endRadius);
+  Logger::Log("param.scale=(%.3f, %.3f, %.3f) length=%.3f", param_.scale.x,
+              param_.scale.y, param_.scale.z, param_.length);
+
   Transform mesh = basePartTransforms_[partIndex];
 
   const Vector3 rawSegment = Subtract(endPos, startPos);
@@ -974,6 +1135,11 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
   const float thicknessScale =
       segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
 
+  DebugLogVector3("expandedStart", expandedStart);
+  DebugLogVector3("expandedEnd", expandedEnd);
+  DebugLogVector3("visualCenter", visualCenter);
+  Logger::Log("========== ApplySegmentToObjectPart END ==========");
+
   mesh.scale = basePartTransforms_[partIndex].scale;
   mesh.scale.x *= thicknessScale * param_.scale.x;
   mesh.scale.y = visualLength * param_.scale.y * param_.length;
@@ -992,6 +1158,9 @@ void ModBody::ApplySingleMeshFallback(Object *target,
   }
 
   Vector3 newScale = MakePartScale(baseMeshTransform.scale, param);
+
+  DebugLogVector3("newScale", newScale);
+
   Transform mesh = baseMeshTransform;
   mesh.scale = newScale;
   mesh.translate =
