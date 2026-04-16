@@ -168,6 +168,9 @@ std::vector<ModelData> LoadMuitObjFile(const std::string& directoryPath, const s
 
 std::vector<ModelData> LoadAssimpFile(const std::string& directoryPath, const std::string& filename) {
 
+	std::string debugMessage = "Loading model: " + directoryPath + "\n";
+	OutputDebugStringA(debugMessage.c_str());
+
 	///1. 中で必要となる変数の宣言
 	Assimp::Importer importer;
 	std::string filePath = directoryPath + "/" + filename;
@@ -175,6 +178,12 @@ std::vector<ModelData> LoadAssimpFile(const std::string& directoryPath, const st
 		aiProcess_FlipWindingOrder |		// 頂点の順番を反転
 		aiProcess_FlipUVs 					// UV反転
 	);
+
+	//if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+	//	// ここでエラーログを出して関数を抜けるべき
+	//	return;
+	//}
+
 	assert(scene->HasMeshes());
 
 	///2. 実際にファイルを読む、ModelDataを構築していく
