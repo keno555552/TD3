@@ -69,8 +69,10 @@ TravelScene::TravelScene(kEngine *system) {
 
   // UpdateChildRootsFromBody();
 
-  leftLegBend_ = legRecoverAngle_;
-  rightLegBend_ = legRecoverAngle_;
+  // leftLegBend_ = legRecoverAngle_;
+  // rightLegBend_ = legRecoverAngle_;
+  leftLegBend_ = 0.0f;
+  rightLegBend_ = 0.0f;
 
   leftLegPrevBend_ = leftLegBend_;
   rightLegPrevBend_ = rightLegBend_;
@@ -163,6 +165,14 @@ void TravelScene::Update() {
   UpdateLegBendState(leftNowInput, rightNowInput);
 
   UpdateMovementState(leftNowInput, rightNowInput);
+
+  if (kickFeedbackTimer_ > 0.0f) {
+    kickFeedbackTimer_ -= deltaTime;
+    if (kickFeedbackTimer_ <= 0.0f) {
+      kickFeedbackTimer_ = 0.0f;
+      kickFeedbackType_ = KickFeedbackType::None;
+    }
+  }
 
   ApplyVisualState();
 
@@ -489,17 +499,40 @@ void TravelScene::SetupInitialLayout() {
 
 /*   各部位Objectの更新をまとめて行う   */
 /*   各部位Objectの更新をまとめて行う   */
+// void TravelScene::UpdateModObjects() {
+//   for (size_t i = 0; i < modObjects_.size(); ++i) {
+//     if (modObjects_[i] == nullptr) {
+//       continue;
+//     }
+//
+//     ModBodyPart part = static_cast<ModBodyPart>(i);
+//
+//     if (part == ModBodyPart::Body || part == ModBodyPart::Neck ||
+//         part == ModBodyPart::Head) {
+//       // modBodies_[i].Apply(modObjects_[i]);
+//     }
+//   }
+//
+//   for (auto &object : modObjects_) {
+//     if (object != nullptr) {
+//       object->Update(usingCamera_);
+//     }
+//   }
+// }
+
 void TravelScene::UpdateModObjects() {
-  for (size_t i = 0; i < modObjects_.size(); ++i) {
-    if (modObjects_[i] == nullptr) {
-      continue;
+  if (useModBodyApplyTorso_) {
+    PrepareTorsoApplySource();
+
+    Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+    Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+
+    if (chestBody != nullptr) {
+      modBodies_[ToIndex(ModBodyPart::ChestBody)].Apply(chestBody);
     }
 
-    ModBodyPart part = static_cast<ModBodyPart>(i);
-
-    if (part == ModBodyPart::Body || part == ModBodyPart::Neck ||
-        part == ModBodyPart::Head) {
-      // modBodies_[i].Apply(modObjects_[i]);
+    if (stomachBody != nullptr) {
+      modBodies_[ToIndex(ModBodyPart::StomachBody)].Apply(stomachBody);
     }
   }
 
@@ -801,20 +834,12 @@ void TravelScene::ApplyCustomizeToMovementParam() {
     return (p.scale.x + p.scale.z) * 0.5f;
   };
 
-  auto AvgXYZ = [](const ModBodyPartParam &p) -> float {
-    return (p.scale.x + p.scale.y + p.scale.z) / 3.0f;
-  };
-
   //==============================
   // 長さ（scale.y をそのまま使う）
   //==============================
   const float leftLegLength = leftThigh.scale.y + leftShin.scale.y;
   const float rightLegLength = rightThigh.scale.y + rightShin.scale.y;
   const float avgLegLength = (leftLegLength + rightLegLength) * 0.5f;
-
-  // const float leftArmLength = leftUpperArm.scale.y + leftForeArm.scale.y;
-  // const float rightArmLength = rightUpperArm.scale.y + rightForeArm.scale.y;
-  // const float avgArmLength = (leftArmLength + rightArmLength) * 0.5f;
 
   const float neckLengthScale = neck.scale.y;
 
@@ -888,7 +913,9 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   headSizeScale_ = headSizeScale;
 
   //==============================
-  // 胴体の大きさ
+  // 胴体サイズ
+  // 旧: 太さだけ
+  // 新: 頭と同じ考え方で「太さ + 長さ」
   //==============================
   const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
   const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
@@ -897,22 +924,52 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   const float chestThicknessScale = (std::max)(chestR, bellyR) / baseRadius;
   const float stomachThicknessScale = (std::max)(bellyR, waistR) / baseRadius;
 
-  const float torsoScaleAvg =
-      (chestThicknessScale + stomachThicknessScale) * 0.5f;
+  const Vector3 &chestPos = customizeData_->controlPoints.chestPos;
+  const Vector3 &bellyPos = customizeData_->controlPoints.bellyPos;
+  const Vector3 &waistPos = customizeData_->controlPoints.waistPos;
+
+  Vector3 chestToBelly = {bellyPos.x - chestPos.x, bellyPos.y - chestPos.y,
+                          bellyPos.z - chestPos.z};
+  Vector3 bellyToWaist = {waistPos.x - bellyPos.x, waistPos.y - bellyPos.y,
+                          waistPos.z - bellyPos.z};
+
+  const float chestLength = Length(chestToBelly);
+  const float stomachLength = Length(bellyToWaist);
+
+  // 無改造基準は今の見た目に合わせた仮値
+  const float baseChestLength = 0.45f;
+  const float baseStomachLength = 0.45f;
+
+  float chestLengthScale = 1.0f;
+  if (chestLength > 0.0001f) {
+    chestLengthScale = chestLength / baseChestLength;
+  }
+
+  float stomachLengthScale = 1.0f;
+  if (stomachLength > 0.0001f) {
+    stomachLengthScale = stomachLength / baseStomachLength;
+  }
+
+  // 頭と同じく「太さ寄り」で平均
+  const float chestScale =
+      (chestThicknessScale * 2.0f + chestLengthScale) / 3.0f;
+  const float stomachScale =
+      (stomachThicknessScale * 2.0f + stomachLengthScale) / 3.0f;
+
+  const float torsoScaleAvg = (chestScale + stomachScale) * 0.5f;
 
   torsoSizeScale_ = torsoScaleAvg;
 
   torsoStabilityScale_ =
-      std::clamp(1.0f + (torsoScaleAvg - 1.0f) * 1.40f, 0.45f, 2.30f);
+      std::clamp(1.0f + (torsoScaleAvg - 1.0f) * 3.00f, 0.45f, 4.20f);
 
   torsoTiltResistance_ =
-      std::clamp(1.0f - (torsoScaleAvg - 1.0f) * 0.85f, 0.35f, 1.15f);
+      std::clamp(1.0f - (torsoScaleAvg - 1.0f) * 1.80f, 0.10f, 1.15f);
 
   //==============================
   // 左右差
   //==============================
   const float legDiff = std::abs(leftLegLength - rightLegLength);
-  // const float armDiff = std::abs(leftArmLength - rightArmLength);
 
   //==============================
   // 細長さ
@@ -930,8 +987,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   //==============================
   // 前進力
-  // 脚長いと強い
-  // 太い脚・重い胴体・左右差で落ちる
   //==============================
   tuning_.runPower += (avgLegLength - 1.0f) * 2.2f;
   tuning_.runPower -= (legThicknessScale - 1.0f) * 1.2f;
@@ -939,8 +994,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   //==============================
   // 最高速
-  // 脚長いとかなり速い
-  // 頭でかい・胴体重い・左右差で落ちる
   //==============================
   tuning_.maxSpeed += (avgLegLength - 1.0f) * 2.7f;
   tuning_.maxSpeed -= (legThicknessScale - 1.0f) * 0.9f;
@@ -949,8 +1002,6 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   //==============================
   // 安定性
-  // 太い脚・太い腕・太い首は安定
-  // 細長い脚・長い首・大きい頭・左右差は不安定
   //==============================
   tuning_.stability += (legThicknessScale - 1.0f) * 1.5f;
   tuning_.stability += (armThicknessScale - 1.0f) * 0.5f;
@@ -960,13 +1011,10 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.stability -= (neckLengthScale - 1.0f) * 1.2f;
   tuning_.stability -= (headSizeScale - 1.0f) * 1.0f;
   tuning_.stability -= legDiff * 1.8f;
-  // tuning_.stability -= armDiff * 0.4f;
   tuning_.stability -= features_.asymmetry * 0.35f;
 
   //==============================
   // 上方向
-  // 脚長いと跳ねる
-  // 太い脚・重い胴体・大きい頭で落ちる
   //==============================
   tuning_.lift += (avgLegLength - 1.0f) * 2.3f;
   tuning_.lift -= (legThicknessScale - 1.0f) * 0.7f;
@@ -977,11 +1025,9 @@ void TravelScene::ApplyCustomizeToMovementParam() {
 
   //==============================
   // 傾きやすさ
-  // 細長い脚・左右差・長い首・非対称で暴れる
   //==============================
   tuning_.turnResponse += (legSlimness - 1.0f) * 1.2f;
   tuning_.turnResponse += legDiff * 2.0f;
-  // tuning_.turnResponse += armDiff * 0.3f;
   tuning_.turnResponse += (neckLengthScale - 1.0f) * 0.8f;
   tuning_.turnResponse += features_.asymmetry * 0.5f;
 
@@ -999,7 +1045,7 @@ void TravelScene::ApplyCustomizeToMovementParam() {
   tuning_.runPower += extraArmCount * 0.1f;
 
   //==============================
-  // プロトタイプ用に広めにクランプ
+  // クランプ
   //==============================
   tuning_.runPower = std::clamp(tuning_.runPower, 0.1f, 4.0f);
   tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.2f, 4.5f);
@@ -1137,18 +1183,25 @@ void TravelScene::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
   float leftMaxSpeed = legMaxSpeed_;
   float rightMaxSpeed = legMaxSpeed_;
 
+  float tiltDiff = bodyTilt_ - idealRunTilt_;
+  float forwardLean = (std::max)(0.0f, -tiltDiff);
+
+  // 前傾しすぎるほど脚を前に戻しづらくする
+  float returnPenalty = 1.0f - forwardLean * 0.65f;
+  returnPenalty = std::clamp(returnPenalty, 0.35f, 1.0f);
+
   // 脚を前へ戻す時だけ重さを強く反映
   if (!leftNowInput) {
-    leftFollow *=
-        leftLegReturnScale_ * leftLegReturnScale_ * leftLegReturnScale_ * 0.25f;
-    leftMaxSpeed *=
-        leftLegReturnScale_ * leftLegReturnScale_ * leftLegReturnScale_;
+    leftFollow *= leftLegReturnScale_ * leftLegReturnScale_ *
+                  leftLegReturnScale_ * 0.25f * returnPenalty;
+    leftMaxSpeed *= leftLegReturnScale_ * leftLegReturnScale_ *
+                    leftLegReturnScale_ * returnPenalty;
   }
   if (!rightNowInput) {
     rightFollow *= rightLegReturnScale_ * rightLegReturnScale_ *
-                   rightLegReturnScale_ * 0.25f;
-    rightMaxSpeed *=
-        rightLegReturnScale_ * rightLegReturnScale_ * rightLegReturnScale_;
+                   rightLegReturnScale_ * 0.25f * returnPenalty;
+    rightMaxSpeed *= rightLegReturnScale_ * rightLegReturnScale_ *
+                     rightLegReturnScale_ * returnPenalty;
   }
 
   leftLegBendSpeed_ += (leftTargetLegAngle - leftLegBend_) * leftFollow;
@@ -1177,6 +1230,8 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   bool bothInput = leftNowInput && rightNowInput;
 
+  kickFeedbackType_ = KickFeedbackType::None;
+
   float stability = useCustomizeMove_ ? tuning_.stability : 1.0f;
   float turnResponse = useCustomizeMove_ ? tuning_.turnResponse : 1.0f;
 
@@ -1195,11 +1250,17 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   float headRecoveryPenalty =
       std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.55f, 0.25f, 1.0f);
 
+  // 常時戻しを弱くして、姿勢を少し引きずるようにする
   float neutralReturnPower =
-      0.050f * stability * headRecoveryPenalty * torsoStabilityScale_;
+      0.020f * stability * headRecoveryPenalty * torsoStabilityScale_;
 
   if (bothInput) {
-    neutralReturnPower *= 0.85f;
+    neutralReturnPower *= 0.80f;
+  }
+
+  // 空中ではさらに戻りにくくする
+  if (!isGrounded_) {
+    neutralReturnPower *= 0.35f;
   }
 
   bodyTiltVelocity_ += (neutralTilt - bodyTilt_) * neutralReturnPower;
@@ -1328,11 +1389,30 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
 
-  // 最低保証付き（完全に死なない）
-  float kickReadyPower = 0.35f + kickReadyRatio * 0.65f;
+  // 少ししか戻していない蹴りはほぼ無意味にする
+  const float minKickReady = 0.35f;
 
-  // 威力に反映
+  float normalizedKickReady = std::clamp(
+      (kickReadyRatio - minKickReady) / (1.0f - minKickReady), 0.0f, 1.0f);
+
+  // 二乗で弱い蹴りをさらに弱くする
+  float kickReadyPower = normalizedKickReady * normalizedKickReady;
+
+  // 姿勢が悪いほど蹴りの力が地面に乗らない
+  float postureKickScale = 1.0f - badPosture * 0.55f;
+  postureKickScale = std::clamp(postureKickScale, 0.35f, 1.0f);
+
+  // 前傾しすぎは特に蹴りづらくする
+  float overForwardPenalty = 1.0f;
+  if (bodyTilt_ < idealRunTilt_) {
+    float forwardOver =
+        std::clamp((idealRunTilt_ - bodyTilt_) / 0.22f, 0.0f, 1.0f);
+    overForwardPenalty = 1.0f - forwardOver * 0.35f;
+  }
+
   totalPush *= kickReadyPower;
+  // totalPush *= postureKickScale;
+  // totalPush *= overForwardPenalty;
 
   bool startStepTrigger = isGrounded_ && landTimer_ > 0.30f && totalPush > 0.0f;
 
@@ -1374,14 +1454,42 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     const float bestTimingEnd = 0.08f;
     const float lateTimingEnd = 0.22f;
 
+    const float perfectTimingEnd = bestTimingEnd * 0.45f;
+
     float tiltImpulse = 0.0f;
+
+    if (!startStepTrigger && isGrounded_) {
+      if (landTimer_ <= perfectTimingEnd) {
+        kickFeedbackType_ = KickFeedbackType::Perfect;
+        kickFeedbackTimer_ = 0.18f;
+
+        Logger::Log("KICK : PERFECT");
+
+      } else if (landTimer_ <= bestTimingEnd) {
+        kickFeedbackType_ = KickFeedbackType::Good;
+        kickFeedbackTimer_ = 0.12f;
+
+        Logger::Log("KICK : GOOD");
+
+      } else {
+        Logger::Log("KICK : BAD");
+      }
+    }
+
+    float perfectBonus = 1.0f;
+
+    if (kickFeedbackType_ == KickFeedbackType::Perfect) {
+      perfectBonus = 1.25f;
+    }
+
+    totalPush *= perfectBonus;
 
     if (startStepTrigger) {
       tiltImpulse = 0.0f;
 
     } else if (!isGrounded_) {
       // 空中入力：ほぼ無効
-      totalPush *= 0.20f;
+      // totalPush *= 0.20f;
       tiltImpulse = 0.0f;
 
     } else if (landTimer_ <= bestTimingEnd) {
@@ -1394,17 +1502,17 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
           (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
       lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
 
-      totalPush *= (0.90f - lateRatio * 0.20f);
+      // totalPush *= (0.90f - lateRatio * 0.20f);
       tiltImpulse = 0.010f + lateRatio * 0.020f;
 
     } else {
       // 遅すぎる：かなり後傾、前進も弱い
-      totalPush *= 0.20f;
+      // totalPush *= 0.20f;
       tiltImpulse = 0.035f;
     }
 
     float headHeavyFactor =
-        std::clamp(1.0f + (headSizeScale_ - 1.0f) * 2.0f, 1.0f, 3.5f);
+        std::clamp(1.0f + (headSizeScale_ - 1.0f) * 3.0f, 1.0f, 5.0f);
 
     bodyTiltVelocity_ +=
         tiltImpulse * turnResponse * headHeavyFactor * torsoTiltResistance_;
@@ -1423,19 +1531,9 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                            .transform.scale;
 
     float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
+    float legLengthScale =
+        std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.75f, 0.45f, 2.0f);
 
-    float legLengthUpwardScale =
-        std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.85f, 0.45f, 2.0f);
-
-    //==============================
-    // 体の前傾で前進効率を変える
-    //==============================
-    // float tiltForwardFactor =
-    //    std::clamp((-bodyTilt_ - 0.02f) * 3.5f, 0.0f, 1.5f);
-
-    //==============================
-    // 採用脚の前後位置で push 補正
-    //==============================
     float kickLegBend = 0.0f;
     if (useLeftPush) {
       kickLegBend = leftLegBend_;
@@ -1448,162 +1546,55 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                               (legRecoverAngle_ - legKickAngle_),
                           0.0f, 1.0f);
 
-    float footForwardBonus = 0.75f + kickLegForwardness * 0.75f;
-    float footUpwardSuppress = 1.15f - kickLegForwardness * 0.55f;
+    float kickEfficiency = 0.75f + kickLegForwardness * 0.75f;
     float groundBoost = isGrounded_ ? 1.2f : 0.6f;
 
     float runPower = useCustomizeMove_ ? tuning_.runPower : 1.0f;
     float lift = useCustomizeMove_ ? tuning_.lift : 1.0f;
 
-    // float upwardSuppressByTilt =
-    //     std::clamp(1.0f - tiltForwardFactor * 0.25f, 0.75f, 1.0f);
-
-    const Vector3 lua = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]
-                            ->objectParts_[0]
-                            .transform.scale;
-    const Vector3 lfa = modObjects_[ToIndex(ModBodyPart::LeftForeArm)]
-                            ->objectParts_[0]
-                            .transform.scale;
-    const Vector3 rua = modObjects_[ToIndex(ModBodyPart::RightUpperArm)]
-                            ->objectParts_[0]
-                            .transform.scale;
-    const Vector3 rfa = modObjects_[ToIndex(ModBodyPart::RightForeArm)]
-                            ->objectParts_[0]
-                            .transform.scale;
-
-    float avgArmScaleY = (lua.y + lfa.y + rua.y + rfa.y) * 0.25f;
-
-    float armLengthPenalty = 1.0f - (avgArmScaleY - 1.0f) * 0.5f;
-    armLengthPenalty = std::clamp(armLengthPenalty, 0.45f, 1.0f);
-
-    float tiltDiff = bodyTilt_ - idealRunTilt_;
-
-    float forwardLean = (std::max)(0.0f, -tiltDiff);
-    float backwardLean = (std::max)(0.0f, tiltDiff);
-
-    float postureEfficiency = 1.0f - (forwardLean + backwardLean) * 0.8f;
-    postureEfficiency = std::clamp(postureEfficiency, 0.2f, 1.0f);
-
-    // const Vector3 lt = modObjects_[ToIndex(ModBodyPart::LeftThigh)]
-    //                        ->objectParts_[0]
-    //                        .transform.scale;
-    // const Vector3 rt = modObjects_[ToIndex(ModBodyPart::RightThigh)]
-    //                        ->objectParts_[0]
-    //                        .transform.scale;
-    // const Vector3 ls = modObjects_[ToIndex(ModBodyPart::LeftShin)]
-    //                        ->objectParts_[0]
-    //                        .transform.scale;
-    // const Vector3 rs = modObjects_[ToIndex(ModBodyPart::RightShin)]
-    //                        ->objectParts_[0]
-    //                        .transform.scale;
-
-    // float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
-
-    float leftLegThicknessNow =
-        ((lt.x + lt.z) * 0.5f + (ls.x + ls.z) * 0.5f) * 0.5f;
-    float rightLegThicknessNow =
-        ((rt.x + rt.z) * 0.5f + (rs.x + rs.z) * 0.5f) * 0.5f;
-    float avgLegThicknessNow =
-        (leftLegThicknessNow + rightLegThicknessNow) * 0.5f;
-
-    float legThicknessPenalty = 1.0f - (avgLegThicknessNow - 1.0f) * 0.55f;
-    legThicknessPenalty = std::clamp(legThicknessPenalty, 0.30f, 1.15f);
-
-    float headForwardPenalty =
-        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.12f, 0.75f, 1.0f);
-
-    float torsoForwardSupport =
-        std::clamp(1.0f + (torsoSizeScale_ - 1.0f) * 0.10f, 1.0f, 1.18f);
-
-    float legLengthForwardScale =
-        std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.65f, 0.75f, 1.80f);
-
-    float pushX = totalPush * (0.15f + runPower * 1.05f + forwardRate * 0.20f) *
-                  footForwardBonus * groundBoost * armLengthPenalty *
-                  headForwardPenalty * torsoForwardSupport *
-                  legLengthForwardScale;
-
-    float postureXScale = 0.75f + postureEfficiency * 0.25f;
-    pushX *= postureXScale;
-
-    // 前傾しすぎるほどつんのめって前進効率低下
-    float headLeanPenaltyScale =
-        std::clamp(1.0f - (headSizeScale_ - 1.0f) * 0.20f, 0.65f, 1.0f);
-
-    pushX *= std::clamp(1.0f - forwardLean * 0.22f * headLeanPenaltyScale,
-                        0.65f, 1.0f);
-
-    float timingForwardScale = 1.0f;
-
-    if (startStepTrigger) {
-      timingForwardScale = 1.0f;
-
-    } else if (landTimer_ <= bestTimingEnd) {
-      timingForwardScale = 1.35f;
-
-    } else if (landTimer_ <= lateTimingEnd) {
-      float lateRatio =
-          (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
-      lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
-
-      timingForwardScale = 1.0f - lateRatio * 0.25f;
-
-    } else {
-      timingForwardScale = 0.55f;
-    }
-
-    pushX *= timingForwardScale;
-
-    float pushY = totalPush * (0.14f + lift * 0.22f) * jumpRatio_ *
-                      footUpwardSuppress * legLengthUpwardScale +
-                  0.02f;
-
-    // 後傾してるほど上に逃げる
-    pushY += backwardLean * 0.15f * legLengthUpwardScale;
-
-    float headUpwardBias =
-        std::clamp((headSizeScale_ - 1.0f) * 0.04f, 0.0f, 0.06f);
-    pushY += headUpwardBias;
-
-    // 遅い入力による上方向ボーナスも脚長依存にする
-    if (!startStepTrigger && isGrounded_) {
-      if (landTimer_ > bestTimingEnd && landTimer_ <= lateTimingEnd) {
-        float lateRatio =
-            (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
-        lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
-
-        pushY += (0.04f + lateRatio * 0.07f) * legLengthUpwardScale;
-      } else if (landTimer_ > lateTimingEnd) {
-        pushY += 0.12f * legLengthUpwardScale;
-      }
-    }
-
-    float timingUpwardScale = 1.0f;
-    if (startStepTrigger) {
-      timingUpwardScale = 1.0f;
-    } else if (landTimer_ <= bestTimingEnd) {
-      timingUpwardScale = 0.65f;
-    } else if (landTimer_ <= lateTimingEnd) {
-      float lateRatio =
-          (landTimer_ - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
-      lateRatio = std::clamp(lateRatio, 0.0f, 1.0f);
-      timingUpwardScale = 1.05f + lateRatio * 0.60f;
-    } else {
-      timingUpwardScale = 1.75f;
-    }
-    pushY *= timingUpwardScale;
+    //==============================
+    // まず総量だけ決める
+    //==============================
+    float pushMagnitude = totalPush *
+                          (0.55f + runPower * 1.10f + lift * 0.75f) *
+                          legLengthScale * kickEfficiency * groundBoost;
 
     if (bothInput) {
-      pushY *= 0.60f;
+      pushMagnitude *= 0.85f;
     } else {
-      pushY *= singleStepJumpScale;
+      pushMagnitude *= 1.10f;
     }
 
-    if (startStepTrigger) {
-      float pushMagnitude = std::sqrt(pushX * pushX + pushY * pushY);
-      pushX = pushMagnitude * 0.707f;
-      pushY = pushMagnitude * 0.707f;
+    //==============================
+    // 姿勢から方向だけ決める
+    //==============================
+    float tiltDiff = bodyTilt_ - idealRunTilt_;
+
+    float forwardRatio = 0.5f - tiltDiff * 0.25f;
+    float upwardRatio = 0.5f + tiltDiff * 0.25f;
+
+    // 後傾側だけ追加で前進を削る
+    if (tiltDiff > 0.0f) {
+      float backwardPenalty = std::clamp(tiltDiff / 0.22f, 0.0f, 1.0f);
+      forwardRatio *= (1.0f - backwardPenalty * 0.55f);
     }
+
+    forwardRatio = std::clamp(forwardRatio, 0.15f, 1.50f);
+    upwardRatio = std::clamp(upwardRatio, 0.15f, 1.50f);
+
+    float dirLen =
+        std::sqrt(forwardRatio * forwardRatio + upwardRatio * upwardRatio);
+
+    if (dirLen > 0.0001f) {
+      forwardRatio /= dirLen;
+      upwardRatio /= dirLen;
+    } else {
+      forwardRatio = 0.707f;
+      upwardRatio = 0.707f;
+    }
+
+    float pushX = pushMagnitude * forwardRatio;
+    float pushY = pushMagnitude * upwardRatio;
 
     velocityX_ += pushX;
     velocityY_ += pushY;
@@ -1630,7 +1621,7 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   bodyTiltVelocity_ *= tiltDamping;
 
   float headTiltRangeFactor =
-      std::clamp(1.0f + (headSizeScale_ - 1.0f) * 1.00f, 1.0f, 2.40f);
+      std::clamp(1.0f + (headSizeScale_ - 1.0f) * 1.60f, 1.0f, 3.20f);
 
   float torsoTiltRangeFactor =
       std::clamp(1.0f - (torsoSizeScale_ - 1.0f) * 0.45f, 0.65f, 1.10f);
@@ -1733,28 +1724,87 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   const ModControlPointData *cp = GetControlPoints();
 
-  if (cp != nullptr) {
-    auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
-      return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
-    };
+  if (cp != nullptr && customizeData_ != nullptr) {
+    Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
+    Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
 
-    const Vector3 chestCenterWorld = Mid(cp->chestPos, cp->bellyPos);
+    Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
 
-    const float lowestFootLocalY =
-        (std::min)(cp->leftAnklePos.y, cp->rightAnklePos.y);
+    Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
+    Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
 
-    // 見た目で実際に描画される足首のYは
-    // moveY_ + chestCenterWorld.y + lowestFootLocalY
-    const float contactMoveY =
-        groundY_ - (chestCenterWorld.y + lowestFootLocalY);
+    int torsoAnchorOwnerId = -1;
+    int leftThighOwnerId = -1;
+    int rightThighOwnerId = -1;
 
-    if (moveY_ <= contactMoveY) {
+    for (const auto &instance : customizeData_->partInstances) {
+      if (torsoAnchorOwnerId < 0 &&
+          instance.partType == ModBodyPart::ChestBody) {
+        torsoAnchorOwnerId = instance.partId;
+      }
+      if (leftThighOwnerId < 0 && instance.partType == ModBodyPart::LeftThigh) {
+        leftThighOwnerId = instance.partId;
+      }
+      if (rightThighOwnerId < 0 &&
+          instance.partType == ModBodyPart::RightThigh) {
+        rightThighOwnerId = instance.partId;
+      }
+    }
+
+    for (const auto &snap : customizeData_->controlPointSnapshots) {
+      if (snap.ownerPartId == torsoAnchorOwnerId) {
+        if (snap.role == ModControlPointRole::LeftHip) {
+          leftHipAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::RightHip) {
+          rightHipAnchorLocal = snap.localPosition;
+        }
+      }
+
+      if (snap.ownerPartId == leftThighOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          leftLegRootLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::End) {
+          leftLegEndLocal = snap.localPosition;
+        }
+      }
+
+      if (snap.ownerPartId == rightThighOwnerId) {
+        if (snap.role == ModControlPointRole::Root) {
+          rightLegRootLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::End) {
+          rightLegEndLocal = snap.localPosition;
+        }
+      }
+    }
+
+    const float leftAnkleRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+    const float rightAnkleRadius =
+        GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+
+    // 実際の見た目配置に合わせた ankle 下端
+    const float leftFootBottomLocalY =
+        leftHipAnchorLocal.y + (leftLegEndLocal.y - leftLegRootLocal.y) -
+        leftAnkleRadius;
+
+    const float rightFootBottomLocalY =
+        rightHipAnchorLocal.y + (rightLegEndLocal.y - rightLegRootLocal.y) -
+        rightAnkleRadius;
+
+    const float lowestLegBottomLocalY =
+        (std::min)(leftFootBottomLocalY, rightFootBottomLocalY);
+
+    const float groundEpsilon = 0.01f;
+    const float contactMoveY = groundY_ - lowestLegBottomLocalY;
+
+    if (moveY_ <= contactMoveY + groundEpsilon) {
       isGrounded_ = true;
       moveY_ = contactMoveY;
       velocityY_ = 0.0f;
     } else {
       isGrounded_ = false;
     }
+
   } else {
     if (moveY_ <= groundY_) {
       isGrounded_ = true;
@@ -1797,7 +1847,10 @@ void TravelScene::ApplyVisualState() {
   // 体全体の位置・姿勢
   //================================
 
-  Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  // Object *body = modObjects_[ToIndex(ModBodyPart::Body)];
+  Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+
   Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
 
@@ -1811,21 +1864,29 @@ void TravelScene::ApplyVisualState() {
   Object *rightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
   Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
-  body->mainPosition.transform.translate.x = moveX_;
+  // body->mainPosition.transform.translate.x = moveX_;
   // const float legHeightOffset = ComputeLegHeightOffset();
   // body->mainPosition.transform.translate.y = moveY_ + legHeightOffset;
-  body->mainPosition.transform.translate.y = moveY_;
+  // body->mainPosition.transform.translate.y = moveY_;
 
   // body->mainPosition.transform.rotate.x = 0.0f;
   // body->mainPosition.transform.rotate.y = 1.57f;
   // body->mainPosition.transform.rotate.z = bodyTilt_;
 
-  body->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  // body->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
   // body->mainPosition.transform.scale.x = 1.0f;
   // body->mainPosition.transform.scale.y =
   //     (std::max)(0.65f, 1.0f - bodyStretch_ * 0.2f);
   // body->mainPosition.transform.scale.z = 1.0f;
+
+  if (chestBody != nullptr) {
+    chestBody->mainPosition.transform.translate.x = 0.0f;
+    chestBody->mainPosition.transform.translate.y = moveY_;
+    chestBody->mainPosition.transform.translate.z = moveX_;
+
+    chestBody->mainPosition.transform.rotate = {-bodyTilt_, 0.0f, 0.0f};
+  }
 
   //================================
   // 各部位の回転をいったん初期化
@@ -3308,6 +3369,12 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     return;
   }
 
+  bool leftNowInput = system_->GetIsPush(DIK_A);
+  bool rightNowInput = system_->GetIsPush(DIK_D);
+
+  bool hasMoveInput = leftNowInput || rightNowInput;
+  float poseAnimScale = hasMoveInput ? 1.0f : 0.0f;
+
   Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
 
@@ -3417,6 +3484,31 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     return;
   }
 
+  static bool torsoBaseLogOnce = false;
+  if (!torsoBaseLogOnce) {
+    if (!chestBody->objectParts_.empty()) {
+      const Vector3 &chestBaseTranslate =
+          chestBody->objectParts_[0].transform.translate;
+      Logger::Log("CHEST_BASE_TRANSLATE : (%.3f, %.3f, %.3f)",
+                  chestBaseTranslate.x, chestBaseTranslate.y,
+                  chestBaseTranslate.z);
+    } else {
+      Logger::Log("CHEST_BASE_TRANSLATE : objectParts empty");
+    }
+
+    if (!stomachBody->objectParts_.empty()) {
+      const Vector3 &stomachBaseTranslate =
+          stomachBody->objectParts_[0].transform.translate;
+      Logger::Log("STOMACH_BASE_TRANSLATE : (%.3f, %.3f, %.3f)",
+                  stomachBaseTranslate.x, stomachBaseTranslate.y,
+                  stomachBaseTranslate.z);
+    } else {
+      Logger::Log("STOMACH_BASE_TRANSLATE : objectParts empty");
+    }
+
+    torsoBaseLogOnce = true;
+  }
+
   auto Mid = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
     return {(a.x + b.x) * 0.5f, (a.y + b.y) * 0.5f, (a.z + b.z) * 0.5f};
   };
@@ -3443,8 +3535,8 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   const Vector3 chestCenterWorld = Mid(chestTopWorld, bellyWorld);
   const Vector3 stomachCenterWorld = Mid(bellyWorld, waistWorld);
 
-  const float chestLength = Length(Sub(bellyWorld, chestTopWorld));
-  const float stomachLength = Length(Sub(waistWorld, bellyWorld));
+  //  const float chestLength = Length(Sub(bellyWorld, chestTopWorld));
+  // const float stomachLength = Length(Sub(waistWorld, bellyWorld));
 
   const float leftUpperArmLength =
       Length(Sub(cp->leftElbowPos, cp->leftShoulderPos));
@@ -3779,114 +3871,750 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   const auto &neckParam = modBodies_[ToIndex(ModBodyPart::Neck)].GetParam();
 
+  ////============================
+  //// 胸部
+  //// root = Chest
+  //// mesh = Chest -> Belly
+  ////============================
+  // chestBody->mainPosition.transform.translate = {
+  //     chestTopWorld.x, moveY_ + chestTopWorld.y, moveX_ + chestTopWorld.z};
+
+  // chestBody->mainPosition.transform.rotate = {-bodyTilt_, 0.0f, 0.0f};
+
+  // if (!chestBody->objectParts_.empty()) {
+  //   chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength *
+  //   0.5f,
+  //                                                     0.0f};
+
+  //  chestBody->objectParts_[0].transform.scale.x =
+  //      chestThicknessScale * chestParam.scale.x;
+  //  chestBody->objectParts_[0].transform.scale.y =
+  //      chestLength * chestParam.scale.y * chestParam.length;
+  //  chestBody->objectParts_[0].transform.scale.z =
+  //      chestThicknessScale * chestParam.scale.z;
+
+  //  chestBody->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  //}
+
   //============================
   // 胸部
   // root = Chest
   // mesh = Chest -> Belly
   //============================
-  chestBody->mainPosition.transform.translate = {
-      chestTopWorld.x, moveY_ + chestTopWorld.y, moveX_ + chestTopWorld.z};
+  // Vector3 chestVec = Sub(bellyWorld, chestTopWorld);
+  // float chestLength = Length(chestVec);
 
-  chestBody->mainPosition.transform.rotate = {-bodyTilt_, 0.0f, 0.0f};
+  // if (chestLength < 0.0001f) {
+  //   chestLength = 0.0001f;
+  //   chestVec = {0.0f, -1.0f, 0.0f};
+  // }
 
-  if (!chestBody->objectParts_.empty()) {
-    chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength * 0.5f,
-                                                      0.0f};
+  // Vector3 chestDir = Normalize(chestVec);
+  // float chestAngleZ = atan2f(chestDir.x, -chestDir.y);
+  // float chestAngleX = -asinf(std::clamp(chestDir.z, -1.0f, 1.0f));
 
-    chestBody->objectParts_[0].transform.scale.x =
-        chestThicknessScale * chestParam.scale.x;
-    chestBody->objectParts_[0].transform.scale.y =
-        chestLength * chestParam.scale.y * chestParam.length;
-    chestBody->objectParts_[0].transform.scale.z =
-        chestThicknessScale * chestParam.scale.z;
+  // chestBody->mainPosition.transform.translate = {
+  //     chestTopWorld.x, moveY_ + chestTopWorld.y, moveX_ + chestTopWorld.z};
 
-    chestBody->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
-  }
+  // chestBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  // if (!chestBody->objectParts_.empty()) {
+  //   chestBody->objectParts_[0].transform.translate = {0.0f, -chestLength *
+  //   0.5f,
+  //                                                     0.0f};
+
+  //  chestBody->objectParts_[0].transform.scale.x =
+  //      chestThicknessScale * chestParam.scale.x;
+  //  chestBody->objectParts_[0].transform.scale.y =
+  //      chestLength * chestParam.scale.y * chestParam.length;
+  //  chestBody->objectParts_[0].transform.scale.z =
+  //      chestThicknessScale * chestParam.scale.z;
+
+  //  chestBody->objectParts_[0].transform.rotate = {chestAngleX - bodyTilt_,
+  //                                                 0.0f, chestAngleZ};
+  //}
+
+  ////============================
+  //// 腹部
+  //// root = Belly
+  //// mesh = Belly -> Waist
+  ////============================
+  // stomachBody->mainPosition.transform.translate =
+  //     Sub(bellyWorld, chestTopWorld);
+  // stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  // if (!stomachBody->objectParts_.empty()) {
+  //   stomachBody->objectParts_[0].transform.translate = {
+  //       0.0f, -stomachLength * 0.5f, 0.0f};
+
+  //  stomachBody->objectParts_[0].transform.scale.x =
+  //      stomachThicknessScale * stomachParam.scale.x;
+  //  stomachBody->objectParts_[0].transform.scale.y =
+  //      stomachLength * stomachParam.scale.y * stomachParam.length;
+  //  stomachBody->objectParts_[0].transform.scale.z =
+  //      stomachThicknessScale * stomachParam.scale.z;
+
+  //  stomachBody->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  //}
 
   //============================
   // 腹部
   // root = Belly
   // mesh = Belly -> Waist
   //============================
-  stomachBody->mainPosition.transform.translate =
-      Sub(bellyWorld, chestTopWorld);
-  stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  // Vector3 stomachVec = Sub(waistWorld, bellyWorld);
+  // float stomachLength = Length(stomachVec);
 
-  if (!stomachBody->objectParts_.empty()) {
-    stomachBody->objectParts_[0].transform.translate = {
-        0.0f, -stomachLength * 0.5f, 0.0f};
+  // if (stomachLength < 0.0001f) {
+  //   stomachLength = 0.0001f;
+  //   stomachVec = {0.0f, -1.0f, 0.0f};
+  // }
 
-    stomachBody->objectParts_[0].transform.scale.x =
-        stomachThicknessScale * stomachParam.scale.x;
-    stomachBody->objectParts_[0].transform.scale.y =
-        stomachLength * stomachParam.scale.y * stomachParam.length;
-    stomachBody->objectParts_[0].transform.scale.z =
-        stomachThicknessScale * stomachParam.scale.z;
+  // Vector3 stomachDir = Normalize(stomachVec);
+  // float stomachAngleZ = atan2f(stomachDir.x, -stomachDir.y);
+  // float stomachAngleX = -asinf(std::clamp(stomachDir.z, -1.0f, 1.0f));
 
-    stomachBody->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+  // stomachBody->mainPosition.transform.translate =
+  //     Sub(bellyWorld, chestTopWorld);
+
+  // stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  // if (!stomachBody->objectParts_.empty()) {
+  //   stomachBody->objectParts_[0].transform.translate = {
+  //       0.0f, -stomachLength * 0.5f, 0.0f};
+
+  //  stomachBody->objectParts_[0].transform.scale.x =
+  //      stomachThicknessScale * stomachParam.scale.x;
+  //  stomachBody->objectParts_[0].transform.scale.y =
+  //      stomachLength * stomachParam.scale.y * stomachParam.length;
+  //  stomachBody->objectParts_[0].transform.scale.z =
+  //      stomachThicknessScale * stomachParam.scale.z;
+
+  //  stomachBody->objectParts_[0].transform.rotate = {stomachAngleX, 0.0f,
+  //                                                   stomachAngleZ};
+  //}
+
+  ////==============================
+  //// 胸・腹も snapshot ベースで置く
+  ////==============================
+  // int chestOwnerId = -1;
+  // int stomachOwnerId = -1;
+
+  // if (customizeData_ != nullptr) {
+  //   for (const auto &instance : customizeData_->partInstances) {
+  //     if (chestOwnerId < 0 && instance.partType == ModBodyPart::ChestBody) {
+  //       chestOwnerId = instance.partId;
+  //     } else if (stomachOwnerId < 0 &&
+  //                instance.partType == ModBodyPart::StomachBody) {
+  //       stomachOwnerId = instance.partId;
+  //     }
+  //   }
+  // }
+
+  // SegmentVisual chestSeg{};
+  // SegmentVisual stomachSeg{};
+
+  // bool hasChestSeg = false;
+  // bool hasStomachSeg = false;
+
+  // if (chestOwnerId >= 0) {
+  //   hasChestSeg = BuildSegmentFromSnapshot(ModBodyPart::ChestBody,
+  //   chestOwnerId,
+  //                                          chestSeg);
+  // }
+
+  // if (stomachOwnerId >= 0) {
+  //   hasStomachSeg = BuildSegmentFromSnapshot(ModBodyPart::StomachBody,
+  //                                            stomachOwnerId, stomachSeg);
+  // }
+
+  // static bool chestSegCheckOnce = false;
+  // if (!chestSegCheckOnce) {
+  //   Logger::Log("CHEST_SEG_CHECK hasChestSeg=%d hasStomachSeg=%d",
+  //               hasChestSeg ? 1 : 0, hasStomachSeg ? 1 : 0);
+
+  //  Logger::Log("CHEST_SEG_ROOT : (%.3f, %.3f, %.3f)", chestSeg.root.x,
+  //              chestSeg.root.y, chestSeg.root.z);
+  //  Logger::Log("CHEST_TOP_CP   : (%.3f, %.3f, %.3f)", chestTopWorld.x,
+  //              chestTopWorld.y, chestTopWorld.z);
+  //  Logger::Log("BELLY_CP       : (%.3f, %.3f, %.3f)", bellyWorld.x,
+  //              bellyWorld.y, bellyWorld.z);
+
+  //  chestSegCheckOnce = true;
+  //}
+
+  //// chest snapshot が無い場合だけ従来CPにフォールバック
+  // if (!hasChestSeg) {
+  //   Vector3 chestVec = Sub(bellyWorld, chestTopWorld);
+  //   chestSeg.length = Length(chestVec);
+
+  //  if (chestSeg.length < 0.0001f) {
+  //    chestSeg.length = 0.0001f;
+  //    chestVec = {0.0f, -1.0f, 0.0f};
+  //  }
+
+  //  Vector3 chestDir = Normalize(chestVec);
+  //  chestSeg.angleZ = atan2f(chestDir.x, -chestDir.y);
+  //  chestSeg.angleX = -asinf(std::clamp(chestDir.z, -1.0f, 1.0f));
+  //  chestSeg.root = chestTopWorld;
+  //}
+
+  //// stomach snapshot が無い場合だけ従来CPにフォールバック
+  // if (!hasStomachSeg) {
+  //   Vector3 stomachVec = Sub(waistWorld, bellyWorld);
+  //   stomachSeg.length = Length(stomachVec);
+
+  //  if (stomachSeg.length < 0.0001f) {
+  //    stomachSeg.length = 0.0001f;
+  //    stomachVec = {0.0f, -1.0f, 0.0f};
+  //  }
+
+  //  Vector3 stomachDir = Normalize(stomachVec);
+  //  stomachSeg.angleZ = atan2f(stomachDir.x, -stomachDir.y);
+  //  stomachSeg.angleX = -asinf(std::clamp(stomachDir.z, -1.0f, 1.0f));
+  //  stomachSeg.root = bellyWorld;
+  //}
+
+  if (!useModBodyApplyTorso_) {
+
+    //==============================
+    // torso は ChestBody owner からまとめて読む
+    // chest  = Chest -> Belly
+    // stomach = Belly -> Waist
+    //==============================
+    int torsoOwnerId = -1;
+
+    if (customizeData_ != nullptr) {
+      for (const auto &instance : customizeData_->partInstances) {
+        if (instance.partType == ModBodyPart::ChestBody) {
+          torsoOwnerId = instance.partId;
+          break;
+        }
+      }
+    }
+
+    SegmentVisual chestSeg{};
+    SegmentVisual stomachSeg{};
+
+    bool hasChestSeg = false;
+    bool hasStomachSeg = false;
+
+    // ChestBody owner に入っている torso snapshot を直接読む
+    if (customizeData_ != nullptr && torsoOwnerId >= 0) {
+      const ModControlPointSnapshot *chestSnap = nullptr;
+      const ModControlPointSnapshot *bellySnap = nullptr;
+      const ModControlPointSnapshot *waistSnap = nullptr;
+
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != torsoOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Chest) {
+          chestSnap = &snap;
+        } else if (snap.role == ModControlPointRole::Belly) {
+          bellySnap = &snap;
+        } else if (snap.role == ModControlPointRole::Waist) {
+          waistSnap = &snap;
+        }
+      }
+
+      if (chestSnap != nullptr && bellySnap != nullptr) {
+        Vector3 chestVec =
+            Sub(bellySnap->localPosition, chestSnap->localPosition);
+        chestSeg.length = Length(chestVec);
+
+        if (chestSeg.length < 0.0001f) {
+          chestSeg.length = 0.0001f;
+          chestVec = {0.0f, -1.0f, 0.0f};
+        }
+
+        Vector3 chestDir = Normalize(chestVec);
+        chestSeg.angleZ = atan2f(chestDir.x, -chestDir.y);
+        chestSeg.angleX = -asinf(std::clamp(chestDir.z, -1.0f, 1.0f));
+        chestSeg.root = chestSnap->localPosition;
+        hasChestSeg = true;
+      }
+
+      if (bellySnap != nullptr && waistSnap != nullptr) {
+        Vector3 stomachVec =
+            Sub(waistSnap->localPosition, bellySnap->localPosition);
+        stomachSeg.length = Length(stomachVec);
+
+        if (stomachSeg.length < 0.0001f) {
+          stomachSeg.length = 0.0001f;
+          stomachVec = {0.0f, -1.0f, 0.0f};
+        }
+
+        Vector3 stomachDir = Normalize(stomachVec);
+        stomachSeg.angleZ = atan2f(stomachDir.x, -stomachDir.y);
+        stomachSeg.angleX = -asinf(std::clamp(stomachDir.z, -1.0f, 1.0f));
+        stomachSeg.root = bellySnap->localPosition;
+        hasStomachSeg = true;
+      }
+    }
+
+    // 取れなかったときだけ cp にフォールバック
+    if (!hasChestSeg) {
+      Vector3 chestVec = Sub(bellyWorld, chestTopWorld);
+      chestSeg.length = Length(chestVec);
+
+      if (chestSeg.length < 0.0001f) {
+        chestSeg.length = 0.0001f;
+        chestVec = {0.0f, -1.0f, 0.0f};
+      }
+
+      Vector3 chestDir = Normalize(chestVec);
+      chestSeg.angleZ = atan2f(chestDir.x, -chestDir.y);
+      chestSeg.angleX = -asinf(std::clamp(chestDir.z, -1.0f, 1.0f));
+      chestSeg.root = chestTopWorld;
+    }
+
+    if (!hasStomachSeg) {
+      Vector3 stomachVec = Sub(waistWorld, bellyWorld);
+      stomachSeg.length = Length(stomachVec);
+
+      if (stomachSeg.length < 0.0001f) {
+        stomachSeg.length = 0.0001f;
+        stomachVec = {0.0f, -1.0f, 0.0f};
+      }
+
+      Vector3 stomachDir = Normalize(stomachVec);
+      stomachSeg.angleZ = atan2f(stomachDir.x, -stomachDir.y);
+      stomachSeg.angleX = -asinf(std::clamp(stomachDir.z, -1.0f, 1.0f));
+      stomachSeg.root = bellyWorld;
+    }
+
+    static bool torsoReadLogOnce = false;
+    if (!torsoReadLogOnce) {
+      Logger::Log("TORSO_OWNER_ID : %d", torsoOwnerId);
+
+      Logger::Log("CHEST_SEG root=(%.3f, %.3f, %.3f) len=%.3f", chestSeg.root.x,
+                  chestSeg.root.y, chestSeg.root.z, chestSeg.length);
+
+      Logger::Log("STOMACH_SEG root=(%.3f, %.3f, %.3f) len=%.3f",
+                  stomachSeg.root.x, stomachSeg.root.y, stomachSeg.root.z,
+                  stomachSeg.length);
+
+      torsoReadLogOnce = true;
+    }
+
+    //============================
+    // 胸部
+    //============================
+    // chestBody->mainPosition.transform.translate = {
+    //    chestSeg.root.x, moveY_ + chestSeg.root.y, moveX_ + chestSeg.root.z};
+    chestBody->mainPosition.transform.translate = {
+        moveX_ + chestSeg.root.x, moveY_ + chestSeg.root.y, chestSeg.root.z};
+
+    chestBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+    if (!chestBody->objectParts_.empty()) {
+      chestBody->objectParts_[0].transform.translate = {
+          0.0f, -chestSeg.length * 0.5f, 0.0f};
+
+      chestBody->objectParts_[0].transform.scale.x =
+          chestThicknessScale * chestParam.scale.x;
+      chestBody->objectParts_[0].transform.scale.y =
+          chestSeg.length * chestParam.scale.y * chestParam.length;
+      chestBody->objectParts_[0].transform.scale.z =
+          chestThicknessScale * chestParam.scale.z;
+
+      chestBody->objectParts_[0].transform.rotate = {
+          chestSeg.angleX - bodyTilt_, 0.0f, chestSeg.angleZ};
+    }
+
+    //============================
+    // 腹部
+    //============================
+    stomachBody->mainPosition.transform.translate = {
+        stomachSeg.root.x - chestSeg.root.x,
+        stomachSeg.root.y - chestSeg.root.y,
+        stomachSeg.root.z - chestSeg.root.z};
+
+    stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+    if (!stomachBody->objectParts_.empty()) {
+      stomachBody->objectParts_[0].transform.translate = {
+          0.0f, -stomachSeg.length * 0.5f, 0.0f};
+
+      stomachBody->objectParts_[0].transform.scale.x =
+          stomachThicknessScale * stomachParam.scale.x;
+      stomachBody->objectParts_[0].transform.scale.y =
+          stomachSeg.length * stomachParam.scale.y * stomachParam.length;
+      stomachBody->objectParts_[0].transform.scale.z =
+          stomachThicknessScale * stomachParam.scale.z;
+
+      stomachBody->objectParts_[0].transform.rotate = {stomachSeg.angleX, 0.0f,
+                                                       stomachSeg.angleZ};
+    }
+
+    static bool torsoPlacementLogOnce = false;
+    if (!torsoPlacementLogOnce) {
+      Logger::Log("=== TORSO PLACEMENT CHECK ===");
+
+      Logger::Log("cp chest      : (%.3f, %.3f, %.3f)", chestTopWorld.x,
+                  chestTopWorld.y, chestTopWorld.z);
+      Logger::Log("cp belly      : (%.3f, %.3f, %.3f)", bellyWorld.x,
+                  bellyWorld.y, bellyWorld.z);
+      Logger::Log("cp waist      : (%.3f, %.3f, %.3f)", waistWorld.x,
+                  waistWorld.y, waistWorld.z);
+
+      Logger::Log("chestSeg root : (%.3f, %.3f, %.3f)", chestSeg.root.x,
+                  chestSeg.root.y, chestSeg.root.z);
+      Logger::Log("stomachSeg root : (%.3f, %.3f, %.3f)", stomachSeg.root.x,
+                  stomachSeg.root.y, stomachSeg.root.z);
+
+      Logger::Log("chestSeg len/ax/az : %.3f / %.3f / %.3f", chestSeg.length,
+                  chestSeg.angleX, chestSeg.angleZ);
+      Logger::Log("stomachSeg len/ax/az : %.3f / %.3f / %.3f",
+                  stomachSeg.length, stomachSeg.angleX, stomachSeg.angleZ);
+
+      Logger::Log("chest main local : (%.3f, %.3f, %.3f)",
+                  chestBody->mainPosition.transform.translate.x,
+                  chestBody->mainPosition.transform.translate.y,
+                  chestBody->mainPosition.transform.translate.z);
+
+      Logger::Log("stomach main local : (%.3f, %.3f, %.3f)",
+                  stomachBody->mainPosition.transform.translate.x,
+                  stomachBody->mainPosition.transform.translate.y,
+                  stomachBody->mainPosition.transform.translate.z);
+
+      if (!chestBody->objectParts_.empty()) {
+        Logger::Log("chest mesh local : (%.3f, %.3f, %.3f)",
+                    chestBody->objectParts_[0].transform.translate.x,
+                    chestBody->objectParts_[0].transform.translate.y,
+                    chestBody->objectParts_[0].transform.translate.z);
+      }
+
+      if (!stomachBody->objectParts_.empty()) {
+        Logger::Log("stomach mesh local : (%.3f, %.3f, %.3f)",
+                    stomachBody->objectParts_[0].transform.translate.x,
+                    stomachBody->objectParts_[0].transform.translate.y,
+                    stomachBody->objectParts_[0].transform.translate.z);
+      }
+
+      torsoPlacementLogOnce = true;
+    }
   }
 
-  //==============================
-  // 固定 首
-  // 腕脚と同じ：
-  // Neck 自身の ownerPartId から Root -> Bend を作る
-  //==============================
-  int neckOwnerId = -1;
-  Vector3 neckAnchorLocal = {0.0f, 0.0f, 0.0f};
+  //================================================
+  // 腕脚の snapshot / anchor 取得
+  //================================================
+
+  Vector3 neckBaseAnchorLocal = {0.0f, 0.45f, 0.0f};
+
+  Vector3 neckRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 neckBendLocal = {0.0f, 0.280f, 0.0f};
+  Vector3 neckEndLocal = {0.0f, 0.800f, 0.0f};
+
+  bool hasNeckRoot = false;
+  bool hasNeckBend = false;
+  bool hasNeckEnd = false;
+
+  //------------------------------
+  // 左腕
+  //------------------------------
+  int leftUpperArmOwnerId = -1;
+  Vector3 leftShoulderAnchorLocal = {-1.25f, 1.0f, 0.0f};
+
+  Vector3 leftArmRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 leftArmBendLocal = {0.0f, -0.55f, 0.0f};
+  Vector3 leftArmEndLocal = {0.0f, -1.10f, 0.0f};
+
+  bool hasLeftArmRoot = false;
+  bool hasLeftArmBend = false;
+  bool hasLeftArmEnd = false;
+
+  //------------------------------
+  // 右腕
+  //------------------------------
+  int rightUpperArmOwnerId = -1;
+  Vector3 rightShoulderAnchorLocal = {1.25f, 1.0f, 0.0f};
+
+  Vector3 rightArmRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 rightArmBendLocal = {0.0f, -0.55f, 0.0f};
+  Vector3 rightArmEndLocal = {0.0f, -1.10f, 0.0f};
+
+  bool hasRightArmRoot = false;
+  bool hasRightArmBend = false;
+  bool hasRightArmEnd = false;
+
+  //------------------------------
+  // 左脚
+  //------------------------------
+  int leftThighOwnerId = -1;
+  Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
+
+  Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 leftLegBendLocal = {0.0f, -0.70f, 0.0f};
+  Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
+
+  bool hasLeftLegRoot = false;
+  bool hasLeftLegBend = false;
+  bool hasLeftLegEnd = false;
+
+  //------------------------------
+  // 右脚
+  //------------------------------
+  int rightThighOwnerId = -1;
+  Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
+
+  Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 rightLegBendLocal = {0.0f, -0.70f, 0.0f};
+  Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
+
+  bool hasRightLegRoot = false;
+  bool hasRightLegBend = false;
+  bool hasRightLegEnd = false;
 
   if (customizeData_ != nullptr) {
+    //==============================
+    // 各部位 ownerPartId は従来どおり partInstances から取る
+    // ただし肩・股関節 anchor は torso owner の snapshot から取る
+    //==============================
     for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::Neck) {
-        neckOwnerId = instance.partId;
-        neckAnchorLocal = instance.localTransform.translate;
+      if (instance.partType == ModBodyPart::LeftUpperArm &&
+          leftUpperArmOwnerId < 0) {
+        leftUpperArmOwnerId = instance.partId;
+      } else if (instance.partType == ModBodyPart::RightUpperArm &&
+                 rightUpperArmOwnerId < 0) {
+        rightUpperArmOwnerId = instance.partId;
+      } else if (instance.partType == ModBodyPart::LeftThigh &&
+                 leftThighOwnerId < 0) {
+        leftThighOwnerId = instance.partId;
+      } else if (instance.partType == ModBodyPart::RightThigh &&
+                 rightThighOwnerId < 0) {
+        rightThighOwnerId = instance.partId;
+      }
+    }
+
+    //==============================
+    // torso owner から shoulder / hip anchor を読む
+    //==============================
+    int torsoAnchorOwnerId = -1;
+    for (const auto &instance : customizeData_->partInstances) {
+      if (instance.partType == ModBodyPart::ChestBody) {
+        torsoAnchorOwnerId = instance.partId;
         break;
       }
     }
-  }
 
-  const ModControlPointSnapshot *neckRootSnap = nullptr;
-  const ModControlPointSnapshot *neckBendSnap = nullptr;
+    if (torsoAnchorOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != torsoAnchorOwnerId) {
+          continue;
+        }
 
-  if (customizeData_ != nullptr && neckOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != neckOwnerId) {
-        continue;
+        if (snap.role == ModControlPointRole::NeckBase) {
+          neckBaseAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::LeftShoulder) {
+          leftShoulderAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::RightShoulder) {
+          rightShoulderAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::LeftHip) {
+          leftHipAnchorLocal = snap.localPosition;
+        } else if (snap.role == ModControlPointRole::RightHip) {
+          rightHipAnchorLocal = snap.localPosition;
+        }
       }
+    }
 
-      if (snap.role == ModControlPointRole::Root) {
-        neckRootSnap = &snap;
-      } else if (snap.role == ModControlPointRole::Bend) {
-        neckBendSnap = &snap;
+    static bool anchorCompareLogOnce = false;
+    if (!anchorCompareLogOnce) {
+      Logger::Log("=== TORSO / ANCHOR CHECK ===");
+
+      Logger::Log("cp->chestPos          : (%.3f, %.3f, %.3f)", cp->chestPos.x,
+                  cp->chestPos.y, cp->chestPos.z);
+      Logger::Log("cp->bellyPos          : (%.3f, %.3f, %.3f)", cp->bellyPos.x,
+                  cp->bellyPos.y, cp->bellyPos.z);
+      Logger::Log("cp->waistPos          : (%.3f, %.3f, %.3f)", cp->waistPos.x,
+                  cp->waistPos.y, cp->waistPos.z);
+
+      Logger::Log("anchor leftShoulder   : (%.3f, %.3f, %.3f)",
+                  leftShoulderAnchorLocal.x, leftShoulderAnchorLocal.y,
+                  leftShoulderAnchorLocal.z);
+      Logger::Log("anchor rightShoulder  : (%.3f, %.3f, %.3f)",
+                  rightShoulderAnchorLocal.x, rightShoulderAnchorLocal.y,
+                  rightShoulderAnchorLocal.z);
+      Logger::Log("anchor leftHip        : (%.3f, %.3f, %.3f)",
+                  leftHipAnchorLocal.x, leftHipAnchorLocal.y,
+                  leftHipAnchorLocal.z);
+      Logger::Log("anchor rightHip       : (%.3f, %.3f, %.3f)",
+                  rightHipAnchorLocal.x, rightHipAnchorLocal.y,
+                  rightHipAnchorLocal.z);
+
+      Logger::Log("leftUpperArmOwnerId   : %d", leftUpperArmOwnerId);
+      Logger::Log("rightUpperArmOwnerId  : %d", rightUpperArmOwnerId);
+      Logger::Log("leftThighOwnerId      : %d", leftThighOwnerId);
+      Logger::Log("rightThighOwnerId     : %d", rightThighOwnerId);
+
+      anchorCompareLogOnce = true;
+    }
+
+    //==============================
+    // 首 snapshot
+    //==============================
+    int neckOwnerId = -1;
+    for (const auto &instance : customizeData_->partInstances) {
+      if (instance.partType == ModBodyPart::Neck) {
+        neckOwnerId = instance.partId;
+        break;
+      }
+    }
+
+    if (neckOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != neckOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Root) {
+          neckRootLocal = snap.localPosition;
+          hasNeckRoot = true;
+        } else if (snap.role == ModControlPointRole::Bend) {
+          neckBendLocal = snap.localPosition;
+          hasNeckBend = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          neckEndLocal = snap.localPosition;
+          hasNeckEnd = true;
+        }
+      }
+    }
+
+    //==============================
+    // 左腕 snapshot
+    //==============================
+    if (leftUpperArmOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != leftUpperArmOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Root) {
+          leftArmRootLocal = snap.localPosition;
+          hasLeftArmRoot = true;
+        } else if (snap.role == ModControlPointRole::Bend) {
+          leftArmBendLocal = snap.localPosition;
+          hasLeftArmBend = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          leftArmEndLocal = snap.localPosition;
+          hasLeftArmEnd = true;
+        }
+      }
+    }
+
+    //==============================
+    // 右腕 snapshot
+    //==============================
+    if (rightUpperArmOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != rightUpperArmOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Root) {
+          rightArmRootLocal = snap.localPosition;
+          hasRightArmRoot = true;
+        } else if (snap.role == ModControlPointRole::Bend) {
+          rightArmBendLocal = snap.localPosition;
+          hasRightArmBend = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          rightArmEndLocal = snap.localPosition;
+          hasRightArmEnd = true;
+        }
+      }
+    }
+
+    //==============================
+    // 左脚 snapshot
+    //==============================
+    if (leftThighOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != leftThighOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Root) {
+          leftLegRootLocal = snap.localPosition;
+          hasLeftLegRoot = true;
+        } else if (snap.role == ModControlPointRole::Bend) {
+          leftLegBendLocal = snap.localPosition;
+          hasLeftLegBend = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          leftLegEndLocal = snap.localPosition;
+          hasLeftLegEnd = true;
+        }
+      }
+    }
+
+    //==============================
+    // 右脚 snapshot
+    //==============================
+    if (rightThighOwnerId >= 0) {
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId != rightThighOwnerId) {
+          continue;
+        }
+
+        if (snap.role == ModControlPointRole::Root) {
+          rightLegRootLocal = snap.localPosition;
+          hasRightLegRoot = true;
+        } else if (snap.role == ModControlPointRole::Bend) {
+          rightLegBendLocal = snap.localPosition;
+          hasRightLegBend = true;
+        } else if (snap.role == ModControlPointRole::End) {
+          rightLegEndLocal = snap.localPosition;
+          hasRightLegEnd = true;
+        }
       }
     }
   }
 
-  Vector3 neckRootLocal = {0.0f, 0.0f, 0.0f};
+  Vector3 leftShoulderFromChest = {leftShoulderAnchorLocal.x - chestTopWorld.x,
+                                   leftShoulderAnchorLocal.y - chestTopWorld.y,
+                                   leftShoulderAnchorLocal.z - chestTopWorld.z};
 
-  if (neckRootSnap != nullptr && neckBendSnap != nullptr) {
-    Vector3 neckVec =
-        Sub(neckBendSnap->localPosition, neckRootSnap->localPosition);
-    float neckLength = Length(neckVec);
+  Vector3 rightShoulderFromChest = {
+      rightShoulderAnchorLocal.x - chestTopWorld.x,
+      rightShoulderAnchorLocal.y - chestTopWorld.y,
+      rightShoulderAnchorLocal.z - chestTopWorld.z};
+
+  Vector3 leftHipFromBelly = {leftHipAnchorLocal.x - bellyWorld.x,
+                              leftHipAnchorLocal.y - bellyWorld.y,
+                              leftHipAnchorLocal.z - bellyWorld.z};
+
+  Vector3 rightHipFromBelly = {rightHipAnchorLocal.x - bellyWorld.x,
+                               rightHipAnchorLocal.y - bellyWorld.y,
+                               rightHipAnchorLocal.z - bellyWorld.z};
+
+  //==============================
+  // 首
+  // anchor = NeckBase
+  // shape  = Neck Root -> Neck Bend
+  //==============================
+  if (neck != nullptr && hasNeckRoot && hasNeckBend) {
+    Vector3 neckShapeVec = Sub(neckBendLocal, neckRootLocal);
+    float neckLength = Length(neckShapeVec);
 
     if (neckLength < 0.0001f) {
       neckLength = 0.0001f;
-      neckVec = {0.0f, -1.0f, 0.0f};
+      neckShapeVec = {0.0f, 1.0f, 0.0f};
     }
 
-    Vector3 neckDir = Normalize(neckVec);
-    float neckAngleZ = atan2(neckDir.x, -neckDir.y);
+    Vector3 neckDir = Normalize(neckShapeVec);
+    float neckAngleZ = atan2f(-neckDir.x, neckDir.y);
+    float neckAngleX = asinf(std::clamp(neckDir.z, -1.0f, 1.0f));
 
-    float neckThicknessScale =
-        (std::max)(neckRootSnap->radius, neckBendSnap->radius) / 0.1f;
+    const float neckRootR = GetSnapshotRadius(ModBodyPart::Neck, 1);
+    const float neckBendR = GetSnapshotRadius(ModBodyPart::Neck, 2);
+    const float neckThicknessScale = (std::max)(neckRootR, neckBendR) / 0.1f;
 
-    // neck->mainPosition.transform.translate = neckAnchorLocal;
-    //   Vector3 neckRootLocal = {0.0f, 0.0f, 0.0f};
-    neck->mainPosition.transform.translate = neckRootLocal;
-
-    neck->mainPosition.transform.rotate = {0.0f, 0.0f, neckAngleZ};
+    neck->mainPosition.transform.translate = neckBaseAnchorLocal;
+    neck->mainPosition.transform.rotate = {neckAngleX, 0.0f, neckAngleZ};
 
     if (!neck->objectParts_.empty()) {
-      neck->objectParts_[0].transform.translate = {0.0f, -neckLength * 0.5f,
+      neck->objectParts_[0].transform.translate = {0.0f, neckLength * 0.5f,
                                                    0.0f};
       neck->objectParts_[0].transform.scale.x =
           neckThicknessScale * neckParam.scale.x;
@@ -3895,74 +4623,53 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       neck->objectParts_[0].transform.scale.z =
           neckThicknessScale * neckParam.scale.z;
     }
-  }
 
-  //==============================
-  // 固定 頭
-  // 首にぶら下がっている base Head を取る
-  //==============================
-  int headOwnerId = -1;
-  Vector3 headAnchorLocal = {0.0f, 0.0f, 0.0f};
-
-  if (customizeData_ != nullptr && neckOwnerId >= 0) {
-    for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::Head &&
-          instance.parentId == neckOwnerId) {
-        headOwnerId = instance.partId;
-        headAnchorLocal = instance.localTransform.translate;
-        break;
-      }
+    static bool neckAnchorCheckOnce = false;
+    if (!neckAnchorCheckOnce) {
+      Logger::Log("=== NECK ANCHOR CHECK ===");
+      Logger::Log("neckBaseAnchorLocal : (%.3f, %.3f, %.3f)",
+                  neckBaseAnchorLocal.x, neckBaseAnchorLocal.y,
+                  neckBaseAnchorLocal.z);
+      Logger::Log("neckRootLocal       : (%.3f, %.3f, %.3f)", neckRootLocal.x,
+                  neckRootLocal.y, neckRootLocal.z);
+      Logger::Log("neckBendLocal       : (%.3f, %.3f, %.3f)", neckBendLocal.x,
+                  neckBendLocal.y, neckBendLocal.z);
+      Logger::Log("neckLength          : %.3f", neckLength);
+      neckAnchorCheckOnce = true;
     }
   }
 
-  const ModControlPointSnapshot *headBendSnap = nullptr;
-  const ModControlPointSnapshot *headEndSnap = nullptr;
+  //==============================
+  // 頭
+  // anchor = 首の先
+  // shape  = Neck Bend -> Neck End
+  //==============================
+  if (head != nullptr && hasNeckRoot && hasNeckBend && hasNeckEnd) {
+    Vector3 neckTipOffset = Sub(neckBendLocal, neckRootLocal);
+    Vector3 headAnchorLocal = Add(neckBaseAnchorLocal, neckTipOffset);
 
-  if (customizeData_ != nullptr && neckOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != neckOwnerId) {
-        continue;
-      }
-
-      if (snap.role == ModControlPointRole::Bend) {
-        headBendSnap = &snap;
-      } else if (snap.role == ModControlPointRole::End) {
-        headEndSnap = &snap;
-      }
-    }
-  }
-
-  if (headBendSnap != nullptr && headEndSnap != nullptr) {
-    Vector3 headVec =
-        Sub(headEndSnap->localPosition, headBendSnap->localPosition);
-    float headLength = Length(headVec);
+    Vector3 headShapeVec = Sub(neckEndLocal, neckBendLocal);
+    float headLength = Length(headShapeVec);
 
     if (headLength < 0.0001f) {
       headLength = 0.0001f;
-      headVec = {0.0f, 1.0f, 0.0f};
+      headShapeVec = {0.0f, 1.0f, 0.0f};
     }
 
-    Vector3 headDir = Normalize(headVec);
-    float headAngleZ = atan2(headDir.x, -headDir.y);
+    Vector3 headDir = Normalize(headShapeVec);
+    float headAngleZ = atan2f(-headDir.x, headDir.y);
+    float headAngleX = -asinf(std::clamp(headDir.z, -1.0f, 1.0f));
 
-    float headThicknessScale =
-        (std::max)(headBendSnap->radius, headEndSnap->radius) / 0.1f;
+    const float headThicknessScale =
+        (std::max)(GetSnapshotRadius(ModBodyPart::Neck, 2),
+                   GetSnapshotRadius(ModBodyPart::Neck, 3)) /
+        0.1f;
 
-    //  head->mainPosition.transform.translate = headAnchorLocal;
-    Vector3 headRootLocal = {
-        neckRootLocal.x +
-            (headBendSnap->localPosition.x - neckRootSnap->localPosition.x),
-        neckRootLocal.y +
-            (headBendSnap->localPosition.y - neckRootSnap->localPosition.y),
-        neckRootLocal.z +
-            (headBendSnap->localPosition.z - neckRootSnap->localPosition.z),
-    };
-
-    head->mainPosition.transform.translate = headRootLocal;
-    head->mainPosition.transform.rotate = {0.0f, 0.0f, headAngleZ};
+    head->mainPosition.transform.translate = headAnchorLocal;
+    head->mainPosition.transform.rotate = {headAngleX, 0.0f, headAngleZ};
 
     if (!head->objectParts_.empty()) {
-      head->objectParts_[0].transform.translate = {0.0f, -headLength * 0.5f,
+      head->objectParts_[0].transform.translate = {0.0f, headLength * 0.5f,
                                                    0.0f};
       head->objectParts_[0].transform.scale.x =
           headThicknessScale * headParam.scale.x;
@@ -3970,6 +4677,316 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
           headLength * headParam.scale.y * headParam.length;
       head->objectParts_[0].transform.scale.z =
           headThicknessScale * headParam.scale.z;
+    }
+
+    static bool headAnchorCheckOnce = false;
+    if (!headAnchorCheckOnce) {
+      Logger::Log("=== HEAD ANCHOR CHECK ===");
+      Logger::Log("headAnchorLocal : (%.3f, %.3f, %.3f)", headAnchorLocal.x,
+                  headAnchorLocal.y, headAnchorLocal.z);
+      Logger::Log("neckBendLocal   : (%.3f, %.3f, %.3f)", neckBendLocal.x,
+                  neckBendLocal.y, neckBendLocal.z);
+      Logger::Log("neckEndLocal    : (%.3f, %.3f, %.3f)", neckEndLocal.x,
+                  neckEndLocal.y, neckEndLocal.z);
+      Logger::Log("headLength      : %.3f", headLength);
+      headAnchorCheckOnce = true;
+    }
+  }
+
+  //==============================
+  // 左上腕＋左前腕（snapshot棒立ち）
+  // root = shoulder anchor
+  // elbow = shoulder anchor + (bend - root)
+  //==============================
+  if (leftUpperArm != nullptr && leftForeArm != nullptr && hasLeftArmRoot &&
+      hasLeftArmBend && hasLeftArmEnd) {
+
+    Vector3 upperDir = Sub(leftArmBendLocal, leftArmRootLocal);
+    float upperLength = Length(upperDir);
+    if (upperLength < 0.0001f) {
+      upperDir = {0.0f, -1.0f, 0.0f};
+      upperLength = 0.0001f;
+    } else {
+      upperDir = Normalize(upperDir);
+    }
+
+    float leftUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
+    float leftUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+
+    // leftUpperArm->mainPosition.transform.translate = leftShoulderAnchorLocal;
+    leftUpperArm->mainPosition.transform.translate =
+        Add(chestTopWorld, leftShoulderFromChest);
+    leftUpperArm->mainPosition.transform.rotate = {leftUpperArmAngleX, 0.0f,
+                                                   leftUpperArmAngleZ};
+
+    if (!leftUpperArm->objectParts_.empty()) {
+      leftUpperArm->objectParts_[0].transform.translate = {
+          0.0f, -upperLength * 0.5f, 0.0f};
+      leftUpperArm->objectParts_[0].transform.scale.x =
+          leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
+      leftUpperArm->objectParts_[0].transform.scale.y =
+          upperLength * leftUpperArmParam.scale.y * leftUpperArmParam.length;
+      leftUpperArm->objectParts_[0].transform.scale.z =
+          leftUpperArmThicknessScale * leftUpperArmParam.scale.z;
+    }
+
+    Vector3 foreDir = Sub(leftArmEndLocal, leftArmBendLocal);
+    float foreLength = Length(foreDir);
+    if (foreLength < 0.0001f) {
+      foreDir = {0.0f, -1.0f, 0.0f};
+      foreLength = 0.0001f;
+    } else {
+      foreDir = Normalize(foreDir);
+    }
+
+    float leftForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
+    float leftForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+
+    Vector3 leftElbowOffset = Sub(leftArmBendLocal, leftArmRootLocal);
+    Vector3 leftUpperArmRoot = Add(chestTopWorld, leftShoulderFromChest);
+    Vector3 leftForeArmRoot = Add(leftUpperArmRoot, leftElbowOffset);
+
+    leftForeArm->mainPosition.transform.translate = leftForeArmRoot;
+    leftForeArm->mainPosition.transform.rotate = {leftForeArmAngleX, 0.0f,
+                                                  leftForeArmAngleZ};
+
+    if (!leftForeArm->objectParts_.empty()) {
+      leftForeArm->objectParts_[0].transform.translate = {
+          0.0f, -foreLength * 0.5f, 0.0f};
+      leftForeArm->objectParts_[0].transform.scale.x =
+          leftForeArmThicknessScale * leftForeArmParam.scale.x;
+      leftForeArm->objectParts_[0].transform.scale.y =
+          foreLength * leftForeArmParam.scale.y * leftForeArmParam.length;
+      leftForeArm->objectParts_[0].transform.scale.z =
+          leftForeArmThicknessScale * leftForeArmParam.scale.z;
+    }
+  }
+
+  static bool rightArmCheckOnce = false;
+  if (!rightArmCheckOnce) {
+    Logger::Log("=== RIGHT ARM CHECK ===");
+    Logger::Log("rightShoulderAnchorLocal : (%.3f, %.3f, %.3f)",
+                rightShoulderAnchorLocal.x, rightShoulderAnchorLocal.y,
+                rightShoulderAnchorLocal.z);
+
+    Logger::Log("chestTopWorld : (%.3f, %.3f, %.3f)", chestTopWorld.x,
+                chestTopWorld.y, chestTopWorld.z);
+
+    Logger::Log("rightShoulderFromChest : (%.3f, %.3f, %.3f)",
+                rightShoulderFromChest.x, rightShoulderFromChest.y,
+                rightShoulderFromChest.z);
+
+    Vector3 test = Add(chestTopWorld, rightShoulderFromChest);
+    Logger::Log("Add result : (%.3f, %.3f, %.3f)", test.x, test.y, test.z);
+
+    rightArmCheckOnce = true;
+  }
+
+  //==============================
+  // 右上腕＋右前腕（snapshot棒立ち）
+  // root = shoulder anchor
+  // elbow = shoulder anchor + (bend - root)
+  //==============================
+  if (rightUpperArm != nullptr && rightForeArm != nullptr && hasRightArmRoot &&
+      hasRightArmBend && hasRightArmEnd) {
+
+    Vector3 upperDir = Sub(rightArmBendLocal, rightArmRootLocal);
+    float upperLength = Length(upperDir);
+    if (upperLength < 0.0001f) {
+      upperDir = {0.0f, -1.0f, 0.0f};
+      upperLength = 0.0001f;
+    } else {
+      upperDir = Normalize(upperDir);
+    }
+
+    float rightUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
+    float rightUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+
+    // rightUpperArm->mainPosition.transform.translate =
+    // rightShoulderAnchorLocal;
+    // rightUpperArm->mainPosition.transform.translate =
+    //    Add(chestTopWorld, rightShoulderFromChest);
+    rightUpperArm->mainPosition.transform.translate = rightShoulderAnchorLocal;
+    rightUpperArm->mainPosition.transform.rotate = {rightUpperArmAngleX, 0.0f,
+                                                    rightUpperArmAngleZ};
+
+    if (!rightUpperArm->objectParts_.empty()) {
+      rightUpperArm->objectParts_[0].transform.translate = {
+          0.0f, -upperLength * 0.5f, 0.0f};
+      rightUpperArm->objectParts_[0].transform.scale.x =
+          rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
+      rightUpperArm->objectParts_[0].transform.scale.y =
+          upperLength * rightUpperArmParam.scale.y * rightUpperArmParam.length;
+      rightUpperArm->objectParts_[0].transform.scale.z =
+          rightUpperArmThicknessScale * rightUpperArmParam.scale.z;
+    }
+
+    Vector3 foreDir = Sub(rightArmEndLocal, rightArmBendLocal);
+    float foreLength = Length(foreDir);
+    if (foreLength < 0.0001f) {
+      foreDir = {0.0f, -1.0f, 0.0f};
+      foreLength = 0.0001f;
+    } else {
+      foreDir = Normalize(foreDir);
+    }
+
+    float rightForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
+    float rightForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+
+    // Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
+    // Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
+    // Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
+    Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
+    Vector3 rightUpperArmRoot = rightShoulderAnchorLocal;
+    Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
+
+    rightForeArm->mainPosition.transform.translate = rightForeArmRoot;
+    rightForeArm->mainPosition.transform.rotate = {rightForeArmAngleX, 0.0f,
+                                                   rightForeArmAngleZ};
+
+    if (!rightForeArm->objectParts_.empty()) {
+      rightForeArm->objectParts_[0].transform.translate = {
+          0.0f, -foreLength * 0.5f, 0.0f};
+      rightForeArm->objectParts_[0].transform.scale.x =
+          rightForeArmThicknessScale * rightForeArmParam.scale.x;
+      rightForeArm->objectParts_[0].transform.scale.y =
+          foreLength * rightForeArmParam.scale.y * rightForeArmParam.length;
+      rightForeArm->objectParts_[0].transform.scale.z =
+          rightForeArmThicknessScale * rightForeArmParam.scale.z;
+    }
+  }
+
+  //==============================
+  // 左腿＋左脛（snapshot棒立ち）
+  // root = hip anchor
+  // knee = hip anchor + (bend - root)
+  //==============================
+  if (leftThigh != nullptr && leftShin != nullptr && hasLeftLegRoot &&
+      hasLeftLegBend && hasLeftLegEnd) {
+
+    Vector3 thighDir = Sub(leftLegBendLocal, leftLegRootLocal);
+    float thighLength = Length(thighDir);
+    if (thighLength < 0.0001f) {
+      thighDir = {0.0f, -1.0f, 0.0f};
+      thighLength = 0.0001f;
+    } else {
+      thighDir = Normalize(thighDir);
+    }
+
+    float leftThighAngleZ = atan2(thighDir.x, -thighDir.y);
+    float leftThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+
+    // 脚は stomachRoot の子なので、belly 基準の相対座標を使う
+    leftThigh->mainPosition.transform.translate = leftHipFromBelly;
+    leftThigh->mainPosition.transform.rotate = {leftThighAngleX, 0.0f,
+                                                leftThighAngleZ};
+
+    if (!leftThigh->objectParts_.empty()) {
+      leftThigh->objectParts_[0].transform.translate = {
+          0.0f, -thighLength * 0.5f, 0.0f};
+      leftThigh->objectParts_[0].transform.scale.x =
+          leftThighThicknessScale * leftThighParam.scale.x;
+      leftThigh->objectParts_[0].transform.scale.y =
+          thighLength * leftThighParam.scale.y * leftThighParam.length;
+      leftThigh->objectParts_[0].transform.scale.z =
+          leftThighThicknessScale * leftThighParam.scale.z;
+    }
+
+    Vector3 shinDir = Sub(leftLegEndLocal, leftLegBendLocal);
+    float shinLength = Length(shinDir);
+    if (shinLength < 0.0001f) {
+      shinDir = {0.0f, -1.0f, 0.0f};
+      shinLength = 0.0001f;
+    } else {
+      shinDir = Normalize(shinDir);
+    }
+
+    float leftShinAngleZ = atan2(shinDir.x, -shinDir.y);
+    float leftShinAngleX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
+
+    Vector3 leftKneeOffset = Sub(leftLegBendLocal, leftLegRootLocal);
+    Vector3 leftShinRoot = Add(leftHipFromBelly, leftKneeOffset);
+
+    leftShin->mainPosition.transform.translate = leftShinRoot;
+    leftShin->mainPosition.transform.rotate = {leftShinAngleX, 0.0f,
+                                               leftShinAngleZ};
+
+    if (!leftShin->objectParts_.empty()) {
+      leftShin->objectParts_[0].transform.translate = {0.0f, -shinLength * 0.5f,
+                                                       0.0f};
+      leftShin->objectParts_[0].transform.scale.x =
+          leftShinThicknessScale * leftShinParam.scale.x;
+      leftShin->objectParts_[0].transform.scale.y =
+          shinLength * leftShinParam.scale.y * leftShinParam.length;
+      leftShin->objectParts_[0].transform.scale.z =
+          leftShinThicknessScale * leftShinParam.scale.z;
+    }
+  }
+
+  //==============================
+  // 右腿＋右脛（snapshot棒立ち）
+  // root = hip anchor
+  // knee = hip anchor + (bend - root)
+  //==============================
+  if (rightThigh != nullptr && rightShin != nullptr && hasRightLegRoot &&
+      hasRightLegBend && hasRightLegEnd) {
+
+    Vector3 thighDir = Sub(rightLegBendLocal, rightLegRootLocal);
+    float thighLength = Length(thighDir);
+    if (thighLength < 0.0001f) {
+      thighDir = {0.0f, -1.0f, 0.0f};
+      thighLength = 0.0001f;
+    } else {
+      thighDir = Normalize(thighDir);
+    }
+
+    float rightThighAngleZ = atan2(thighDir.x, -thighDir.y);
+    float rightThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+
+    // 脚は stomachRoot の子なので、belly 基準の相対座標を使う
+    rightThigh->mainPosition.transform.translate = rightHipFromBelly;
+    rightThigh->mainPosition.transform.rotate = {rightThighAngleX, 0.0f,
+                                                 rightThighAngleZ};
+
+    if (!rightThigh->objectParts_.empty()) {
+      rightThigh->objectParts_[0].transform.translate = {
+          0.0f, -thighLength * 0.5f, 0.0f};
+      rightThigh->objectParts_[0].transform.scale.x =
+          rightThighThicknessScale * rightThighParam.scale.x;
+      rightThigh->objectParts_[0].transform.scale.y =
+          thighLength * rightThighParam.scale.y * rightThighParam.length;
+      rightThigh->objectParts_[0].transform.scale.z =
+          rightThighThicknessScale * rightThighParam.scale.z;
+    }
+
+    Vector3 shinDir = Sub(rightLegEndLocal, rightLegBendLocal);
+    float shinLength = Length(shinDir);
+    if (shinLength < 0.0001f) {
+      shinDir = {0.0f, -1.0f, 0.0f};
+      shinLength = 0.0001f;
+    } else {
+      shinDir = Normalize(shinDir);
+    }
+
+    float rightShinAngleZ = atan2(shinDir.x, -shinDir.y);
+    float rightShinAngleX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
+
+    Vector3 rightKneeOffset = Sub(rightLegBendLocal, rightLegRootLocal);
+    Vector3 rightShinRoot = Add(rightHipFromBelly, rightKneeOffset);
+
+    rightShin->mainPosition.transform.translate = rightShinRoot;
+    rightShin->mainPosition.transform.rotate = {rightShinAngleX, 0.0f,
+                                                rightShinAngleZ};
+
+    if (!rightShin->objectParts_.empty()) {
+      rightShin->objectParts_[0].transform.translate = {
+          0.0f, -shinLength * 0.5f, 0.0f};
+      rightShin->objectParts_[0].transform.scale.x =
+          rightShinThicknessScale * rightShinParam.scale.x;
+      rightShin->objectParts_[0].transform.scale.y =
+          shinLength * rightShinParam.scale.y * rightShinParam.length;
+      rightShin->objectParts_[0].transform.scale.z =
+          rightShinThicknessScale * rightShinParam.scale.z;
     }
   }
 
@@ -4080,238 +5097,258 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // leftForeArm->objectParts_[0].transform.scale.z =
   //    leftForeArmThicknessScale * leftForeArmParam.scale.z;
 
-  //================================================
-  // 左上腕＋左前腕（snapshotベース）
-  //================================================
-  int leftUpperArmOwnerId = -1;
-  Vector3 leftShoulderAnchorLocal = {-1.25f, 1.0f, 0.0f};
+  ////================================================
+  //// 左上腕＋左前腕（snapshotベース）
+  ////================================================
+  // int leftUpperArmOwnerId = -1;
+  // Vector3 leftShoulderAnchorLocal = {-1.25f, 1.0f, 0.0f};
 
-  if (customizeData_ != nullptr) {
-    for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::LeftUpperArm) {
-        leftUpperArmOwnerId = instance.partId;
-        leftShoulderAnchorLocal = instance.localTransform.translate;
-        break;
-      }
-    }
-  }
+  // if (customizeData_ != nullptr) {
+  //   for (const auto &instance : customizeData_->partInstances) {
+  //     if (instance.partType == ModBodyPart::LeftUpperArm) {
+  //       leftUpperArmOwnerId = instance.partId;
+  //       leftShoulderAnchorLocal = instance.localTransform.translate;
+  //       break;
+  //     }
+  //   }
+  // }
 
-  Vector3 leftArmRootLocal = {0.0f, 0.0f, 0.0f};
-  Vector3 leftArmBendLocal = {0.0f, -0.55f, 0.0f};
-  Vector3 leftArmEndLocal = {0.0f, -1.10f, 0.0f};
+  // Vector3 leftArmRootLocal = {0.0f, 0.0f, 0.0f};
+  // Vector3 leftArmBendLocal = {0.0f, -0.55f, 0.0f};
+  // Vector3 leftArmEndLocal = {0.0f, -1.10f, 0.0f};
 
-  bool hasLeftArmRoot = false;
-  bool hasLeftArmBend = false;
-  bool hasLeftArmEnd = false;
+  // bool hasLeftArmRoot = false;
+  // bool hasLeftArmBend = false;
+  // bool hasLeftArmEnd = false;
 
-  if (customizeData_ != nullptr && leftUpperArmOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != leftUpperArmOwnerId) {
-        continue;
-      }
+  // if (customizeData_ != nullptr && leftUpperArmOwnerId >= 0) {
+  //   for (const auto &snap : customizeData_->controlPointSnapshots) {
+  //     if (snap.ownerPartId != leftUpperArmOwnerId) {
+  //       continue;
+  //     }
 
-      if (snap.role == ModControlPointRole::Root) {
-        leftArmRootLocal = snap.localPosition;
-        hasLeftArmRoot = true;
-      } else if (snap.role == ModControlPointRole::Bend) {
-        leftArmBendLocal = snap.localPosition;
-        hasLeftArmBend = true;
-      } else if (snap.role == ModControlPointRole::End) {
-        leftArmEndLocal = snap.localPosition;
-        hasLeftArmEnd = true;
-      }
-    }
-  }
+  //    if (snap.role == ModControlPointRole::Root) {
+  //      leftArmRootLocal = snap.localPosition;
+  //      hasLeftArmRoot = true;
+  //    } else if (snap.role == ModControlPointRole::Bend) {
+  //      leftArmBendLocal = snap.localPosition;
+  //      hasLeftArmBend = true;
+  //    } else if (snap.role == ModControlPointRole::End) {
+  //      leftArmEndLocal = snap.localPosition;
+  //      hasLeftArmEnd = true;
+  //    }
+  //  }
+  //}
 
-  if (hasLeftArmRoot && hasLeftArmBend) {
-    Vector3 upperVec = Sub(leftArmBendLocal, leftArmRootLocal);
-    float upperLength = Length(upperVec);
-    if (upperLength < 0.0001f) {
-      upperLength = 0.0001f;
-      upperVec = {0.0f, -1.0f, 0.0f};
-    }
+  // if (hasLeftArmRoot && hasLeftArmBend) {
+  //   Vector3 upperVec = Sub(leftArmBendLocal, leftArmRootLocal);
+  //   float upperLength = Length(upperVec);
+  //   if (upperLength < 0.0001f) {
+  //     upperLength = 0.0001f;
+  //     upperVec = {0.0f, -1.0f, 0.0f};
+  //   }
 
-    Vector3 upperDir = Normalize(upperVec);
-    float leftUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
+  //  Vector3 upperDir = Normalize(upperVec);
+  //  float leftUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
 
-    // leftUpperArm->mainPosition.transform.translate = leftShoulderAnchorLocal;
-    leftUpperArm->mainPosition.transform.translate = {
-        -chestThicknessScale * chestParam.scale.x, chestOffset.y, 0.0f};
-    leftUpperArm->mainPosition.transform.rotate = {
-        -rightLegBend_ * armSwingScale, 0.0f, leftUpperArmAngleZ};
+  //  // leftUpperArm->mainPosition.transform.translate =
+  //  leftShoulderAnchorLocal; leftUpperArm->mainPosition.transform.translate =
+  //  {
+  //      -chestThicknessScale * chestParam.scale.x, chestOffset.y, 0.0f};
+  //  float leftUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+  //  float leftUpperArmAnimX = (-rightLegBend_ * armSwingScale) *
+  //  poseAnimScale;
 
-    leftUpperArm->objectParts_[0].transform.translate = {
-        0.0f, -upperLength * 0.5f, 0.0f};
-    leftUpperArm->objectParts_[0].transform.scale.x =
-        leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
-    leftUpperArm->objectParts_[0].transform.scale.y =
-        upperLength * leftUpperArmParam.scale.y * leftUpperArmParam.length;
-    leftUpperArm->objectParts_[0].transform.scale.z =
-        leftUpperArmThicknessScale * leftUpperArmParam.scale.z;
+  //  leftUpperArm->mainPosition.transform.rotate = {
+  //      leftUpperArmAngleX + leftUpperArmAnimX, 0.0f, leftUpperArmAngleZ};
 
-    if (hasLeftArmEnd) {
-      Vector3 foreVec = Sub(leftArmEndLocal, leftArmBendLocal);
-      float foreLength = Length(foreVec);
-      if (foreLength < 0.0001f) {
-        foreLength = 0.0001f;
-        foreVec = {0.0f, -1.0f, 0.0f};
-      }
+  //  leftUpperArm->objectParts_[0].transform.translate = {
+  //      0.0f, -upperLength * 0.5f, 0.0f};
+  //  leftUpperArm->objectParts_[0].transform.scale.x =
+  //      leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
+  //  leftUpperArm->objectParts_[0].transform.scale.y =
+  //      upperLength * leftUpperArmParam.scale.y * leftUpperArmParam.length;
+  //  leftUpperArm->objectParts_[0].transform.scale.z =
+  //      leftUpperArmThicknessScale * leftUpperArmParam.scale.z;
 
-      Vector3 foreDir = Normalize(foreVec);
-      float leftForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
+  //  if (hasLeftArmEnd) {
+  //    Vector3 foreVec = Sub(leftArmEndLocal, leftArmBendLocal);
+  //    float foreLength = Length(foreVec);
+  //    if (foreLength < 0.0001f) {
+  //      foreLength = 0.0001f;
+  //      foreVec = {0.0f, -1.0f, 0.0f};
+  //    }
 
-      float leftUpperArmSwing = -rightLegBend_ * armSwingScale;
-      float leftElbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
-                                           (legRecoverAngle_ - legKickAngle_),
-                                       0.0f, 1.0f);
+  //    Vector3 foreDir = Normalize(foreVec);
+  //    float leftForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
 
-      float leftForeArmX =
-          -(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f + 0.20f);
+  //    float leftUpperArmSwing = -rightLegBend_ * armSwingScale;
+  //    float leftElbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
+  //                                         (legRecoverAngle_ - legKickAngle_),
+  //                                     0.0f, 1.0f);
 
-      // Vector3 leftAnimatedElbowPos = leftShoulderAnchorLocal;
-      Vector3 leftAnimatedElbowPos =
-          leftUpperArm->mainPosition.transform.translate;
-      leftAnimatedElbowPos.x += std::sin(leftUpperArmAngleZ) *
-                                std::cos(-rightLegBend_ * armSwingScale) *
-                                upperLength;
-      leftAnimatedElbowPos.y += -std::cos(leftUpperArmAngleZ) *
-                                std::cos(-rightLegBend_ * armSwingScale) *
-                                upperLength;
-      leftAnimatedElbowPos.z +=
-          -std::sin(-rightLegBend_ * armSwingScale) * upperLength;
+  //    float leftForeArmX =
+  //        -(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f + 0.20f);
 
-      leftForeArm->mainPosition.transform.translate = leftAnimatedElbowPos;
-      leftForeArm->mainPosition.transform.rotate = {leftForeArmX, 0.0f,
-                                                    leftForeArmAngleZ};
+  //    // Vector3 leftAnimatedElbowPos = leftShoulderAnchorLocal;
+  //    Vector3 leftAnimatedElbowPos =
+  //        leftUpperArm->mainPosition.transform.translate;
+  //    leftAnimatedElbowPos.x += std::sin(leftUpperArmAngleZ) *
+  //                              std::cos(-rightLegBend_ * armSwingScale) *
+  //                              upperLength;
+  //    leftAnimatedElbowPos.y += -std::cos(leftUpperArmAngleZ) *
+  //                              std::cos(-rightLegBend_ * armSwingScale) *
+  //                              upperLength;
+  //    leftAnimatedElbowPos.z +=
+  //        -std::sin(-rightLegBend_ * armSwingScale) * upperLength;
 
-      leftForeArm->objectParts_[0].transform.translate = {
-          0.0f, -foreLength * 0.5f, 0.0f};
-      leftForeArm->objectParts_[0].transform.scale.x =
-          leftForeArmThicknessScale * leftForeArmParam.scale.x;
-      leftForeArm->objectParts_[0].transform.scale.y =
-          foreLength * leftForeArmParam.scale.y * leftForeArmParam.length;
-      leftForeArm->objectParts_[0].transform.scale.z =
-          leftForeArmThicknessScale * leftForeArmParam.scale.z;
-    }
-  }
+  //    leftForeArm->mainPosition.transform.translate = leftAnimatedElbowPos;
+  //    float leftForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+  //    float leftForeArmAnimX =
+  //        (-(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f)) *
+  //        poseAnimScale;
 
-  //================================================
-  // 右上腕＋右前腕（snapshotベース）
-  //================================================
-  int rightUpperArmOwnerId = -1;
-  Vector3 rightShoulderAnchorLocal = {1.25f, 1.0f, 0.0f};
+  //    leftForeArm->mainPosition.transform.rotate = {
+  //        leftForeArmAngleX + leftForeArmAnimX, 0.0f, leftForeArmAngleZ};
 
-  if (customizeData_ != nullptr) {
-    for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::RightUpperArm) {
-        rightUpperArmOwnerId = instance.partId;
-        rightShoulderAnchorLocal = instance.localTransform.translate;
-        break;
-      }
-    }
-  }
+  //    leftForeArm->objectParts_[0].transform.translate = {
+  //        0.0f, -foreLength * 0.5f, 0.0f};
+  //    leftForeArm->objectParts_[0].transform.scale.x =
+  //        leftForeArmThicknessScale * leftForeArmParam.scale.x;
+  //    leftForeArm->objectParts_[0].transform.scale.y =
+  //        foreLength * leftForeArmParam.scale.y * leftForeArmParam.length;
+  //    leftForeArm->objectParts_[0].transform.scale.z =
+  //        leftForeArmThicknessScale * leftForeArmParam.scale.z;
+  //  }
+  //}
 
-  Vector3 rightArmRootLocal = {0.0f, 0.0f, 0.0f};
-  Vector3 rightArmBendLocal = {0.0f, -0.55f, 0.0f};
-  Vector3 rightArmEndLocal = {0.0f, -1.10f, 0.0f};
+  ////================================================
+  //// 右上腕＋右前腕（snapshotベース）
+  ////================================================
+  // int rightUpperArmOwnerId = -1;
+  // Vector3 rightShoulderAnchorLocal = {1.25f, 1.0f, 0.0f};
 
-  bool hasRightArmRoot = false;
-  bool hasRightArmBend = false;
-  bool hasRightArmEnd = false;
+  // if (customizeData_ != nullptr) {
+  //   for (const auto &instance : customizeData_->partInstances) {
+  //     if (instance.partType == ModBodyPart::RightUpperArm) {
+  //       rightUpperArmOwnerId = instance.partId;
+  //       rightShoulderAnchorLocal = instance.localTransform.translate;
+  //       break;
+  //     }
+  //   }
+  // }
 
-  if (customizeData_ != nullptr && rightUpperArmOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != rightUpperArmOwnerId) {
-        continue;
-      }
+  // Vector3 rightArmRootLocal = {0.0f, 0.0f, 0.0f};
+  // Vector3 rightArmBendLocal = {0.0f, -0.55f, 0.0f};
+  // Vector3 rightArmEndLocal = {0.0f, -1.10f, 0.0f};
 
-      if (snap.role == ModControlPointRole::Root) {
-        rightArmRootLocal = snap.localPosition;
-        hasRightArmRoot = true;
-      } else if (snap.role == ModControlPointRole::Bend) {
-        rightArmBendLocal = snap.localPosition;
-        hasRightArmBend = true;
-      } else if (snap.role == ModControlPointRole::End) {
-        rightArmEndLocal = snap.localPosition;
-        hasRightArmEnd = true;
-      }
-    }
-  }
+  // bool hasRightArmRoot = false;
+  // bool hasRightArmBend = false;
+  // bool hasRightArmEnd = false;
 
-  if (hasRightArmRoot && hasRightArmBend) {
-    Vector3 upperVec = Sub(rightArmBendLocal, rightArmRootLocal);
-    float upperLength = Length(upperVec);
-    if (upperLength < 0.0001f) {
-      upperLength = 0.0001f;
-      upperVec = {0.0f, -1.0f, 0.0f};
-    }
+  // if (customizeData_ != nullptr && rightUpperArmOwnerId >= 0) {
+  //   for (const auto &snap : customizeData_->controlPointSnapshots) {
+  //     if (snap.ownerPartId != rightUpperArmOwnerId) {
+  //       continue;
+  //     }
 
-    Vector3 upperDir = Normalize(upperVec);
-    float rightUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
+  //    if (snap.role == ModControlPointRole::Root) {
+  //      rightArmRootLocal = snap.localPosition;
+  //      hasRightArmRoot = true;
+  //    } else if (snap.role == ModControlPointRole::Bend) {
+  //      rightArmBendLocal = snap.localPosition;
+  //      hasRightArmBend = true;
+  //    } else if (snap.role == ModControlPointRole::End) {
+  //      rightArmEndLocal = snap.localPosition;
+  //      hasRightArmEnd = true;
+  //    }
+  //  }
+  //}
 
-    // rightUpperArm->mainPosition.transform.translate =
-    // rightShoulderAnchorLocal;
-    // rightUpperArm->mainPosition.transform.translate =
-    //    Sub(rightShoulderAnchorLocal, cp->chestPos) + chestOffset;
-    rightUpperArm->mainPosition.transform.translate = {
-        chestThicknessScale * chestParam.scale.x, chestOffset.y, 0.0f};
-    rightUpperArm->mainPosition.transform.rotate = {
-        -leftLegBend_ * armSwingScale, 0.0f, rightUpperArmAngleZ};
+  // if (hasRightArmRoot && hasRightArmBend) {
+  //   Vector3 upperVec = Sub(rightArmBendLocal, rightArmRootLocal);
+  //   float upperLength = Length(upperVec);
+  //   if (upperLength < 0.0001f) {
+  //     upperLength = 0.0001f;
+  //     upperVec = {0.0f, -1.0f, 0.0f};
+  //   }
 
-    rightUpperArm->objectParts_[0].transform.translate = {
-        0.0f, -upperLength * 0.5f, 0.0f};
-    rightUpperArm->objectParts_[0].transform.scale.x =
-        rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
-    rightUpperArm->objectParts_[0].transform.scale.y =
-        upperLength * rightUpperArmParam.scale.y * rightUpperArmParam.length;
-    rightUpperArm->objectParts_[0].transform.scale.z =
-        rightUpperArmThicknessScale * rightUpperArmParam.scale.z;
+  //  Vector3 upperDir = Normalize(upperVec);
+  //  float rightUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
 
-    if (hasRightArmEnd) {
-      Vector3 foreVec = Sub(rightArmEndLocal, rightArmBendLocal);
-      float foreLength = Length(foreVec);
-      if (foreLength < 0.0001f) {
-        foreLength = 0.0001f;
-        foreVec = {0.0f, -1.0f, 0.0f};
-      }
+  //  // rightUpperArm->mainPosition.transform.translate =
+  //  // rightShoulderAnchorLocal;
+  //  // rightUpperArm->mainPosition.transform.translate =
+  //  //    Sub(rightShoulderAnchorLocal, cp->chestPos) + chestOffset;
+  //  rightUpperArm->mainPosition.transform.translate = {
+  //      chestThicknessScale * chestParam.scale.x, chestOffset.y, 0.0f};
+  //  float rightUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+  //  float rightUpperArmAnimX = (-leftLegBend_ * armSwingScale) *
+  //  poseAnimScale;
 
-      Vector3 foreDir = Normalize(foreVec);
-      float rightForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
+  //  rightUpperArm->mainPosition.transform.rotate = {
+  //      rightUpperArmAngleX + rightUpperArmAnimX, 0.0f, rightUpperArmAngleZ};
 
-      float rightUpperArmSwing = -leftLegBend_ * armSwingScale;
-      float rightElbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
-                                            (legRecoverAngle_ - legKickAngle_),
-                                        0.0f, 1.0f);
+  //  rightUpperArm->objectParts_[0].transform.translate = {
+  //      0.0f, -upperLength * 0.5f, 0.0f};
+  //  rightUpperArm->objectParts_[0].transform.scale.x =
+  //      rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
+  //  rightUpperArm->objectParts_[0].transform.scale.y =
+  //      upperLength * rightUpperArmParam.scale.y * rightUpperArmParam.length;
+  //  rightUpperArm->objectParts_[0].transform.scale.z =
+  //      rightUpperArmThicknessScale * rightUpperArmParam.scale.z;
 
-      float rightForeArmX =
-          -(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f + 0.20f);
+  //  if (hasRightArmEnd) {
+  //    Vector3 foreVec = Sub(rightArmEndLocal, rightArmBendLocal);
+  //    float foreLength = Length(foreVec);
+  //    if (foreLength < 0.0001f) {
+  //      foreLength = 0.0001f;
+  //      foreVec = {0.0f, -1.0f, 0.0f};
+  //    }
 
-      // Vector3 rightAnimatedElbowPos = rightShoulderAnchorLocal;
-      Vector3 rightAnimatedElbowPos =
-          rightUpperArm->mainPosition.transform.translate;
-      rightAnimatedElbowPos.x += std::sin(rightUpperArmAngleZ) *
-                                 std::cos(-leftLegBend_ * armSwingScale) *
-                                 upperLength;
-      rightAnimatedElbowPos.y += -std::cos(rightUpperArmAngleZ) *
-                                 std::cos(-leftLegBend_ * armSwingScale) *
-                                 upperLength;
-      rightAnimatedElbowPos.z +=
-          -std::sin(-leftLegBend_ * armSwingScale) * upperLength;
+  //    Vector3 foreDir = Normalize(foreVec);
+  //    float rightForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
 
-      rightForeArm->mainPosition.transform.translate = rightAnimatedElbowPos;
-      rightForeArm->mainPosition.transform.rotate = {rightForeArmX, 0.0f,
-                                                     rightForeArmAngleZ};
+  //    float rightUpperArmSwing = -leftLegBend_ * armSwingScale;
+  //    float rightElbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
+  //                                          (legRecoverAngle_ -
+  //                                          legKickAngle_),
+  //                                      0.0f, 1.0f);
 
-      rightForeArm->objectParts_[0].transform.translate = {
-          0.0f, -foreLength * 0.5f, 0.0f};
-      rightForeArm->objectParts_[0].transform.scale.x =
-          rightForeArmThicknessScale * rightForeArmParam.scale.x;
-      rightForeArm->objectParts_[0].transform.scale.y =
-          foreLength * rightForeArmParam.scale.y * rightForeArmParam.length;
-      rightForeArm->objectParts_[0].transform.scale.z =
-          rightForeArmThicknessScale * rightForeArmParam.scale.z;
-    }
-  }
+  //    float rightForeArmX =
+  //        -(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f + 0.20f);
+
+  //    // Vector3 rightAnimatedElbowPos = rightShoulderAnchorLocal;
+  //    Vector3 rightAnimatedElbowPos =
+  //        rightUpperArm->mainPosition.transform.translate;
+  //    rightAnimatedElbowPos.x += std::sin(rightUpperArmAngleZ) *
+  //                               std::cos(-leftLegBend_ * armSwingScale) *
+  //                               upperLength;
+  //    rightAnimatedElbowPos.y += -std::cos(rightUpperArmAngleZ) *
+  //                               std::cos(-leftLegBend_ * armSwingScale) *
+  //                               upperLength;
+  //    rightAnimatedElbowPos.z +=
+  //        -std::sin(-leftLegBend_ * armSwingScale) * upperLength;
+
+  //    rightForeArm->mainPosition.transform.translate = rightAnimatedElbowPos;
+  //    float rightForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+  //    float rightForeArmAnimX =
+  //        (-(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f)) *
+  //        poseAnimScale;
+
+  //    rightForeArm->mainPosition.transform.rotate = {
+  //        rightForeArmAngleX + rightForeArmAnimX, 0.0f, rightForeArmAngleZ};
+
+  //    rightForeArm->objectParts_[0].transform.translate = {
+  //        0.0f, -foreLength * 0.5f, 0.0f};
+  //    rightForeArm->objectParts_[0].transform.scale.x =
+  //        rightForeArmThicknessScale * rightForeArmParam.scale.x;
+  //    rightForeArm->objectParts_[0].transform.scale.y =
+  //        foreLength * rightForeArmParam.scale.y * rightForeArmParam.length;
+  //    rightForeArm->objectParts_[0].transform.scale.z =
+  //        rightForeArmThicknessScale * rightForeArmParam.scale.z;
+  //  }
+  //}
 
   //================================================
   // 左腿
@@ -4362,219 +5399,241 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   // rightShin->objectParts_[0].transform.scale.z =
   //    rightShinThicknessScale * rightShinParam.scale.z;
 
-  //================================================
-  // 左腿＋左脛（snapshotベース）
-  //================================================
-  int leftThighOwnerId = -1;
-  Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
+  ////================================================
+  //// 左腿＋左脛（snapshotベース）
+  ////================================================
+  // int leftThighOwnerId = -1;
+  // Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
 
-  if (customizeData_ != nullptr) {
-    for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::LeftThigh) {
-        leftThighOwnerId = instance.partId;
-        leftHipAnchorLocal = instance.localTransform.translate;
-        break;
-      }
-    }
-  }
+  // if (customizeData_ != nullptr) {
+  //   for (const auto &instance : customizeData_->partInstances) {
+  //     if (instance.partType == ModBodyPart::LeftThigh) {
+  //       leftThighOwnerId = instance.partId;
+  //       leftHipAnchorLocal = instance.localTransform.translate;
+  //       break;
+  //     }
+  //   }
+  // }
 
-  Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
-  Vector3 leftLegBendLocal = {0.0f, -0.70f, 0.0f};
-  Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
+  // Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
+  // Vector3 leftLegBendLocal = {0.0f, -0.70f, 0.0f};
+  // Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
 
-  bool hasLeftLegRoot = false;
-  bool hasLeftLegBend = false;
-  bool hasLeftLegEnd = false;
+  // bool hasLeftLegRoot = false;
+  // bool hasLeftLegBend = false;
+  // bool hasLeftLegEnd = false;
 
-  if (customizeData_ != nullptr && leftThighOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != leftThighOwnerId) {
-        continue;
-      }
+  // if (customizeData_ != nullptr && leftThighOwnerId >= 0) {
+  //   for (const auto &snap : customizeData_->controlPointSnapshots) {
+  //     if (snap.ownerPartId != leftThighOwnerId) {
+  //       continue;
+  //     }
 
-      if (snap.role == ModControlPointRole::Root) {
-        leftLegRootLocal = snap.localPosition;
-        hasLeftLegRoot = true;
-      } else if (snap.role == ModControlPointRole::Bend) {
-        leftLegBendLocal = snap.localPosition;
-        hasLeftLegBend = true;
-      } else if (snap.role == ModControlPointRole::End) {
-        leftLegEndLocal = snap.localPosition;
-        hasLeftLegEnd = true;
-      }
-    }
-  }
+  //    if (snap.role == ModControlPointRole::Root) {
+  //      leftLegRootLocal = snap.localPosition;
+  //      hasLeftLegRoot = true;
+  //    } else if (snap.role == ModControlPointRole::Bend) {
+  //      leftLegBendLocal = snap.localPosition;
+  //      hasLeftLegBend = true;
+  //    } else if (snap.role == ModControlPointRole::End) {
+  //      leftLegEndLocal = snap.localPosition;
+  //      hasLeftLegEnd = true;
+  //    }
+  //  }
+  //}
 
-  if (hasLeftLegRoot && hasLeftLegBend) {
-    Vector3 thighVec = Sub(leftLegBendLocal, leftLegRootLocal);
-    float thighLength = Length(thighVec);
-    if (thighLength < 0.0001f) {
-      thighLength = 0.0001f;
-      thighVec = {0.0f, -1.0f, 0.0f};
-    }
+  // if (hasLeftLegRoot && hasLeftLegBend) {
+  //   Vector3 thighVec = Sub(leftLegBendLocal, leftLegRootLocal);
+  //   float thighLength = Length(thighVec);
+  //   if (thighLength < 0.0001f) {
+  //     thighLength = 0.0001f;
+  //     thighVec = {0.0f, -1.0f, 0.0f};
+  //   }
 
-    Vector3 thighDir = Normalize(thighVec);
-    float leftThighAngleZ = atan2(thighDir.x, -thighDir.y);
+  //  Vector3 thighDir = Normalize(thighVec);
+  //  float leftThighAngleZ = atan2(thighDir.x, -thighDir.y);
 
-    leftThigh->mainPosition.transform.translate = leftHipAnchorLocal;
-    leftThigh->mainPosition.transform.rotate = {-leftLegBend_ * 0.7f, 0.0f,
-                                                leftThighAngleZ};
+  //  leftThigh->mainPosition.transform.translate = leftHipAnchorLocal;
+  //  // leftThigh->mainPosition.transform.rotate = {-leftLegBend_ * 0.7f, 0.0f,
+  //  //                                             leftThighAngleZ};
+  //  float leftThighAnimX = (-leftLegBend_ * 0.7f) * poseAnimScale;
 
-    leftThigh->objectParts_[0].transform.translate = {0.0f, -thighLength * 0.5f,
-                                                      0.0f};
-    leftThigh->objectParts_[0].transform.scale.x =
-        leftThighThicknessScale * leftThighParam.scale.x;
-    leftThigh->objectParts_[0].transform.scale.y =
-        thighLength * leftThighParam.scale.y * leftThighParam.length;
-    leftThigh->objectParts_[0].transform.scale.z =
-        leftThighThicknessScale * leftThighParam.scale.z;
+  //  leftThigh->mainPosition.transform.rotate = {leftThighAnimX, 0.0f,
+  //                                              leftThighAngleZ};
 
-    if (hasLeftLegEnd) {
-      Vector3 shinVec = Sub(leftLegEndLocal, leftLegBendLocal);
-      float shinLength = Length(shinVec);
-      if (shinLength < 0.0001f) {
-        shinLength = 0.0001f;
-        shinVec = {0.0f, -1.0f, 0.0f};
-      }
+  //  leftThigh->objectParts_[0].transform.translate = {0.0f, -thighLength *
+  //  0.5f,
+  //                                                    0.0f};
+  //  leftThigh->objectParts_[0].transform.scale.x =
+  //      leftThighThicknessScale * leftThighParam.scale.x;
+  //  leftThigh->objectParts_[0].transform.scale.y =
+  //      thighLength * leftThighParam.scale.y * leftThighParam.length;
+  //  leftThigh->objectParts_[0].transform.scale.z =
+  //      leftThighThicknessScale * leftThighParam.scale.z;
 
-      Vector3 shinDir = Normalize(shinVec);
-      float leftShinAngleZ = atan2(shinDir.x, -shinDir.y);
+  //  if (hasLeftLegEnd) {
+  //    Vector3 shinVec = Sub(leftLegEndLocal, leftLegBendLocal);
+  //    float shinLength = Length(shinVec);
+  //    if (shinLength < 0.0001f) {
+  //      shinLength = 0.0001f;
+  //      shinVec = {0.0f, -1.0f, 0.0f};
+  //    }
 
-      float leftThighSwing = -leftLegBend_ * 0.7f;
-      float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
-                                          (legRecoverAngle_ - legKickAngle_),
-                                      0.0f, 1.0f);
+  //    Vector3 shinDir = Normalize(shinVec);
+  //    float leftShinAngleZ = atan2(shinDir.x, -shinDir.y);
 
-      float leftShinX = leftThighSwing * 0.35f + leftKneeFold * 0.6f + 0.3f;
+  //    float leftThighSwing = -leftLegBend_ * 0.7f;
+  //    float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
+  //                                        (legRecoverAngle_ - legKickAngle_),
+  //                                    0.0f, 1.0f);
 
-      Vector3 leftAnimatedKneePos = leftHipAnchorLocal;
-      leftAnimatedKneePos.x += std::sin(leftThighAngleZ) *
-                               std::cos(-leftLegBend_ * 0.7f) * thighLength;
-      leftAnimatedKneePos.y += -std::cos(leftThighAngleZ) *
-                               std::cos(-leftLegBend_ * 0.7f) * thighLength;
-      leftAnimatedKneePos.z += -std::sin(-leftLegBend_ * 0.7f) * thighLength;
+  //    float leftShinX = leftThighSwing * 0.35f + leftKneeFold * 0.6f + 0.3f;
 
-      leftShin->mainPosition.transform.translate = leftAnimatedKneePos;
-      leftShin->mainPosition.transform.rotate = {leftShinX, 0.0f,
-                                                 leftShinAngleZ};
+  //    Vector3 leftAnimatedKneePos = leftHipAnchorLocal;
+  //    leftAnimatedKneePos.x += std::sin(leftThighAngleZ) *
+  //                             std::cos(-leftLegBend_ * 0.7f) * thighLength;
+  //    leftAnimatedKneePos.y += -std::cos(leftThighAngleZ) *
+  //                             std::cos(-leftLegBend_ * 0.7f) * thighLength;
+  //    leftAnimatedKneePos.z += -std::sin(-leftLegBend_ * 0.7f) * thighLength;
 
-      leftShin->objectParts_[0].transform.translate = {0.0f, -shinLength * 0.5f,
-                                                       0.0f};
-      leftShin->objectParts_[0].transform.scale.x =
-          leftShinThicknessScale * leftShinParam.scale.x;
-      leftShin->objectParts_[0].transform.scale.y =
-          shinLength * leftShinParam.scale.y * leftShinParam.length;
-      leftShin->objectParts_[0].transform.scale.z =
-          leftShinThicknessScale * leftShinParam.scale.z;
-    }
-  }
+  //    leftShin->mainPosition.transform.translate = leftAnimatedKneePos;
+  //    // leftShin->mainPosition.transform.rotate = {leftShinX, 0.0f,
+  //    //                                            leftShinAngleZ};
+  //    float leftShinAnimX =
+  //        (leftThighSwing * 0.35f + leftKneeFold * 0.6f) * poseAnimScale;
+  //    leftShin->mainPosition.transform.rotate = {leftShinAnimX, 0.0f,
+  //                                               leftShinAngleZ};
 
-  //================================================
-  // 右腿＋右脛（snapshotベース）
-  //================================================
-  int rightThighOwnerId = -1;
-  Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
+  //    leftShin->objectParts_[0].transform.translate = {0.0f, -shinLength *
+  //    0.5f,
+  //                                                     0.0f};
+  //    leftShin->objectParts_[0].transform.scale.x =
+  //        leftShinThicknessScale * leftShinParam.scale.x;
+  //    leftShin->objectParts_[0].transform.scale.y =
+  //        shinLength * leftShinParam.scale.y * leftShinParam.length;
+  //    leftShin->objectParts_[0].transform.scale.z =
+  //        leftShinThicknessScale * leftShinParam.scale.z;
+  //  }
+  //}
 
-  if (customizeData_ != nullptr) {
-    for (const auto &instance : customizeData_->partInstances) {
-      if (instance.partType == ModBodyPart::RightThigh) {
-        rightThighOwnerId = instance.partId;
-        rightHipAnchorLocal = instance.localTransform.translate;
-        break;
-      }
-    }
-  }
+  ////================================================
+  //// 右腿＋右脛（snapshotベース）
+  ////================================================
+  // int rightThighOwnerId = -1;
+  // Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
 
-  Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
-  Vector3 rightLegBendLocal = {0.0f, -0.70f, 0.0f};
-  Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
+  // if (customizeData_ != nullptr) {
+  //   for (const auto &instance : customizeData_->partInstances) {
+  //     if (instance.partType == ModBodyPart::RightThigh) {
+  //       rightThighOwnerId = instance.partId;
+  //       rightHipAnchorLocal = instance.localTransform.translate;
+  //       break;
+  //     }
+  //   }
+  // }
 
-  bool hasRightLegRoot = false;
-  bool hasRightLegBend = false;
-  bool hasRightLegEnd = false;
+  // Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
+  // Vector3 rightLegBendLocal = {0.0f, -0.70f, 0.0f};
+  // Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
 
-  if (customizeData_ != nullptr && rightThighOwnerId >= 0) {
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId != rightThighOwnerId) {
-        continue;
-      }
+  // bool hasRightLegRoot = false;
+  // bool hasRightLegBend = false;
+  // bool hasRightLegEnd = false;
 
-      if (snap.role == ModControlPointRole::Root) {
-        rightLegRootLocal = snap.localPosition;
-        hasRightLegRoot = true;
-      } else if (snap.role == ModControlPointRole::Bend) {
-        rightLegBendLocal = snap.localPosition;
-        hasRightLegBend = true;
-      } else if (snap.role == ModControlPointRole::End) {
-        rightLegEndLocal = snap.localPosition;
-        hasRightLegEnd = true;
-      }
-    }
-  }
+  // if (customizeData_ != nullptr && rightThighOwnerId >= 0) {
+  //   for (const auto &snap : customizeData_->controlPointSnapshots) {
+  //     if (snap.ownerPartId != rightThighOwnerId) {
+  //       continue;
+  //     }
 
-  if (hasRightLegRoot && hasRightLegBend) {
-    Vector3 thighVec = Sub(rightLegBendLocal, rightLegRootLocal);
-    float thighLength = Length(thighVec);
-    if (thighLength < 0.0001f) {
-      thighLength = 0.0001f;
-      thighVec = {0.0f, -1.0f, 0.0f};
-    }
+  //    if (snap.role == ModControlPointRole::Root) {
+  //      rightLegRootLocal = snap.localPosition;
+  //      hasRightLegRoot = true;
+  //    } else if (snap.role == ModControlPointRole::Bend) {
+  //      rightLegBendLocal = snap.localPosition;
+  //      hasRightLegBend = true;
+  //    } else if (snap.role == ModControlPointRole::End) {
+  //      rightLegEndLocal = snap.localPosition;
+  //      hasRightLegEnd = true;
+  //    }
+  //  }
+  //}
 
-    Vector3 thighDir = Normalize(thighVec);
-    float rightThighAngleZ = atan2(thighDir.x, -thighDir.y);
+  // if (hasRightLegRoot && hasRightLegBend) {
+  //   Vector3 thighVec = Sub(rightLegBendLocal, rightLegRootLocal);
+  //   float thighLength = Length(thighVec);
+  //   if (thighLength < 0.0001f) {
+  //     thighLength = 0.0001f;
+  //     thighVec = {0.0f, -1.0f, 0.0f};
+  //   }
 
-    rightThigh->mainPosition.transform.translate = rightHipAnchorLocal;
-    rightThigh->mainPosition.transform.rotate = {-rightLegBend_ * 0.7f, 0.0f,
-                                                 rightThighAngleZ};
+  //  Vector3 thighDir = Normalize(thighVec);
+  //  float rightThighAngleZ = atan2(thighDir.x, -thighDir.y);
 
-    rightThigh->objectParts_[0].transform.translate = {
-        0.0f, -thighLength * 0.5f, 0.0f};
-    rightThigh->objectParts_[0].transform.scale.x =
-        rightThighThicknessScale * rightThighParam.scale.x;
-    rightThigh->objectParts_[0].transform.scale.y =
-        thighLength * rightThighParam.scale.y * rightThighParam.length;
-    rightThigh->objectParts_[0].transform.scale.z =
-        rightThighThicknessScale * rightThighParam.scale.z;
+  //  rightThigh->mainPosition.transform.translate = rightHipAnchorLocal;
+  //  // rightThigh->mainPosition.transform.rotate = {-rightLegBend_ * 0.7f,
+  //  0.0f,
+  //  //                                              rightThighAngleZ};
+  //  float rightThighAnimX = (-rightLegBend_ * 0.7f) * poseAnimScale;
 
-    if (hasRightLegEnd) {
-      Vector3 shinVec = Sub(rightLegEndLocal, rightLegBendLocal);
-      float shinLength = Length(shinVec);
-      if (shinLength < 0.0001f) {
-        shinLength = 0.0001f;
-        shinVec = {0.0f, -1.0f, 0.0f};
-      }
+  //  rightThigh->mainPosition.transform.rotate = {rightThighAnimX, 0.0f,
+  //                                               rightThighAngleZ};
 
-      Vector3 shinDir = Normalize(shinVec);
-      float rightShinAngleZ = atan2(shinDir.x, -shinDir.y);
+  //  rightThigh->objectParts_[0].transform.translate = {
+  //      0.0f, -thighLength * 0.5f, 0.0f};
+  //  rightThigh->objectParts_[0].transform.scale.x =
+  //      rightThighThicknessScale * rightThighParam.scale.x;
+  //  rightThigh->objectParts_[0].transform.scale.y =
+  //      thighLength * rightThighParam.scale.y * rightThighParam.length;
+  //  rightThigh->objectParts_[0].transform.scale.z =
+  //      rightThighThicknessScale * rightThighParam.scale.z;
 
-      float rightThighSwing = -rightLegBend_ * 0.7f;
-      float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
-                                           (legRecoverAngle_ - legKickAngle_),
-                                       0.0f, 1.0f);
+  //  if (hasRightLegEnd) {
+  //    Vector3 shinVec = Sub(rightLegEndLocal, rightLegBendLocal);
+  //    float shinLength = Length(shinVec);
+  //    if (shinLength < 0.0001f) {
+  //      shinLength = 0.0001f;
+  //      shinVec = {0.0f, -1.0f, 0.0f};
+  //    }
 
-      float rightShinX = rightThighSwing * 0.35f + rightKneeFold * 0.6f + 0.3f;
+  //    Vector3 shinDir = Normalize(shinVec);
+  //    float rightShinAngleZ = atan2(shinDir.x, -shinDir.y);
 
-      Vector3 rightAnimatedKneePos = rightHipAnchorLocal;
-      rightAnimatedKneePos.x += std::sin(rightThighAngleZ) *
-                                std::cos(-rightLegBend_ * 0.7f) * thighLength;
-      rightAnimatedKneePos.y += -std::cos(rightThighAngleZ) *
-                                std::cos(-rightLegBend_ * 0.7f) * thighLength;
-      rightAnimatedKneePos.z += -std::sin(-rightLegBend_ * 0.7f) * thighLength;
+  //    float rightThighSwing = -rightLegBend_ * 0.7f;
+  //    float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
+  //                                         (legRecoverAngle_ - legKickAngle_),
+  //                                     0.0f, 1.0f);
 
-      rightShin->mainPosition.transform.translate = rightAnimatedKneePos;
-      rightShin->mainPosition.transform.rotate = {rightShinX, 0.0f,
-                                                  rightShinAngleZ};
+  //    float rightShinX = rightThighSwing * 0.35f + rightKneeFold * 0.6f +
+  //    0.3f;
 
-      rightShin->objectParts_[0].transform.translate = {
-          0.0f, -shinLength * 0.5f, 0.0f};
-      rightShin->objectParts_[0].transform.scale.x =
-          rightShinThicknessScale * rightShinParam.scale.x;
-      rightShin->objectParts_[0].transform.scale.y =
-          shinLength * rightShinParam.scale.y * rightShinParam.length;
-      rightShin->objectParts_[0].transform.scale.z =
-          rightShinThicknessScale * rightShinParam.scale.z;
-    }
-  }
+  //    Vector3 rightAnimatedKneePos = rightHipAnchorLocal;
+  //    rightAnimatedKneePos.x += std::sin(rightThighAngleZ) *
+  //                              std::cos(-rightLegBend_ * 0.7f) * thighLength;
+  //    rightAnimatedKneePos.y += -std::cos(rightThighAngleZ) *
+  //                              std::cos(-rightLegBend_ * 0.7f) * thighLength;
+  //    rightAnimatedKneePos.z += -std::sin(-rightLegBend_ * 0.7f) *
+  //    thighLength;
+
+  //    rightShin->mainPosition.transform.translate = rightAnimatedKneePos;
+  //    // rightShin->mainPosition.transform.rotate = {rightShinX, 0.0f,
+  //    //                                             rightShinAngleZ};
+  //    float rightShinAnimX =
+  //        (rightThighSwing * 0.35f + rightKneeFold * 0.6f) * poseAnimScale;
+
+  //    rightShin->mainPosition.transform.rotate = {rightShinAnimX, 0.0f,
+  //                                                rightShinAngleZ};
+
+  //    rightShin->objectParts_[0].transform.translate = {
+  //        0.0f, -shinLength * 0.5f, 0.0f};
+  //    rightShin->objectParts_[0].transform.scale.x =
+  //        rightShinThicknessScale * rightShinParam.scale.x;
+  //    rightShin->objectParts_[0].transform.scale.y =
+  //        shinLength * rightShinParam.scale.y * rightShinParam.length;
+  //    rightShin->objectParts_[0].transform.scale.z =
+  //        rightShinThicknessScale * rightShinParam.scale.z;
+  //  }
+  //}
 }
 
 float TravelScene::GetControlPointRadius(ModControlPointRole role) const {
@@ -4672,16 +5731,102 @@ bool TravelScene::BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
 
   Vector3 diff = {end.x - start.x, end.y - start.y, end.z - start.z};
 
-  float length = sqrtf(diff.x * diff.x + diff.y * diff.y);
-  if (length < 0.0001f)
+  float length = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+  if (length < 0.0001f) {
     return false;
+  }
 
-  float angle = atan2f(diff.x, -diff.y);
+  Vector3 dir = {diff.x / length, diff.y / length, diff.z / length};
+
+  float angleZ = atan2f(dir.x, -dir.y);
+  float angleX = -asinf(std::clamp(dir.z, -1.0f, 1.0f));
 
   out.root = start;
   out.length = length;
-  out.angleZ = angle;
+  out.angleX = angleX;
+  out.angleZ = angleZ;
   out.thickness = 1.0f;
 
   return true;
+}
+
+void TravelScene::PrepareTorsoApplySource() {
+  if (!useModBodyApplyTorso_) {
+    return;
+  }
+
+  Object *chestBody = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object *stomachBody = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+  if (chestBody == nullptr || stomachBody == nullptr) {
+    return;
+  }
+
+  int torsoOwnerId = -1;
+  if (customizeData_ != nullptr) {
+    for (const auto &instance : customizeData_->partInstances) {
+      if (instance.partType == ModBodyPart::ChestBody) {
+        torsoOwnerId = instance.partId;
+        break;
+      }
+    }
+  }
+
+  if (torsoOwnerId < 0) {
+    return;
+  }
+
+  std::vector<ModControlPoint> torsoPoints;
+  torsoPoints.reserve(3);
+
+  const ModControlPointSnapshot *chestSnap = nullptr;
+  const ModControlPointSnapshot *bellySnap = nullptr;
+  const ModControlPointSnapshot *waistSnap = nullptr;
+
+  for (const auto &snap : customizeData_->controlPointSnapshots) {
+    if (snap.ownerPartId != torsoOwnerId) {
+      continue;
+    }
+
+    if (snap.role == ModControlPointRole::Chest) {
+      chestSnap = &snap;
+    } else if (snap.role == ModControlPointRole::Belly) {
+      bellySnap = &snap;
+    } else if (snap.role == ModControlPointRole::Waist) {
+      waistSnap = &snap;
+    }
+  }
+
+  if (chestSnap == nullptr || bellySnap == nullptr || waistSnap == nullptr) {
+    return;
+  }
+
+  auto PushPoint = [&](const ModControlPointSnapshot *snap) {
+    ModControlPoint point{};
+    point.role = snap->role;
+    point.localPosition = snap->localPosition;
+    point.radius = snap->radius;
+    point.movable = snap->movable;
+    point.isConnectionPoint = snap->isConnectionPoint;
+    point.acceptsParent = snap->acceptsParent;
+    point.acceptsChild = snap->acceptsChild;
+    torsoPoints.push_back(point);
+  };
+
+  PushPoint(chestSnap);
+  PushPoint(bellySnap);
+  PushPoint(waistSnap);
+
+  torsoSharedPointsBuffer_.clear();
+  torsoSharedPointsBuffer_ = torsoPoints;
+
+  modBodies_[ToIndex(ModBodyPart::ChestBody)].ClearExternalSegmentSource();
+  modBodies_[ToIndex(ModBodyPart::StomachBody)].ClearExternalSegmentSource();
+
+  modBodies_[ToIndex(ModBodyPart::ChestBody)].SetExternalSegmentSource(
+      &torsoSharedPointsBuffer_, ModControlPointRole::Chest,
+      ModControlPointRole::Belly);
+
+  modBodies_[ToIndex(ModBodyPart::StomachBody)].SetExternalSegmentSource(
+      &torsoSharedPointsBuffer_, ModControlPointRole::Belly,
+      ModControlPointRole::Waist);
 }

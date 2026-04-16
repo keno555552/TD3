@@ -6,6 +6,8 @@
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
 #include <cfloat>
+#include <algorithm>
+#include <cmath>
 #include <unordered_set>
 
 namespace {
@@ -185,6 +187,29 @@ int ResolveControlOwnerPartId(const ModAssemblyGraph &assembly, int partId) {
 
 bool IsSelectablePart(ModBodyPart part) { return part != ModBodyPart::Count; }
 
+bool IsMouseLeftPressed() {
+  return (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+}
+
+bool IsMouseRightPressed() {
+  return (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+}
+
+bool IsMouseLeftTriggered() {
+  static bool wasPressed = false;
+  const bool nowPressed = IsMouseLeftPressed();
+  const bool triggered = (!wasPressed && nowPressed);
+  wasPressed = nowPressed;
+  return triggered;
+}
+
+bool IsMouseLeftReleased() {
+  static bool wasPressed = false;
+  const bool nowPressed = IsMouseLeftPressed();
+  const bool released = (wasPressed && !nowPressed);
+  wasPressed = nowPressed;
+  return released;
+}
 bool RayPlaneIntersectionZ(const Ray &ray, float planeZ, Vector3 *hitPoint) {
   const float epsilon = 0.0001f;
 
@@ -201,6 +226,28 @@ bool RayPlaneIntersectionZ(const Ray &ray, float planeZ, Vector3 *hitPoint) {
     hitPoint->x = ray.origin.x + ray.direction.x * t;
     hitPoint->y = ray.origin.y + ray.direction.y * t;
     hitPoint->z = ray.origin.z + ray.direction.z * t;
+  }
+
+  return true;
+}
+
+bool RayPlaneIntersection(const Ray &ray, const Vector3 &planePoint,
+                          const Vector3 &planeNormal, Vector3 *hitPoint) {
+  const float epsilon = 0.0001f;
+
+  const float denom = Dot(ray.direction, planeNormal);
+  if (fabsf(denom) < epsilon) {
+    return false;
+  }
+
+  const Vector3 diff = Subtract(planePoint, ray.origin);
+  const float t = Dot(diff, planeNormal) / denom;
+  if (t < 0.0f) {
+    return false;
+  }
+
+  if (hitPoint != nullptr) {
+    *hitPoint = Add(ray.origin, Multiply(t, ray.direction));
   }
 
   return true;
@@ -820,6 +867,11 @@ ModScene::ModScene(kEngine *system) {
   customizeData_->timeLimit_ = timeLimit_;
   customizeData_->totalTimeLimit_ = totalTimeLimit_;
   isTimeUp_ = customizeData_->isTimeUp_;
+
+  orbitTarget_ = ComputeOrbitTarget();
+  orbitYaw_ = 0.0f;
+  orbitPitch_ = 0.0f;
+  orbitDistance_ = 8.0f;
 }
 
 ModScene::~ModScene() {
@@ -927,14 +979,7 @@ void ModScene::Update() {
     for (const auto &pair : modBodies_) {
       const auto &points = pair.second.GetControlPoints();
       if (!points.empty()) {
-        Logger::Log("[PreSync] partId=%d partType=%d points=%d", pair.first,
-                    static_cast<int>(pair.second.GetPart()),
-                    static_cast<int>(points.size()));
         for (size_t pi = 0; pi < points.size(); ++pi) {
-          Logger::Log("  point[%d] role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
-                      static_cast<int>(pi), static_cast<int>(points[pi].role),
-                      points[pi].localPosition.x, points[pi].localPosition.y,
-                      points[pi].localPosition.z, points[pi].radius);
         }
       }
     }
@@ -960,17 +1005,9 @@ void ModScene::Update() {
   // フェードアウト完了後に共有データを保存して次シーンへ進む
   if (isStartTransition_ && fade_.IsFinished()) {
     if (customizeData_ != nullptr) {
-      Logger::Log(
-          "[ModScene Exit] controlPointSnapshots=%d",
-          static_cast<int>(customizeData_->controlPointSnapshots.size()));
       for (size_t i = 0; i < customizeData_->controlPointSnapshots.size();
            ++i) {
         const auto &s = customizeData_->controlPointSnapshots[i];
-        Logger::Log(
-            "  [%d] ownerType=%d role=%d pos=(%.3f,%.3f,%.3f) radius=%.3f",
-            static_cast<int>(i), static_cast<int>(s.ownerPartType),
-            static_cast<int>(s.role), s.localPosition.x, s.localPosition.y,
-            s.localPosition.z, s.radius);
       }
       ModBody::SetSharedCustomizeData(*customizeData_);
     }
@@ -1016,25 +1053,172 @@ void ModScene::Draw() {
 }
 
 void ModScene::CameraPart() {
+  UpdateOrbitCamera();
+
   if (useDebugCamera_) {
     usingCamera_ = debugCamera_;
-
-    const bool blockDebugCameraMouse = ShouldBlockDebugCameraMouseControl();
-
-#ifdef USE_IMGUI
-    if (!ImGui::GetIO().WantCaptureMouse && !blockDebugCameraMouse) {
-      debugCamera_->MouseControlUpdate();
-    }
-#else
-    if (!blockDebugCameraMouse) {
-      debugCamera_->MouseControlUpdate();
-    }
-#endif
   } else {
     usingCamera_ = camera_;
   }
 
   system_->SetCamera(usingCamera_);
+}
+
+
+Vector3 ModScene::ComputeOrbitTarget() const {
+  // まず胴体中心を優先して見る
+  const int chestIndex = FindTorsoControlPointIndex(ModControlPointRole::Chest);
+  const int bellyIndex = FindTorsoControlPointIndex(ModControlPointRole::Belly);
+  const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
+
+  if (chestIndex >= 0 && bellyIndex >= 0 && waistIndex >= 0) {
+    const Vector3 chest =
+        GetTorsoControlPointWorldPosition(ModControlPointRole::Chest);
+    const Vector3 belly =
+        GetTorsoControlPointWorldPosition(ModControlPointRole::Belly);
+    const Vector3 waist =
+        GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
+
+    Vector3 center{};
+    center.x = (chest.x + belly.x + waist.x) / 3.0f;
+    center.y = (chest.y + belly.y + waist.y) / 3.0f;
+    center.z = (chest.z + belly.z + waist.z) / 3.0f;
+    return center;
+  }
+
+  // 胴体が取れないときは選択部位を見る
+  if (selectedPartId_ >= 0 && modObjects_.count(selectedPartId_) > 0) {
+    Object *object = modObjects_.at(selectedPartId_).get();
+    if (object != nullptr) {
+      return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+    }
+  }
+
+  // 何も無ければ原点少し上
+  return {0.0f, 0.5f, 0.0f};
+}
+
+void ModScene::UpdateOrbitCamera() {
+  if (debugCamera_ == nullptr || camera_ == nullptr) {
+    return;
+  }
+
+#ifdef USE_IMGUI
+  const bool wantCaptureMouse = ImGui::GetIO().WantCaptureMouse;
+#else
+  const bool wantCaptureMouse = false;
+#endif
+
+  const bool blockCameraInput =
+      wantCaptureMouse || ShouldBlockDebugCameraMouseControl();
+
+  static bool wasRightPressed = false;
+  static POINT prevCursorPos{};
+
+  POINT currentCursorPos{};
+  GetCursorPos(&currentCursorPos);
+
+  const bool rightPressed = IsMouseRightPressed();
+
+  // 注視ターゲットだけは毎フレーム更新
+  orbitTarget_ = ComputeOrbitTarget();
+
+  // --------------------------------
+  // 右クリック開始時：
+  // 「今のカメラ位置」から orbit パラメータを逆算する
+  // これで初期位置は変えない
+  // --------------------------------
+  if (!blockCameraInput && rightPressed && !wasRightPressed) {
+    Vector3 currentPos = debugCamera_->GetTransform().translate;
+    Vector3 offset = Subtract(currentPos, orbitTarget_);
+
+    orbitDistance_ = Length(offset);
+    if (orbitDistance_ < 0.0001f) {
+      orbitDistance_ = 0.0001f;
+    }
+
+    orbitYaw_ = atan2f(offset.x, -offset.z);
+
+    const float horizontalLength =
+        sqrtf(offset.x * offset.x + offset.z * offset.z);
+    orbitPitch_ = atan2f(offset.y, horizontalLength);
+
+    prevCursorPos = currentCursorPos;
+  }
+
+  // --------------------------------
+  // 右ドラッグ中だけ orbit 回転
+  // --------------------------------
+  if (!blockCameraInput && rightPressed) {
+    if (wasRightPressed) {
+      const float deltaX =
+          static_cast<float>(currentCursorPos.x - prevCursorPos.x);
+      const float deltaY =
+          static_cast<float>(currentCursorPos.y - prevCursorPos.y);
+
+      orbitYaw_ -= deltaX * orbitRotateSpeed_;
+      orbitPitch_ += deltaY * orbitRotateSpeed_;
+      orbitPitch_ = (std::clamp)(orbitPitch_, -1.2f, 1.2f);
+    }
+
+    prevCursorPos = currentCursorPos;
+
+    const float cosPitch = cosf(orbitPitch_);
+    const float sinPitch = sinf(orbitPitch_);
+    const float cosYaw = cosf(orbitYaw_);
+    const float sinYaw = sinf(orbitYaw_);
+
+    Vector3 cameraPos{};
+    cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
+    cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
+    cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
+
+    Vector3 toTarget = Subtract(orbitTarget_, cameraPos);
+    Vector3 dir = NormalizeSafeV(toTarget, {0.0f, 0.0f, 1.0f});
+
+    Vector3 cameraRotate{};
+    cameraRotate.y = atan2f(dir.x, dir.z);
+
+    const float horizontalLength = sqrtf(dir.x * dir.x + dir.z * dir.z);
+    cameraRotate.x = atan2f(-dir.y, horizontalLength);
+
+    cameraRotate.z = 0.0f;
+
+    debugCamera_->SetTranslate(cameraPos);
+    debugCamera_->SetRotation(cameraRotate);
+
+    camera_->SetTranslate(cameraPos);
+    camera_->SetRotation(cameraRotate);
+  }
+
+  // --------------------------------
+  // ホイール zoom も右押し中だけ反映
+  // 初期位置を勝手に変えないため
+  // --------------------------------
+  if (!blockCameraInput) {
+    const int wheelDelta = system_->GetMouseScrollOrigin();
+    if (wheelDelta != 0) {
+      orbitDistance_ -=
+          (static_cast<float>(wheelDelta) / 120.0f) * orbitZoomSpeed_;
+      orbitDistance_ =
+          (std::clamp)(orbitDistance_, orbitMinDistance_, orbitMaxDistance_);
+
+      const float cosPitch = cosf(orbitPitch_);
+      const float sinPitch = sinf(orbitPitch_);
+      const float cosYaw = cosf(orbitYaw_);
+      const float sinYaw = sinf(orbitYaw_);
+
+      Vector3 cameraPos{};
+      cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
+      cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
+      cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
+
+      debugCamera_->SetTranslate(cameraPos);
+      camera_->SetTranslate(cameraPos);
+    }
+  }
+
+  wasRightPressed = rightPressed;
 }
 
 void ModScene::SetupModObjects() {
@@ -1228,7 +1412,7 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
     }
 
     object->mainPosition.transform.translate = localTranslate;
-    object->mainPosition.transform.rotate = localRotate;
+    // object->mainPosition.transform.rotate = localRotate;
     object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 }
@@ -1338,12 +1522,6 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.localTransform = node->localTransform;
     instance.param = modBodies_[id].GetParam();
 
-    /*Logger::Log("SAVE PARAM CHECK : id=%d partType=%d length=%.3f scale=(%.3f, "
-                "%.3f, %.3f)",
-                id, static_cast<int>(instance.partType), instance.param.length,
-                instance.param.scale.x, instance.param.scale.y,
-                instance.param.scale.z);*/
-
     // 新方式ではインスタンス単位で count は常に 1
     instance.param.count = 1;
 
@@ -1403,6 +1581,84 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 
         customizeData_->controlPointSnapshots.push_back(snapshot);
       }
+
+      auto PushTorsoAnchorSnapshot = [&](ModControlPointRole role,
+                                         const Vector3 &localPosition,
+                                         float radius) {
+        ModControlPointSnapshot snapshot;
+        snapshot.ownerPartId = chestPartId;
+        snapshot.ownerPartType = ModBodyPart::ChestBody;
+        snapshot.role = role;
+        snapshot.localPosition = localPosition;
+        snapshot.radius = radius;
+        snapshot.movable = false;
+        snapshot.isConnectionPoint = true;
+        snapshot.acceptsParent = false;
+        snapshot.acceptsChild = true;
+
+        customizeData_->controlPointSnapshots.push_back(snapshot);
+      };
+
+      auto FindTorsoLocal = [&](ModControlPointRole role,
+                                const Vector3 &fallback) -> Vector3 {
+        for (const auto &point : torsoControlPoints_) {
+          if (point.role == role) {
+            return point.localPosition;
+          }
+        }
+        return fallback;
+      };
+
+      auto NormalizeSafe = [&](const Vector3 &v,
+                               const Vector3 &fallback) -> Vector3 {
+        float len = Length(v);
+        if (len < 0.0001f) {
+          return fallback;
+        }
+        return {v.x / len, v.y / len, v.z / len};
+      };
+
+      auto MulScalar = [&](const Vector3 &v, float s) -> Vector3 {
+        return {v.x * s, v.y * s, v.z * s};
+      };
+
+      auto AddV = [&](const Vector3 &a, const Vector3 &b) -> Vector3 {
+        return {a.x + b.x, a.y + b.y, a.z + b.z};
+      };
+
+      auto SubV = [&](const Vector3 &a, const Vector3 &b) -> Vector3 {
+        return {a.x - b.x, a.y - b.y, a.z - b.z};
+      };
+
+      Vector3 chestLocal = {0.0f, 0.45f, 0.0f};
+      for (const auto &point : torsoControlPoints_) {
+        if (point.role == ModControlPointRole::Chest) {
+          chestLocal = point.localPosition;
+          break;
+        }
+      }
+
+      PushTorsoAnchorSnapshot(ModControlPointRole::NeckBase, chestLocal, 0.08f);
+
+      // 肩・股関節アンカーは再計算せず、control point
+      // の現在位置をそのまま保存する
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::LeftShoulder,
+          GetControlPointLocalPosition(ModControlPointRole::LeftShoulder),
+          0.09f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::RightShoulder,
+          GetControlPointLocalPosition(ModControlPointRole::RightShoulder),
+          0.09f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::LeftHip,
+          GetControlPointLocalPosition(ModControlPointRole::LeftHip), 0.10f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::RightHip,
+          GetControlPointLocalPosition(ModControlPointRole::RightHip), 0.10f);
     }
   }
 
@@ -1428,18 +1684,8 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
     const std::vector<ModControlPoint> &points =
         modBodies_.at(id).GetControlPoints();
 
-    /*Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
-                static_cast<int>(node->part), static_cast<int>(points.size()));*/
-
     if (id == 13) {
       for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
-        Logger::Log("  point[%d] role=%d pos=(%.3f, %.3f, %.3f) radius=%.3f",
-                    static_cast<int>(pointIndex),
-                    static_cast<int>(points[pointIndex].role),
-                    points[pointIndex].localPosition.x,
-                    points[pointIndex].localPosition.y,
-                    points[pointIndex].localPosition.z,
-                    points[pointIndex].radius);
       }
     }
 
@@ -1458,6 +1704,16 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
       snapshot.acceptsChild = point.acceptsChild;
 
       customizeData_->controlPointSnapshots.push_back(snapshot);
+
+      if (node->part == ModBodyPart::Neck || node->part == ModBodyPart::Head) {
+        Logger::Log("=== MODSCENE SNAP CHECK ===");
+        Logger::Log("partType   : %d", static_cast<int>(node->part));
+        Logger::Log("ownerPartId: %d", id);
+        Logger::Log("role       : %d", static_cast<int>(snapshot.role));
+        Logger::Log("localPos   : (%.3f, %.3f, %.3f)", snapshot.localPosition.x,
+                    snapshot.localPosition.y, snapshot.localPosition.z);
+        Logger::Log("radius     : %.3f", snapshot.radius);
+      }
     }
   }
 }
@@ -1868,10 +2124,16 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
     const Vector3 worldPos = GetTorsoControlPointWorldPosition(
         torsoControlPoints_[static_cast<size_t>(nearestPointIndex)].role);
 
-    dragControlPlaneZ_ = worldPos.z;
+    dragControlPlanePoint_ = worldPos;
+
+    // カメラからターゲットへ向く方向 = 画面の法線
+    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    dragControlPlaneNormal_ =
+        NormalizeSafeV(Subtract(worldPos, cameraPos), {0.0f, 0.0f, 1.0f});
 
     Vector3 hitPoint{};
-    if (RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+    if (RayPlaneIntersection(mouseRay, dragControlPlanePoint_,
+                             dragControlPlaneNormal_, &hitPoint)) {
       dragControlPointOffset_ = Subtract(worldPos, hitPoint);
     } else {
       dragControlPointOffset_ = ZeroV();
@@ -1939,10 +2201,15 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       modBodies_[controlOwnerId].GetControlPointWorldPosition(
           object, static_cast<size_t>(nearestPointIndex));
 
-  dragControlPlaneZ_ = worldPos.z;
+  dragControlPlanePoint_ = worldPos;
+
+  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+  dragControlPlaneNormal_ =
+      NormalizeSafeV(Subtract(worldPos, cameraPos), {0.0f, 0.0f, 1.0f});
 
   Vector3 hitPoint{};
-  if (RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+  if (RayPlaneIntersection(mouseRay, dragControlPlanePoint_,
+                           dragControlPlaneNormal_, &hitPoint)) {
     dragControlPointOffset_ = Subtract(worldPos, hitPoint);
   } else {
     dragControlPointOffset_ = ZeroV();
@@ -1957,7 +2224,8 @@ void ModScene::MoveSelectedControlPointFromMouseRay(const Ray &mouseRay) {
   }
 
   Vector3 hitPoint{};
-  if (!RayPlaneIntersectionZ(mouseRay, dragControlPlaneZ_, &hitPoint)) {
+  if (!RayPlaneIntersection(mouseRay, dragControlPlanePoint_,
+                            dragControlPlaneNormal_, &hitPoint)) {
     return;
   }
 
@@ -2018,7 +2286,8 @@ void ModScene::ClearControlPointSelection() {
   selectedControlPartId_ = -1;
   selectedControlPointIndex_ = -1;
   isDraggingControlPoint_ = false;
-  dragControlPlaneZ_ = 0.0f;
+  dragControlPlanePoint_ = {0.0f, 0.0f, 0.0f};
+  dragControlPlaneNormal_ = {0.0f, 0.0f, 1.0f};
   dragControlPointOffset_ = {0.0f, 0.0f, 0.0f};
   hoveredPartId_ = -1;
 }
@@ -4779,50 +5048,8 @@ void ModScene::SaveControlPointsToCustomizeData() {
       GetControlPointLocalPosition(ModControlPointRole::UpperNeck);
   cp.headCenterPos =
       GetControlPointLocalPosition(ModControlPointRole::HeadCenter);
-
-  /*Logger::Log("SEND LeftShoulderPos : %.2f %.2f %.2f\n", cp.leftShoulderPos.x,
-              cp.leftShoulderPos.y, cp.leftShoulderPos.z);
-
-  Logger::Log("SEND LeftElbowPos : %.2f %.2f %.2f\n", cp.leftElbowPos.x,
-              cp.leftElbowPos.y, cp.leftElbowPos.z);
-  Logger::Log("SEND LeftWristPos : %.2f %.2f %.2f\n", cp.leftWristPos.x,
-              cp.leftWristPos.y, cp.leftWristPos.z);
-
-  Logger::Log("SEND RightShoulderPos : %.2f %.2f %.2f\n", cp.rightShoulderPos.x,
-              cp.rightShoulderPos.y, cp.rightShoulderPos.z);
-  Logger::Log("SEND RightElbowPos : %.2f %.2f %.2f\n", cp.rightElbowPos.x,
-              cp.rightElbowPos.y, cp.rightElbowPos.z);
-  Logger::Log("SEND RightWristPos : %.2f %.2f %.2f\n", cp.rightWristPos.x,
-              cp.rightWristPos.y, cp.rightWristPos.z);
-
-  Logger::Log("SEND LeftHipPos : %.2f %.2f %.2f\n", cp.leftHipPos.x,
-              cp.leftHipPos.y, cp.leftHipPos.z);
-  Logger::Log("SEND LeftKneePos : %.2f %.2f %.2f\n", cp.leftKneePos.x,
-              cp.leftKneePos.y, cp.leftKneePos.z);
-  Logger::Log("SEND LeftAnklePos : %.2f %.2f %.2f\n", cp.leftAnklePos.x,
-              cp.leftAnklePos.y, cp.leftAnklePos.z);
-
-  Logger::Log("SEND RightHipPos : %.2f %.2f %.2f\n", cp.rightHipPos.x,
-              cp.rightHipPos.y, cp.rightHipPos.z);
-  Logger::Log("SEND RightKneePos : %.2f %.2f %.2f\n", cp.rightKneePos.x,
-              cp.rightKneePos.y, cp.rightKneePos.z);
-  Logger::Log("SEND RightAnklePos : %.2f %.2f %.2f\n", cp.rightAnklePos.x,
-              cp.rightAnklePos.y, cp.rightAnklePos.z);
-
-  Logger::Log("SEND ChestPos : %.2f %.2f %.2f\n", cp.chestPos.x, cp.chestPos.y,
-              cp.chestPos.z);
-  Logger::Log("SEND BellyPos : %.2f %.2f %.2f\n", cp.bellyPos.x, cp.bellyPos.y,
-              cp.bellyPos.z);
-  Logger::Log("SEND WaistPos : %.2f %.2f %.2f\n", cp.waistPos.x, cp.waistPos.y,
-              cp.waistPos.z);
-
-  Logger::Log("SEND LowerNeckPos : %.2f %.2f %.2f\n", cp.lowerNeckPos.x,
-              cp.lowerNeckPos.y, cp.lowerNeckPos.z);
-  Logger::Log("SEND UpperNeckPos : %.2f %.2f %.2f\n", cp.upperNeckPos.x,
-              cp.upperNeckPos.y, cp.upperNeckPos.z);
-  Logger::Log("SEND HeadCenterPos : %.2f %.2f %.2f\n", cp.headCenterPos.x,
-              cp.headCenterPos.y, cp.headCenterPos.z);*/
 }
+
 Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::LeftShoulder) {
     for (const auto &[id, node] : assembly_.GetNodes()) {

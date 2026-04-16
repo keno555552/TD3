@@ -1,275 +1,232 @@
 #include "ContestScene.h"
-
-namespace {
-
-    /// ★を文字列に変換（例：3 → "★★★☆☆"）
-    std::string StarsToString(int stars) {
-        std::string result;
-        for (int i = 0; i < 5; ++i) {
-            result += (i < stars) ? "*" : "-";
-        }
-        return result;
-    }
-
-} // namespace
+#include "GAME/contest/parts/ShowOffPart.h"
+#include "GAME/contest/parts/JudgingPart.h"
+#include "GAME/contest/parts/ResultPart.h"
+#include "GAME/contest/parts/TrophyPart.h"
 
 ContestScene::ContestScene(kEngine* system) {
-    const ModBodyCustomizeData* earlyCheck = ModBody::GetSharedCustomizeData();
+	system_ = system;
 
-    system_ = system;
+	// ライト
+	light1_ = new Light;
+	light1_->direction = { -0.5f, -1.0f, -0.3f };
+	light1_->color = { 1.0f, 1.0f, 1.0f };
+	light1_->intensity = 1.0f;
+	system_->AddLight(light1_);
 
-    // ライト
-    light1_ = new Light;
-    light1_->direction = { -0.5f, -1.0f, -0.3f };
-    light1_->color = { 1.0f, 1.0f, 1.0f };
-    light1_->intensity = 1.0f;
-    system_->AddLight(light1_);
+	// カメラ
+	debugCamera_ = system_->CreateDebugCamera();
+	camera_ = system_->CreateCamera();
+	usingCamera_ = camera_;
+	system_->SetCamera(usingCamera_);
 
-    // カメラ
-    debugCamera_ = system_->CreateDebugCamera();
-    camera_ = system_->CreateCamera();
-    usingCamera_ = camera_;
-    system_->SetCamera(usingCamera_);
+	fade_.Initialize(system_);
+	fade_.StartFadeIn();
 
-    fade_.Initialize(system_);
-    fade_.StartFadeIn();
+	// PromptData からお題と審査員を取得してスコア計算
+	const ThemeData* theme = PromptData::GetThemeData();
+	const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
+	const std::vector<JudgeData>* judges = PromptData::GetJudges();
 
-    // PromptData からお題と審査員を取得してスコア計算
-    const ThemeData* theme = PromptData::GetThemeData();
-    const ModBodyCustomizeData* playerData = ModBody::GetSharedCustomizeData();
+	if (theme != nullptr && playerData != nullptr) {
+		std::vector<JudgeData> judgeList;
+		if (judges != nullptr) {
+			judgeList = *judges;
+		}
+		scoreResult_ = ScoreCalculator::Calculate(*theme, *playerData, judgeList);
+		isScoreCalculated_ = true;
+	}
 
-    const std::vector<JudgeData>* judges = PromptData::GetJudges();
+	// ユーザーデータ読み込み
+	userDataManager_ = new UserDataManager();
 
-    if (theme != nullptr && playerData != nullptr) {
-        std::vector<JudgeData> judgeList;
-        if (judges != nullptr) {
-            judgeList = *judges;
-        }
-        scoreResult_ = ScoreCalculator::Calculate(*theme, *playerData, judgeList);
-        isScoreCalculated_ = true;
-    }
+	// 審査員コメント読み込み＆生成
+	JudgeCommentManager::LoadCommentTable(
+		"GAME/resources/judges/comments/", judgeCommentTable_);
 
-    // ユーザーデータ読み込み
-    userDataManager_ = new UserDataManager();
+	if (isScoreCalculated_) {
+		judgeCommentResults_ = JudgeCommentManager::GenerateComments(
+			judgeCommentTable_, scoreResult_);
+	}
 
-    // 審査員コメント読み込み＆生成
-    JudgeCommentManager::LoadCommentTable(
-        "GAME/resources/judges/comments/", judgeCommentTable_);
+	// 二つ名テーブル読み込み
+	NicknameManager::LoadNicknameTable(
+		"GAME/resources/nicknames/nicknames.json", nicknameTable_);
 
-    if (isScoreCalculated_) {
-        judgeCommentResults_ = JudgeCommentManager::GenerateComments(
-            judgeCommentTable_, scoreResult_);
-    }
+	// 二つ名生成
+	if (isScoreCalculated_) {
+		earnedNickname_ = NicknameManager::GenerateNickname(
+			nicknameTable_, scoreResult_, userDataManager_->GetUserData(),
+			*playerData);
+		earnedNickname_.earnedTheme = theme->themeId;
 
-    // 二つ名テーブル読み込み
-    NicknameManager::LoadNicknameTable(
-        "GAME/resources/nicknames/nicknames.json", nicknameTable_);
+		// ユーザーデータ更新＆保存
+		userDataManager_->IncrementPlayCount();
+		userDataManager_->UpdateBestRank(scoreResult_.overallRank);
+		userDataManager_->AddNickname(earnedNickname_);
+		userDataManager_->Save();
+	}
 
-    // 二つ名生成
-    if (isScoreCalculated_) {
-        earnedNickname_ = NicknameManager::GenerateNickname(
-            nicknameTable_, scoreResult_, userDataManager_->GetUserData(),
-            *playerData);
-        earnedNickname_.earnedTheme = theme->themeId;
+	// 観客コメント読み込み＆生成
+	AudienceManager::LoadCommentData(
+		"GAME/resources/audience/audience_comments.json",
+		audienceCommentData_);
 
-        // ユーザーデータ更新＆保存
-        userDataManager_->IncrementPlayCount();
-        userDataManager_->UpdateBestRank(scoreResult_.overallRank);
-        userDataManager_->AddNickname(earnedNickname_);
-        userDataManager_->Save();
-    }
+	if (isScoreCalculated_) {
+		audienceResult_ = AudienceManager::GenerateComments(
+			audienceCommentData_, *playerData);
+	}
 
-    // 観客コメント読み込み＆生成
-    AudienceManager::LoadCommentData(
-        "GAME/resources/audience/audience_comments.json",
-        audienceCommentData_);
+	// フォント初期化
+	bitmapFont_.Initialize(system_);
 
-    if (isScoreCalculated_) {
-        audienceResult_ = AudienceManager::GenerateComments(
-            audienceCommentData_, *playerData);
-    }
+	// 最初のパートを生成
+	phase_ = ContestPhase::ShowOff;
+	currentPart_ = CreatePart(phase_);
 }
 
 ContestScene::~ContestScene() {
-    system_->DestroyCamera(camera_);
-    system_->DestroyCamera(debugCamera_);
-    system_->RemoveLight(light1_);
+	currentPart_.reset();
+	bitmapFont_.Cleanup();
 
-    delete light1_;
+	system_->DestroyCamera(camera_);
+	system_->DestroyCamera(debugCamera_);
+	system_->RemoveLight(light1_);
 
-    delete userDataManager_;
-    userDataManager_ = nullptr;
+	delete light1_;
+
+	delete userDataManager_;
+	userDataManager_ = nullptr;
 }
 
 void ContestScene::Update() {
-    CameraPart();
+	CameraPart();
 
-    // スペースキーでお題発表シーンへ
-    if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
-        fade_.StartFadeOut();
-        isStartTransition_ = true;
-        nextOutcome_ = SceneOutcome::NEXT;
-    }
+	// フェード中は操作を受け付けない
+	if (!fade_.IsBusy() && currentPart_) {
+		currentPart_->Update();
 
-    // タイトルへ戻る
-    if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_1)) {
-        fade_.StartFadeOut();
-        isStartTransition_ = true;
-        nextOutcome_ = SceneOutcome::RETURN;
-    }
+		if (currentPart_->IsFinished()) {
+			if (phase_ == ContestPhase::Trophy) {
+				// トロフィーパートの選択結果を処理
+				HandleTrophyChoice();
+			} else {
+				// 次のパートへ遷移
+				AdvancePhase();
+			}
+		}
+	}
 
-    // 同じお題でリトライ（MODシーンへ）
-    if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_R)) {
-        fade_.StartFadeOut();
-        isStartTransition_ = true;
-        nextOutcome_ = SceneOutcome::RETRY_MOD;
-    }
+	// フェード更新
+	fade_.Update(usingCamera_);
 
-    // フェード更新
-    fade_.Update(usingCamera_);
-
-    // フェード終了後にシーン移行
-    if (isStartTransition_ && fade_.IsFinished()) {
-        outcome_ = nextOutcome_;
-    }
+	// フェード終了後にシーン移行
+	if (isStartTransition_ && fade_.IsFinished()) {
+		outcome_ = nextOutcome_;
+	}
 }
 
 void ContestScene::Draw() {
 #ifdef USE_IMGUI
-    // 現在シーン表示
-    ImGui::Begin("Scene");
-    ImGui::Text("ContestScene");
-    ImGui::End();
+	// 現在シーン・フェーズ表示
+	ImGui::Begin("Scene");
+	ImGui::Text("ContestScene");
 
-    // スコア結果ウィンドウ
-    ImGui::Begin("Contest Result");
-
-    const ThemeData* theme = PromptData::GetThemeData();
-    if (theme != nullptr) {
-        ImGui::Text("Theme: %s", theme->themeId.c_str());
-    }
-
-    ImGui::Separator();
-
-    if (!isScoreCalculated_) {
-        ImGui::Text("Score not calculated");
-    } else {
-
-        // 観客コメント
-        ImGui::Separator();
-        ImGui::Text("Audience:");
-        for (int i = 0; i < 3; ++i) {
-            ImGui::Text("  %d: %s", i + 1, audienceResult_.comments[i].c_str());
-        }
-
-        // 総合ランク
-        ImGui::Text("Overall Rank: %s", scoreResult_.overallRank.c_str());
-
-        // 二つ名を表示
-        if (earnedNickname_.isRare) {
-            ImGui::Text("Nickname: [RARE] %s", earnedNickname_.nickname.c_str());
-        } else {
-            ImGui::Text("Nickname: %s", earnedNickname_.nickname.c_str());
-        }
-
-        ImGui::Text("Total Stars: %d / 25", scoreResult_.totalStars);
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        // ★評価 4 項目
-        if (ImGui::TreeNodeEx("Star Ratings", ImGuiTreeNodeFlags_DefaultOpen)) {
-            ImGui::Text("  Theme Match : %s (%d)",
-                StarsToString(scoreResult_.starThemeMatch).c_str(),
-                scoreResult_.starThemeMatch);
-            ImGui::Text("  Impact      : %s (%d)",
-                StarsToString(scoreResult_.starImpact).c_str(),
-                scoreResult_.starImpact);
-            ImGui::Text("  Efficiency  : %s (%d)",
-                StarsToString(scoreResult_.starEfficiency).c_str(),
-                scoreResult_.starEfficiency);
-            ImGui::Text("  Commitment  : %s (%d)",
-                StarsToString(scoreResult_.starCommitment).c_str(),
-                scoreResult_.starCommitment);
-            ImGui::TreePop();
-        }
-
-        // 審査員評価
-        if (ImGui::TreeNodeEx("Judge Evaluations",
-            ImGuiTreeNodeFlags_DefaultOpen)) {
-            for (size_t i = 0; i < 3; ++i) {
-                const auto& je = scoreResult_.judgeEvaluations[i];
-                if (!je.judgeId.empty()) {
-                    ImGui::Text("  %s (%s)", je.judgeId.c_str(),
-                        je.judgeTitle.c_str());
-                    ImGui::Text("    %s (%d)",
-                        StarsToString(je.star).c_str(), je.star);
-                    // コメント表示
-                    if (i < judgeCommentResults_.size()) {
-                        ImGui::Text("    \"%s\"",
-                            judgeCommentResults_[i].comment.c_str());
-                    }
-                    ImGui::Spacing();
-                }
-            }
-            ImGui::Separator();
-            ImGui::Text("  Judge Bonus : %s (%d)",
-                StarsToString(scoreResult_.starJudgeBonus).c_str(),
-                scoreResult_.starJudgeBonus);
-            ImGui::TreePop();
-        }
-
-        // デバッグ用：内部スコア詳細
-        if (ImGui::TreeNode("Debug: Internal Scores")) {
-            const char* partNames[] = {
-                "Body","StomachBody","Neck","Head",
-                "LeftUpperArm", "LeftForeArm",   "RightUpperArm",
-                "RightForeArm", "LeftThigh",     "LeftShin",
-                "RightThigh",   "RightShin",
-            };
-
-            const char* countNames[] = {
-                "LeftArm", "RightArm", "LeftLeg", "RightLeg",
-            };
-
-            const char* bonusNames[] = {
-                "Symmetry", "CostEfficiency", "Minimalist",
-                "Wildcard", "Balance",
-            };
-
-            ImGui::Text("Part Scores (total: %.1f)", scoreResult_.totalPartScore);
-            for (int i = 0; i < 12; ++i) {
-                ImGui::Text("  %s = %.1f", partNames[i], scoreResult_.partScores[i]);
-            }
-
-            ImGui::Text("Count Scores (total: %.1f)", scoreResult_.totalCountScore);
-            for (int i = 0; i < 4; ++i) {
-                ImGui::Text("  %s = %.1f", countNames[i], scoreResult_.countScores[i]);
-            }
-
-            ImGui::Text("Bonus Scores (total: %.1f)", scoreResult_.totalBonusScore);
-            for (int i = 0; i < 5; ++i) {
-                ImGui::Text("  %s = %.1f", bonusNames[i], scoreResult_.bonusScores[i]);
-            }
-
-            ImGui::Text("Final Score: %.1f", scoreResult_.finalScore);
-            ImGui::TreePop();
-        }
-    }
-
-    ImGui::End();
+	const char* phaseNames[] = {
+		"ShowOff", "Judging", "Result", "Trophy"
+	};
+	ImGui::Text("Phase: %s", phaseNames[static_cast<int>(phase_)]);
+	ImGui::End();
 #endif
 
-    // フェード描画
-    fade_.Draw();
+	// 現在のパートの描画
+	if (currentPart_) {
+		currentPart_->Draw();
+	}
+
+	// フェード描画
+	fade_.Draw();
+}
+
+void ContestScene::AdvancePhase() {
+	switch (phase_) {
+	case ContestPhase::ShowOff:
+		phase_ = ContestPhase::Judging;
+		break;
+	case ContestPhase::Judging:
+		phase_ = ContestPhase::Result;
+		break;
+	case ContestPhase::Result:
+		phase_ = ContestPhase::Trophy;
+		break;
+	case ContestPhase::Trophy:
+		// Trophyは HandleTrophyChoice で処理するのでここには来ない
+		break;
+	}
+
+	currentPart_ = CreatePart(phase_);
+}
+
+std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
+	switch (phase) {
+	case ContestPhase::ShowOff:
+		return std::make_unique<ShowOffPart>(
+			system_, &bitmapFont_, audienceResult_);
+
+	case ContestPhase::Judging:
+		return std::make_unique<JudgingPart>(
+			system_, &bitmapFont_, scoreResult_, judgeCommentResults_);
+
+	case ContestPhase::Result:
+		return std::make_unique<ResultPart>(
+			system_, &bitmapFont_, scoreResult_, earnedNickname_);
+
+	case ContestPhase::Trophy:
+		return std::make_unique<TrophyPart>(system_, &bitmapFont_);
+
+	default:
+		return nullptr;
+	}
+}
+
+void ContestScene::HandleTrophyChoice() {
+	// TrophyPartにダウンキャストして選択結果を取得
+	auto* trophyPart = dynamic_cast<TrophyPart*>(currentPart_.get());
+	if (!trophyPart) return;
+
+	TrophyChoice choice = trophyPart->GetChoice();
+
+	switch (choice) {
+	case TrophyChoice::NextTheme:
+		fade_.StartFadeOut();
+		isStartTransition_ = true;
+		nextOutcome_ = SceneOutcome::NEXT;
+		break;
+
+	case TrophyChoice::Retry:
+		fade_.StartFadeOut();
+		isStartTransition_ = true;
+		nextOutcome_ = SceneOutcome::RETRY_MOD;
+		break;
+
+	case TrophyChoice::Title:
+		fade_.StartFadeOut();
+		isStartTransition_ = true;
+		nextOutcome_ = SceneOutcome::RETURN;
+		break;
+
+	default:
+		break;
+	}
 }
 
 void ContestScene::CameraPart() {
-    if (useDebugCamera_) {
-        usingCamera_ = debugCamera_;
-        debugCamera_->MouseControlUpdate();
-    } else {
-        usingCamera_ = camera_;
-    }
+	if (useDebugCamera_) {
+		usingCamera_ = debugCamera_;
+		debugCamera_->MouseControlUpdate();
+	} else {
+		usingCamera_ = camera_;
+	}
 
-    system_->SetCamera(usingCamera_);
+	system_->SetCamera(usingCamera_);
 }

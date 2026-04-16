@@ -21,7 +21,22 @@ Vector3 LerpV(const Vector3 &a, const Vector3 &b, float t) {
   return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t};
 }
 
+float ClampFloat(float value, float minValue, float maxValue) {
+  if (value < minValue) {
+    return minValue;
+  }
+  if (value > maxValue) {
+    return maxValue;
+  }
+  return value;
+}
+
 float AngleZFromMinusY(const Vector3 &dir) { return std::atan2(dir.x, -dir.y); }
+
+float AngleXFromMinusY(const Vector3 &dir) {
+  const float clampedZ = ClampFloat(dir.z, -1.0f, 1.0f);
+  return -std::asin(clampedZ);
+}
 
 Vector3 ZeroV() { return {0.0f, 0.0f, 0.0f}; }
 
@@ -59,16 +74,6 @@ bool GetVisualSegmentRoles(ModBodyPart part, ModControlPointRole &startRole,
   default:
     return false;
   }
-}
-
-float ClampFloat(float value, float minValue, float maxValue) {
-  if (value < minValue) {
-    return minValue;
-  }
-  if (value > maxValue) {
-    return maxValue;
-  }
-  return value;
 }
 
 bool IsLegControlPart(ModBodyPart part) {
@@ -1107,7 +1112,15 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
   mesh.translate = visualCenter;
 
   mesh.rotate = basePartTransforms_[partIndex].rotate;
+
+  // 正面から見た曲がり
   mesh.rotate.z = AngleZFromMinusY(segmentDir);
+
+  // 奥行き方向の曲がり
+  mesh.rotate.x = AngleXFromMinusY(segmentDir);
+
+  // いったんねじりは使わない
+  mesh.rotate.y = 0.0f;
 
   // セグメント太さは両端操作点半径の大きい方に合わせる
   const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);

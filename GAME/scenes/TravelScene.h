@@ -333,11 +333,30 @@ private:
 
   struct SegmentVisual {
     Vector3 root;
-    float angleZ;
     float length;
+    float angleX;
+    float angleZ;
     float thickness;
   };
 
   bool BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
                                 SegmentVisual &out);
+
+private:
+  // タイミング
+  enum class KickFeedbackType {
+    None,
+    Good,
+    Perfect,
+  };
+
+private:
+  KickFeedbackType kickFeedbackType_ = KickFeedbackType::None;
+  float kickFeedbackTimer_ = 0.0f;
+
+  // 描画方法切り替え(デバッグ用)
+  bool useModBodyApplyTorso_ = true;
+
+  void PrepareTorsoApplySource();
+  std::vector<ModControlPoint> torsoSharedPointsBuffer_;
 };

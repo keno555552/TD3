@@ -89,6 +89,21 @@ private:
   Camera *usingCamera_ = nullptr;      // 現在使用中のカメラ
   bool useDebugCamera_ = true;         // デバッグカメラを使うかどうか
 
+// ==============================
+// 周回カメラ用
+// ==============================
+Vector3 orbitTarget_{0.0f, 0.5f, 0.0f};
+float orbitYaw_ = 0.0f;
+float orbitPitch_ = 0.25f;
+float orbitDistance_ = 8.0f;
+float orbitRotateSpeed_ = 0.01f;
+float orbitZoomSpeed_ = 0.8f;
+float orbitMinDistance_ = 2.5f;
+float orbitMaxDistance_ = 20.0f;
+
+void UpdateOrbitCamera();
+Vector3 ComputeOrbitTarget() const;
+
   ModAssemblyGraph assembly_;       // 部位構造と親子関係を管理するグラフ
   std::vector<int> orderedPartIds_; // 描画や更新順に使う部位ID一覧
 
@@ -121,6 +136,9 @@ private:
   bool isDraggingControlPoint_ = false; // 左ドラッグ中かどうか
   float dragControlPlaneZ_ = 0.0f;      // ドラッグ時に固定する Z 平面
   Vector3 dragControlPointOffset_{0.0f, 0.0f, 0.0f}; // 掴んだ位置との差分
+
+Vector3 dragControlPlaneNormal_ = {0.0f, 0.0f, 1.0f};
+Vector3 dragControlPlanePoint_ = {0.0f, 0.0f, 0.0f};
 
   std::vector<TorsoControlPoint> torsoControlPoints_; // 胴体の操作点情報一覧
 
@@ -451,6 +469,7 @@ private:
       const ModSceneSegmentBox &box, const Vector4 &color,
       std::vector<DebugCapsuleDrawSphere> &out) const;
 
+
   /// <summary>
   /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
   /// </summary>
@@ -768,4 +787,6 @@ public:
   void EnsureDebugCapsuleGizmoCount(size_t requiredCount);
   void UpdateDebugCapsuleGizmos();
   void DrawDebugCapsuleGizmos();
+
+  bool ShouldBlockDebugCameraMouseControl() const;
 };
