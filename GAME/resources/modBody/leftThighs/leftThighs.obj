@@ -1,6 +1,6 @@
 # Blender 4.4.1
 # www.blender.org
-mtllib leftThigh.mtl
+mtllib leftThighs.mtl
 o leftThigh
 v 0.210872 0.783554 0.344216
 v 0.210872 0.783554 -0.439134

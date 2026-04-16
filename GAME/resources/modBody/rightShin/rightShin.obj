@@ -1,6 +1,6 @@
 # Blender 4.4.1
 # www.blender.org
-mtllib righeShin.mtl
+mtllib rightShin.mtl
 o rightShin
 v -0.147266 -1.525055 -0.365640
 v 0.171633 -1.525055 -0.365640
