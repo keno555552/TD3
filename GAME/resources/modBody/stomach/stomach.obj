@@ -1,6 +1,6 @@
 # Blender 4.4.1
 # www.blender.org
-mtllib stmach.mtl
+mtllib stomach.mtl
 o stmach
 v -0.843798 -0.623476 0.344216
 v -0.843798 -0.623476 -0.439134

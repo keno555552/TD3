@@ -1,6 +1,6 @@
 # Blender 4.4.1
 # www.blender.org
-mtllib righeUpperArm.mtl
+mtllib rightUpperArm.mtl
 o rightUpperArm
 v -0.109607 0.529395 0.145086
 v -0.109607 0.529395 -0.311280

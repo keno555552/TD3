@@ -1,6 +1,6 @@
 # Blender 4.4.1
 # www.blender.org
-mtllib righeThigh.mtl
+mtllib rightThighs.mtl
 o rightThigh
 v -0.234252 0.749972 0.344216
 v -0.234252 0.749972 -0.439134

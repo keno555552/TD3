@@ -29,11 +29,33 @@ MaterialData LoadMaterialTemplateFile(const std::string& directoryPath, const st
 
 MaterialData LoadTargetMaterialTemplateFile(const std::string& directoryPath, const std::string& filename, const std::string& target) {
 
+	// 1. 読み込もうとしているフルパスを構築
+	std::string fullPath = directoryPath + "/" + filename;
+
+	// 2. コンソール（黒い画面）に出力
+	std::cout << "[Loading MTL] " << fullPath << std::endl;
+
+	// 3. Visual Studio の「出力」ウィンドウにも出す（これがあると超便利です）
+	std::string debugMsg = "--- Loading MTL: " + fullPath + " ---\n";
+	OutputDebugStringA(debugMsg.c_str());
+
+	// --- ここでファイルを開く ---
+	std::ifstream file(fullPath);
+
+	if (!file.is_open()) {
+		// 4. 失敗した場合、より詳細なエラーメッセージを出す
+		std::string errorMsg = "!!! FAILED TO OPEN FILE !!!\nPath: " + fullPath + "\n";
+		OutputDebugStringA(errorMsg.c_str());
+
+		// ここで止まるので、上のログが最後に表示されたものが「犯人」です
+		assert(false && "Check the Output window for the failed file path.");
+	}
+
 	///1. 中で必要となる変数の宣言
 	MaterialData materialData;
 	std::string line;
-	std::ifstream file(directoryPath + "/" + filename);
-	assert(file.is_open());
+	/*std::ifstream file(directoryPath + "/" + filename);
+	assert(file.is_open());*/
 	bool isNewmtlRight = false;
 	///2. ファイルを開く
 	while (std::getline(file, line)) {
