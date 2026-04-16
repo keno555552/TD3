@@ -351,3 +351,26 @@ int ResourceManager::InputMaterialConfig(std::shared_ptr<MaterialConfig> materia
 
 	return materialList_.back().materialID;
 }
+
+void ResourceManager::CleanupUnusedMaterials() {
+  std::vector<MaterialEntry> newMaterialList;
+  std::vector<std::unique_ptr<BasicResource>> newResourceList;
+
+  newMaterialList.reserve(materialList_.size());
+  newResourceList.reserve(materialResourceList_.size());
+
+  for (size_t i = 0; i < materialList_.size(); ++i) {
+    if (!materialList_[i].config.expired()) {
+      newMaterialList.push_back(std::move(materialList_[i]));
+      newResourceList.push_back(std::move(materialResourceList_[i]));
+    }
+  }
+
+  materialList_ = std::move(newMaterialList);
+  materialResourceList_ = std::move(newResourceList);
+
+  idToIndex_.clear();
+  for (int i = 0; i < static_cast<int>(materialList_.size()); ++i) {
+    idToIndex_[materialList_[i].materialID] = i;
+  }
+}

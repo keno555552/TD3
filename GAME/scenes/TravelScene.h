@@ -2,6 +2,7 @@
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/ModBody.h"
+#include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
 #include <array>
 #include <memory>
@@ -78,6 +79,10 @@ private:
   Camera *usingCamera_ = nullptr;
 
   bool useDebugCamera_ = false;
+
+  /* ビットマップフォント
+  ------------------------------*/
+  BitmapFont bitmapFont;
 
   /* フェード
   ------------------------------*/
@@ -359,4 +364,125 @@ private:
 
   void PrepareTorsoApplySource();
   std::vector<ModControlPoint> torsoSharedPointsBuffer_;
+
+private:
+  // 地面との当たり判定用
+  enum class LowestBodyPart {
+    None,
+    LeftForeArm,
+    RightForeArm,
+    LeftShin,
+    RightShin,
+    Head,
+    Chest,
+    Stomach,
+  };
+
+  float GetLowestVisualBodyY(LowestBodyPart *outPart) const;
+  const char *GetLowestBodyPartName(LowestBodyPart part) const;
+  void ResolveVisualGroundPenetration();
+
+  float visualLiftY_ = 0.0f;
+
+  // NPC
+  struct NpcRunner {
+    float moveX = -18.0f;
+    float moveY = 0.0f;
+    float velocityX = 0.0f;
+    float velocityY = 0.0f;
+
+    float leftLegBend = 0.0f;
+    float rightLegBend = 0.0f;
+    float leftLegBendSpeed = 0.0f;
+    float rightLegBendSpeed = 0.0f;
+
+    float bodyTilt = 0.0f;
+    float bodyTiltVelocity = 0.0f;
+
+    float landTimer = 999.0f;
+
+    bool leftInput = false;
+    bool rightInput = false;
+    bool isGrounded = false;
+    bool finished = false;
+
+    float phaseTimer = 0.0f;
+    int phase = 0; // 0:左押し 1:左離し 2:右押し 3:右離し
+
+    float laneX = 0.0f;
+
+    float startDelay = 0.0f;
+    bool started = false;
+
+    float timingSkill = 1.0f;
+    float targetKickTime = 0.05f; 
+    bool hasKickPlan = false;
+    bool prevGrounded = false;
+
+    int lastTimingResult = 0;
+
+    int finishRank = -1;
+
+    std::unique_ptr<Object> debugObject;
+
+    bool useCustomizedVisual = false;
+
+    std::unique_ptr<ModBodyCustomizeData> customizeData;
+
+    std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects{};
+    std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies{};
+
+    std::vector<Object *> extraObjects;
+  };
+
+  std::vector<NpcRunner> npcRunners_;
+  int npcModelHandle_ = 0;
+
+  void InitializeNpcRunners();
+  void UpdateNpcRunners(float deltaTime);
+  void UpdateNpcInput(NpcRunner &npc, float deltaTime);
+  void UpdateNpcMovement(NpcRunner &npc);
+
+  // 順位
+  struct RaceEntry {
+    bool isPlayer = false;
+    int npcIndex = -1;
+    float progress = 0.0f;
+  };
+
+  int playerRank_ = 1;
+  void UpdateRaceRanking();
+
+  // レース通過人数
+  int qualifyCount_ = 3;
+  bool isPlayerQualified_ = false;
+  int goalCount_ = 0;
+
+  // リザルト
+  enum class RaceResultState { None, Clear, GameOver };
+
+  bool isPlayerFinished_ = false;
+  bool isRaceFinished_ = false;
+  int playerFinishRank_ = -1;
+
+  int finishCount_ = 0;
+
+  RaceResultState raceResultState_ = RaceResultState::None;
+
+  void UpdateRaceFinishState();
+
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetDefault();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetHeadBig();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetLongLeg();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetBigTorso();
+
+  void SetupNpcPartObject(
+      std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> &objects,
+      std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> &bodies,
+      ModBodyPart part, const std::string &path);
+
+  void SetupNpcCustomizedVisual(NpcRunner &npc);
+  void UpdateNpcCustomizedVisual(NpcRunner &npc);
+  void DrawNpcCustomizedVisual(NpcRunner &npc);
+  void ClearNpcCustomizedVisual(NpcRunner &npc);
 };

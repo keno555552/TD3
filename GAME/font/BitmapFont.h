@@ -107,4 +107,7 @@ private:
 	/// スプライトプールからスプライトを取得（足りなければ追加生成）
 	/// </summary>
 	SimpleSprite* GetPooledSprite();
+
+public:
+	void BeginFrame();
 };
