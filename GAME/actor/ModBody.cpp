@@ -262,6 +262,10 @@ Vector3 InverseRotateByEulerXYZLocal(const Vector3 &point, const Vector3 &rot) {
   return RotateByEulerXYZLocal(point, {-rot.x, -rot.y, -rot.z});
 }
 
+void DebugLogVector3(const char *label, const Vector3 &v) {
+  Logger::Log("%s=(%.3f, %.3f, %.3f)", label, v.x, v.y, v.z);
+}
+
 } // namespace
 
 void ModBody::Initialize(Object *target, ModBodyPart part) {
@@ -662,6 +666,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
 
   point.radius = newRadius;
 
+  Logger::Log("========== ScaleControlPoint START ==========");
+  Logger::Log("part=%d role=%d index=%d", static_cast<int>(part_),
+              static_cast<int>(role), static_cast<int>(index));
+  Logger::Log("oldRadius=%.3f newRadius=%.3f radiusDelta=%.3f scaleFactor=%.3f",
+              oldRadius, newRadius, radiusDelta, scaleFactor);
+  Logger::Log("param.scale=(%.3f, %.3f, %.3f) length=%.3f", param_.scale.x,
+              param_.scale.y, param_.scale.z, param_.length);
+  DebugLogVector3("point.localPosition", point.localPosition);
+
   if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
     const int chainIndex = chain_.FindIndex(role);
     if (chainIndex >= 0) {
@@ -703,6 +716,19 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
       const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
                                     Multiply(lateralPush, lateralDir));
 
+      Logger::Log("[RootScalePush] axialPush=%.3f lateralPush=%.3f", axialPush,
+                  lateralPush);
+      DebugLogVector3("segmentDir", segmentDir);
+      DebugLogVector3("lateralDir", lateralDir);
+      DebugLogVector3("totalPush", totalPush);
+
+      DebugLogVector3("bend.before", bendPos);
+      if (endIndex >= 0) {
+        DebugLogVector3(
+            "end.before",
+            controlPoints_[static_cast<size_t>(endIndex)].localPosition);
+      }
+
       controlPoints_[static_cast<size_t>(bendIndex)].localPosition =
           Add(controlPoints_[static_cast<size_t>(bendIndex)].localPosition,
               totalPush);
@@ -711,6 +737,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
         controlPoints_[static_cast<size_t>(endIndex)].localPosition =
             Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
                 totalPush);
+      }
+
+      DebugLogVector3(
+          "bend.after",
+          controlPoints_[static_cast<size_t>(bendIndex)].localPosition);
+      if (endIndex >= 0) {
+        DebugLogVector3(
+            "end.after",
+            controlPoints_[static_cast<size_t>(endIndex)].localPosition);
       }
     }
   }
@@ -740,9 +775,20 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
       const Vector3 totalPush = Add(Multiply(axialPush, segmentDir),
                                     Multiply(lateralPush, lateralDir));
 
+      Logger::Log("[BendScalePush] axialPush=%.3f lateralPush=%.3f", axialPush,
+                  lateralPush);
+      DebugLogVector3("segmentDir", segmentDir);
+      DebugLogVector3("lateralDir", lateralDir);
+      DebugLogVector3("totalPush", totalPush);
+      DebugLogVector3("end.before", endPos);
+
       controlPoints_[static_cast<size_t>(endIndex)].localPosition =
           Add(controlPoints_[static_cast<size_t>(endIndex)].localPosition,
               totalPush);
+
+      DebugLogVector3(
+          "end.after",
+          controlPoints_[static_cast<size_t>(endIndex)].localPosition);
     }
   }
 
@@ -752,6 +798,15 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
   if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
     SyncControlPointsFromChain(&controlPoints_, chain_);
   }
+
+  for (size_t i = 0; i < controlPoints_.size(); ++i) {
+    Logger::Log("point[%d] role=%d radius=%.3f pos=(%.3f, %.3f, %.3f)",
+                static_cast<int>(i), static_cast<int>(controlPoints_[i].role),
+                controlPoints_[i].radius, controlPoints_[i].localPosition.x,
+                controlPoints_[i].localPosition.y,
+                controlPoints_[i].localPosition.z);
+  }
+  Logger::Log("========== ScaleControlPoint END ==========");
 
   return true;
 }
@@ -1020,6 +1075,15 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
     return;
   }
 
+  Logger::Log("========== ApplySegmentToObjectPart START ==========");
+  Logger::Log("part=%d partIndex=%d", static_cast<int>(part_),
+              static_cast<int>(partIndex));
+  DebugLogVector3("startPos", startPos);
+  DebugLogVector3("endPos", endPos);
+  Logger::Log("startRadius=%.3f endRadius=%.3f", startRadius, endRadius);
+  Logger::Log("param.scale=(%.3f, %.3f, %.3f) length=%.3f", param_.scale.x,
+              param_.scale.y, param_.scale.z, param_.length);
+
   Transform mesh = basePartTransforms_[partIndex];
 
   const Vector3 rawSegment = Subtract(endPos, startPos);
@@ -1058,6 +1122,11 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
   const float thicknessScale =
       segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
 
+  DebugLogVector3("expandedStart", expandedStart);
+  DebugLogVector3("expandedEnd", expandedEnd);
+  DebugLogVector3("visualCenter", visualCenter);
+  Logger::Log("========== ApplySegmentToObjectPart END ==========");
+
   mesh.scale = basePartTransforms_[partIndex].scale;
   mesh.scale.x *= thicknessScale * param_.scale.x;
   mesh.scale.y = visualLength * param_.scale.y * param_.length;
@@ -1076,6 +1145,9 @@ void ModBody::ApplySingleMeshFallback(Object *target,
   }
 
   Vector3 newScale = MakePartScale(baseMeshTransform.scale, param);
+
+  DebugLogVector3("newScale", newScale);
+
   Transform mesh = baseMeshTransform;
   mesh.scale = newScale;
   mesh.translate =

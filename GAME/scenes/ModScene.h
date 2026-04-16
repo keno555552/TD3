@@ -13,17 +13,28 @@
 #include <unordered_map>
 #include <vector>
 
-struct ModCapsule;
+struct ModSceneSegmentBox {
+  Vector3 center{0.0f, 0.0f, 0.0f};
 
-struct ModSceneCapsuleSegment {
-  Vector3 start{0.0f, 0.0f, 0.0f};
-  Vector3 end{0.0f, 0.0f, 0.0f};
-  float radius = 0.0f;
+  Vector3 axisX{1.0f, 0.0f, 0.0f};
+  Vector3 axisY{0.0f, 1.0f, 0.0f};
+  Vector3 axisZ{0.0f, 0.0f, 1.0f};
+
+  float halfWidth = 0.0f;
+  float halfLength = 0.0f;
+  float halfDepth = 0.0f;
 };
 
-struct ModSceneCapsuleSet {
-  ModSceneCapsuleSegment segments[2];
+struct ModSceneSegmentBoxSet {
+  ModSceneSegmentBox segments[2];
   int count = 0;
+};
+
+/*デバッグカプセル*/
+struct DebugCapsuleDrawSphere {
+  Vector3 worldPosition{0.0f, 0.0f, 0.0f};
+  float radius = 0.05f;
+  Vector4 color{1.0f, 0.0f, 0.0f, 0.5f};
 };
 
 /// <summary>
@@ -122,6 +133,9 @@ private:
 
   float assemblyAttachSearchRadius_ = 1.35f; // 接続有効範囲
   float assemblyAttachSnapRadius_ = 0.55f;   // 接続時スナップ距離
+
+  mutable std::unordered_map<int, float> modelLocalVisualRadiusCache_;
+  mutable std::unordered_map<int, float> modelLocalVisualHalfHeightCache_;
 
 private:
   /// <summary>
@@ -420,12 +434,22 @@ private:
   bool ScaleTorsoControlPoint(size_t index, float scaleFactor);
 
   /// <summary>
-  /// 指定部位の操作点を拡縮する
+  /// 指定部位のピック用ボックスを構築する
   /// </summary>
-  /// <param name="partId">拡縮対象の部位ID</param>
-  /// <param name="outCapsules">拡縮後のカプセルセットを受け取る参照</param>
-  /// <returns></returns>
-  bool BuildPartPickCapsules(int partId, ModSceneCapsuleSet &outCapsules) const;
+  /// <param name="partId">対象部位ID</param>
+  /// <param name="outBoxes">構築されたボックスを受け取る参照</param>
+  /// <returns>成功したら true</returns>
+  bool BuildPartPickBoxes(int partId, ModSceneSegmentBoxSet &outBoxes) const;
+
+  /// <summary>
+  /// セグメントボックスをデバッグ描画用の球セットに変換して追加する
+  /// </summary>
+  /// <param name="box">対象のセグメントボックス</param>
+  /// <param name="color">デバッグ描画用の色</param>
+  /// <param name="out">変換された球セットを受け取る参照</param>
+  void AppendDebugSpheresForSegmentBox(
+      const ModSceneSegmentBox &box, const Vector4 &color,
+      std::vector<DebugCapsuleDrawSphere> &out) const;
 
   /// <summary>
   /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
@@ -491,50 +515,163 @@ private:
   /// <param name="pickedPartId">ドラッグ開始元の部位ID</param>
   void BeginAssemblyDragFromPart(int pickedPartId);
 
+  /// <summary>
+  /// 各部位のワールド座標取得
+  /// </summary>
+  /// <param name="partId">対象部位ID</param>
+  /// <returns>部位のワールド座標</returns>
   Vector3 GetPartWorldPosition(int partId) const;
+
+  /// <summary>
+  /// 各操作点のワールド座標取得
+  /// </summary>
+  /// <param name="rootPartId">対象部位ID</param>
+  /// <returns>操作点のワールド座標</returns>
   Vector3 GetAssemblyRootWorldPosition(int rootPartId) const;
 
+  /// <summary>
+  /// 部位IDが付け替えドラッグのルートとして有効かどうか
+  /// </summary>
+  /// <param name="partId">対象部位ID</param>
+  /// <returns>有効なら true</returns>
   bool IsAssemblyRootPartId(int partId) const;
+
+  /// <summary>
+  /// 接続先として、子部位ルートを親部位へ付け替え可能かどうか
+  /// </summary>
+  /// <param name="childRootPartId">子部位ルートの部位ID</param>
+  /// <param name="parentPartId">親部位の部位ID</param>
+  /// <returns>付け替え可能なら true</returns>
   bool CanAttachAssemblyRootToParentPart(int childRootPartId,
                                          int parentPartId) const;
 
+  /// <summary>
+  /// マウス位置に最も近い有効な接続候補を探す
+  /// </summary>
+  /// <param name="childRootPartId">子部位ルートの部位ID</param>
+  /// <param name="dragWorldPosition">ドラッグ中のワールド座標</param>
+  /// <returns>最適な接続候補</returns>
   ModAttachSearchResult
   FindBestAttachCandidate(int childRootPartId,
                           const Vector3 &dragWorldPosition) const;
 
+  /// <summary>
+  /// 接続候補に基づいて、子部位ルートのローカル移動量を計算する
+  /// </summary>
+  /// <param name="childRootPartId">子部位ルートの部位ID</param>
+  /// <param name="candidate">接続候補</param>
+  /// <returns>計算されたローカル移動量</returns>
   Vector3 ComputeAssemblyPreviewLocalTranslate(
       int childRootPartId, const ModAttachFaceCandidate &candidate) const;
 
+  /// <summary>
+  /// 現在のマウス Ray に基づいて、部位ドラッグの接続候補を更新する
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
   void UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay);
 
+  /// <summary>
+  /// 部位ドラッグのプレビューをシーンに適用する
+  /// </summary>
   void ApplyAssemblyDragPreview();
 
+  /// <summary>
+  /// 部位ドラッグの更新処理
+  /// </summary>
   void UpdateAssemblyDragTest();
 
+  /// <summary>
+  /// 部位ドラッグの確定処理
+  /// </summary>
   void ConfirmAssemblyDragPlacement();
+
+  /// <summary>
+  /// 部位ドラッグのキャンセル処理
+  /// </summary>
   void CancelAssemblyDragPlacement();
+
+  /// <summary>
+  /// 指定した部位IDが現在ドラッグ中の部位構造に含まれているかどうかを返す
+  /// </summary>
+  /// <param name="partId">部位ID</param>
+  /// <returns>含まれている場合は true</returns>
   bool IsPartInDraggingAssembly(int partId) const;
+
+  /// <summary>
+  /// 部位ドラッグのプレビュー状態に基づいて、シーン上の見た目を更新する
+  /// </summary>
   void ApplyAssemblyDragVisualFeedback();
 
+  /// <summary>
+  /// 現在のマウス状態が、部位ドラッグの継続条件を満たしているかどうかを返す
+  /// </summary>
+  /// <returns>継続条件を満たしている場合は true</returns>
   bool IsMouseLeftPressedNow() const;
+
+  /// <summary>
+  /// 現在のマウス状態が、部位ドラッグの開始条件を満たしているかどうかを返す
+  /// </summary>
+  /// <returns>開始条件を満たしている場合は true</returns>
   bool IsMouseLeftTriggeredNow() const;
+
+  /// <summary>
+  /// 現在のマウス状態が、部位ドラッグの終了条件を満たしているかどうかを返す
+  /// </summary>
+  /// <returns>終了条件を満たしている場合は true</returns>
   bool IsMouseLeftReleasedNow() const;
 
+  /// <summary>
+  /// 指定した部位IDと操作点インデックスが、部位ドラッグの優先的な操作点であるかどうかを返す
+  /// </summary>
+  /// <param name="ownerPartId">部位ID</param>
+  /// <param name="pointIndex">操作点インデックス</param>
+  /// <returns>優先的な操作点である場合は true</returns>
   bool IsAssemblyDragPriorityControlPoint(int ownerPartId,
                                           int pointIndex) const;
 
+  /// <summary>
+  /// マウスの Ray に基づいて、部位ドラッグを開始できるか試みる
+  /// </summary>
+  /// <param name="mouseRay">マウス位置から作成した Ray</param>
+  /// <returns>開始可能な場合は true</returns>
   bool TryBeginAssemblyDragFromMouseRay(const Ray &mouseRay);
 
+  /// <summary>
+  /// 部位ドラッグのプレビュー状態に基づいて、子部位ルートのローカル移動量を計算する
+  /// </summary>
+  /// <param name="childRootPartId">子部位ルートの部位ID</param>
+  /// <param name="desiredRootWorld">希望するルートのワールド座標</param>
+  /// <returns>計算されたローカル移動量</returns>
   Vector3
   ComputeAssemblyFreeDragLocalTranslate(int childRootPartId,
                                         const Vector3 &desiredRootWorld) const;
 
+  /// <summary>
+  /// 部位ドラッグのプレビュー状態に基づいて、子部位ルートのローカル移動量を計算する
+  /// </summary>
+  /// <param name="movingAssemblyRootPartId">移動中の部位ルートの部位ID</param>
+  /// <param name="ignoreParentPartId">無視する親部位の部位ID</param>
+  /// <returns>重なりがある場合は true</returns>
   bool IsAssemblyPreviewOverlapping(int movingAssemblyRootPartId,
                                     int ignoreParentPartId) const;
 
+  /// <summary>
+  /// 部位ドラッグのプレビュー状態に基づいて、子部位ルートを親部位へ付け替え可能かどうかを返す
+  /// </summary>
+  /// <param name="parentNode">親部位ノード</param>
+  /// <param name="worldPosition">ワールド座標</param>
+  /// <returns>付け替え可能な場合は接続点ID、不可の場合は -1</returns>
   int FindBestParentConnectorIdForPosition(const PartNode &parentNode,
                                            const Vector3 &worldPosition) const;
 
+  /// <summary>
+  /// 部位ドラッグのプレビュー状態に基づいて、接続カプセル候補を構築する
+  /// </summary>
+  /// <param name="childRootPartId">子部位ルートの部位ID</param>
+  /// <param name="parentPartId">親部位の部位ID</param>
+  /// <param name="dragWorldPosition">ドラッグ中のワールド座標</param>
+  /// <param name="outCandidate">構築された候補を格納するポインタ</param>
+  /// <returns>構築に成功した場合は true、失敗した場合は false</returns>
   bool BuildAttachCapsuleCandidate(int childRootPartId, int parentPartId,
                                    const Vector3 &dragWorldPosition,
                                    ModAttachFaceCandidate *outCandidate) const;
@@ -583,6 +720,38 @@ private:
 
   Vector3 GetControlPointLocalPosition(ModControlPointRole role) const;
 
+  /// <summary>
+  /// 指定モデルのローカル見た目半径を取得する
+  /// OBJ頂点を rootNode.localMatrix 込みで評価し、X/Z の横幅だけから求める
+  /// </summary>
+  float GetModelLocalVisualRadius(ModBodyPart part) const;
+
+  /// <summary>
+  /// 指定部位のカプセル半径補正倍率を自動計算する
+  /// モデル実寸の横幅と、コード側のデフォルト半径との差を吸収する
+  /// </summary>
+  float GetAutoCapsuleRadiusScale(ModBodyPart part,
+                                  ModControlPointRole startRole,
+                                  ModControlPointRole endRole) const;
+
+  /// <summary>
+  /// 胴体用のカプセル半径補正倍率を自動計算する
+  /// </summary>
+  float GetAutoTorsoCapsuleRadiusScale(ModControlPointRole startRole,
+                                       ModControlPointRole endRole) const;
+
+  /// <summary>
+  /// 指定モデルのローカル見た目高さ半径を取得する
+  /// OBJ頂点を rootNode.localMatrix 込みで評価し、Y の半幅を求める
+  /// </summary>
+  float GetModelLocalVisualHalfHeight(ModBodyPart part) const;
+
+  /// <summary>
+  /// 頭部専用のピック用ボックスを構築する
+  /// 頭は neck の制御点線分ではなく、head モデル実寸ベースで判定する
+  /// </summary>
+  bool BuildHeadPickBox(int partId, ModSceneSegmentBoxSet &outBoxes) const;
+
 public:
   // 改造シーンでも移動シーンと共通の制限時間を使う
   float timeLimit_ = 180.0f;      // 制限時間（秒）
@@ -590,4 +759,13 @@ public:
   bool isTimeUp_ = false;         // 時間切れになったか
 
   bool ShouldBlockDebugCameraMouseControl() const;
+
+  /*デバッグカプセル*/
+  bool showDebugCapsules_ = true;
+  std::vector<std::unique_ptr<Object>> debugCapsuleGizmos_;
+  size_t activeDebugCapsuleGizmoCount_ = 0;
+
+  void EnsureDebugCapsuleGizmoCount(size_t requiredCount);
+  void UpdateDebugCapsuleGizmos();
+  void DrawDebugCapsuleGizmos();
 };

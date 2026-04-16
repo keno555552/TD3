@@ -129,19 +129,13 @@ float SignedDistanceCapsuleToCapsule(const ModCapsule &a, const ModCapsule &b) {
 Vector3 GetSurfacePointTowardDirection(const ModCapsule &capsule,
                                        const Vector3 &direction,
                                        const Vector3 &fallbackNormal) {
-  const Vector3 axis = Subtract(capsule.end, capsule.start);
-  const float axisLenSq = Dot(axis, axis);
+  Vector3 outward = NormalizeSafe(direction, fallbackNormal);
 
-  Vector3 dir = NormalizeSafe(direction, fallbackNormal);
+  // 方向だけから表面点を取りたい場合は、
+  // 軸上の「中央」を基準にするのが一番安定する
+  const Vector3 axisMid = Multiply(0.5f, Add(capsule.start, capsule.end));
 
-  Vector3 axisPoint = capsule.start;
-  if (axisLenSq > 0.000001f) {
-    const float t =
-        Clamp01(Dot(Subtract(dir, {0.0f, 0.0f, 0.0f}), axis) / axisLenSq);
-    axisPoint = Add(capsule.start, Multiply(t, axis));
-  }
-
-  return Add(axisPoint, Multiply(capsule.radius, dir));
+  return Add(axisMid, Multiply(capsule.radius, outward));
 }
 
 Vector3 GetSurfacePointTowardPosition(const ModCapsule &capsule,

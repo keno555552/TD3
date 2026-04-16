@@ -3,7 +3,6 @@
 #include "GAME/actor/ModAssemblyUtil.h"
 #include "GAME/actor/ModObjectUtil.h"
 #include "GAME/actor/prompt/PromptData.h"
-#include "GAME/actor/ModCapsuleUtil.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
 #include <cfloat>
@@ -451,25 +450,6 @@ bool IsDescendantPartIdRecursive(const ModAssemblyGraph &assembly,
   return false;
 }
 
-ModCapsuleAttachSide ToCapsuleAttachSide(ModAttachFace face) {
-  switch (face) {
-  case ModAttachFace::PosX:
-    return ModCapsuleAttachSide::PosX;
-  case ModAttachFace::NegX:
-    return ModCapsuleAttachSide::NegX;
-  case ModAttachFace::PosY:
-    return ModCapsuleAttachSide::PosY;
-  case ModAttachFace::NegY:
-    return ModCapsuleAttachSide::NegY;
-  case ModAttachFace::PosZ:
-    return ModCapsuleAttachSide::PosZ;
-  case ModAttachFace::NegZ:
-    return ModCapsuleAttachSide::NegZ;
-  default:
-    return ModCapsuleAttachSide::PosY;
-  }
-}
-
 Vector3 ClosestPointOnSegmentLocal(const Vector3 &point, const Vector3 &a,
                                    const Vector3 &b) {
   const Vector3 ab = Subtract(b, a);
@@ -495,6 +475,293 @@ float DistancePointToCapsuleSurfaceSq(const Vector3 &point,
   const float centerDist = sqrtf((std::max)(0.0f, centerDistSq));
   const float surfaceDist = (std::max)(0.0f, centerDist - capsuleRadius);
   return surfaceDist * surfaceDist;
+}
+
+void BuildExpandedSegment(const Vector3 &startPos, const Vector3 &endPos,
+                          float startRadius, float endRadius,
+                          Vector3 *outExpandedStart, Vector3 *outExpandedEnd) {
+  if (outExpandedStart == nullptr || outExpandedEnd == nullptr) {
+    return;
+  }
+
+  const Vector3 rawSegment = Subtract(endPos, startPos);
+  const float rawLength = Length(rawSegment);
+
+  Vector3 segmentDir = {0.0f, -1.0f, 0.0f};
+  if (rawLength > 0.0001f) {
+    segmentDir = NormalizeSafeV(rawSegment, segmentDir);
+  }
+
+  const float safeStartRadius = (std::max)(startRadius, 0.01f);
+  const float safeEndRadius = (std::max)(endRadius, 0.01f);
+
+  *outExpandedStart = Subtract(startPos, Multiply(safeStartRadius, segmentDir));
+  *outExpandedEnd = Add(endPos, Multiply(safeEndRadius, segmentDir));
+}
+
+bool IsDebugCapsuleTargetPart(ModBodyPart part) {
+  switch (part) {
+  case ModBodyPart::ChestBody:
+  case ModBodyPart::StomachBody:
+  case ModBodyPart::Neck:
+  case ModBodyPart::Head:
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::RightShin:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/*デバッグカプセル*/
+void DebugLogVector3(const char *label, const Vector3 &v) {
+  Logger::Log("%s=(%.3f, %.3f, %.3f)", label, v.x, v.y, v.z);
+}
+
+float ClampFloat01Local(float value) {
+  if (value < 0.0f) {
+    return 0.0f;
+  }
+  if (value > 1.0f) {
+    return 1.0f;
+  }
+  return value;
+}
+
+Vector3 LerpVector3Local(const Vector3 &a, const Vector3 &b, float t) {
+  return Add(a, Multiply(t, Subtract(b, a)));
+}
+/*-------------------------------------*/
+
+Vector3 TransformPointByMatrixLocal(const Matrix4x4 &m, const Vector3 &p) {
+  Vector3 result{};
+  result.x = p.x * m.m[0][0] + p.y * m.m[1][0] + p.z * m.m[2][0] + m.m[3][0];
+  result.y = p.x * m.m[0][1] + p.y * m.m[1][1] + p.z * m.m[2][1] + m.m[3][1];
+  result.z = p.x * m.m[0][2] + p.y * m.m[1][2] + p.z * m.m[2][2] + m.m[3][2];
+  return result;
+}
+
+float GetDefaultSegmentRadiusForPartRoles(ModBodyPart part,
+                                          ModControlPointRole startRole,
+                                          ModControlPointRole endRole) {
+  switch (part) {
+  case ModBodyPart::ChestBody:
+    if (startRole == ModControlPointRole::Chest &&
+        endRole == ModControlPointRole::Belly) {
+      return (0.12f + 0.10f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::StomachBody:
+    if (startRole == ModControlPointRole::Belly &&
+        endRole == ModControlPointRole::Waist) {
+      return (0.10f + 0.12f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::Neck:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return (0.09f + 0.08f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::Head:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return (0.08f + 0.11f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return (0.09f + 0.08f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return (0.08f + 0.08f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return (0.10f + 0.09f) * 0.5f;
+    }
+    break;
+
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return (0.09f + 0.09f) * 0.5f;
+    }
+    break;
+
+  default:
+    break;
+  }
+
+  return 0.10f;
+}
+
+Vector3 CrossLocal(const Vector3 &a, const Vector3 &b) {
+  return {
+      a.y * b.z - a.z * b.y,
+      a.z * b.x - a.x * b.z,
+      a.x * b.y - a.y * b.x,
+  };
+}
+
+float AbsDotLocal(const Vector3 &a, const Vector3 &b) {
+  const float d = Dot(a, b);
+  return (d >= 0.0f) ? d : -d;
+}
+
+bool IntersectRaySegmentBox(const Ray &ray, const ModSceneSegmentBox &box,
+                            float *outT) {
+  const float epsilon = 0.0001f;
+
+  const Vector3 p = Subtract(box.center, ray.origin);
+
+  const Vector3 axes[3] = {box.axisX, box.axisY, box.axisZ};
+  const float extents[3] = {box.halfWidth, box.halfLength, box.halfDepth};
+
+  float tMin = -FLT_MAX;
+  float tMax = FLT_MAX;
+
+  for (int i = 0; i < 3; ++i) {
+    const float e = Dot(axes[i], p);
+    const float f = Dot(axes[i], ray.direction);
+
+    if (fabsf(f) > epsilon) {
+      float t1 = (e + extents[i]) / f;
+      float t2 = (e - extents[i]) / f;
+
+      if (t1 > t2) {
+        const float tmp = t1;
+        t1 = t2;
+        t2 = tmp;
+      }
+
+      if (t1 > tMin) {
+        tMin = t1;
+      }
+      if (t2 < tMax) {
+        tMax = t2;
+      }
+
+      if (tMin > tMax) {
+        return false;
+      }
+      if (tMax < 0.0f) {
+        return false;
+      }
+    } else {
+      if (-e - extents[i] > 0.0f || -e + extents[i] < 0.0f) {
+        return false;
+      }
+    }
+  }
+
+  float hitT = tMin;
+  if (hitT < 0.0f) {
+    hitT = tMax;
+  }
+  if (hitT < 0.0f) {
+    return false;
+  }
+
+  if (outT != nullptr) {
+    *outT = hitT;
+  }
+  return true;
+}
+
+bool IntersectSegmentBoxes(const ModSceneSegmentBox &a,
+                           const ModSceneSegmentBox &b,
+                           float extraMargin = 0.0f) {
+  const Vector3 A[3] = {a.axisX, a.axisY, a.axisZ};
+  const Vector3 B[3] = {b.axisX, b.axisY, b.axisZ};
+
+  const float aExt[3] = {
+      a.halfWidth + extraMargin,
+      a.halfLength + extraMargin,
+      a.halfDepth + extraMargin,
+  };
+
+  const float bExt[3] = {
+      b.halfWidth + extraMargin,
+      b.halfLength + extraMargin,
+      b.halfDepth + extraMargin,
+  };
+
+  float R[3][3];
+  float AbsR[3][3];
+
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      R[i][j] = Dot(A[i], B[j]);
+      AbsR[i][j] = fabsf(R[i][j]) + 0.0001f;
+    }
+  }
+
+  const Vector3 tWorld = Subtract(b.center, a.center);
+  const float t[3] = {
+      Dot(tWorld, A[0]),
+      Dot(tWorld, A[1]),
+      Dot(tWorld, A[2]),
+  };
+
+  float ra = 0.0f;
+  float rb = 0.0f;
+
+  for (int i = 0; i < 3; ++i) {
+    ra = aExt[i];
+    rb = bExt[0] * AbsR[i][0] + bExt[1] * AbsR[i][1] + bExt[2] * AbsR[i][2];
+    if (fabsf(t[i]) > ra + rb) {
+      return false;
+    }
+  }
+
+  for (int j = 0; j < 3; ++j) {
+    ra = aExt[0] * AbsR[0][j] + aExt[1] * AbsR[1][j] + aExt[2] * AbsR[2][j];
+    rb = bExt[j];
+    if (fabsf(t[0] * R[0][j] + t[1] * R[1][j] + t[2] * R[2][j]) > ra + rb) {
+      return false;
+    }
+  }
+
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j) {
+      ra = aExt[(i + 1) % 3] * AbsR[(i + 2) % 3][j] +
+           aExt[(i + 2) % 3] * AbsR[(i + 1) % 3][j];
+      rb = bExt[(j + 1) % 3] * AbsR[i][(j + 2) % 3] +
+           bExt[(j + 2) % 3] * AbsR[i][(j + 1) % 3];
+
+      const float value = fabsf(t[(i + 2) % 3] * R[(i + 1) % 3][j] -
+                                t[(i + 1) % 3] * R[(i + 2) % 3][j]);
+
+      if (value > ra + rb) {
+        return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 } // namespace
@@ -651,6 +918,10 @@ void ModScene::Update() {
   // 現在の構造とパラメータを見た目へ反映する
   UpdateModObjects();
 
+  /*デバッグカプセル*/
+  UpdateDebugCapsuleGizmos();
+  /*-----------------------*/
+
   if (isStartTransition_) {
     // 胴体(id=1)と頭(id=4)の操作点を確認する
     for (const auto &pair : modBodies_) {
@@ -735,6 +1006,10 @@ void ModScene::Draw() {
   // 改造用UI本体を表示する
   DrawModGui();
 #endif
+
+  /*デバッグカプセル*/
+  //DrawDebugCapsuleGizmos();
+  /*-----------------------*/
 
   // フェードを描画する
   fade_.Draw();
@@ -1063,11 +1338,11 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.localTransform = node->localTransform;
     instance.param = modBodies_[id].GetParam();
 
-    Logger::Log("SAVE PARAM CHECK : id=%d partType=%d length=%.3f scale=(%.3f, "
+    /*Logger::Log("SAVE PARAM CHECK : id=%d partType=%d length=%.3f scale=(%.3f, "
                 "%.3f, %.3f)",
                 id, static_cast<int>(instance.partType), instance.param.length,
                 instance.param.scale.x, instance.param.scale.y,
-                instance.param.scale.z);
+                instance.param.scale.z);*/
 
     // 新方式ではインスタンス単位で count は常に 1
     instance.param.count = 1;
@@ -1153,8 +1428,8 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
     const std::vector<ModControlPoint> &points =
         modBodies_.at(id).GetControlPoints();
 
-    Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
-                static_cast<int>(node->part), static_cast<int>(points.size()));
+    /*Logger::Log("SNAP SAVE CHECK : id=%d partType=%d pointCount=%d", id,
+                static_cast<int>(node->part), static_cast<int>(points.size()));*/
 
     if (id == 13) {
       for (size_t pointIndex = 0; pointIndex < points.size(); ++pointIndex) {
@@ -1760,16 +2035,14 @@ void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int partId = orderedPartIds_[i];
 
-    ModSceneCapsuleSet capsuleSet{};
-    if (!BuildPartPickCapsules(partId, capsuleSet)) {
+    ModSceneSegmentBoxSet boxSet{};
+    if (!BuildPartPickBoxes(partId, boxSet)) {
       continue;
     }
 
-    for (int ci = 0; ci < capsuleSet.count; ++ci) {
-      const ModSceneCapsuleSegment &seg = capsuleSet.segments[ci];
-
+    for (int bi = 0; bi < boxSet.count; ++bi) {
       float t = 0.0f;
-      if (!IntersectRayCapsule(mouseRay, seg.start, seg.end, seg.radius, &t)) {
+      if (!IntersectRaySegmentBox(mouseRay, boxSet.segments[bi], &t)) {
         continue;
       }
 
@@ -2708,28 +2981,58 @@ bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
   return true;
 }
 
-bool ModScene::BuildPartPickCapsules(int partId,
-                                     ModSceneCapsuleSet &outCapsules) const {
-  outCapsules.count = 0;
+bool ModScene::BuildPartPickBoxes(int partId,
+                                  ModSceneSegmentBoxSet &outBoxes) const {
+  outBoxes.count = 0;
 
   const PartNode *node = assembly_.FindNode(partId);
   if (node == nullptr) {
     return false;
   }
 
-  auto pushSegment = [&](const Vector3 &start, const Vector3 &end,
-                         float radius) {
-    if (outCapsules.count >= 2) {
+  if (node->part == ModBodyPart::Head) {
+    return BuildHeadPickBox(partId, outBoxes);
+  }
+
+  auto pushBox = [&](const Vector3 &start, const Vector3 &end, float halfWidth,
+                     float halfDepth) {
+    if (outBoxes.count >= 2) {
       return;
     }
 
-    outCapsules.segments[outCapsules.count].start = start;
-    outCapsules.segments[outCapsules.count].end = end;
-    outCapsules.segments[outCapsules.count].radius = radius;
-    ++outCapsules.count;
+    ModSceneSegmentBox &box = outBoxes.segments[outBoxes.count];
+
+    const Vector3 segment = Subtract(end, start);
+    const float segmentLength = Length(segment);
+
+    Vector3 axisY = {0.0f, 1.0f, 0.0f};
+    if (segmentLength > 0.0001f) {
+      axisY = NormalizeSafeV(segment, axisY);
+    }
+
+    Vector3 fallbackForward = {0.0f, 0.0f, 1.0f};
+    Vector3 axisX = CrossLocal(fallbackForward, axisY);
+
+    if (Length(axisX) <= 0.0001f) {
+      fallbackForward = {1.0f, 0.0f, 0.0f};
+      axisX = CrossLocal(fallbackForward, axisY);
+    }
+
+    axisX = NormalizeSafeV(axisX, {1.0f, 0.0f, 0.0f});
+    Vector3 axisZ =
+        NormalizeSafeV(CrossLocal(axisY, axisX), {0.0f, 0.0f, 1.0f});
+
+    box.center = Multiply(0.5f, Add(start, end));
+    box.axisX = axisX;
+    box.axisY = axisY;
+    box.axisZ = axisZ;
+    box.halfWidth = (std::max)(halfWidth, 0.01f);
+    box.halfDepth = (std::max)(halfDepth, 0.01f);
+    box.halfLength = (std::max)(segmentLength * 0.5f, 0.01f);
+
+    ++outBoxes.count;
   };
 
-  // torso は Chest->Belly と Belly->Waist の2本
   if (node->part == ModBodyPart::ChestBody ||
       node->part == ModBodyPart::StomachBody) {
     const int chestIndex =
@@ -2750,16 +3053,15 @@ bool ModScene::BuildPartPickCapsules(int partId,
     const Vector3 waist =
         GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
 
-    const float upperRadius = GetTorsoVisualSegmentRadius(
-        ModControlPointRole::Chest, ModControlPointRole::Belly);
+    const float chestHalfWidth =
+        GetModelLocalVisualRadius(ModBodyPart::ChestBody);
+    const float stomachHalfWidth =
+        GetModelLocalVisualRadius(ModBodyPart::StomachBody);
 
-    const float lowerRadius = GetTorsoVisualSegmentRadius(
-        ModControlPointRole::Belly, ModControlPointRole::Waist);
+    pushBox(chest, belly, chestHalfWidth, chestHalfWidth);
+    pushBox(belly, waist, stomachHalfWidth, stomachHalfWidth);
 
-    pushSegment(chest, belly, (std::max)(upperRadius, 0.01f));
-    pushSegment(belly, waist, (std::max)(lowerRadius, 0.01f));
-
-    return outCapsules.count > 0;
+    return outBoxes.count > 0;
   }
 
   const int ownerId = ResolveControlOwnerPartId(assembly_, partId);
@@ -2786,51 +3088,42 @@ bool ModScene::BuildPartPickCapsules(int partId,
                                              static_cast<size_t>(index));
   };
 
-  // Root -> Bend
-  if (rootIndex >= 0 && bendIndex >= 0) {
-    const Vector3 start = worldAt(rootIndex);
-    const Vector3 end = worldAt(bendIndex);
-
-    const float radius = GetPartVisualSegmentRadius(
-        ownerId, ModControlPointRole::Root, ModControlPointRole::Bend);
-
-    pushSegment(start, end, (std::max)(radius, 0.01f));
-  }
-
-  // Bend -> End
-  if (bendIndex >= 0 && endIndex >= 0) {
-    const Vector3 start = worldAt(bendIndex);
-    const Vector3 end = worldAt(endIndex);
-
-    const float radius = GetPartVisualSegmentRadius(
-        ownerId, ModControlPointRole::Bend, ModControlPointRole::End);
-
-    pushSegment(start, end, (std::max)(radius, 0.01f));
-  }
-
-  // fallback
-  if (outCapsules.count == 0) {
-    ModControlPointRole startRole = ModControlPointRole::None;
-    ModControlPointRole endRole = ModControlPointRole::None;
-
-    if (!GetPickSegmentRoles(node->part, startRole, endRole)) {
-      return false;
+  auto pushSegmentBox = [&](int startIndex, int endIndex) {
+    if (startIndex < 0 || endIndex < 0) {
+      return;
     }
 
-    const int startIndex = body.FindControlPointIndex(startRole);
-    const int endIndex2 = body.FindControlPointIndex(endRole);
-    if (startIndex >= 0 && endIndex2 >= 0) {
-      const Vector3 start = worldAt(startIndex);
-      const Vector3 end = worldAt(endIndex2);
+    const Vector3 startWorld = worldAt(startIndex);
+    const Vector3 endWorld = worldAt(endIndex);
 
-      const float radius =
-          GetPartVisualSegmentRadius(ownerId, startRole, endRole);
+    const float halfWidth = GetModelLocalVisualRadius(node->part);
+    const float halfDepth = halfWidth;
 
-      pushSegment(start, end, (std::max)(radius, 0.01f));
-    }
+    pushBox(startWorld, endWorld, halfWidth, halfDepth);
+  };
+
+  switch (node->part) {
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+  case ModBodyPart::Neck:
+    pushSegmentBox(rootIndex, bendIndex);
+    break;
+
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+  case ModBodyPart::Head:
+    pushSegmentBox(bendIndex, endIndex);
+    break;
+
+  default:
+    break;
   }
 
-  return outCapsules.count > 0;
+  return outBoxes.count > 0;
 }
 
 bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
@@ -2845,15 +3138,14 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
         continue;
       }
 
-      ModSceneCapsuleSet capsuleSet{};
-      if (!BuildPartPickCapsules(partId, capsuleSet)) {
+      ModSceneSegmentBoxSet boxSet{};
+      if (!BuildPartPickBoxes(partId, boxSet)) {
         continue;
       }
 
-      for (int ci = 0; ci < capsuleSet.count; ++ci) {
-        const ModSceneCapsuleSegment &seg = capsuleSet.segments[ci];
+      for (int bi = 0; bi < boxSet.count; ++bi) {
         float t = 0.0f;
-        if (IntersectRayCapsule(mouseRay, seg.start, seg.end, seg.radius, &t)) {
+        if (IntersectRaySegmentBox(mouseRay, boxSet.segments[bi], &t)) {
           return true;
         }
       }
@@ -2866,15 +3158,14 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
     return false;
   }
 
-  ModSceneCapsuleSet capsuleSet{};
-  if (!BuildPartPickCapsules(selectedPartId_, capsuleSet)) {
+  ModSceneSegmentBoxSet boxSet{};
+  if (!BuildPartPickBoxes(selectedPartId_, boxSet)) {
     return false;
   }
 
-  for (int ci = 0; ci < capsuleSet.count; ++ci) {
-    const ModSceneCapsuleSegment &seg = capsuleSet.segments[ci];
+  for (int bi = 0; bi < boxSet.count; ++bi) {
     float t = 0.0f;
-    if (IntersectRayCapsule(mouseRay, seg.start, seg.end, seg.radius, &t)) {
+    if (IntersectRaySegmentBox(mouseRay, boxSet.segments[bi], &t)) {
       return true;
     }
   }
@@ -3227,57 +3518,141 @@ bool ModScene::BuildAttachCapsuleCandidate(
     return false;
   }
 
-  ModSceneCapsuleSet parentCapsules{};
-  if (!BuildPartPickCapsules(parentPartId, parentCapsules)) {
+  ModSceneSegmentBoxSet parentBoxes{};
+  if (!BuildPartPickBoxes(parentPartId, parentBoxes)) {
     return false;
   }
 
   float bestSurfaceDistSq = FLT_MAX;
-  int bestCapsuleIndex = -1;
-  Vector3 bestClosestOnAxis{0.0f, 0.0f, 0.0f};
+  int bestBoxIndex = -1;
 
-  for (int ci = 0; ci < parentCapsules.count; ++ci) {
-    const ModSceneCapsuleSegment &seg = parentCapsules.segments[ci];
+  Vector3 bestAttachPoint{0.0f, 0.0f, 0.0f};
+  Vector3 bestWorldNormal{0.0f, 1.0f, 0.0f};
+  Vector3 bestConnectorSearchPoint{0.0f, 0.0f, 0.0f};
+  ModAttachFace bestFace = ModAttachFace::PosY;
 
-    const Vector3 closestOnAxis =
-        ClosestPointOnSegmentLocal(dragWorldPosition, seg.start, seg.end);
+  for (int bi = 0; bi < parentBoxes.count; ++bi) {
+    const ModSceneSegmentBox &box = parentBoxes.segments[bi];
 
-    const float distSq = DistancePointToCapsuleSurfaceSq(
-        dragWorldPosition, seg.start, seg.end, seg.radius);
+    const Vector3 toPoint = Subtract(dragWorldPosition, box.center);
+
+    const float localX = Dot(toPoint, box.axisX);
+    const float localY = Dot(toPoint, box.axisY);
+    const float localZ = Dot(toPoint, box.axisZ);
+
+    const float clampedX =
+        ClampFloatLocal(localX, -box.halfWidth, box.halfWidth);
+    const float clampedY =
+        ClampFloatLocal(localY, -box.halfLength, box.halfLength);
+    const float clampedZ =
+        ClampFloatLocal(localZ, -box.halfDepth, box.halfDepth);
+
+    // 箱内部/近傍の基準点
+    const Vector3 closestPointInBox =
+        Add(Add(Add(box.center, Multiply(clampedX, box.axisX)),
+                Multiply(clampedY, box.axisY)),
+            Multiply(clampedZ, box.axisZ));
+
+    // 各面までの距離を比較して最も近い面を選ぶ
+    const float distToPosX = fabsf(localX - box.halfWidth);
+    const float distToNegX = fabsf(localX + box.halfWidth);
+    const float distToPosY = fabsf(localY - box.halfLength);
+    const float distToNegY = fabsf(localY + box.halfLength);
+    const float distToPosZ = fabsf(localZ - box.halfDepth);
+    const float distToNegZ = fabsf(localZ + box.halfDepth);
+
+    float minFaceDist = distToPosX;
+    ModAttachFace face = ModAttachFace::PosX;
+    Vector3 faceNormal = box.axisX;
+
+    if (distToNegX < minFaceDist) {
+      minFaceDist = distToNegX;
+      face = ModAttachFace::NegX;
+      faceNormal = Multiply(-1.0f, box.axisX);
+    }
+
+    if (distToPosY < minFaceDist) {
+      minFaceDist = distToPosY;
+      face = ModAttachFace::PosY;
+      faceNormal = box.axisY;
+    }
+
+    if (distToNegY < minFaceDist) {
+      minFaceDist = distToNegY;
+      face = ModAttachFace::NegY;
+      faceNormal = Multiply(-1.0f, box.axisY);
+    }
+
+    if (distToPosZ < minFaceDist) {
+      minFaceDist = distToPosZ;
+      face = ModAttachFace::PosZ;
+      faceNormal = box.axisZ;
+    }
+
+    if (distToNegZ < minFaceDist) {
+      minFaceDist = distToNegZ;
+      face = ModAttachFace::NegZ;
+      faceNormal = Multiply(-1.0f, box.axisZ);
+    }
+
+    float surfaceX = clampedX;
+    float surfaceY = clampedY;
+    float surfaceZ = clampedZ;
+
+    switch (face) {
+    case ModAttachFace::PosX:
+      surfaceX = box.halfWidth;
+      break;
+    case ModAttachFace::NegX:
+      surfaceX = -box.halfWidth;
+      break;
+    case ModAttachFace::PosY:
+      surfaceY = box.halfLength;
+      break;
+    case ModAttachFace::NegY:
+      surfaceY = -box.halfLength;
+      break;
+    case ModAttachFace::PosZ:
+      surfaceZ = box.halfDepth;
+      break;
+    case ModAttachFace::NegZ:
+      surfaceZ = -box.halfDepth;
+      break;
+    default:
+      break;
+    }
+
+    const Vector3 attachPoint =
+        Add(Add(Add(box.center, Multiply(surfaceX, box.axisX)),
+                Multiply(surfaceY, box.axisY)),
+            Multiply(surfaceZ, box.axisZ));
+
+    const Vector3 surfaceDiff = Subtract(dragWorldPosition, attachPoint);
+    const float distSq = Dot(surfaceDiff, surfaceDiff);
 
     if (distSq < bestSurfaceDistSq) {
       bestSurfaceDistSq = distSq;
-      bestCapsuleIndex = ci;
-      bestClosestOnAxis = closestOnAxis;
+      bestBoxIndex = bi;
+      bestAttachPoint = attachPoint;
+      bestWorldNormal = NormalizeSafeV(faceNormal, {0.0f, 1.0f, 0.0f});
+      bestConnectorSearchPoint = closestPointInBox;
+      bestFace = face;
     }
   }
 
-  if (bestCapsuleIndex < 0) {
+  if (bestBoxIndex < 0) {
     return false;
   }
 
-  const ModSceneCapsuleSegment &bestSeg =
-      parentCapsules.segments[bestCapsuleIndex];
-
-  Vector3 worldNormal = Subtract(dragWorldPosition, bestClosestOnAxis);
-  worldNormal = NormalizeSafeV(worldNormal, {0.0f, 1.0f, 0.0f});
-
-  // 見た目は「ドラッグ位置から見た接触表面点」
-  const Vector3 attachPoint =
-      Add(bestClosestOnAxis, Multiply(bestSeg.radius, worldNormal));
-
   ModAttachFaceCandidate candidate{};
   candidate.parentPartId = parentPartId;
-  candidate.parentConnectorId =
-      FindBestParentConnectorIdForPosition(*parentNode, bestClosestOnAxis);
+  candidate.parentConnectorId = FindBestParentConnectorIdForPosition(
+      *parentNode, bestConnectorSearchPoint);
+  candidate.face = bestFace;
+  candidate.worldPosition = bestAttachPoint;
+  candidate.worldNormal = bestWorldNormal;
 
-  // face は互換用ダミー
-  candidate.face = ModAttachFace::PosY;
-
-  candidate.worldPosition = attachPoint;
-  candidate.worldNormal = worldNormal;
-
-  const Vector3 diff = Subtract(dragWorldPosition, attachPoint);
+  const Vector3 diff = Subtract(dragWorldPosition, bestAttachPoint);
   candidate.distanceSq = Dot(diff, diff);
   candidate.isValid = (candidate.parentConnectorId >= 0);
 
@@ -3696,8 +4071,8 @@ bool ModScene::IsAssemblyPreviewOverlapping(int movingAssemblyRootPartId,
   }
 
   for (size_t i = 0; i < movingParts.size(); ++i) {
-    ModSceneCapsuleSet movingSet{};
-    if (!BuildPartPickCapsules(movingParts[i], movingSet)) {
+    ModSceneSegmentBoxSet movingSet{};
+    if (!BuildPartPickBoxes(movingParts[i], movingSet)) {
       continue;
     }
 
@@ -3722,25 +4097,15 @@ bool ModScene::IsAssemblyPreviewOverlapping(int movingAssemblyRootPartId,
         }
       }
 
-      ModSceneCapsuleSet otherSet{};
-      if (!BuildPartPickCapsules(otherId, otherSet)) {
+      ModSceneSegmentBoxSet otherSet{};
+      if (!BuildPartPickBoxes(otherId, otherSet)) {
         continue;
       }
 
       for (int mi = 0; mi < movingSet.count; ++mi) {
-        ModCapsule movingCapsule{};
-        movingCapsule.start = movingSet.segments[mi].start;
-        movingCapsule.end = movingSet.segments[mi].end;
-        movingCapsule.radius = movingSet.segments[mi].radius;
-
         for (int oi = 0; oi < otherSet.count; ++oi) {
-          ModCapsule otherCapsule{};
-          otherCapsule.start = otherSet.segments[oi].start;
-          otherCapsule.end = otherSet.segments[oi].end;
-          otherCapsule.radius = otherSet.segments[oi].radius;
-
-          if (ModCapsuleUtil::IntersectCapsules(movingCapsule, otherCapsule,
-                                                overlapMargin)) {
+          if (IntersectSegmentBoxes(movingSet.segments[mi],
+                                    otherSet.segments[oi], overlapMargin)) {
             return true;
           }
         }
@@ -4415,7 +4780,7 @@ void ModScene::SaveControlPointsToCustomizeData() {
   cp.headCenterPos =
       GetControlPointLocalPosition(ModControlPointRole::HeadCenter);
 
-  Logger::Log("SEND LeftShoulderPos : %.2f %.2f %.2f\n", cp.leftShoulderPos.x,
+  /*Logger::Log("SEND LeftShoulderPos : %.2f %.2f %.2f\n", cp.leftShoulderPos.x,
               cp.leftShoulderPos.y, cp.leftShoulderPos.z);
 
   Logger::Log("SEND LeftElbowPos : %.2f %.2f %.2f\n", cp.leftElbowPos.x,
@@ -4456,7 +4821,7 @@ void ModScene::SaveControlPointsToCustomizeData() {
   Logger::Log("SEND UpperNeckPos : %.2f %.2f %.2f\n", cp.upperNeckPos.x,
               cp.upperNeckPos.y, cp.upperNeckPos.z);
   Logger::Log("SEND HeadCenterPos : %.2f %.2f %.2f\n", cp.headCenterPos.x,
-              cp.headCenterPos.y, cp.headCenterPos.z);
+              cp.headCenterPos.y, cp.headCenterPos.z);*/
 }
 Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
   if (role == ModControlPointRole::LeftShoulder) {
@@ -4746,4 +5111,365 @@ bool ModScene::ShouldBlockDebugCameraMouseControl() const {
   }
 
   return false;
+}
+
+/*デバッグカプセル*/
+void ModScene::EnsureDebugCapsuleGizmoCount(size_t requiredCount) {
+  while (debugCapsuleGizmos_.size() < requiredCount) {
+    std::unique_ptr<Object> gizmo = std::make_unique<Object>();
+    gizmo->IntObject(system_);
+    gizmo->CreateDefaultData();
+    gizmo->modelHandle_ = config::default_Sphere_MeshBufferHandle_;
+
+    if (!gizmo->objectParts_.empty()) {
+      gizmo->objectParts_[0].materialConfig->textureHandle =
+          controlPointGizmoTextureHandle_;
+      gizmo->objectParts_[0].materialConfig->useModelTexture = false;
+      gizmo->objectParts_[0].materialConfig->enableLighting = false;
+      gizmo->objectParts_[0].materialConfig->textureColor =
+          MakeColor(1.0f, 0.0f, 0.0f, 0.45f);
+    }
+
+    debugCapsuleGizmos_.push_back(std::move(gizmo));
+  }
+}
+
+void ModScene::UpdateDebugCapsuleGizmos() {
+  activeDebugCapsuleGizmoCount_ = 0;
+
+  if (!showDebugCapsules_) {
+    return;
+  }
+
+  std::vector<DebugCapsuleDrawSphere> debugSpheres;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int partId = orderedPartIds_[i];
+
+    ModSceneSegmentBoxSet boxSet{};
+    if (!BuildPartPickBoxes(partId, boxSet)) {
+      continue;
+    }
+
+    Vector4 color = MakeColor(1.0f, 0.2f, 0.2f, 0.30f);
+
+    if (partId == hoveredPartId_) {
+      color = MakeColor(1.0f, 1.0f, 0.2f, 0.45f);
+    } else if (partId == selectedPartId_) {
+      color = MakeColor(0.2f, 1.0f, 1.0f, 0.45f);
+    }
+
+    for (int segIndex = 0; segIndex < boxSet.count; ++segIndex) {
+      AppendDebugSpheresForSegmentBox(boxSet.segments[segIndex], color,
+                                      debugSpheres);
+    }
+  }
+
+  EnsureDebugCapsuleGizmoCount(debugSpheres.size());
+
+  for (size_t i = 0; i < debugSpheres.size(); ++i) {
+    Object *gizmo = debugCapsuleGizmos_[i].get();
+    if (gizmo == nullptr || gizmo->objectParts_.empty()) {
+      continue;
+    }
+
+    gizmo->mainPosition.transform.translate = debugSpheres[i].worldPosition;
+    gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+    gizmo->mainPosition.transform.scale = {debugSpheres[i].radius * 2.0f,
+                                           debugSpheres[i].radius * 2.0f,
+                                           debugSpheres[i].radius * 2.0f};
+
+    gizmo->objectParts_[0].materialConfig->useModelTexture = false;
+    gizmo->objectParts_[0].materialConfig->enableLighting = false;
+    gizmo->objectParts_[0].materialConfig->textureColor = debugSpheres[i].color;
+
+    gizmo->Update(usingCamera_);
+  }
+
+  activeDebugCapsuleGizmoCount_ = debugSpheres.size();
+}
+
+void ModScene::DrawDebugCapsuleGizmos() {
+  for (size_t i = 0; i < activeDebugCapsuleGizmoCount_; ++i) {
+    Object *gizmo = debugCapsuleGizmos_[i].get();
+    if (gizmo != nullptr) {
+      gizmo->Draw();
+    }
+  }
+}
+/*-------------------------------------------*/
+
+float ModScene::GetModelLocalVisualRadius(ModBodyPart part) const {
+  const int key = static_cast<int>(part);
+
+  auto cacheIt = modelLocalVisualRadiusCache_.find(key);
+  if (cacheIt != modelLocalVisualRadiusCache_.end()) {
+    return cacheIt->second;
+  }
+
+  const std::string path = ModelPath(part);
+  const std::vector<ModelData> models = LoadFileTop(path);
+
+  if (models.empty()) {
+    modelLocalVisualRadiusCache_[key] = 0.10f;
+    return 0.10f;
+  }
+
+  const ModelData &model = models[0];
+
+  if (model.vertices.empty()) {
+    modelLocalVisualRadiusCache_[key] = 0.10f;
+    return 0.10f;
+  }
+
+  float minX = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float minZ = FLT_MAX;
+  float maxZ = -FLT_MAX;
+
+  for (size_t i = 0; i < model.vertices.size(); ++i) {
+    const Vector4 &pos4 = model.vertices[i].position;
+    const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
+
+    const Vector3 transformed =
+        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+
+    if (transformed.x < minX) {
+      minX = transformed.x;
+    }
+    if (transformed.x > maxX) {
+      maxX = transformed.x;
+    }
+    if (transformed.z < minZ) {
+      minZ = transformed.z;
+    }
+    if (transformed.z > maxZ) {
+      maxZ = transformed.z;
+    }
+  }
+
+  const float halfWidthX = (maxX - minX) * 0.5f;
+  const float halfWidthZ = (maxZ - minZ) * 0.5f;
+
+  const float radius = (std::max)(halfWidthX, halfWidthZ);
+  const float safeRadius = (std::max)(radius, 0.01f);
+
+  modelLocalVisualRadiusCache_[key] = safeRadius;
+  return safeRadius;
+}
+
+float ModScene::GetAutoCapsuleRadiusScale(ModBodyPart part,
+                                          ModControlPointRole startRole,
+                                          ModControlPointRole endRole) const {
+  const float modelRadius = GetModelLocalVisualRadius(part);
+  const float defaultRadius =
+      GetDefaultSegmentRadiusForPartRoles(part, startRole, endRole);
+
+  return modelRadius / (std::max)(defaultRadius, 0.0001f);
+}
+
+float ModScene::GetAutoTorsoCapsuleRadiusScale(
+    ModControlPointRole startRole, ModControlPointRole endRole) const {
+  ModBodyPart part = ModBodyPart::ChestBody;
+
+  if (startRole == ModControlPointRole::Belly &&
+      endRole == ModControlPointRole::Waist) {
+    part = ModBodyPart::StomachBody;
+  }
+
+  const float modelRadius = GetModelLocalVisualRadius(part);
+  const float defaultRadius =
+      GetDefaultSegmentRadiusForPartRoles(part, startRole, endRole);
+
+  return modelRadius / (std::max)(defaultRadius, 0.0001f);
+}
+
+void ModScene::AppendDebugSpheresForSegmentBox(
+    const ModSceneSegmentBox &box, const Vector4 &color,
+    std::vector<DebugCapsuleDrawSphere> &out) const {
+  auto pushSphere = [&](const Vector3 &pos, float radius) {
+    DebugCapsuleDrawSphere sphere{};
+    sphere.worldPosition = pos;
+    sphere.radius = radius;
+    sphere.color = color;
+    out.push_back(sphere);
+  };
+
+  auto localToWorld = [&](float x, float y, float z) -> Vector3 {
+    Vector3 result = box.center;
+    result = Add(result, Multiply(x, box.axisX));
+    result = Add(result, Multiply(y, box.axisY));
+    result = Add(result, Multiply(z, box.axisZ));
+    return result;
+  };
+
+  const float hx = box.halfWidth;
+  const float hy = box.halfLength;
+  const float hz = box.halfDepth;
+
+  const float pointRadius = (std::max)((std::min)(hx, hz) * 0.20f, 0.02f);
+  const float edgeStep = (std::max)(pointRadius * 2.5f, 0.04f);
+
+  Vector3 corners[8] = {
+      localToWorld(-hx, -hy, -hz), localToWorld(hx, -hy, -hz),
+      localToWorld(-hx, hy, -hz),  localToWorld(hx, hy, -hz),
+      localToWorld(-hx, -hy, hz),  localToWorld(hx, -hy, hz),
+      localToWorld(-hx, hy, hz),   localToWorld(hx, hy, hz),
+  };
+
+  for (int i = 0; i < 8; ++i) {
+    pushSphere(corners[i], pointRadius);
+  }
+
+  auto appendEdge = [&](const Vector3 &a, const Vector3 &b) {
+    const Vector3 ab = Subtract(b, a);
+    const float length = Length(ab);
+
+    int count = 1;
+    if (length > 0.0001f) {
+      count = static_cast<int>(ceilf(length / edgeStep));
+    }
+
+    for (int i = 0; i <= count; ++i) {
+      float t = 0.0f;
+      if (count > 0) {
+        t = static_cast<float>(i) / static_cast<float>(count);
+      }
+      t = ClampFloat01Local(t);
+
+      DebugCapsuleDrawSphere sphere{};
+      sphere.worldPosition = LerpVector3Local(a, b, t);
+      sphere.radius = pointRadius * 0.75f;
+      sphere.color = color;
+      out.push_back(sphere);
+    }
+  };
+
+  // 下面
+  appendEdge(corners[0], corners[1]);
+  appendEdge(corners[1], corners[5]);
+  appendEdge(corners[5], corners[4]);
+  appendEdge(corners[4], corners[0]);
+
+  // 上面
+  appendEdge(corners[2], corners[3]);
+  appendEdge(corners[3], corners[7]);
+  appendEdge(corners[7], corners[6]);
+  appendEdge(corners[6], corners[2]);
+
+  // 縦辺
+  appendEdge(corners[0], corners[2]);
+  appendEdge(corners[1], corners[3]);
+  appendEdge(corners[4], corners[6]);
+  appendEdge(corners[5], corners[7]);
+}
+
+float ModScene::GetModelLocalVisualHalfHeight(ModBodyPart part) const {
+  const int key = static_cast<int>(part);
+
+  auto cacheIt = modelLocalVisualHalfHeightCache_.find(key);
+  if (cacheIt != modelLocalVisualHalfHeightCache_.end()) {
+    return cacheIt->second;
+  }
+
+  const std::string path = ModelPath(part);
+  const std::vector<ModelData> models = LoadFileTop(path);
+
+  if (models.empty()) {
+    modelLocalVisualHalfHeightCache_[key] = 0.10f;
+    return 0.10f;
+  }
+
+  const ModelData &model = models[0];
+  if (model.vertices.empty()) {
+    modelLocalVisualHalfHeightCache_[key] = 0.10f;
+    return 0.10f;
+  }
+
+  float minY = FLT_MAX;
+  float maxY = -FLT_MAX;
+
+  for (size_t i = 0; i < model.vertices.size(); ++i) {
+    const Vector4 &pos4 = model.vertices[i].position;
+    const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
+
+    const Vector3 transformed =
+        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+
+    if (transformed.y < minY) {
+      minY = transformed.y;
+    }
+    if (transformed.y > maxY) {
+      maxY = transformed.y;
+    }
+  }
+
+  const float halfHeight = (maxY - minY) * 0.5f;
+  const float safeHalfHeight = (std::max)(halfHeight, 0.01f);
+
+  modelLocalVisualHalfHeightCache_[key] = safeHalfHeight;
+  return safeHalfHeight;
+}
+
+bool ModScene::BuildHeadPickBox(int partId,
+                                ModSceneSegmentBoxSet &outBoxes) const {
+  outBoxes.count = 0;
+
+  const PartNode *node = assembly_.FindNode(partId);
+  if (node == nullptr || node->part != ModBodyPart::Head) {
+    return false;
+  }
+
+  auto objectIt = modObjects_.find(partId);
+  if (objectIt == modObjects_.end() || objectIt->second == nullptr) {
+    return false;
+  }
+
+  const Object *headObject = objectIt->second.get();
+  if (headObject == nullptr) {
+    return false;
+  }
+
+  ModSceneSegmentBox &box = outBoxes.segments[0];
+
+  const Matrix4x4 world =
+      ModObjectUtil::ComputeMainPositionWorldMatrix(headObject);
+
+  Vector3 axisX = {
+      world.m[0][0],
+      world.m[0][1],
+      world.m[0][2],
+  };
+  Vector3 axisY = {
+      world.m[1][0],
+      world.m[1][1],
+      world.m[1][2],
+  };
+  Vector3 axisZ = {
+      world.m[2][0],
+      world.m[2][1],
+      world.m[2][2],
+  };
+
+  axisX = NormalizeSafeV(axisX, {1.0f, 0.0f, 0.0f});
+  axisY = NormalizeSafeV(axisY, {0.0f, 1.0f, 0.0f});
+  axisZ = NormalizeSafeV(axisZ, {0.0f, 0.0f, 1.0f});
+
+  box.center = ModObjectUtil::ComputeObjectRootWorldTranslate(headObject);
+  box.axisX = axisX;
+  box.axisY = axisY;
+  box.axisZ = axisZ;
+
+  const float halfWidth = GetModelLocalVisualRadius(ModBodyPart::Head);
+  const float halfHeight = GetModelLocalVisualHalfHeight(ModBodyPart::Head);
+  const Vector3 scale = modBodies_.count(partId) > 0
+                            ? modBodies_.at(partId).GetVisualScaleRatio()
+                            : Vector3{1.0f, 1.0f, 1.0f};
+
+  box.halfWidth = (std::max)(halfWidth * scale.x, 0.01f);
+  box.halfLength = (std::max)(halfHeight * scale.y, 0.01f);
+  box.halfDepth = (std::max)(halfWidth * scale.z, 0.01f);
+
+  outBoxes.count = 1;
+  return true;
 }
