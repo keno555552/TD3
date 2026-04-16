@@ -30,13 +30,6 @@ struct ModSceneSegmentBoxSet {
   int count = 0;
 };
 
-/*デバッグカプセル*/
-struct DebugCapsuleDrawSphere {
-  Vector3 worldPosition{0.0f, 0.0f, 0.0f};
-  float radius = 0.05f;
-  Vector4 color{1.0f, 0.0f, 0.0f, 0.5f};
-};
-
 /// <summary>
 /// 改造シーン本体
 /// 部位の追加、削除、付け替え、パラメータ編集を行い、次のシーンへ渡す改造結果を作る
@@ -89,20 +82,20 @@ private:
   Camera *usingCamera_ = nullptr;      // 現在使用中のカメラ
   bool useDebugCamera_ = true;         // デバッグカメラを使うかどうか
 
-// ==============================
-// 周回カメラ用
-// ==============================
-Vector3 orbitTarget_{0.0f, 0.5f, 0.0f};
-float orbitYaw_ = 0.0f;
-float orbitPitch_ = 0.25f;
-float orbitDistance_ = 8.0f;
-float orbitRotateSpeed_ = 0.01f;
-float orbitZoomSpeed_ = 0.8f;
-float orbitMinDistance_ = 2.5f;
-float orbitMaxDistance_ = 20.0f;
+  // ==============================
+  // 周回カメラ用
+  // ==============================
+  Vector3 orbitTarget_{0.0f, 0.5f, 0.0f};
+  float orbitYaw_ = 0.0f;
+  float orbitPitch_ = 0.25f;
+  float orbitDistance_ = 8.0f;
+  float orbitRotateSpeed_ = 0.01f;
+  float orbitZoomSpeed_ = 0.8f;
+  float orbitMinDistance_ = 2.5f;
+  float orbitMaxDistance_ = 20.0f;
 
-void UpdateOrbitCamera();
-Vector3 ComputeOrbitTarget() const;
+  void UpdateOrbitCamera();
+  Vector3 ComputeOrbitTarget() const;
 
   ModAssemblyGraph assembly_;       // 部位構造と親子関係を管理するグラフ
   std::vector<int> orderedPartIds_; // 描画や更新順に使う部位ID一覧
@@ -137,8 +130,8 @@ Vector3 ComputeOrbitTarget() const;
   float dragControlPlaneZ_ = 0.0f;      // ドラッグ時に固定する Z 平面
   Vector3 dragControlPointOffset_{0.0f, 0.0f, 0.0f}; // 掴んだ位置との差分
 
-Vector3 dragControlPlaneNormal_ = {0.0f, 0.0f, 1.0f};
-Vector3 dragControlPlanePoint_ = {0.0f, 0.0f, 0.0f};
+  Vector3 dragControlPlaneNormal_ = {0.0f, 0.0f, 1.0f};
+  Vector3 dragControlPlanePoint_ = {0.0f, 0.0f, 0.0f};
 
   std::vector<TorsoControlPoint> torsoControlPoints_; // 胴体の操作点情報一覧
 
@@ -460,17 +453,6 @@ private:
   bool BuildPartPickBoxes(int partId, ModSceneSegmentBoxSet &outBoxes) const;
 
   /// <summary>
-  /// セグメントボックスをデバッグ描画用の球セットに変換して追加する
-  /// </summary>
-  /// <param name="box">対象のセグメントボックス</param>
-  /// <param name="color">デバッグ描画用の色</param>
-  /// <param name="out">変換された球セットを受け取る参照</param>
-  void AppendDebugSpheresForSegmentBox(
-      const ModSceneSegmentBox &box, const Vector4 &color,
-      std::vector<DebugCapsuleDrawSphere> &out) const;
-
-
-  /// <summary>
   /// 現在のマウス Ray が選択中操作点の属するメッシュ範囲内にあるかを判定する
   /// </summary>
   /// <param name="mouseRay">マウス位置から作成した Ray</param>
@@ -778,13 +760,4 @@ public:
   bool isTimeUp_ = false;         // 時間切れになったか
 
   bool ShouldBlockDebugCameraMouseControl() const;
-
-  /*デバッグカプセル*/
-  bool showDebugCapsules_ = true;
-  std::vector<std::unique_ptr<Object>> debugCapsuleGizmos_;
-  size_t activeDebugCapsuleGizmoCount_ = 0;
-
-  void EnsureDebugCapsuleGizmoCount(size_t requiredCount);
-  void UpdateDebugCapsuleGizmos();
-  void DrawDebugCapsuleGizmos();
 };
