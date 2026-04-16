@@ -546,46 +546,6 @@ void BuildExpandedSegment(const Vector3 &startPos, const Vector3 &endPos,
   *outExpandedEnd = Add(endPos, Multiply(safeEndRadius, segmentDir));
 }
 
-bool IsDebugCapsuleTargetPart(ModBodyPart part) {
-  switch (part) {
-  case ModBodyPart::ChestBody:
-  case ModBodyPart::StomachBody:
-  case ModBodyPart::Neck:
-  case ModBodyPart::Head:
-  case ModBodyPart::LeftUpperArm:
-  case ModBodyPart::LeftForeArm:
-  case ModBodyPart::RightUpperArm:
-  case ModBodyPart::RightForeArm:
-  case ModBodyPart::LeftThigh:
-  case ModBodyPart::LeftShin:
-  case ModBodyPart::RightThigh:
-  case ModBodyPart::RightShin:
-    return true;
-  default:
-    return false;
-  }
-}
-
-/*デバッグカプセル*/
-void DebugLogVector3(const char *label, const Vector3 &v) {
-  Logger::Log("%s=(%.3f, %.3f, %.3f)", label, v.x, v.y, v.z);
-}
-
-float ClampFloat01Local(float value) {
-  if (value < 0.0f) {
-    return 0.0f;
-  }
-  if (value > 1.0f) {
-    return 1.0f;
-  }
-  return value;
-}
-
-Vector3 LerpVector3Local(const Vector3 &a, const Vector3 &b, float t) {
-  return Add(a, Multiply(t, Subtract(b, a)));
-}
-/*-------------------------------------*/
-
 Vector3 TransformPointByMatrixLocal(const Matrix4x4 &m, const Vector3 &p) {
   Vector3 result{};
   result.x = p.x * m.m[0][0] + p.y * m.m[1][0] + p.z * m.m[2][0] + m.m[3][0];
@@ -882,6 +842,9 @@ ModScene::~ModScene() {
   // 登録したライトを解除して解放する
   system_->RemoveLight(light1_);
   delete light1_;
+
+  // 使用していないマテリアルをクリーンアップする
+  ResourceManager::GetInstance()->CleanupUnusedMaterials();
 }
 
 void ModScene::Update() {
@@ -970,10 +933,6 @@ void ModScene::Update() {
   // 現在の構造とパラメータを見た目へ反映する
   UpdateModObjects();
 
-  /*デバッグカプセル*/
-  UpdateDebugCapsuleGizmos();
-  /*-----------------------*/
-
   if (isStartTransition_) {
     // 胴体(id=1)と頭(id=4)の操作点を確認する
     for (const auto &pair : modBodies_) {
@@ -1043,10 +1002,6 @@ void ModScene::Draw() {
   // 改造用UI本体を表示する
   DrawModGui();
 #endif
-
-  /*デバッグカプセル*/
-  //DrawDebugCapsuleGizmos();
-  /*-----------------------*/
 
   // フェードを描画する
   fade_.Draw();
@@ -5340,92 +5295,6 @@ bool ModScene::ShouldBlockDebugCameraMouseControl() const {
   return false;
 }
 
-/*デバッグカプセル*/
-void ModScene::EnsureDebugCapsuleGizmoCount(size_t requiredCount) {
-  while (debugCapsuleGizmos_.size() < requiredCount) {
-    std::unique_ptr<Object> gizmo = std::make_unique<Object>();
-    gizmo->IntObject(system_);
-    gizmo->CreateDefaultData();
-    gizmo->modelHandle_ = config::default_Sphere_MeshBufferHandle_;
-
-    if (!gizmo->objectParts_.empty()) {
-      gizmo->objectParts_[0].materialConfig->textureHandle =
-          controlPointGizmoTextureHandle_;
-      gizmo->objectParts_[0].materialConfig->useModelTexture = false;
-      gizmo->objectParts_[0].materialConfig->enableLighting = false;
-      gizmo->objectParts_[0].materialConfig->textureColor =
-          MakeColor(1.0f, 0.0f, 0.0f, 0.45f);
-    }
-
-    debugCapsuleGizmos_.push_back(std::move(gizmo));
-  }
-}
-
-void ModScene::UpdateDebugCapsuleGizmos() {
-  activeDebugCapsuleGizmoCount_ = 0;
-
-  if (!showDebugCapsules_) {
-    return;
-  }
-
-  std::vector<DebugCapsuleDrawSphere> debugSpheres;
-
-  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-    const int partId = orderedPartIds_[i];
-
-    ModSceneSegmentBoxSet boxSet{};
-    if (!BuildPartPickBoxes(partId, boxSet)) {
-      continue;
-    }
-
-    Vector4 color = MakeColor(1.0f, 0.2f, 0.2f, 0.30f);
-
-    if (partId == hoveredPartId_) {
-      color = MakeColor(1.0f, 1.0f, 0.2f, 0.45f);
-    } else if (partId == selectedPartId_) {
-      color = MakeColor(0.2f, 1.0f, 1.0f, 0.45f);
-    }
-
-    for (int segIndex = 0; segIndex < boxSet.count; ++segIndex) {
-      AppendDebugSpheresForSegmentBox(boxSet.segments[segIndex], color,
-                                      debugSpheres);
-    }
-  }
-
-  EnsureDebugCapsuleGizmoCount(debugSpheres.size());
-
-  for (size_t i = 0; i < debugSpheres.size(); ++i) {
-    Object *gizmo = debugCapsuleGizmos_[i].get();
-    if (gizmo == nullptr || gizmo->objectParts_.empty()) {
-      continue;
-    }
-
-    gizmo->mainPosition.transform.translate = debugSpheres[i].worldPosition;
-    gizmo->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-    gizmo->mainPosition.transform.scale = {debugSpheres[i].radius * 2.0f,
-                                           debugSpheres[i].radius * 2.0f,
-                                           debugSpheres[i].radius * 2.0f};
-
-    gizmo->objectParts_[0].materialConfig->useModelTexture = false;
-    gizmo->objectParts_[0].materialConfig->enableLighting = false;
-    gizmo->objectParts_[0].materialConfig->textureColor = debugSpheres[i].color;
-
-    gizmo->Update(usingCamera_);
-  }
-
-  activeDebugCapsuleGizmoCount_ = debugSpheres.size();
-}
-
-void ModScene::DrawDebugCapsuleGizmos() {
-  for (size_t i = 0; i < activeDebugCapsuleGizmoCount_; ++i) {
-    Object *gizmo = debugCapsuleGizmos_[i].get();
-    if (gizmo != nullptr) {
-      gizmo->Draw();
-    }
-  }
-}
-/*-------------------------------------------*/
-
 float ModScene::GetModelLocalVisualRadius(ModBodyPart part) const {
   const int key = static_cast<int>(part);
 
@@ -5509,86 +5378,6 @@ float ModScene::GetAutoTorsoCapsuleRadiusScale(
       GetDefaultSegmentRadiusForPartRoles(part, startRole, endRole);
 
   return modelRadius / (std::max)(defaultRadius, 0.0001f);
-}
-
-void ModScene::AppendDebugSpheresForSegmentBox(
-    const ModSceneSegmentBox &box, const Vector4 &color,
-    std::vector<DebugCapsuleDrawSphere> &out) const {
-  auto pushSphere = [&](const Vector3 &pos, float radius) {
-    DebugCapsuleDrawSphere sphere{};
-    sphere.worldPosition = pos;
-    sphere.radius = radius;
-    sphere.color = color;
-    out.push_back(sphere);
-  };
-
-  auto localToWorld = [&](float x, float y, float z) -> Vector3 {
-    Vector3 result = box.center;
-    result = Add(result, Multiply(x, box.axisX));
-    result = Add(result, Multiply(y, box.axisY));
-    result = Add(result, Multiply(z, box.axisZ));
-    return result;
-  };
-
-  const float hx = box.halfWidth;
-  const float hy = box.halfLength;
-  const float hz = box.halfDepth;
-
-  const float pointRadius = (std::max)((std::min)(hx, hz) * 0.20f, 0.02f);
-  const float edgeStep = (std::max)(pointRadius * 2.5f, 0.04f);
-
-  Vector3 corners[8] = {
-      localToWorld(-hx, -hy, -hz), localToWorld(hx, -hy, -hz),
-      localToWorld(-hx, hy, -hz),  localToWorld(hx, hy, -hz),
-      localToWorld(-hx, -hy, hz),  localToWorld(hx, -hy, hz),
-      localToWorld(-hx, hy, hz),   localToWorld(hx, hy, hz),
-  };
-
-  for (int i = 0; i < 8; ++i) {
-    pushSphere(corners[i], pointRadius);
-  }
-
-  auto appendEdge = [&](const Vector3 &a, const Vector3 &b) {
-    const Vector3 ab = Subtract(b, a);
-    const float length = Length(ab);
-
-    int count = 1;
-    if (length > 0.0001f) {
-      count = static_cast<int>(ceilf(length / edgeStep));
-    }
-
-    for (int i = 0; i <= count; ++i) {
-      float t = 0.0f;
-      if (count > 0) {
-        t = static_cast<float>(i) / static_cast<float>(count);
-      }
-      t = ClampFloat01Local(t);
-
-      DebugCapsuleDrawSphere sphere{};
-      sphere.worldPosition = LerpVector3Local(a, b, t);
-      sphere.radius = pointRadius * 0.75f;
-      sphere.color = color;
-      out.push_back(sphere);
-    }
-  };
-
-  // 下面
-  appendEdge(corners[0], corners[1]);
-  appendEdge(corners[1], corners[5]);
-  appendEdge(corners[5], corners[4]);
-  appendEdge(corners[4], corners[0]);
-
-  // 上面
-  appendEdge(corners[2], corners[3]);
-  appendEdge(corners[3], corners[7]);
-  appendEdge(corners[7], corners[6]);
-  appendEdge(corners[6], corners[2]);
-
-  // 縦辺
-  appendEdge(corners[0], corners[2]);
-  appendEdge(corners[1], corners[3]);
-  appendEdge(corners[4], corners[6]);
-  appendEdge(corners[5], corners[7]);
 }
 
 float ModScene::GetModelLocalVisualHalfHeight(ModBodyPart part) const {
