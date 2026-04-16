@@ -94,13 +94,13 @@ void BitmapFont::RenderText(const std::string& text,
 	if (chars.empty()) return;
 
 	// 前回のスプライトを全部削除
-	for (auto* sprite : spritePool_) {
-		delete sprite;
-	}
-	spritePool_.clear();
+	//for (auto* sprite : spritePool_) {
+	//	delete sprite;
+	//}
+	//spritePool_.clear();
 
 	// スプライトプールの使用数をリセット
-	spritePoolUsed_ = 0;
+	//spritePoolUsed_ = 0;
 
 	// Align用に合計幅を計算
 	float totalWidth = CalcTextWidth(chars, heightPx);
@@ -185,11 +185,11 @@ void BitmapFont::RenderText(const std::string& text,
 		cursorX += charWidth;
 
 		// 使わなかったスプライトを画面外に移動
-		for (int i = spritePoolUsed_; i < static_cast<int>(spritePool_.size()); ++i) {
-			spritePool_[i]->mainPosition.transform.translate = { -9999.0f, -9999.0f, 0.0f };
-			spritePool_[i]->Update(nullptr);
-			spritePool_[i]->Draw();
-		}
+		//for (int i = spritePoolUsed_; i < static_cast<int>(spritePool_.size()); ++i) {
+		//	spritePool_[i]->mainPosition.transform.translate = { -9999.0f, -9999.0f, 0.0f };
+		//	spritePool_[i]->Update(nullptr);
+		//	spritePool_[i]->Draw();
+		//}
 	}
 }
 
@@ -290,3 +290,4 @@ SimpleSprite* BitmapFont::GetPooledSprite() {
 
 	return sprite;
 }
+void BitmapFont::BeginFrame() { spritePoolUsed_ = 0; }

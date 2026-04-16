@@ -160,7 +160,8 @@ private:
 	//	return checker == list.end();
 	//}
 
-
+    public:
+  void CleanupUnusedMaterials();
 };
 
 //Todo: MeshBufferリストの管理仕方を見直す。

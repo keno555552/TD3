@@ -396,6 +396,11 @@ private:
     float leftLegBendSpeed = 0.0f;
     float rightLegBendSpeed = 0.0f;
 
+    float bodyTilt = 0.0f;
+    float bodyTiltVelocity = 0.0f;
+
+    float landTimer = 999.0f;
+
     bool leftInput = false;
     bool rightInput = false;
     bool isGrounded = false;
@@ -410,10 +415,24 @@ private:
     bool started = false;
 
     float timingSkill = 1.0f;
+    float targetKickTime = 0.05f; 
+    bool hasKickPlan = false;
+    bool prevGrounded = false;
+
+    int lastTimingResult = 0;
 
     int finishRank = -1;
 
     std::unique_ptr<Object> debugObject;
+
+    bool useCustomizedVisual = false;
+
+    std::unique_ptr<ModBodyCustomizeData> customizeData;
+
+    std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects{};
+    std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies{};
+
+    std::vector<Object *> extraObjects;
   };
 
   std::vector<NpcRunner> npcRunners_;
@@ -451,4 +470,19 @@ private:
   RaceResultState raceResultState_ = RaceResultState::None;
 
   void UpdateRaceFinishState();
+
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetDefault();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetHeadBig();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetLongLeg();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetBigTorso();
+
+  void SetupNpcPartObject(
+      std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> &objects,
+      std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> &bodies,
+      ModBodyPart part, const std::string &path);
+
+  void SetupNpcCustomizedVisual(NpcRunner &npc);
+  void UpdateNpcCustomizedVisual(NpcRunner &npc);
+  void DrawNpcCustomizedVisual(NpcRunner &npc);
+  void ClearNpcCustomizedVisual(NpcRunner &npc);
 };
