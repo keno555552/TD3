@@ -787,6 +787,4 @@ public:
   void EnsureDebugCapsuleGizmoCount(size_t requiredCount);
   void UpdateDebugCapsuleGizmos();
   void DrawDebugCapsuleGizmos();
-
-  bool ShouldBlockDebugCameraMouseControl() const;
 };
