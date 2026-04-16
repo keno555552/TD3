@@ -33,15 +33,16 @@ void ShowOffPart::Update() {
 
 void ShowOffPart::Draw() {
 
-  font_->RenderText("ざわ・・・", {100, 100}, 64, BitmapFont::Align::Left);
-  font_->RenderText("ざわ・・・", {200, 10}, 32, BitmapFont::Align::Left);
-  font_->RenderText("ざわ・・・", {1000, 600}, 48, BitmapFont::Align::Right);
-  font_->RenderText("ざわ・・・", {130, 650}, 64, BitmapFont::Align::Left);
-  font_->RenderText("ざわ・・・", {400, 370}, 32, BitmapFont::Align::Left);
-  font_->RenderText("ざわ・・・", {900, 250}, 64, BitmapFont::Align::Right);
-  font_->RenderText("ざわ・・・", {1200, 200}, 48, BitmapFont::Align::Right);
-  font_->RenderText("Perfect", {640, 360}, 48, BitmapFont::Align::Center);
 
+	font_->RenderText("ざわ・・・", { 100,100 }, 64, BitmapFont::Align::Left);
+	font_->RenderText("ざわ・・・", { 200,10 }, 32, BitmapFont::Align::Left);
+	font_->RenderText("ざわ・・・", { 1000,600 }, 48, BitmapFont::Align::Right);
+	font_->RenderText("ざわ・・・", { 130,650 }, 64, BitmapFont::Align::Left);
+	font_->RenderText("ざわ・・・", { 400,370 }, 32, BitmapFont::Align::Left);
+	font_->RenderText("ざわ・・・", { 900,250 }, 64, BitmapFont::Align::Right);
+	font_->RenderText("ざわ・・・", { 1200,200 }, 48, BitmapFont::Align::Right);
+	font_->RenderText("// ざわ・・・", { 640,360 }, 48, BitmapFont::Align::Center);
+	
 #ifdef USE_IMGUI
   ImGui::Begin("Contest - ShowOff");
 

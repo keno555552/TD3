@@ -145,7 +145,7 @@ struct ModBodyCustomizeData {
   // 共通進行データ
   float timeLimit_ = 180.0f;      // 残り制限時間（秒）
   float totalTimeLimit_ = 180.0f; // 制限時間の初期値（秒）
-  bool isTimeUp_ = false;        // 時間切れになったか
+  bool isTimeUp_ = false;         // 時間切れになったか
 };
 
 /// <summary>
@@ -322,6 +322,13 @@ public:
   /// </summary>
   const ControlPointChain &GetChain() const { return chain_; }
 
+  /// <summary>
+  /// 指定した2点役割から、この部位で実際に見た目へ使われるセグメント半径を返す
+  /// 判定用カプセル半径を見た目に合わせるために使う
+  /// </summary>
+  float GetVisualSegmentRadius(ModControlPointRole startRole,
+                               ModControlPointRole endRole) const;
+
 private:
   /// <summary>
   /// 対象Objectの基準transformを必要に応じてキャッシュする
@@ -381,16 +388,32 @@ private:
                                   const ControlPointChain &chain);
 
   /// <summary>
-/// 隣接する操作点同士が半径ぶんめり込まないように距離を補正する
-/// Root-Bend、Bend-End、LowerNeck-UpperNeck、UpperNeck-HeadCenter に適用する
-/// </summary>
+  /// 隣接する操作点同士が半径ぶんめり込まないように距離を補正する
+  /// Root-Bend、Bend-End、LowerNeck-UpperNeck、UpperNeck-HeadCenter に適用する
+  /// </summary>
   void EnforceAdjacentPointSpacing();
 
   /// <summary>
   /// 2点間が最小距離以上になるように後ろ側の点を押し出す
   /// </summary>
   void PushPointToMinimumDistance(int fixedIndex, int movableIndex,
-      float extraMargin);
+                                  float extraMargin);
+
+  /// <summary>
+  /// 部位ローカルの操作点位置を、Objectの親子transformを加味してワールド位置へ変換する
+  /// </summary>
+  /// <param name="target"></param>
+  /// <param name="localPoint"></param>
+  /// <returns></returns>
+  Vector3 TransformControlPointLocalToWorld(const Object *target,
+                                            const Vector3 &localPoint) const;
+
+    /// <summary>
+  /// 外部参照している操作点ローカル座標を、この部位 Object
+  /// のローカル座標へ変換する
+  /// </summary>
+  Vector3 ConvertExternalPointToThisObjectLocal(
+      const Object *target, const Vector3 &externalOwnerLocalPoint) const;
 
 private:
   ModBodyPart part_ = ModBodyPart::ChestBody;

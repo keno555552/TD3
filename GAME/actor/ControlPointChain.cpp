@@ -137,7 +137,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode root{};
   root.role = ModControlPointRole::Root;
   root.parentIndex = -1;
-  root.localPosition = {0.0f, 0.0f, 0.0f};
+  root.localPosition = {0.0f, 0.1f, 0.0f};
   root.radius = 0.09f;
   root.movable = false;
   root.isConnectionPoint = true;
@@ -148,7 +148,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode bend{};
   bend.role = ModControlPointRole::Bend;
   bend.parentIndex = 0;
-  bend.localPosition = {0.0f, 0.28f, 0.0f};
+  bend.localPosition = {0.0f, 0.38f, 0.0f};
   bend.radius = 0.08f;
   bend.movable = true;
   bend.isConnectionPoint = true;
@@ -159,7 +159,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode end{};
   end.role = ModControlPointRole::End;
   end.parentIndex = 1;
-  end.localPosition = {0.0f, 0.52f, 0.0f};
+  end.localPosition = {0.0f, 1.00f, 0.0f};
   end.radius = 0.11f;
   end.movable = true;
   end.isConnectionPoint = true;

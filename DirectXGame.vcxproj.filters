@@ -174,6 +174,7 @@
     <ClCompile Include="GAME\actor\ModCustomizeDataStore.cpp" />
     <ClCompile Include="GAME\audience\AudienceManager.cpp" />
     <ClCompile Include="GAME\judges\comment\JudgeCommentManager.cpp" />
+    <ClCompile Include="GAME\actor\ModCapsuleUtil.cpp" />
     <ClCompile Include="GAME\contest\parts\JudgingPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ResultPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ShowOffPart.cpp" />
@@ -422,6 +423,12 @@
     <ClInclude Include="GAME\audience\AudienceManager.h" />
     <ClInclude Include="GAME\judges\comment\JudgeCommentData.h" />
     <ClInclude Include="GAME\judges\comment\JudgeCommentManager.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyTypes.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyUtil.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyResolver.h" />
+    <ClInclude Include="GAME\actor\ModAssemblyDragState.h" />
+    <ClInclude Include="GAME\actor\ModAttachCandidate.h" />
+    <ClInclude Include="GAME\actor\ModCapsuleUtil.h" />
     <ClInclude Include="GAME\contest\parts\IContestPart.h" />
     <ClInclude Include="GAME\contest\parts\JudgingPart.h" />
     <ClInclude Include="GAME\contest\parts\ResultPart.h" />
