@@ -114,18 +114,6 @@ std::string ModelPath(ModBodyPart part) {
   }
 }
 
-int FindFirstChildPartId(const ModAssemblyGraph &assembly, int parentId,
-                         ModBodyPart wantedPart) {
-  const std::vector<int> children = assembly.GetChildren(parentId);
-  for (size_t i = 0; i < children.size(); ++i) {
-    const PartNode *child = assembly.FindNode(children[i]);
-    if (child != nullptr && child->part == wantedPart) {
-      return child->id;
-    }
-  }
-  return -1;
-}
-
 int ResolveControlOwnerPartId(const ModAssemblyGraph &assembly, int partId) {
   const PartNode *node = assembly.FindNode(partId);
   if (node == nullptr) {
@@ -821,13 +809,6 @@ ModScene::ModScene(kEngine *system) {
   controlPointGizmoTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/white100x100.png");
 
-  // 共有データから制限時間を復元する
-  timeLimit_ = 180.0f;
-  totalTimeLimit_ = 180.0f;
-  customizeData_->timeLimit_ = timeLimit_;
-  customizeData_->totalTimeLimit_ = totalTimeLimit_;
-  isTimeUp_ = customizeData_->isTimeUp_;
-
   orbitTarget_ = ComputeOrbitTarget();
   orbitYaw_ = 0.0f;
   orbitPitch_ = 0.0f;
@@ -848,23 +829,6 @@ ModScene::~ModScene() {
 }
 
 void ModScene::Update() {
-
-  // 共通制限時間を更新する
-  if (!isTimeUp_) {
-    if (!fade_.IsBusy()) {
-      timeLimit_ -= system_->GetDeltaTime();
-    }
-
-    if (timeLimit_ <= 0.0f) {
-      timeLimit_ = 0.0f;
-      isTimeUp_ = true;
-    }
-  } else {
-    SetupModObjects();            // 時間切れで構造をリセット
-    timeLimit_ = totalTimeLimit_; // 制限時間をリセット
-    isTimeUp_ = false;            // 時間切れ状態をリセット
-    outcome_ = SceneOutcome::RETRY;
-  }
 
   // 使用中カメラを更新する
   CameraPart();
@@ -895,28 +859,11 @@ void ModScene::Update() {
   if (system_->GetTriggerOn(DIK_6)) {
     assemblyChanged |= assembly_.AddBodyPart();
   }
-  if (system_->GetTriggerOn(DIK_7)) {
-    assemblyChanged |= assembly_.AddHeadPart();
-  }
 
   // Delete キーで選択部位を削除する
   if (system_->GetTriggerOn(DIK_DELETE)) {
     DeleteSelectedPart();
     assemblyChanged = true;
-  }
-
-  // 矢印キーで選択部位のローカル位置を微調整する
-  if (system_->GetTriggerOn(DIK_UP)) {
-    NudgeSelectedPart({0.0f, 0.1f, 0.0f});
-  }
-  if (system_->GetTriggerOn(DIK_DOWN)) {
-    NudgeSelectedPart({0.0f, -0.1f, 0.0f});
-  }
-  if (system_->GetTriggerOn(DIK_LEFT)) {
-    NudgeSelectedPart({-0.1f, 0.0f, 0.0f});
-  }
-  if (system_->GetTriggerOn(DIK_RIGHT)) {
-    NudgeSelectedPart({0.1f, 0.0f, 0.0f});
   }
 
   // 構造変更があった場合は Object 一覧と選択状態を同期し直す
@@ -992,11 +939,7 @@ void ModScene::Draw() {
   ImGui::Text("DIK_3/4 : Add Leg Assembly");
   ImGui::Text("DIK_5   : Add Neck");
   ImGui::Text("DIK_6   : Add Body");
-  ImGui::Text("DIK_7   : Add Head");
   ImGui::Text("Delete  : Remove Selected Part");
-  ImGui::Text("Arrow   : Move Selected Part");
-  ImGui::Text("Remaining Time : %.2f", timeLimit_);
-  ImGui::Text("Time Up        : %s", isTimeUp_ ? "YES" : "NO");
   ImGui::End();
 
   // 改造用UI本体を表示する
@@ -1324,6 +1267,13 @@ void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
   // 管理コンテナへ登録し、対応する ModBody も初期化する
   modObjects_[partId] = std::move(object);
   modBodies_[partId].Initialize(modObjects_[partId].get(), node.part);
+
+  if (node.part == ModBodyPart::Head && modObjects_[partId] != nullptr) {
+    Logger::Log("HEAD CREATE");
+    Logger::Log("partId = %d", partId);
+    Logger::Log("objectParts size = %zu",
+                modObjects_[partId]->objectParts_.size());
+  }
 }
 
 void ModScene::ApplyAssemblyToSceneHierarchy() {
@@ -1492,10 +1442,6 @@ void ModScene::SyncCustomizeDataFromScene() {
   // 旧方式配列も互換用に再構築する
   RebuildLegacyCustomizeDataFromInstances();
 
-  // 共通制限時間を共有データへ保存する
-  customizeData_->timeLimit_ = timeLimit_;
-  customizeData_->isTimeUp_ = isTimeUp_;
-
   // shared に積む前に整合性を揃えておく
   ModBody::NormalizeCustomizeData(*customizeData_);
 }
@@ -1585,7 +1531,7 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
         return {a.x - b.x, a.y - b.y, a.z - b.z};
       };
 
-      Vector3 chestLocal = {0.0f, 0.45f, 0.0f};
+      Vector3 chestLocal = {0.0f, 1.27f, 0.0f};
       for (const auto &point : torsoControlPoints_) {
         if (point.role == ModControlPointRole::Chest) {
           chestLocal = point.localPosition;
@@ -1764,10 +1710,6 @@ void ModScene::ResetSelectedPartParams() {
 
 void ModScene::ResetToDefaultHumanoid() {
 
-  // 制限時間も初期化する
-  timeLimit_ = totalTimeLimit_;
-  isTimeUp_ = false;
-
   // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
@@ -1784,12 +1726,6 @@ void ModScene::ResetToDefaultHumanoid() {
   // 選択状態と共有データも初期状態へ寄せる
   EnsureValidSelection();
   SyncCustomizeDataFromScene();
-
-  if (customizeData_ != nullptr) {
-    customizeData_->totalTimeLimit_ = totalTimeLimit_;
-    customizeData_->timeLimit_ = timeLimit_;
-    customizeData_->isTimeUp_ = false;
-  }
 }
 
 void ModScene::SelectPart(int partId) {
@@ -2485,12 +2421,13 @@ void ModScene::DrawControlPointGizmos() {
 void ModScene::ResetTorsoControlPoints() {
   torsoControlPoints_.clear();
 
-  torsoChestToBellyLength_ = 0.45f;
-  torsoBellyToWaistLength_ = 0.45f;
+  // 新モデル寸法に合わせる
+  torsoChestToBellyLength_ = 1.2796f;
+  torsoBellyToWaistLength_ = 1.6880f;
 
   TorsoControlPoint chest{};
   chest.role = ModControlPointRole::Chest;
-  chest.localPosition = {0.0f, 0.45f, 0.0f};
+  chest.localPosition = {0.0f, 1.2796f, 0.0f};
   chest.radius = 0.12f;
   chest.movable = true;
   chest.isConnectionPoint = true;
@@ -2510,7 +2447,7 @@ void ModScene::ResetTorsoControlPoints() {
 
   TorsoControlPoint waist{};
   waist.role = ModControlPointRole::Waist;
-  waist.localPosition = {0.0f, -0.45f, 0.0f};
+  waist.localPosition = {0.0f, -1.6880f, 0.0f};
   waist.radius = 0.12f;
   waist.movable = true;
   waist.isConnectionPoint = true;
@@ -2545,9 +2482,9 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     const int waistIndex =
         FindTorsoControlPointIndex(ModControlPointRole::Waist);
 
-    const Vector3 defaultChest = {0.0f, 0.45f, 0.0f};
+    const Vector3 defaultChest = {0.0f, 1.2796f, 0.0f};
     const Vector3 defaultBelly = {0.0f, 0.0f, 0.0f};
-    const Vector3 defaultWaist = {0.0f, -0.45f, 0.0f};
+    const Vector3 defaultWaist = {0.0f, -1.6880f, 0.0f};
 
     const Vector3 currentChest =
         (chestIndex >= 0)
@@ -2577,92 +2514,76 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     const float currentWaistRadius = GetTorsoControlPointRadius(
         ModControlPointRole::Waist, defaultWaistRadius);
 
-    const float chestRadiusRatio =
-        currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
-
-    const float bellyRadiusRatio =
-        currentBellyRadius / (std::max)(defaultBellyRadius, 0.0001f);
-
-    const float waistRadiusRatio =
-        currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
-
-    // 上半身上端の押し出し量
-    // 胴体メッシュは Chest-Belly
-    // のセグメント太さを大きい方の半径で描いているので、
-    // 首の接続位置も同じ考え方で押し出す
     const float defaultUpperTorsoRadius =
         (std::max)(defaultChestRadius, defaultBellyRadius);
     const float defaultLowerTorsoRadius =
         (std::max)(defaultBellyRadius, defaultWaistRadius);
+
     const float currentUpperTorsoRadius =
         (std::max)(currentChestRadius, currentBellyRadius);
     const float currentLowerTorsoRadius =
         (std::max)(currentBellyRadius, currentWaistRadius);
 
-    Vector3 upperOutwardDir = {0.0f, 1.0f, 0.0f};
-    {
-      const Vector3 chestToBelly = Subtract(currentBelly, currentChest);
-      if (Length(chestToBelly) > 0.0001f) {
-        upperOutwardDir =
-            NormalizeSafeV(Multiply(-1.0f, chestToBelly), {0.0f, 1.0f, 0.0f});
-      }
-    }
+    const float upperTorsoRadiusRatio =
+        currentUpperTorsoRadius / (std::max)(defaultUpperTorsoRadius, 0.0001f);
 
-    const Vector3 upperTorsoSurfacePush = Multiply(
-        currentUpperTorsoRadius - defaultUpperTorsoRadius, upperOutwardDir);
+    const float lowerTorsoRadiusRatio =
+        currentLowerTorsoRadius / (std::max)(defaultLowerTorsoRadius, 0.0001f);
+
+    const float chestRadiusRatio =
+        currentChestRadius / (std::max)(defaultChestRadius, 0.0001f);
+
+    const float waistRadiusRatio =
+        currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
+
+    // 新モデル基準の接続配置
+    // 腕  : Chest と同じ高さ、少し外
+    // 脚  : Waist より少し下
+    // 首  : Chest より少し上
+    const float baseShoulderX = 1.34f;
+    const float baseHipX = 0.58f;
+    const float neckLift = 0.08f;
+    const float legDrop = 0.10f;
 
     switch (childNode.part) {
     case ModBodyPart::Neck:
     case ModBodyPart::Head: {
-      const Vector3 relative = Subtract(defaultAttach, defaultChest);
-
-      // 中央接続でも Belly 側の拡縮が効くように、
-      // 上半身全体の太さとして Chest/Belly の大きい方を使う
-      const float upperTorsoRadiusRatio =
-          currentUpperTorsoRadius /
-          (std::max)(defaultUpperTorsoRadius, 0.0001f);
-
-      const Vector3 scaledRelative = ScaleVectorComponents(
-          relative, {upperTorsoRadiusRatio, upperTorsoRadiusRatio,
-                     upperTorsoRadiusRatio});
-
-      return Add(Add(currentChest, scaledRelative), upperTorsoSurfacePush);
+      Vector3 attach = currentChest;
+      attach.y +=
+          neckLift + (currentUpperTorsoRadius - defaultUpperTorsoRadius);
+      return attach;
     }
 
-    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::LeftUpperArm: {
+      Vector3 attach = currentChest;
+      attach.x -= baseShoulderX * upperTorsoRadiusRatio;
+      attach.y = currentChest.y;
+      attach.z = 0.0f;
+      return attach;
+    }
+
     case ModBodyPart::RightUpperArm: {
-      const Vector3 relative = Subtract(defaultAttach, defaultChest);
-
-      const float upperTorsoRadiusRatio =
-          currentUpperTorsoRadius /
-          (std::max)(defaultUpperTorsoRadius, 0.0001f);
-
-      // 腕は Chest に接続しているが、
-      // 胴体見た目は Chest-Belly の上半分全体で太くなるので、
-      // 横方向は upperTorsoRadiusRatio を使って Belly の拡縮も反映する
-      const Vector3 scaledRelative = ScaleVectorComponents(
-          relative,
-          {upperTorsoRadiusRatio, chestRadiusRatio, upperTorsoRadiusRatio});
-
-      return Add(currentChest, scaledRelative);
+      Vector3 attach = currentChest;
+      attach.x += baseShoulderX * upperTorsoRadiusRatio;
+      attach.y = currentChest.y;
+      attach.z = 0.0f;
+      return attach;
     }
 
-    case ModBodyPart::LeftThigh:
+    case ModBodyPart::LeftThigh: {
+      Vector3 attach = currentWaist;
+      attach.x -= baseHipX * lowerTorsoRadiusRatio;
+      attach.y -= legDrop * waistRadiusRatio;
+      attach.z = 0.0f;
+      return attach;
+    }
+
     case ModBodyPart::RightThigh: {
-      const Vector3 relative = Subtract(defaultAttach, defaultWaist);
-
-      const float lowerTorsoRadiusRatio =
-          currentLowerTorsoRadius /
-          (std::max)(defaultLowerTorsoRadius, 0.0001f);
-
-      // 脚は Waist 接続だが、
-      // 胴体見た目は Belly-Waist の下半分全体で太くなるので、
-      // 横方向は lowerTorsoRadiusRatio を使って Belly の拡縮も反映する
-      const Vector3 scaledRelative = ScaleVectorComponents(
-          relative,
-          {lowerTorsoRadiusRatio, waistRadiusRatio, lowerTorsoRadiusRatio});
-
-      return Add(currentWaist, scaledRelative);
+      Vector3 attach = currentWaist;
+      attach.x += baseHipX * lowerTorsoRadiusRatio;
+      attach.y -= legDrop * waistRadiusRatio;
+      attach.z = 0.0f;
+      return attach;
     }
 
     default:
@@ -4525,6 +4446,17 @@ void ModScene::UpdateModObjects() {
       continue;
     }
 
+    const PartNode *node = assembly_.FindNode(id);
+    if (node != nullptr && node->part == ModBodyPart::Head) {
+      const ModBodyPartParam &param = modBodies_[id].GetParam();
+      Logger::Log("HEAD APPLY");
+      Logger::Log("id = %d", id);
+      Logger::Log("enabled = %d", param.enabled ? 1 : 0);
+      Logger::Log("scale = (%.3f, %.3f, %.3f)", param.scale.x, param.scale.y,
+                  param.scale.z);
+      Logger::Log("length = %.3f", param.length);
+    }
+
     Object *object = modObjects_[id].get();
     if (object != nullptr) {
       modBodies_[id].Apply(object);
@@ -4889,7 +4821,7 @@ void ModScene::DrawModGui() {
     }
   }
 
-  if (ImGui::Button("Add Neck")) {
+  if (ImGui::Button("Add Head Set")) {
     if (assembly_.AddNeckPart()) {
       SyncObjectsWithAssembly();
       EnsureValidSelection();
@@ -4898,13 +4830,6 @@ void ModScene::DrawModGui() {
   ImGui::SameLine();
   if (ImGui::Button("Add Body")) {
     if (assembly_.AddBodyPart()) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Add Head")) {
-    if (assembly_.AddHeadPart()) {
       SyncObjectsWithAssembly();
       EnsureValidSelection();
     }
