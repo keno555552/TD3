@@ -281,6 +281,8 @@ private:
   std::vector<Object *> extraObjects_;
   std::vector<int> extraParentIds_;
   std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
+  std::vector<ModBodyPart> extraPartTypes_;
+  std::vector<int> extraPartIds_;
 
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;
 
@@ -327,6 +329,29 @@ private:
   void UpdateExtraVisualParts();
   void DrawExtraVisualParts();
   void ClearExtraVisualParts();
+
+  void CollectSnapshotsByOwnerId(
+      int ownerPartId,
+      std::vector<const ModControlPointSnapshot *> &outSnapshots) const;
+
+  Vector3 BuildAnimatedChildRootFromParent(const Vector3 &root, float angleZ,
+                                           float angleX, float length) const;
+
+  bool GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
+                                     Vector3 &outBend, Vector3 &outEnd) const;
+
+  bool GetExtraPartParentObject(
+      ModBodyPart partType, int parentId,
+      const std::unordered_map<int, Object *> &extraPartObjectMap,
+      Object *&outParent) const;
+
+  int GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
+                              int parentId) const;
+
+  bool ComputeExtraBaseAngles(ModBodyPart partType, int snapshotOwnerId,
+                              float &outBaseAngleX, float &outBaseAngleZ) const;
+
+  float ComputeExtraAnimAngleX(ModBodyPart partType) const;
 
   void UpdatePartRootsFromControlPoints();
 
@@ -414,8 +439,14 @@ private:
     float startDelay = 0.0f;
     bool started = false;
 
+    float inputHoldTimer = 0.0f;
+    bool inputLeftActive = false;
+    float baseKickInterval = 0.25f;
+    bool isKickHolding = false;
+    bool kickHoldLeft = false;
+
     float timingSkill = 1.0f;
-    float targetKickTime = 0.05f; 
+    float targetKickTime = 0.05f;
     bool hasKickPlan = false;
     bool prevGrounded = false;
 
@@ -433,6 +464,8 @@ private:
     std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies{};
 
     std::vector<Object *> extraObjects;
+
+    bool visualInitialized = false;
   };
 
   std::vector<NpcRunner> npcRunners_;
@@ -482,6 +515,7 @@ private:
       ModBodyPart part, const std::string &path);
 
   void SetupNpcCustomizedVisual(NpcRunner &npc);
+  void BuildNpcCustomizedVisual(NpcRunner &npc);
   void UpdateNpcCustomizedVisual(NpcRunner &npc);
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);

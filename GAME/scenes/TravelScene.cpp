@@ -2148,14 +2148,15 @@ void TravelScene::UpdateSceneTransition() {
   //================================
   // 時間切れでもリトライ
   //================================
-  if (!isRaceFinished_ && isTimeUp_ && !fade_.IsBusy() && !isStartTransition_) {
-    fade_.StartFadeOut();
-    isStartTransition_ = true;
-    nextOutcome_ = SceneOutcome::RETRY;
+  // if (!isRaceFinished_ && isTimeUp_ && !fade_.IsBusy() &&
+  // !isStartTransition_) {
+  //  fade_.StartFadeOut();
+  //  isStartTransition_ = true;
+  //  nextOutcome_ = SceneOutcome::RETRY;
 
-    timeLimit_ = travelTimeLimit_;
-    isTimeUp_ = false;
-  }
+  //  timeLimit_ = travelTimeLimit_;
+  //  isTimeUp_ = false;
+  //}
 
 #ifdef _DEBUG
 
@@ -2230,6 +2231,217 @@ void TravelScene::ClearExtraVisualParts() {
 
   extraObjects_.clear();
   extraParentIds_.clear();
+  extraPartTypes_.clear();
+  extraPartIds_.clear();
+}
+
+void TravelScene::CollectSnapshotsByOwnerId(
+    int ownerPartId,
+    std::vector<const ModControlPointSnapshot *> &outSnapshots) const {
+
+  outSnapshots.clear();
+
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  for (const auto &snap : customizeData_->controlPointSnapshots) {
+    if (snap.ownerPartId == ownerPartId) {
+      outSnapshots.push_back(&snap);
+    }
+  }
+}
+
+Vector3 TravelScene::BuildAnimatedChildRootFromParent(const Vector3 &root,
+                                                      float angleZ,
+                                                      float angleX,
+                                                      float length) const {
+  Vector3 result{};
+  result.x = root.x + std::sin(angleZ) * std::cos(angleX) * length;
+  result.y = root.y - std::cos(angleZ) * std::cos(angleX) * length;
+  result.z = root.z - std::sin(angleX) * length;
+  return result;
+}
+
+bool TravelScene::GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
+                                                Vector3 &outBend,
+                                                Vector3 &outEnd) const {
+  if (customizeData_ == nullptr) {
+    return false;
+  }
+
+  bool hasRoot = false;
+  bool hasBend = false;
+  bool hasEnd = false;
+
+  for (const auto &snap : customizeData_->controlPointSnapshots) {
+    if (snap.ownerPartId != partId) {
+      continue;
+    }
+
+    if (snap.role == ModControlPointRole::Root) {
+      outRoot = snap.localPosition;
+      hasRoot = true;
+    } else if (snap.role == ModControlPointRole::Bend) {
+      outBend = snap.localPosition;
+      hasBend = true;
+    } else if (snap.role == ModControlPointRole::End) {
+      outEnd = snap.localPosition;
+      hasEnd = true;
+    }
+  }
+
+  return hasRoot && hasBend && hasEnd;
+}
+
+bool TravelScene::GetExtraPartParentObject(
+    ModBodyPart partType, int parentId,
+    const std::unordered_map<int, Object *> &extraPartObjectMap,
+    Object *&outParent) const {
+  outParent = nullptr;
+
+  auto it = extraPartObjectMap.find(parentId);
+  if (it != extraPartObjectMap.end()) {
+    outParent = it->second;
+    return true;
+  }
+
+  switch (partType) {
+  case ModBodyPart::LeftForeArm:
+    outParent = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+    return outParent != nullptr;
+
+  case ModBodyPart::RightForeArm:
+    outParent = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+    return outParent != nullptr;
+
+  case ModBodyPart::LeftShin:
+    outParent = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+    return outParent != nullptr;
+
+  case ModBodyPart::RightShin:
+    outParent = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+    return outParent != nullptr;
+
+  default:
+    return false;
+  }
+}
+
+int TravelScene::GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
+                                         int parentId) const {
+  switch (partType) {
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    if (parentId >= 0) {
+      return parentId;
+    }
+    return partId;
+
+  default:
+    return partId;
+  }
+}
+
+bool TravelScene::ComputeExtraBaseAngles(ModBodyPart partType,
+                                         int snapshotOwnerId,
+                                         float &outBaseAngleX,
+                                         float &outBaseAngleZ) const {
+  Vector3 snapRoot = {0.0f, 0.0f, 0.0f};
+  Vector3 snapBend = {0.0f, -0.5f, 0.0f};
+  Vector3 snapEnd = {0.0f, -1.0f, 0.0f};
+
+  if (!GetExtraPartSnapshotPositions(snapshotOwnerId, snapRoot, snapBend,
+                                     snapEnd)) {
+    return false;
+  }
+
+  Vector3 from = snapRoot;
+  Vector3 to = snapBend;
+
+  switch (partType) {
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    from = snapBend;
+    to = snapEnd;
+    break;
+
+  default:
+    from = snapRoot;
+    to = snapBend;
+    break;
+  }
+
+  Vector3 vec = {to.x - from.x, to.y - from.y, to.z - from.z};
+  float length = Length(vec);
+
+  if (length < 0.0001f) {
+    vec = {0.0f, -1.0f, 0.0f};
+  } else {
+    vec = Normalize(vec);
+  }
+
+  outBaseAngleZ = atan2(vec.x, -vec.y);
+  outBaseAngleX = -asinf(std::clamp(vec.z, -1.0f, 1.0f));
+  return true;
+}
+
+float TravelScene::ComputeExtraAnimAngleX(ModBodyPart partType) const {
+  const float armSwingScale = 0.60f;
+  const float thighSwingScale = 0.70f;
+
+  switch (partType) {
+  case ModBodyPart::LeftUpperArm:
+    return -rightLegBend_ * armSwingScale;
+
+  case ModBodyPart::RightUpperArm:
+    return -leftLegBend_ * armSwingScale;
+
+  case ModBodyPart::LeftForeArm: {
+    float upperArmSwing = -rightLegBend_ * armSwingScale;
+    float elbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                     (legRecoverAngle_ - legKickAngle_),
+                                 0.0f, 1.0f);
+    return -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+  }
+
+  case ModBodyPart::RightForeArm: {
+    float upperArmSwing = -leftLegBend_ * armSwingScale;
+    float elbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                     (legRecoverAngle_ - legKickAngle_),
+                                 0.0f, 1.0f);
+    return -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+  }
+
+  case ModBodyPart::LeftThigh:
+    return -leftLegBend_ * thighSwingScale;
+
+  case ModBodyPart::RightThigh:
+    return -rightLegBend_ * thighSwingScale;
+
+  case ModBodyPart::LeftShin: {
+    float thighSwing = -leftLegBend_ * thighSwingScale;
+    float kneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                    (legRecoverAngle_ - legKickAngle_),
+                                0.0f, 1.0f);
+    return thighSwing * 0.35f + kneeFold * 0.6f;
+  }
+
+  case ModBodyPart::RightShin: {
+    float thighSwing = -rightLegBend_ * thighSwingScale;
+    float kneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                    (legRecoverAngle_ - legKickAngle_),
+                                0.0f, 1.0f);
+    return thighSwing * 0.35f + kneeFold * 0.6f;
+  }
+
+  default:
+    return 0.0f;
+  }
 }
 
 const ModControlPointData *TravelScene::GetControlPoints() const {
@@ -2547,6 +2759,7 @@ void TravelScene::BuildExtraVisualParts() {
           Vector3 armVector = {0.0f, -1.0f, 0.0f};
           float armLength = 0.0001f;
           float armAngleZ = 0.0f;
+          float armAngleX = 0.0f;
 
           if (rootSnap != nullptr && bendSnap != nullptr) {
             armVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
@@ -2559,6 +2772,7 @@ void TravelScene::BuildExtraVisualParts() {
 
             Vector3 armDir = Normalize(armVector);
             armAngleZ = atan2(armDir.x, -armDir.y);
+            armAngleX = -asinf(std::clamp(armDir.z, -1.0f, 1.0f));
 
             obj->mainPosition.transform.translate =
                 instance.localTransform.translate;
@@ -2599,7 +2813,7 @@ void TravelScene::BuildExtraVisualParts() {
 
           mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
 
-          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+          obj->mainPosition.transform.rotate = {armAngleX, 0.0f, armAngleZ};
         }
       } else if (instance.partType == ModBodyPart::LeftUpperArm) {
 
@@ -2648,6 +2862,7 @@ void TravelScene::BuildExtraVisualParts() {
           Vector3 armVector = {0.0f, -1.0f, 0.0f};
           float armLength = 0.0001f;
           float armAngleZ = 0.0f;
+          float armAngleX = 0.0f;
 
           if (rootSnap != nullptr && bendSnap != nullptr) {
             armVector = Sub(bendSnap->localPosition, rootSnap->localPosition);
@@ -2660,6 +2875,7 @@ void TravelScene::BuildExtraVisualParts() {
 
             Vector3 armDir = Normalize(armVector);
             armAngleZ = atan2(armDir.x, -armDir.y);
+            armAngleX = -asinf(std::clamp(armDir.z, -1.0f, 1.0f));
 
             obj->mainPosition.transform.translate =
                 instance.localTransform.translate;
@@ -2698,7 +2914,7 @@ void TravelScene::BuildExtraVisualParts() {
 
           mesh.translate = {0.0f, -armLength * 0.5f, 0.0f};
 
-          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+          obj->mainPosition.transform.rotate = {armAngleX, 0.0f, armAngleZ};
         }
       } else if (instance.partType == ModBodyPart::RightForeArm) {
 
@@ -2709,14 +2925,8 @@ void TravelScene::BuildExtraVisualParts() {
           ownerPartId = instance.parentId;
         }
 
-        std::vector<const ModControlPointSnapshot *> snaps;
-        snaps.reserve(customizeData_->controlPointSnapshots.size());
-
-        for (const auto &snap : customizeData_->controlPointSnapshots) {
-          if (snap.ownerPartId == ownerPartId) {
-            snaps.push_back(&snap);
-          }
-        }
+std::vector<const ModControlPointSnapshot *> snaps;
+        CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
         const ModControlPointSnapshot *endSnap = nullptr;
@@ -2750,6 +2960,7 @@ void TravelScene::BuildExtraVisualParts() {
 
           Vector3 armDir = Normalize(armVector);
           float armAngleZ = atan2(armDir.x, -armDir.y);
+          float armAngleX = -asinf(std::clamp(armDir.z, -1.0f, 1.0f));
 
           //================================
           // 太さ
@@ -2802,7 +3013,7 @@ void TravelScene::BuildExtraVisualParts() {
           } else {
             obj->mainPosition.transform.translate = ownerTranslate;
           }
-          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+          obj->mainPosition.transform.rotate = {armAngleX, 0.0f, armAngleZ};
         }
       } else if (instance.partType == ModBodyPart::LeftForeArm) {
 
@@ -2813,14 +3024,8 @@ void TravelScene::BuildExtraVisualParts() {
           ownerPartId = instance.parentId;
         }
 
-        std::vector<const ModControlPointSnapshot *> snaps;
-        snaps.reserve(customizeData_->controlPointSnapshots.size());
-
-        for (const auto &snap : customizeData_->controlPointSnapshots) {
-          if (snap.ownerPartId == ownerPartId) {
-            snaps.push_back(&snap);
-          }
-        }
+std::vector<const ModControlPointSnapshot *> snaps;
+        CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
         const ModControlPointSnapshot *endSnap = nullptr;
@@ -2854,6 +3059,7 @@ void TravelScene::BuildExtraVisualParts() {
 
           Vector3 armDir = Normalize(armVector);
           float armAngleZ = atan2(armDir.x, -armDir.y);
+          float armAngleX = -asinf(std::clamp(armDir.z, -1.0f, 1.0f));
 
           //================================
           // 太さ
@@ -2906,7 +3112,7 @@ void TravelScene::BuildExtraVisualParts() {
             obj->mainPosition.transform.translate = ownerTranslate;
           }
 
-          obj->mainPosition.transform.rotate = {0.0f, 0.0f, armAngleZ};
+          obj->mainPosition.transform.rotate = {armAngleX, 0.0f, armAngleZ};
         }
       } else if (instance.partType == ModBodyPart::LeftThigh) {
 
@@ -3008,14 +3214,8 @@ void TravelScene::BuildExtraVisualParts() {
           ownerPartId = instance.parentId;
         }
 
-        std::vector<const ModControlPointSnapshot *> snaps;
-        snaps.reserve(customizeData_->controlPointSnapshots.size());
-
-        for (const auto &snap : customizeData_->controlPointSnapshots) {
-          if (snap.ownerPartId == ownerPartId) {
-            snaps.push_back(&snap);
-          }
-        }
+std::vector<const ModControlPointSnapshot *> snaps;
+        CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
         const ModControlPointSnapshot *endSnap = nullptr;
@@ -3195,14 +3395,8 @@ void TravelScene::BuildExtraVisualParts() {
           ownerPartId = instance.parentId;
         }
 
-        std::vector<const ModControlPointSnapshot *> snaps;
-        snaps.reserve(customizeData_->controlPointSnapshots.size());
-
-        for (const auto &snap : customizeData_->controlPointSnapshots) {
-          if (snap.ownerPartId == ownerPartId) {
-            snaps.push_back(&snap);
-          }
-        }
+std::vector<const ModControlPointSnapshot *> snaps;
+        CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
         const ModControlPointSnapshot *endSnap = nullptr;
@@ -3358,6 +3552,9 @@ void TravelScene::BuildExtraVisualParts() {
     builtPartIdToPart[instance.partId] = &obj->mainPosition;
 
     extraObjects_.push_back(obj);
+    extraPartTypes_.push_back(instance.partType);
+    extraPartIds_.push_back(instance.partId);
+    extraParentIds_.push_back(instance.parentId);
   }
 }
 
@@ -3373,107 +3570,125 @@ void TravelScene::UpdateExtraVisualParts() {
   Object *fixedRightThigh = modObjects_[ToIndex(ModBodyPart::RightThigh)];
   Object *fixedRightShin = modObjects_[ToIndex(ModBodyPart::RightShin)];
 
-  for (auto *obj : extraObjects_) {
+  std::unordered_map<int, Object *> extraPartObjectMap;
+  for (size_t i = 0; i < extraObjects_.size() && i < extraPartIds_.size();
+       ++i) {
+    if (extraObjects_[i] != nullptr) {
+      extraPartObjectMap[extraPartIds_[i]] = extraObjects_[i];
+    }
+  }
+
+  const size_t count = (std::min)(extraObjects_.size(), extraPartTypes_.size());
+
+  for (size_t i = 0; i < count; ++i) {
+    Object *obj = extraObjects_[i];
     if (obj == nullptr) {
       continue;
     }
 
-    if (fixedHead != nullptr &&
-        obj->followObject_ == &fixedHead->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedHead->mainPosition.transform.rotate;
+    ModBodyPart partType = extraPartTypes_[i];
 
-      if (!obj->objectParts_.empty() && !fixedHead->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedHead->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedLeftUpperArm != nullptr &&
-               obj->followObject_ == &fixedLeftUpperArm->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedLeftUpperArm->mainPosition.transform.rotate;
+    int partId = -1;
+    if (i < extraPartIds_.size()) {
+      partId = extraPartIds_[i];
+    }
 
-      if (!obj->objectParts_.empty() &&
-          !fixedLeftUpperArm->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedLeftUpperArm->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedLeftForeArm != nullptr &&
-               obj->followObject_ == &fixedLeftForeArm->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedLeftForeArm->mainPosition.transform.rotate;
+    int parentId = -1;
+    if (i < extraParentIds_.size()) {
+      parentId = extraParentIds_[i];
+    }
 
-      if (!obj->objectParts_.empty() &&
-          !fixedLeftForeArm->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedLeftForeArm->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedRightUpperArm != nullptr &&
-               obj->followObject_ == &fixedRightUpperArm->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedRightUpperArm->mainPosition.transform.rotate;
+    Object *source = nullptr;
+    switch (partType) {
+    case ModBodyPart::Head:
+      source = fixedHead;
+      break;
+    case ModBodyPart::Neck:
+      source = fixedNeck;
+      break;
+    case ModBodyPart::LeftUpperArm:
+      source = fixedLeftUpperArm;
+      break;
+    case ModBodyPart::LeftForeArm:
+      source = fixedLeftForeArm;
+      break;
+    case ModBodyPart::RightUpperArm:
+      source = fixedRightUpperArm;
+      break;
+    case ModBodyPart::RightForeArm:
+      source = fixedRightForeArm;
+      break;
+    case ModBodyPart::LeftThigh:
+      source = fixedLeftThigh;
+      break;
+    case ModBodyPart::LeftShin:
+      source = fixedLeftShin;
+      break;
+    case ModBodyPart::RightThigh:
+      source = fixedRightThigh;
+      break;
+    case ModBodyPart::RightShin:
+      source = fixedRightShin;
+      break;
+    default:
+      break;
+    }
 
-      if (!obj->objectParts_.empty() &&
-          !fixedRightUpperArm->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedRightUpperArm->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedRightForeArm != nullptr &&
-               obj->followObject_ == &fixedRightForeArm->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedRightForeArm->mainPosition.transform.rotate;
+    if (source == nullptr) {
+      obj->Update(usingCamera_);
+      continue;
+    }
 
-      if (!obj->objectParts_.empty() &&
-          !fixedRightForeArm->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedRightForeArm->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedLeftThigh != nullptr &&
-               obj->followObject_ == &fixedLeftThigh->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedLeftThigh->mainPosition.transform.rotate;
+    if (!obj->objectParts_.empty() && !source->objectParts_.empty()) {
+      obj->objectParts_[0].transform.rotate =
+          source->objectParts_[0].transform.rotate;
+    }
 
-      if (!obj->objectParts_.empty() && !fixedLeftThigh->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedLeftThigh->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedLeftShin != nullptr &&
-               obj->followObject_ == &fixedLeftShin->mainPosition) {
+    if (partType == ModBodyPart::Head || partType == ModBodyPart::Neck) {
+      obj->mainPosition.transform.translate =
+          source->mainPosition.transform.translate;
       obj->mainPosition.transform.rotate =
-          fixedLeftShin->mainPosition.transform.rotate;
+          source->mainPosition.transform.rotate;
+      obj->Update(usingCamera_);
+      continue;
+    }
 
-      if (!obj->objectParts_.empty() && !fixedLeftShin->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedLeftShin->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedRightThigh != nullptr &&
-               obj->followObject_ == &fixedRightThigh->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedRightThigh->mainPosition.transform.rotate;
+    int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
 
-      if (!obj->objectParts_.empty() &&
-          !fixedRightThigh->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedRightThigh->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedRightShin != nullptr &&
-               obj->followObject_ == &fixedRightShin->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedRightShin->mainPosition.transform.rotate;
+    float baseAngleX = 0.0f;
+    float baseAngleZ = 0.0f;
+    bool hasBaseAngles = ComputeExtraBaseAngles(partType, snapshotOwnerId,
+                                                baseAngleX, baseAngleZ);
 
-      if (!obj->objectParts_.empty() && !fixedRightShin->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedRightShin->objectParts_[0].transform.rotate;
-      }
-    } else if (fixedNeck != nullptr &&
-               obj->followObject_ == &fixedNeck->mainPosition) {
-      obj->mainPosition.transform.rotate =
-          fixedNeck->mainPosition.transform.rotate;
+    if (!hasBaseAngles) {
+      obj->Update(usingCamera_);
+      continue;
+    }
 
-      if (!obj->objectParts_.empty() && !fixedNeck->objectParts_.empty()) {
-        obj->objectParts_[0].transform.rotate =
-            fixedNeck->objectParts_[0].transform.rotate;
+    if (partType == ModBodyPart::LeftForeArm ||
+        partType == ModBodyPart::RightForeArm ||
+        partType == ModBodyPart::LeftShin ||
+        partType == ModBodyPart::RightShin) {
+      Object *parentObj = nullptr;
+      bool hasParent = GetExtraPartParentObject(partType, parentId,
+                                                extraPartObjectMap, parentObj);
+
+      if (hasParent && parentObj != nullptr &&
+          !parentObj->objectParts_.empty()) {
+        const Vector3 parentRoot = parentObj->mainPosition.transform.translate;
+        const float parentAngleX = parentObj->mainPosition.transform.rotate.x;
+        const float parentAngleZ = parentObj->mainPosition.transform.rotate.z;
+        const float parentLength =
+            (std::max)(0.05f, parentObj->objectParts_[0].transform.scale.y);
+
+        obj->mainPosition.transform.translate =
+            BuildAnimatedChildRootFromParent(parentRoot, parentAngleZ,
+                                             parentAngleX, parentLength);
       }
     }
+
+    obj->mainPosition.transform.rotate = {
+        baseAngleX + ComputeExtraAnimAngleX(partType), 0.0f, baseAngleZ};
 
     obj->Update(usingCamera_);
   }
@@ -3497,8 +3712,9 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
   bool leftNowInput = system_->GetIsPush(DIK_A);
   bool rightNowInput = system_->GetIsPush(DIK_D);
 
-  bool hasMoveInput = leftNowInput || rightNowInput;
-  float poseAnimScale = hasMoveInput ? 1.0f : 0.0f;
+  // bool hasMoveInput = leftNowInput || rightNowInput;
+  // float poseAnimScale = hasMoveInput ? 1.0f : 0.0f;
+  float poseAnimScale = 1.0f;
 
   Object *neck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
@@ -3522,6 +3738,13 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
   auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
     return {a.x - b.x, a.y - b.y, a.z - b.z};
+  };
+
+  auto BuildAnimatedChildRoot = [](const Vector3 &root, float angleZ,
+                                   float angleX, float length) -> Vector3 {
+    return {root.x + std::sin(angleZ) * std::cos(angleX) * length,
+            root.y - std::cos(angleZ) * std::cos(angleX) * length,
+            root.z - std::sin(angleX) * length};
   };
 
   int baseHeadPartId = -1;
@@ -4689,7 +4912,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
 
     Vector3 headDir = Normalize(headShapeVec);
     float headAngleZ = atan2f(-headDir.x, headDir.y);
-    float headAngleX = -asinf(std::clamp(headDir.z, -1.0f, 1.0f));
+    float headAngleX = asinf(std::clamp(headDir.z, -1.0f, 1.0f));
 
     const float headThicknessScale =
         (std::max)(GetSnapshotRadius(ModBodyPart::Neck, 2),
@@ -4734,7 +4957,11 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float leftUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
-    float leftUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+    float leftUpperArmBaseX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+
+    float leftUpperArmAnimX = (-rightLegBend_ * armSwingScale) * poseAnimScale;
+
+    float leftUpperArmAngleX = leftUpperArmBaseX + leftUpperArmAnimX;
 
     // leftUpperArm->mainPosition.transform.translate = leftShoulderAnchorLocal;
     leftUpperArm->mainPosition.transform.translate =
@@ -4763,11 +4990,21 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float leftForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
-    float leftForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+    float leftForeArmBaseX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
 
-    Vector3 leftElbowOffset = Sub(leftArmBendLocal, leftArmRootLocal);
+    float leftUpperArmSwing = -rightLegBend_ * armSwingScale;
+    float leftElbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                         (legRecoverAngle_ - legKickAngle_),
+                                     0.0f, 1.0f);
+
+    float leftForeArmAnimX =
+        (-(leftUpperArmSwing * 0.35f + leftElbowFold * 0.45f)) * poseAnimScale;
+
+    float leftForeArmAngleX = leftForeArmBaseX + leftForeArmAnimX;
+
     Vector3 leftUpperArmRoot = Add(chestTopWorld, leftShoulderFromChest);
-    Vector3 leftForeArmRoot = Add(leftUpperArmRoot, leftElbowOffset);
+    Vector3 leftForeArmRoot = BuildAnimatedChildRoot(
+        leftUpperArmRoot, leftUpperArmAngleZ, leftUpperArmAngleX, upperLength);
 
     leftForeArm->mainPosition.transform.translate = leftForeArmRoot;
     leftForeArm->mainPosition.transform.rotate = {leftForeArmAngleX, 0.0f,
@@ -4809,7 +5046,11 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float rightUpperArmAngleZ = atan2(upperDir.x, -upperDir.y);
-    float rightUpperArmAngleX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+    float rightUpperArmBaseX = -asinf(std::clamp(upperDir.z, -1.0f, 1.0f));
+
+    float rightUpperArmAnimX = (-leftLegBend_ * armSwingScale) * poseAnimScale;
+
+    float rightUpperArmAngleX = rightUpperArmBaseX + rightUpperArmAnimX;
 
     // rightUpperArm->mainPosition.transform.translate =
     // rightShoulderAnchorLocal;
@@ -4843,14 +5084,26 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float rightForeArmAngleZ = atan2(foreDir.x, -foreDir.y);
-    float rightForeArmAngleX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+    float rightForeArmBaseX = -asinf(std::clamp(foreDir.z, -1.0f, 1.0f));
+
+    float rightUpperArmSwing = -leftLegBend_ * armSwingScale;
+    float rightElbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                          (legRecoverAngle_ - legKickAngle_),
+                                      0.0f, 1.0f);
+
+    float rightForeArmAnimX =
+        (-(rightUpperArmSwing * 0.35f + rightElbowFold * 0.45f)) *
+        poseAnimScale;
+
+    float rightForeArmAngleX = rightForeArmBaseX + rightForeArmAnimX;
 
     // Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
     // Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
     // Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
-    Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
     Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
-    Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
+    Vector3 rightForeArmRoot =
+        BuildAnimatedChildRoot(rightUpperArmRoot, rightUpperArmAngleZ,
+                               rightUpperArmAngleX, upperLength);
 
     rightForeArm->mainPosition.transform.translate = rightForeArmRoot;
     rightForeArm->mainPosition.transform.rotate = {rightForeArmAngleX, 0.0f,
@@ -4885,8 +5138,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       thighDir = Normalize(thighDir);
     }
 
+    // float leftThighAngleZ = atan2(thighDir.x, -thighDir.y);
+    // float leftThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
     float leftThighAngleZ = atan2(thighDir.x, -thighDir.y);
-    float leftThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+    float leftThighBaseX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+
+    const float thighSwingScale = 0.70f;
+    float leftThighAnimX = (-leftLegBend_ * thighSwingScale) * poseAnimScale;
+    float leftThighAngleX = leftThighBaseX + leftThighAnimX;
 
     // 脚は stomachRoot の子なので、belly 基準の相対座標を使う
     leftThigh->mainPosition.transform.translate = leftHipFromBelly;
@@ -4914,10 +5173,23 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float leftShinAngleZ = atan2(shinDir.x, -shinDir.y);
-    float leftShinAngleX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
+    float leftShinBaseX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
 
-    Vector3 leftKneeOffset = Sub(leftLegBendLocal, leftLegRootLocal);
-    Vector3 leftShinRoot = Add(leftHipFromBelly, leftKneeOffset);
+    float leftThighSwing = -leftLegBend_ * thighSwingScale;
+    float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
+                                        (legRecoverAngle_ - legKickAngle_),
+                                    0.0f, 1.0f);
+
+    float leftShinAnimX =
+        (leftThighSwing * 0.35f + leftKneeFold * 0.6f) * poseAnimScale;
+
+    float leftShinAngleX = leftShinBaseX + leftShinAnimX;
+
+    // Vector3 leftKneeOffset = Sub(leftLegBendLocal, leftLegRootLocal);
+    // Vector3 leftShinRoot = Add(leftHipFromBelly, leftKneeOffset);
+    Vector3 leftThighRoot = leftHipFromBelly;
+    Vector3 leftShinRoot = BuildAnimatedChildRoot(
+        leftThighRoot, leftThighAngleZ, leftThighAngleX, thighLength);
 
     leftShin->mainPosition.transform.translate = leftShinRoot;
     leftShin->mainPosition.transform.rotate = {leftShinAngleX, 0.0f,
@@ -4952,8 +5224,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
       thighDir = Normalize(thighDir);
     }
 
+    // float rightThighAngleZ = atan2(thighDir.x, -thighDir.y);
+    // float rightThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
     float rightThighAngleZ = atan2(thighDir.x, -thighDir.y);
-    float rightThighAngleX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+    float rightThighBaseX = -asinf(std::clamp(thighDir.z, -1.0f, 1.0f));
+
+    const float thighSwingScale = 0.70f;
+    float rightThighAnimX = (-rightLegBend_ * thighSwingScale) * poseAnimScale;
+    float rightThighAngleX = rightThighBaseX + rightThighAnimX;
 
     // 脚は stomachRoot の子なので、belly 基準の相対座標を使う
     rightThigh->mainPosition.transform.translate = rightHipFromBelly;
@@ -4981,10 +5259,23 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     }
 
     float rightShinAngleZ = atan2(shinDir.x, -shinDir.y);
-    float rightShinAngleX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
+    float rightShinBaseX = -asinf(std::clamp(shinDir.z, -1.0f, 1.0f));
 
-    Vector3 rightKneeOffset = Sub(rightLegBendLocal, rightLegRootLocal);
-    Vector3 rightShinRoot = Add(rightHipFromBelly, rightKneeOffset);
+    float rightThighSwing = -rightLegBend_ * thighSwingScale;
+    float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
+                                         (legRecoverAngle_ - legKickAngle_),
+                                     0.0f, 1.0f);
+
+    float rightShinAnimX =
+        (rightThighSwing * 0.35f + rightKneeFold * 0.6f) * poseAnimScale;
+
+    float rightShinAngleX = rightShinBaseX + rightShinAnimX;
+
+    // Vector3 rightKneeOffset = Sub(rightLegBendLocal, rightLegRootLocal);
+    // Vector3 rightShinRoot = Add(rightHipFromBelly, rightKneeOffset);
+    Vector3 rightThighRoot = rightHipFromBelly;
+    Vector3 rightShinRoot = BuildAnimatedChildRoot(
+        rightThighRoot, rightThighAngleZ, rightThighAngleX, thighLength);
 
     rightShin->mainPosition.transform.translate = rightShinRoot;
     rightShin->mainPosition.transform.rotate = {rightShinAngleX, 0.0f,
@@ -6185,26 +6476,26 @@ void TravelScene::InitializeNpcRunners() {
 }
 
 void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
-  const float skill = std::clamp(npc.timingSkill, 0.70f, 1.30f);
+  npc.leftInput = false;
+  npc.rightInput = false;
 
-  // プレイヤー側と合わせる判定境界
+  const float perfectTimingEnd = 0.08f * 0.45f;
   const float bestTimingEnd = 0.08f;
   const float lateTimingEnd = 0.22f;
-  const float perfectTimingEnd = bestTimingEnd * 0.45f;
 
-  //================================
-  // 着地した瞬間に「今回の狙いタイミング」を決める
-  //================================
   bool justLanded = (!npc.prevGrounded && npc.isGrounded);
 
-  if (justLanded || !npc.hasKickPlan) {
+  //==============================
+  // 着地した瞬間に「今回いつ蹴るか」を決める
+  // timingSkill が高いほど Perfect を引きやすい
+  //==============================
+  if (justLanded) {
+    npc.isKickHolding = false;
     npc.hasKickPlan = true;
 
-    // skill 0.70 -> 0.0
-    // skill 1.30 -> 1.0
+    float skill = std::clamp(npc.timingSkill, 0.70f, 1.30f);
     float skill01 = std::clamp((skill - 0.70f) / (1.30f - 0.70f), 0.0f, 1.0f);
 
-    // 上手いほど Perfect を引きやすい
     float perfectWeight = 0.15f + skill01 * 0.65f;
     float goodWeight = 0.55f - skill01 * 0.10f;
     float badWeight = 1.0f - perfectWeight - goodWeight;
@@ -6215,80 +6506,75 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
 
     float roll = RandomFloat(0.0f, 1.0f);
 
-    // 上手いほどズレ幅を小さくする
-    float timingErrorRange =
-        std::clamp(0.055f - skill01 * 0.040f, 0.008f, 0.055f);
-
     if (roll < perfectWeight) {
-      // Perfect帯を狙う
-      float center = perfectTimingEnd * 0.55f;
-      float error = RandomFloat(-timingErrorRange, timingErrorRange);
-      npc.targetKickTime =
-          std::clamp(center + error, 0.0f, perfectTimingEnd * 0.98f);
-
+      npc.targetKickTime = RandomFloat(0.0f, perfectTimingEnd * 0.95f);
+      npc.lastTimingResult = 1; // Perfect狙い
     } else if (roll < perfectWeight + goodWeight) {
-      // Good帯を狙う
-      float center = (perfectTimingEnd + bestTimingEnd) * 0.55f;
-      float error =
-          RandomFloat(-timingErrorRange * 1.4f, timingErrorRange * 1.4f);
-      npc.targetKickTime =
-          std::clamp(center + error, perfectTimingEnd + 0.002f, bestTimingEnd);
-
+      npc.targetKickTime = RandomFloat(perfectTimingEnd, bestTimingEnd);
+      npc.lastTimingResult = 2; // Good狙い
     } else {
-      // Badは「少し遅いBad」と「かなり遅いBad」に分ける
-      float badRoll = RandomFloat(0.0f, 1.0f);
-
-      if (badRoll < 0.65f) {
-        // ちょい遅れ
-        float center = (bestTimingEnd + lateTimingEnd) * 0.55f;
-        float error =
-            RandomFloat(-timingErrorRange * 1.8f, timingErrorRange * 1.8f);
-        npc.targetKickTime =
-            std::clamp(center + error, bestTimingEnd + 0.003f, lateTimingEnd);
-      } else {
-        // かなり遅い
-        float center = lateTimingEnd + 0.05f;
-        float error =
-            RandomFloat(-timingErrorRange * 2.2f, timingErrorRange * 2.2f);
-        npc.targetKickTime =
-            std::clamp(center + error, lateTimingEnd + 0.005f, 0.32f);
-      }
+      npc.targetKickTime = RandomFloat(bestTimingEnd, lateTimingEnd + 0.05f);
+      npc.lastTimingResult = 3; // Bad狙い
     }
   }
 
-  //================================
-  // デフォルトは入力しない
-  //================================
-  npc.leftInput = false;
-  npc.rightInput = false;
-
-  //================================
-  // 接地中で、今回の狙い時間に入ったら蹴る
-  // 左右は交互
-  //================================
-  if (npc.isGrounded && npc.hasKickPlan) {
-    if (npc.landTimer >= npc.targetKickTime) {
-      if (npc.phase == 0) {
-        npc.leftInput = true;
-        npc.rightInput = false;
-        npc.phase = 1;
-      } else {
-        npc.leftInput = false;
-        npc.rightInput = true;
-        npc.phase = 0;
-      }
-
-      // 今回の蹴り計画は使い切り
-      npc.hasKickPlan = false;
+  //==============================
+  // いま蹴った足を着地まで保持中
+  //==============================
+  if (npc.isKickHolding) {
+    if (npc.kickHoldLeft) {
+      npc.leftInput = true;
+      npc.rightInput = false;
+    } else {
+      npc.leftInput = false;
+      npc.rightInput = true;
     }
+
+    // 着地した瞬間だけ保持終了
+    if (justLanded) {
+      npc.isKickHolding = false;
+      npc.leftInput = false;
+      npc.rightInput = false;
+    }
+
+    npc.prevGrounded = npc.isGrounded;
+    return;
   }
 
-  //================================
-  // 空中は入力しない
-  //================================
+  //==============================
+  // 空中では新しい蹴りを出さない
+  //==============================
   if (!npc.isGrounded) {
-    npc.leftInput = false;
-    npc.rightInput = false;
+    npc.prevGrounded = npc.isGrounded;
+    return;
+  }
+
+  //==============================
+  // まだ今回の蹴り予定が無いなら、最低限作る
+  // （初回や保険）
+  //==============================
+  if (!npc.hasKickPlan) {
+    npc.hasKickPlan = true;
+    npc.targetKickTime = RandomFloat(perfectTimingEnd, bestTimingEnd);
+    npc.lastTimingResult = 2;
+  }
+
+  //==============================
+  // 狙いタイミングが来たら蹴る
+  // 左右交互
+  //==============================
+  if (npc.landTimer >= npc.targetKickTime) {
+    npc.kickHoldLeft = !npc.kickHoldLeft;
+    npc.isKickHolding = true;
+    npc.hasKickPlan = false;
+
+    if (npc.kickHoldLeft) {
+      npc.leftInput = true;
+      npc.rightInput = false;
+    } else {
+      npc.leftInput = false;
+      npc.rightInput = true;
+    }
   }
 
   npc.prevGrounded = npc.isGrounded;
@@ -6666,6 +6952,10 @@ void TravelScene::UpdateNpcRunners(float deltaTime) {
     }
 
     if (npc.useCustomizedVisual) {
+      if (!npc.visualInitialized) {
+        BuildNpcCustomizedVisual(npc);
+        npc.visualInitialized = true;
+      }
       UpdateNpcCustomizedVisual(npc);
     } else if (npc.debugObject) {
       npc.debugObject->mainPosition.transform.translate = {npc.laneX, npc.moveY,
@@ -6774,6 +7064,15 @@ std::unique_ptr<ModBodyCustomizeData> TravelScene::CreateNpcPresetDefault() {
 
   if (data == nullptr) {
     return nullptr;
+  }
+
+  Logger::Log("NPC PRESET DEFAULT partInstances=%d snapshots=%d",
+              (int)data->partInstances.size(),
+              (int)data->controlPointSnapshots.size());
+
+  for (const auto &inst : data->partInstances) {
+    Logger::Log("NPC PRESET partType=%d partId=%d parentId=%d",
+                (int)inst.partType, inst.partId, inst.parentId);
   }
 
   return data;
@@ -6979,6 +7278,14 @@ void TravelScene::DrawNpcCustomizedVisual(NpcRunner &npc) {
 
 void TravelScene::ClearNpcCustomizedVisual(NpcRunner &npc) {}
 
+void TravelScene::BuildNpcCustomizedVisual(NpcRunner &npc) {
+  for (size_t i = 0; i < npc.modObjects.size(); ++i) {
+    if (npc.modObjects[i] != nullptr) {
+      npc.modBodies[i].Apply(npc.modObjects[i]);
+    }
+  }
+}
+
 void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   Object *chestBody = npc.modObjects[ToIndex(ModBodyPart::ChestBody)];
   Object *stomachBody = npc.modObjects[ToIndex(ModBodyPart::StomachBody)];
@@ -7010,12 +7317,11 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
     return (std::max)(0.05f, obj->objectParts_[0].transform.scale.y);
   };
 
-  // まず Apply して現在の見た目長さを確定
-  for (size_t i = 0; i < npc.modObjects.size(); ++i) {
-    if (npc.modObjects[i] != nullptr) {
-      npc.modBodies[i].Apply(npc.modObjects[i]);
-    }
-  }
+  auto BuildAnimatedChildRoot = [](const Vector3 &root, float angleX,
+                                   float length) -> Vector3 {
+    return {root.x, root.y - std::cos(angleX) * length,
+            root.z - std::sin(angleX) * length};
+  };
 
   const float chestLength = SafePartLength(chestBody);
   const float stomachLength = SafePartLength(stomachBody);
@@ -7031,58 +7337,118 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   const float rightThighLength = SafePartLength(rightThigh);
   const float rightShinLength = SafePartLength(rightShin);
 
-  const float armSwingScale = 0.60f;
-  const float thighSwingScale = 0.70f;
+  //==============================
+  // bend の中間を基準に使う
+  // これをしないと「初期姿勢だけ強い」になりやすい
+  //==============================
+  const float legAnimCenter = (legKickAngle_ + legRecoverAngle_) * 0.5f;
 
-  // const float leftUpperArmRotX = -npc.rightLegBend * armSwingScale;
-  // const float rightUpperArmRotX = -npc.leftLegBend * armSwingScale;
+  float leftLegAnim = npc.leftLegBend - legAnimCenter;
+  float rightLegAnim = npc.rightLegBend - legAnimCenter;
 
-  // const float leftThighRotX = -npc.leftLegBend * thighSwingScale;
-  // const float rightThighRotX = -npc.rightLegBend * thighSwingScale;
+  const float armSwingScale = 1.4f;
+  const float thighSwingScale = 1.4;
 
-  const float leftUpperArmRotX = 0.0f;
-  const float rightUpperArmRotX = 0.0f;
+  const float bodyTiltArmAssist = npc.bodyTilt * 0.35f;
 
-  const float leftThighRotX = 0.0f;
-  const float rightThighRotX = 0.0f;
+  const float leftUpperArmRotX =
+      -rightLegAnim * armSwingScale + bodyTiltArmAssist;
+  const float rightUpperArmRotX =
+      -leftLegAnim * armSwingScale + bodyTiltArmAssist;
 
-  // 胸をワールド基準に置く
-  chestBody->mainPosition.transform.translate.x = npc.laneX;
-  chestBody->mainPosition.transform.translate.y = npc.moveY;
-  chestBody->mainPosition.transform.translate.z = npc.moveX;
+  const float leftThighRotX = -leftLegAnim * thighSwingScale;
+  const float rightThighRotX = -rightLegAnim * thighSwingScale;
 
-  chestBody->mainPosition.transform.rotate = {-npc.bodyTilt, 0.0f, 0.0f};
-
-  // 胴体
-  stomachBody->mainPosition.transform.translate = {0.0f, -chestLength * 0.78f,
-                                                   0.0f};
-  stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-
-  // 首・頭
-  neck->mainPosition.transform.translate = {0.0f, chestLength * 0.72f, 0.0f};
-  neck->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-
-  head->mainPosition.transform.translate = {0.0f, neckLength * 0.62f, 0.0f};
-  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-
-  // 上腕
-  float shoulderX = 0.52f;
-  float shoulderY = chestLength * 0.32f;
+  //==============================
+  // 胴体スケール取得
+  //==============================
+  float chestWidthScale = 1.0f;
+  float chestHeightScale = 1.0f;
+  float stomachWidthScale = 1.0f;
+  float stomachHeightScale = 1.0f;
+  float neckHeightScale = 1.0f;
 
   if (npc.customizeData != nullptr) {
     const auto &chestParam =
         npc.customizeData->partParams[ToIndex(ModBodyPart::ChestBody)];
     const auto &stomachParam =
         npc.customizeData->partParams[ToIndex(ModBodyPart::StomachBody)];
+    const auto &neckParam =
+        npc.customizeData->partParams[ToIndex(ModBodyPart::Neck)];
 
-    float torsoWidthScale = (chestParam.scale.x + stomachParam.scale.x) * 0.5f;
-
-    shoulderX += (torsoWidthScale - 1.0f) * 0.7f;
+    chestWidthScale = chestParam.scale.x;
+    chestHeightScale = chestParam.scale.y;
+    stomachWidthScale = stomachParam.scale.x;
+    stomachHeightScale = stomachParam.scale.y;
+    neckHeightScale = neckParam.scale.y;
   }
 
-  const Vector3 leftShoulderLocal = {-shoulderX, shoulderY, 0.0f};
-  const Vector3 rightShoulderLocal = {shoulderX, shoulderY, 0.0f};
+  //==============================
+  // 胸
+  //==============================
+  chestBody->mainPosition.transform.translate.x = npc.laneX;
+  chestBody->mainPosition.transform.translate.y = npc.moveY;
+  chestBody->mainPosition.transform.translate.z = npc.moveX;
+  chestBody->mainPosition.transform.rotate = {-npc.bodyTilt, 0.0f, 0.0f};
 
+  //==============================
+  // 腹
+  //==============================
+  stomachBody->mainPosition.transform.translate = {0.0f, -chestLength * 0.78f,
+                                                   0.0f};
+  stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  //==============================
+  // 首・頭
+  //==============================
+  const Vector3 neckBaseLocal = {0.0f, chestLength * 0.72f, 0.0f};
+
+  neck->mainPosition.transform.translate = neckBaseLocal;
+  neck->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  head->mainPosition.transform.translate = {
+      0.0f, neckLength * 0.62f * neckHeightScale, 0.0f};
+  head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  //==============================
+  // 肩位置
+  //==============================
+  const Vector3 leftShoulderLocal = {
+      -0.52f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
+
+  const Vector3 rightShoulderLocal = {
+      0.52f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
+
+  //==============================
+  // 股関節位置
+  //==============================
+  const Vector3 leftHipLocal = {-0.30f * stomachWidthScale,
+                                -stomachLength * 0.28f * stomachHeightScale,
+                                0.0f};
+
+  const Vector3 rightHipLocal = {0.30f * stomachWidthScale,
+                                 -stomachLength * 0.28f * stomachHeightScale,
+                                 0.0f};
+
+  //==============================
+  // 擬似CP
+  // 肩→肘、股関節→膝を毎フレーム作る
+  //==============================
+  Vector3 leftElbowLocal = BuildAnimatedChildRoot(
+      leftShoulderLocal, leftUpperArmRotX, leftUpperArmLength);
+
+  Vector3 rightElbowLocal = BuildAnimatedChildRoot(
+      rightShoulderLocal, rightUpperArmRotX, rightUpperArmLength);
+
+  Vector3 leftKneeLocal =
+      BuildAnimatedChildRoot(leftHipLocal, leftThighRotX, leftThighLength);
+
+  Vector3 rightKneeLocal =
+      BuildAnimatedChildRoot(rightHipLocal, rightThighRotX, rightThighLength);
+
+  //==============================
+  // 上腕
+  //==============================
   leftUpperArm->mainPosition.transform.translate = leftShoulderLocal;
   leftUpperArm->mainPosition.transform.rotate = {leftUpperArmRotX, 0.0f, 0.0f};
 
@@ -7090,83 +7456,81 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   rightUpperArm->mainPosition.transform.rotate = {rightUpperArmRotX, 0.0f,
                                                   0.0f};
 
-  // 腿
-  const Vector3 leftHipLocal = {-0.30f, -stomachLength * 0.28f, 0.0f};
-  const Vector3 rightHipLocal = {0.30f, -stomachLength * 0.28f, 0.0f};
+  if (!leftUpperArm->objectParts_.empty()) {
+    leftUpperArm->objectParts_[0].transform.translate = {
+        0.0f, -leftUpperArmLength * 0.5f, 0.0f};
+  }
 
+  if (!rightUpperArm->objectParts_.empty()) {
+    rightUpperArm->objectParts_[0].transform.translate = {
+        0.0f, -rightUpperArmLength * 0.5f, 0.0f};
+  }
+
+  //==============================
+  // 前腕
+  //==============================
+  leftForeArm->mainPosition.transform.translate = leftElbowLocal;
+  leftForeArm->mainPosition.transform.rotate = {leftUpperArmRotX * 0.45f, 0.0f,
+                                                0.0f};
+
+  rightForeArm->mainPosition.transform.translate = rightElbowLocal;
+  rightForeArm->mainPosition.transform.rotate = {rightUpperArmRotX * 0.45f,
+                                                 0.0f, 0.0f};
+
+  if (!leftForeArm->objectParts_.empty()) {
+    leftForeArm->objectParts_[0].transform.translate = {
+        0.0f, -leftForeArmLength * 0.5f, 0.0f};
+  }
+
+  if (!rightForeArm->objectParts_.empty()) {
+    rightForeArm->objectParts_[0].transform.translate = {
+        0.0f, -rightForeArmLength * 0.5f, 0.0f};
+  }
+
+  //==============================
+  // 腿
+  //==============================
   leftThigh->mainPosition.transform.translate = leftHipLocal;
   leftThigh->mainPosition.transform.rotate = {leftThighRotX, 0.0f, 0.0f};
 
   rightThigh->mainPosition.transform.translate = rightHipLocal;
   rightThigh->mainPosition.transform.rotate = {rightThighRotX, 0.0f, 0.0f};
 
-  //================================
-  // 前腕・脛は「回転後の先端位置」を手計算
-  // X回転だけ使う簡易版
-  //================================
-
-  // 左肘
-  Vector3 leftElbowLocal = leftShoulderLocal;
-  leftElbowLocal.y += -std::cos(leftUpperArmRotX) * leftUpperArmLength;
-  leftElbowLocal.z += -std::sin(leftUpperArmRotX) * leftUpperArmLength;
-
-  // 右肘
-  Vector3 rightElbowLocal = rightShoulderLocal;
-  rightElbowLocal.y += -std::cos(rightUpperArmRotX) * rightUpperArmLength;
-  rightElbowLocal.z += -std::sin(rightUpperArmRotX) * rightUpperArmLength;
-
-  // 左膝
-  Vector3 leftKneeLocal = {
-      leftHipLocal.x,
-      leftHipLocal.y - std::cos(leftThighRotX) * leftThighLength,
-      leftHipLocal.z - std::sin(leftThighRotX) * leftThighLength};
-
-  // 右膝
-  Vector3 rightKneeLocal = {
-      rightHipLocal.x,
-      rightHipLocal.y - std::cos(rightThighRotX) * rightThighLength,
-      rightHipLocal.z - std::sin(rightThighRotX) * rightThighLength};
-
-  // 前腕は chest 基準のまま、肘位置へ直接置く
-  leftForeArm->mainPosition.transform.translate = {
-      leftElbowLocal.x, leftElbowLocal.y + 0.15f, leftElbowLocal.z};
-  leftForeArm->mainPosition.transform.rotate = {leftUpperArmRotX * 0.35f, 0.0f,
-                                                0.0f};
-
-  rightForeArm->mainPosition.transform.translate = {
-      rightElbowLocal.x, rightElbowLocal.y + 0.15f, rightElbowLocal.z};
-  rightForeArm->mainPosition.transform.rotate = {rightUpperArmRotX * 0.35f,
-                                                 0.0f, 0.0f};
-
-  // 脛は stomach 基準のまま、膝位置へ直接置く
-  float shinJoinOffsetY = 0.08f;
-
-  if (npc.customizeData != nullptr) {
-    const auto &leftShinParam =
-        npc.customizeData->partParams[ToIndex(ModBodyPart::LeftShin)];
-    const auto &rightShinParam =
-        npc.customizeData->partParams[ToIndex(ModBodyPart::RightShin)];
-
-    float avgShinScaleY =
-        (leftShinParam.scale.y + rightShinParam.scale.y) * 0.5f;
-
-    shinJoinOffsetY += (avgShinScaleY - 1.0f) * 0.80f;
+  if (!leftThigh->objectParts_.empty()) {
+    leftThigh->objectParts_[0].transform.translate = {
+        0.0f, -leftThighLength * 0.5f, 0.0f};
   }
 
-  leftShin->mainPosition.transform.translate = {
-      leftKneeLocal.x, leftKneeLocal.y + shinJoinOffsetY, leftKneeLocal.z};
-  leftShin->mainPosition.transform.rotate = {-leftThighRotX * 0.25f, 0.0f,
-                                             0.0f};
+  if (!rightThigh->objectParts_.empty()) {
+    rightThigh->objectParts_[0].transform.translate = {
+        0.0f, -rightThighLength * 0.5f, 0.0f};
+  }
 
-  rightShin->mainPosition.transform.translate = {
-      rightKneeLocal.x, rightKneeLocal.y + shinJoinOffsetY, rightKneeLocal.z};
-  rightShin->mainPosition.transform.rotate = {-rightThighRotX * 0.25f, 0.0f,
+  //==============================
+  // 脛
+  //==============================
+  leftShin->mainPosition.transform.translate = leftKneeLocal;
+  leftShin->mainPosition.transform.rotate = {leftThighRotX * 0.55f, 0.0f, 0.0f};
+
+  rightShin->mainPosition.transform.translate = rightKneeLocal;
+  rightShin->mainPosition.transform.rotate = {rightThighRotX * 0.55f, 0.0f,
                                               0.0f};
 
+  if (!leftShin->objectParts_.empty()) {
+    leftShin->objectParts_[0].transform.translate = {
+        0.0f, -leftShinLength * 0.5f, 0.0f};
+  }
+
+  if (!rightShin->objectParts_.empty()) {
+    rightShin->objectParts_[0].transform.translate = {
+        0.0f, -rightShinLength * 0.5f, 0.0f};
+  }
+
+  //==============================
   // 反映
+  //==============================
   for (size_t i = 0; i < npc.modObjects.size(); ++i) {
     if (npc.modObjects[i] != nullptr) {
-      npc.modBodies[i].Apply(npc.modObjects[i]);
       npc.modObjects[i]->Update(usingCamera_);
     }
   }
