@@ -145,6 +145,11 @@ TravelScene::TravelScene(kEngine *system) {
   npcModelHandle_ =
       system_->SetModelObj("GAME/resources/modBody/body/body.obj");
   InitializeNpcRunners();
+
+  //===============================
+  // パーティクル
+  //===============================
+  perfectParticle_ = std::make_unique<Perfect_Particle>(system_);
 }
 
 TravelScene::~TravelScene() {
@@ -156,6 +161,14 @@ TravelScene::~TravelScene() {
   for (auto &object : modObjects_) {
     delete object;
     object = nullptr;
+  }
+
+  for (auto &npc : npcRunners_) {
+    ClearNpcCustomizedVisual(npc);
+  }
+
+  if (perfectParticle_) {
+    perfectParticle_->ClearAll();
   }
 
   ClearExtraVisualParts();
@@ -220,6 +233,8 @@ void TravelScene::Update() {
   }
 
   ApplyVisualState();
+
+  perfectParticle_->Update(camera_);
 
   UpdateSceneTransition();
 
@@ -369,6 +384,8 @@ void TravelScene::Draw() {
   } else if (raceResultState_ == RaceResultState::GameOver) {
     bitmapFont.RenderText("GAME OVER", {800, 300}, 96, BitmapFont::Align::Left);
   }
+
+  perfectParticle_->Draw();
 
   // フェード描画
   fade_.Draw();
@@ -1569,16 +1586,26 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       if (landTimer_ <= perfectTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Perfect;
         kickFeedbackTimer_ = 0.18f;
+        perfectStreak_++;
 
+        perfectParticle_->Spawn({0.0f, moveY_ + 2.0f, moveX_},
+                                KickEffectType::Perfect);
         Logger::Log("KICK : PERFECT");
 
       } else if (landTimer_ <= bestTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Good;
         kickFeedbackTimer_ = 0.12f;
+        perfectStreak_ = 0;
 
+        perfectParticle_->Spawn({0.0f, moveY_ + 2.0f, moveX_},
+                                KickEffectType::Good);
         Logger::Log("KICK : GOOD");
 
       } else {
+        perfectStreak_ = 0;
+
+        perfectParticle_->Spawn({0.0f, moveY_ + 2.0f, moveX_},
+                                KickEffectType::Bad);
         Logger::Log("KICK : BAD");
       }
     }
@@ -1586,7 +1613,7 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float perfectBonus = 1.0f;
 
     if (kickFeedbackType_ == KickFeedbackType::Perfect) {
-      perfectBonus = 1.25f;
+      perfectBonus = 1.5f;
     }
 
     totalPush *= perfectBonus;
@@ -1702,6 +1729,20 @@ void TravelScene::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
     float pushX = pushMagnitude * forwardRatio;
     float pushY = pushMagnitude * upwardRatio;
+
+    //==============================
+    // 連続Perfect補正
+    //==============================
+    if (kickFeedbackType_ == KickFeedbackType::Perfect) {
+      int streakLevel = std::min(perfectStreak_ - 1, 4);
+
+      float streakForwardScale = 1.0f + streakLevel * 0.06f;
+      float streakRiseScale = 1.0f - streakLevel * 0.10f;
+      streakRiseScale = std::clamp(streakRiseScale, 0.55f, 1.0f);
+
+      pushX *= streakForwardScale;
+      pushY *= streakRiseScale;
+    }
 
     velocityX_ += pushX;
     velocityY_ += pushY;
@@ -2925,7 +2966,7 @@ void TravelScene::BuildExtraVisualParts() {
           ownerPartId = instance.parentId;
         }
 
-std::vector<const ModControlPointSnapshot *> snaps;
+        std::vector<const ModControlPointSnapshot *> snaps;
         CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
@@ -3024,7 +3065,7 @@ std::vector<const ModControlPointSnapshot *> snaps;
           ownerPartId = instance.parentId;
         }
 
-std::vector<const ModControlPointSnapshot *> snaps;
+        std::vector<const ModControlPointSnapshot *> snaps;
         CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
@@ -3214,7 +3255,7 @@ std::vector<const ModControlPointSnapshot *> snaps;
           ownerPartId = instance.parentId;
         }
 
-std::vector<const ModControlPointSnapshot *> snaps;
+        std::vector<const ModControlPointSnapshot *> snaps;
         CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
@@ -3395,7 +3436,7 @@ std::vector<const ModControlPointSnapshot *> snaps;
           ownerPartId = instance.parentId;
         }
 
-std::vector<const ModControlPointSnapshot *> snaps;
+        std::vector<const ModControlPointSnapshot *> snaps;
         CollectSnapshotsByOwnerId(ownerPartId, snaps);
 
         const ModControlPointSnapshot *bendSnap = nullptr;
@@ -6416,7 +6457,7 @@ void TravelScene::InitializeNpcRunners() {
 
   for (size_t i = 0; i < npcRunners_.size(); ++i) {
     npcRunners_[i].moveX = -18.0f;
-    npcRunners_[i].laneX = -3.0f + static_cast<float>(i) * 2.0f;
+    npcRunners_[i].laneX = -3.0f - static_cast<float>(i) * 2.0f;
 
     npcRunners_[i].moveY = 1.94f;
     npcRunners_[i].velocityX = 0.0f;
@@ -7276,7 +7317,19 @@ void TravelScene::DrawNpcCustomizedVisual(NpcRunner &npc) {
   }
 }
 
-void TravelScene::ClearNpcCustomizedVisual(NpcRunner &npc) {}
+void TravelScene::ClearNpcCustomizedVisual(NpcRunner &npc) {
+  for (auto &obj : npc.modObjects) {
+    delete obj;
+    obj = nullptr;
+  }
+
+  for (auto *obj : npc.extraObjects) {
+    delete obj;
+  }
+  npc.extraObjects.clear();
+
+  npc.useCustomizedVisual = false;
+}
 
 void TravelScene::BuildNpcCustomizedVisual(NpcRunner &npc) {
   for (size_t i = 0; i < npc.modObjects.size(); ++i) {
@@ -7347,7 +7400,7 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   float rightLegAnim = npc.rightLegBend - legAnimCenter;
 
   const float armSwingScale = 1.4f;
-  const float thighSwingScale = 1.4;
+  const float thighSwingScale = 1.4f;
 
   const float bodyTiltArmAssist = npc.bodyTilt * 0.35f;
 

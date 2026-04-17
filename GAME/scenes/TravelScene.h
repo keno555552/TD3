@@ -2,6 +2,7 @@
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/ModBody.h"
+#include "GAME/effect/Perfect_Particle.h"
 #include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
 #include <array>
@@ -309,6 +310,8 @@ private:
 
   float torsoSizeScale_ = 1.0f;
 
+  int perfectStreak_ = 0;
+
 private:
   /// <summary>
   /// 使用するカメラを設定・更新する
@@ -519,4 +522,7 @@ private:
   void UpdateNpcCustomizedVisual(NpcRunner &npc);
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);
+
+  // Particle
+  std::unique_ptr<Perfect_Particle> perfectParticle_;
 };
