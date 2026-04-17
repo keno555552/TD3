@@ -47,11 +47,6 @@ ModBodyCustomizeData MakeDefaultCustomizeDataLocal() {
   // 新方式の操作点は空からスタート
   data.controlPointSnapshots.clear();
 
-  // 制限時間初期化
-  data.timeLimit_ = 30.0f;
-  data.totalTimeLimit_ = 30.0f;
-  data.isTimeUp_ = false;
-
   return data;
 }
 
@@ -266,13 +261,5 @@ void ModCustomizeDataStore::NormalizeCustomizeData(ModBodyCustomizeData &data) {
   for (size_t i = 0; i < data.controlPointSnapshots.size(); ++i) {
     ApplySnapshotToLegacyControlPointLocal(data.controlPoints,
                                            data.controlPointSnapshots[i]);
-  }
-
-  if (data.timeLimit_ < 0.0f) {
-    data.timeLimit_ = 0.0f;
-  }
-
-  if (data.totalTimeLimit_ < 0.0f) {
-    data.totalTimeLimit_ = 0.0f;
   }
 }

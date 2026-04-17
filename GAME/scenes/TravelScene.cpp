@@ -695,9 +695,9 @@ void TravelScene::LoadCustomizeData() {
   }
 
   // ModScene から引き継いだ残り時間を復元する
-  timeLimit_ = customizeData_->timeLimit_;
+  /*timeLimit_ = customizeData_->timeLimit_;
   travelTimeLimit_ = timeLimit_;
-  isTimeUp_ = customizeData_->isTimeUp_;
+  isTimeUp_ = customizeData_->isTimeUp_;*/
 
   bodyJointOffsets_ = customizeData_->bodyJointOffsets;
   controlPointSnapshots_ = customizeData_->controlPointSnapshots;
@@ -1269,10 +1269,10 @@ void TravelScene::UpdateTimeLimit(float deltaTime) {
     }
   }
 
-  if (customizeData_ != nullptr) {
+  /*if (customizeData_ != nullptr) {
     customizeData_->timeLimit_ = timeLimit_;
     customizeData_->isTimeUp_ = isTimeUp_;
-  }
+  }*/
 }
 
 void TravelScene::UpdateHoldState(bool leftNowInput, bool rightNowInput,
@@ -2233,8 +2233,8 @@ void TravelScene::UpdateSceneTransition() {
     outcome_ = nextOutcome_;
 
     if (customizeData_ != nullptr) {
-      customizeData_->timeLimit_ = timeLimit_;
-      customizeData_->isTimeUp_ = isTimeUp_;
+      /*customizeData_->timeLimit_ = timeLimit_;
+      customizeData_->isTimeUp_ = isTimeUp_;*/
       ModBody::SetSharedCustomizeData(*customizeData_);
     }
   }
