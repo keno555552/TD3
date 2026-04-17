@@ -271,6 +271,120 @@ void DebugLogVector3(const char *label, const Vector3 &v) {
   Logger::Log("%s=(%.3f, %.3f, %.3f)", label, v.x, v.y, v.z);
 }
 
+bool IsBottomOriginPositiveYPart(ModBodyPart part) {
+  switch (part) {
+  case ModBodyPart::Neck:
+  case ModBodyPart::Head:
+    return true;
+
+  default:
+    return false;
+  }
+}
+
+float GetDefaultSegmentLength(ModBodyPart part, ModControlPointRole startRole,
+                              ModControlPointRole endRole) {
+  switch (part) {
+  case ModBodyPart::ChestBody:
+    if (startRole == ModControlPointRole::Chest &&
+        endRole == ModControlPointRole::Belly) {
+      return 1.2796f;
+    }
+    break;
+
+  case ModBodyPart::StomachBody:
+    if (startRole == ModControlPointRole::Belly &&
+        endRole == ModControlPointRole::Waist) {
+      return 1.6880f;
+    }
+    break;
+
+  case ModBodyPart::Neck:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return 0.3462f;
+    }
+    break;
+
+  case ModBodyPart::Head:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return 2.0252f - 0.3462f;
+    }
+    break;
+
+  case ModBodyPart::LeftUpperArm:
+  case ModBodyPart::RightUpperArm:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return 1.0814f;
+    }
+    break;
+
+  case ModBodyPart::LeftForeArm:
+  case ModBodyPart::RightForeArm:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return 3.2191f - 1.0814f;
+    }
+    break;
+
+  case ModBodyPart::LeftThigh:
+  case ModBodyPart::RightThigh:
+    if (startRole == ModControlPointRole::Root &&
+        endRole == ModControlPointRole::Bend) {
+      return 1.5704f;
+    }
+    break;
+
+  case ModBodyPart::LeftShin:
+  case ModBodyPart::RightShin:
+    if (startRole == ModControlPointRole::Bend &&
+        endRole == ModControlPointRole::End) {
+      return 4.1885f - 1.5704f;
+    }
+    break;
+
+  default:
+    break;
+  }
+
+  return 1.0f;
+}
+
+void SyncChainNodesFromControlPoints(
+    ControlPointChain *chain, const std::vector<ModControlPoint> &points) {
+  if (chain == nullptr) {
+    return;
+  }
+
+  std::vector<ControlPointNode> &nodes = chain->GetNodes();
+  const size_t count = (std::min)(nodes.size(), points.size());
+
+  for (size_t i = 0; i < count; ++i) {
+    const int parentIndex = nodes[i].parentIndex;
+
+    if (parentIndex >= 0 && static_cast<size_t>(parentIndex) < count) {
+      // controlPoints_ は「各点の絶対ローカル座標」
+      // chain の localPosition は「親基準の相対座標」
+      nodes[i].localPosition =
+          Subtract(points[i].localPosition,
+                   points[static_cast<size_t>(parentIndex)].localPosition);
+    } else {
+      // root はそのまま
+      nodes[i].localPosition = points[i].localPosition;
+    }
+
+    nodes[i].radius = points[i].radius;
+    nodes[i].movable = points[i].movable;
+    nodes[i].isConnectionPoint = points[i].isConnectionPoint;
+    nodes[i].acceptsParent = points[i].acceptsParent;
+    nodes[i].acceptsChild = points[i].acceptsChild;
+  }
+
+  chain->UpdateHierarchy();
+}
+
 } // namespace
 
 void ModBody::Initialize(Object *target, ModBodyPart part) {
@@ -492,7 +606,17 @@ void ModBody::Apply(Object *target) {
     }
   }
 
-  ApplySegmentToObjectPart(target, 0, startPos, endPos, startRadius, endRadius);
+    ApplySegmentToObjectPart(target, 0, startPos, endPos, startRadius, endRadius);
+
+  // Head は obj が複数メッシュの可能性があるので、
+  // 0番以降も同じセグメント変形を適用して消さない
+  if (part_ == ModBodyPart::Head) {
+    for (size_t i = 1; i < target->objectParts_.size(); ++i) {
+      ApplySegmentToObjectPart(target, i, startPos, endPos, startRadius,
+                               endRadius);
+    }
+    return;
+  }
 
   // 2つ目以降の mesh は使わない
   HideUnusedMeshes(target, basePartTransforms_, 1);
@@ -523,6 +647,12 @@ void ModBody::ResetControlPoints() {
   }
 
   UpdateControlPointHierarchy();
+
+  if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+    SyncChainNodesFromControlPoints(&chain_, controlPoints_);
+    SyncControlPointsFromChain(&controlPoints_, chain_);
+    UpdateControlPointHierarchy();
+  }
 }
 
 int ModBody::FindControlPointIndex(ModControlPointRole role) const {
@@ -551,6 +681,9 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
     }
 
     if (chain_.MovePoint(static_cast<size_t>(chainIndex), newLocalPosition)) {
+      SyncControlPointsFromChain(&controlPoints_, chain_);
+      UpdateControlPointHierarchy();
+      SyncChainNodesFromControlPoints(&chain_, controlPoints_);
       SyncControlPointsFromChain(&controlPoints_, chain_);
       UpdateControlPointHierarchy();
       return true;
@@ -799,8 +932,9 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
 
   UpdateControlPointHierarchy();
 
-  // chain 側も最後に同期し直す
+  // controlPoints_ で確定した値を chain 側へ戻して整合を取る
   if (HasOwnControlPoints() && !chain_.GetNodes().empty()) {
+    SyncChainNodesFromControlPoints(&chain_, controlPoints_);
     SyncControlPointsFromChain(&controlPoints_, chain_);
   }
 
@@ -831,17 +965,21 @@ void ModBody::BuildDefaultControlPoints() {
 
   switch (part_) {
   case ModBodyPart::ChestBody: {
+    // chest.obj
+    // 上原点モデル
+    // top(=Chest) -> bottom(=Belly) の長さに合わせる
     controlPoints_.push_back(MakePoint(ModControlPointRole::Chest,
-                                       {0.0f, 0.45f, 0.0f}, 0.12f, true, true,
+                                       {0.0f, 1.2796f, 0.0f}, 0.12f, true, true,
                                        false, true));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Belly,
                                        {0.0f, 0.0f, 0.0f}, 0.10f, true, false,
                                        false, false));
 
+    // stomach 側とのつながりもここで持っておく
     controlPoints_.push_back(MakePoint(ModControlPointRole::Waist,
-                                       {0.0f, -0.45f, 0.0f}, 0.12f, true, true,
-                                       false, true));
+                                       {0.0f, -1.6880f, 0.0f}, 0.12f, true,
+                                       true, false, true));
     break;
   }
 
@@ -850,16 +988,19 @@ void ModBody::BuildDefaultControlPoints() {
   }
 
   case ModBodyPart::Neck: {
+    // neck.obj は下原点モデル
+    // Root -> Bend が neck.obj の長さ
+    // Bend -> End が head.obj の長さにつながる
     controlPoints_.push_back(MakePoint(ModControlPointRole::Root,
-                                       {0.0f, 0.1f, 0.0f}, 0.09f, false, true,
+                                       {0.0f, 0.0f, 0.0f}, 0.09f, false, true,
                                        true, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Bend,
-                                       {0.0f, 0.38f, 0.0f}, 0.08f, true, true,
+                                       {0.0f, 0.3462f, 0.0f}, 0.08f, true, true,
                                        false, true));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::End,
-                                       {0.0f, 1.00f, 0.0f}, 0.11f, true, true,
+                                       {0.0f, 2.0252f, 0.0f}, 0.11f, true, true,
                                        false, true));
     break;
   }
@@ -870,17 +1011,20 @@ void ModBody::BuildDefaultControlPoints() {
 
   case ModBodyPart::LeftUpperArm:
   case ModBodyPart::RightUpperArm: {
+    // upperArm.obj は上原点モデル
+    // Root -> Bend が upperArm.obj の長さ
+    // Bend -> End が foreArm.obj の長さにつながる
     controlPoints_.push_back(MakePoint(ModControlPointRole::Root,
                                        {0.0f, 0.0f, 0.0f}, 0.09f, false, true,
                                        true, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Bend,
-                                       {0.0f, -0.55f, 0.0f}, 0.08f, true, false,
-                                       false, false));
+                                       {0.0f, -1.08f, 0.0f}, 0.08f, true,
+                                       false, false, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::End,
-                                       {0.0f, -1.10f, 0.0f}, 0.08f, true, true,
-                                       false, true));
+                                       {0.0f, -3.22f, 0.0f}, 0.08f, true,
+                                       true, false, true));
     break;
   }
 
@@ -891,17 +1035,20 @@ void ModBody::BuildDefaultControlPoints() {
 
   case ModBodyPart::LeftThigh:
   case ModBodyPart::RightThigh: {
+    // thighs.obj は上原点モデル
+    // Root -> Bend が thigh.obj の長さ
+    // Bend -> End が shin.obj の長さにつながる
     controlPoints_.push_back(MakePoint(ModControlPointRole::Root,
                                        {0.0f, 0.0f, 0.0f}, 0.10f, false, true,
                                        true, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::Bend,
-                                       {0.0f, -0.70f, 0.0f}, 0.09f, true, false,
-                                       false, false));
+                                       {0.0f, -1.57f, 0.0f}, 0.09f, true,
+                                       false, false, false));
 
     controlPoints_.push_back(MakePoint(ModControlPointRole::End,
-                                       {0.0f, -1.40f, 0.0f}, 0.09f, true, true,
-                                       false, true));
+                                       {0.0f, -4.19f, 0.0f}, 0.09f, true,
+                                       true, false, true));
     break;
   }
 
@@ -1080,49 +1227,14 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
     return;
   }
 
-  Logger::Log("========== ApplySegmentToObjectPart START ==========");
-  Logger::Log("part=%d partIndex=%d", static_cast<int>(part_),
-              static_cast<int>(partIndex));
-  DebugLogVector3("startPos", startPos);
-  DebugLogVector3("endPos", endPos);
-  Logger::Log("startRadius=%.3f endRadius=%.3f", startRadius, endRadius);
-  Logger::Log("param.scale=(%.3f, %.3f, %.3f) length=%.3f", param_.scale.x,
-              param_.scale.y, param_.scale.z, param_.length);
-
   Transform mesh = basePartTransforms_[partIndex];
 
-  const Vector3 rawSegment = Subtract(endPos, startPos);
-  const float rawLength = (std::max)(Length(rawSegment), 0.05f);
-  const Vector3 segmentDir = NormalizeSafe(rawSegment, {0.0f, -1.0f, 0.0f});
+  const Vector3 segment = Subtract(endPos, startPos);
+  const float segmentLength = (std::max)(Length(segment), 0.0001f);
+  const Vector3 segmentDir = NormalizeSafe(segment, {0.0f, -1.0f, 0.0f});
 
   const float safeStartRadius = (std::max)(startRadius, 0.01f);
   const float safeEndRadius = (std::max)(endRadius, 0.01f);
-
-  // 操作点の中心同士ではなく、
-  // 両端の半径ぶんだけ外へ伸ばした区間でメッシュを作る
-  // こうすると操作点球がメッシュ内に収まりやすい
-  const Vector3 expandedStart =
-      Subtract(startPos, Multiply(safeStartRadius, segmentDir));
-  const Vector3 expandedEnd = Add(endPos, Multiply(safeEndRadius, segmentDir));
-
-  const Vector3 visualSegment = Subtract(expandedEnd, expandedStart);
-  const float visualLength = (std::max)(Length(visualSegment), rawLength);
-  const Vector3 visualCenter = LerpV(expandedStart, expandedEnd, 0.5f);
-
-  mesh.translate = visualCenter;
-
-  mesh.rotate = basePartTransforms_[partIndex].rotate;
-
-  // 正面から見た曲がり
-  mesh.rotate.z = AngleZFromMinusY(segmentDir);
-
-  // 奥行き方向の曲がり
-  mesh.rotate.x = AngleXFromMinusY(segmentDir);
-
-  // いったんねじりは使わない
-  mesh.rotate.y = 0.0f;
-
-  // セグメント太さは両端操作点半径の大きい方に合わせる
   const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);
 
   ModControlPointRole startRole = ModControlPointRole::None;
@@ -1132,17 +1244,33 @@ void ModBody::ApplySegmentToObjectPart(Object *target, size_t partIndex,
   const float defaultSegmentRadius =
       GetDefaultSegmentRadius(part_, startRole, endRole);
 
+  const float defaultSegmentLength =
+      (std::max)(GetDefaultSegmentLength(part_, startRole, endRole), 0.0001f);
+
   const float thicknessScale =
       segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
 
-  DebugLogVector3("expandedStart", expandedStart);
-  DebugLogVector3("expandedEnd", expandedEnd);
-  DebugLogVector3("visualCenter", visualCenter);
-  Logger::Log("========== ApplySegmentToObjectPart END ==========");
+  const float lengthScale = segmentLength / defaultSegmentLength;
+
+  // 区間の開始点をモデル原点に合わせる
+  // Root -> Bend なら Root
+  // Bend -> End なら Bend
+  mesh.translate = startPos;
+
+  mesh.rotate = basePartTransforms_[partIndex].rotate;
+
+  Vector3 rotationTargetDir = segmentDir;
+  if (IsBottomOriginPositiveYPart(part_)) {
+    rotationTargetDir = Multiply(-1.0f, segmentDir);
+  }
+
+  mesh.rotate.z = AngleZFromMinusY(rotationTargetDir);
+  mesh.rotate.x = AngleXFromMinusY(rotationTargetDir);
+  mesh.rotate.y = 0.0f;
 
   mesh.scale = basePartTransforms_[partIndex].scale;
   mesh.scale.x *= thicknessScale * param_.scale.x;
-  mesh.scale.y = visualLength * param_.scale.y * param_.length;
+  mesh.scale.y *= lengthScale * param_.scale.y * param_.length;
   mesh.scale.z *= thicknessScale * param_.scale.z;
 
   target->objectParts_[partIndex].transform = mesh;

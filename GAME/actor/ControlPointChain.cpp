@@ -45,7 +45,7 @@ void ControlPointChain::BuildArmChain() {
   ControlPointNode elbow{};
   elbow.role = ModControlPointRole::Bend;
   elbow.parentIndex = 0;
-  elbow.localPosition = {0.0f, -0.55f, 0.0f};
+  elbow.localPosition = {0.0f, -1.08f, 0.0f};
   elbow.radius = 0.08f;
   elbow.movable = true;
   nodes_.push_back(elbow);
@@ -53,7 +53,7 @@ void ControlPointChain::BuildArmChain() {
   ControlPointNode wrist{};
   wrist.role = ModControlPointRole::End;
   wrist.parentIndex = 1;
-  wrist.localPosition = {0.0f, -0.55f, 0.0f};
+  wrist.localPosition = {0.0f, -2.14f, 0.0f};
   wrist.radius = 0.08f;
   wrist.movable = true;
   wrist.isConnectionPoint = true;
@@ -79,7 +79,7 @@ void ControlPointChain::BuildLegChain() {
   ControlPointNode knee{};
   knee.role = ModControlPointRole::Bend;
   knee.parentIndex = 0;
-  knee.localPosition = {0.0f, -0.70f, 0.0f};
+  knee.localPosition = {0.0f, -1.57f, 0.0f};
   knee.radius = 0.09f;
   knee.movable = true;
   nodes_.push_back(knee);
@@ -87,7 +87,7 @@ void ControlPointChain::BuildLegChain() {
   ControlPointNode ankle{};
   ankle.role = ModControlPointRole::End;
   ankle.parentIndex = 1;
-  ankle.localPosition = {0.0f, -0.70f, 0.0f};
+  ankle.localPosition = {0.0f, -(4.19f - 1.57f), 0.0f};
   ankle.radius = 0.09f;
   ankle.movable = true;
   ankle.isConnectionPoint = true;
@@ -103,7 +103,7 @@ void ControlPointChain::BuildTorsoChain() {
   ControlPointNode chest{};
   chest.role = ModControlPointRole::Chest;
   chest.parentIndex = -1;
-  chest.localPosition = {0.0f, 0.45f, 0.0f};
+  chest.localPosition = {0.0f, 1.27f, 0.0f};
   chest.radius = 0.12f;
   chest.movable = true;
   chest.isConnectionPoint = true;
@@ -113,7 +113,7 @@ void ControlPointChain::BuildTorsoChain() {
   ControlPointNode belly{};
   belly.role = ModControlPointRole::Belly;
   belly.parentIndex = 0;
-  belly.localPosition = {0.0f, -0.45f, 0.0f};
+  belly.localPosition = {0.0f, -1.27f, 0.0f};
   belly.radius = 0.10f;
   belly.movable = true;
   nodes_.push_back(belly);
@@ -121,7 +121,7 @@ void ControlPointChain::BuildTorsoChain() {
   ControlPointNode waist{};
   waist.role = ModControlPointRole::Waist;
   waist.parentIndex = 1;
-  waist.localPosition = {0.0f, -0.45f, 0.0f};
+  waist.localPosition = {0.0f, -1.68f, 0.0f};
   waist.radius = 0.12f;
   waist.movable = true;
   waist.isConnectionPoint = true;
@@ -137,7 +137,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode root{};
   root.role = ModControlPointRole::Root;
   root.parentIndex = -1;
-  root.localPosition = {0.0f, 0.1f, 0.0f};
+  root.localPosition = {0.0f, 0.0f, 0.0f};
   root.radius = 0.09f;
   root.movable = false;
   root.isConnectionPoint = true;
@@ -148,7 +148,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode bend{};
   bend.role = ModControlPointRole::Bend;
   bend.parentIndex = 0;
-  bend.localPosition = {0.0f, 0.38f, 0.0f};
+  bend.localPosition = {0.0f, 0.3462f, 0.0f};
   bend.radius = 0.08f;
   bend.movable = true;
   bend.isConnectionPoint = true;
@@ -159,7 +159,7 @@ void ControlPointChain::BuildNeckChain() {
   ControlPointNode end{};
   end.role = ModControlPointRole::End;
   end.parentIndex = 1;
-  end.localPosition = {0.0f, 1.00f, 0.0f};
+  end.localPosition = {0.0f, 2.0252f - 0.3462f, 0.0f};
   end.radius = 0.11f;
   end.movable = true;
   end.isConnectionPoint = true;
@@ -237,7 +237,7 @@ bool ControlPointChain::MovePoint(size_t index,
 
     Vector3 direction = NormalizeSafe(bendToCandidate, {0.0f, 1.0f, 0.0f});
     float length = Length(bendToCandidate);
-    length = ClampFloat(length, 0.20f, 1.50f);
+    length = ClampFloat(length, 0.20f, 2.50f);
 
     const Vector3 clampedEnd = Add(bendPos, Multiply(length, direction));
     nodes_[index].localPosition = ToLocalFromWorld(index, clampedEnd);

@@ -898,32 +898,72 @@ void ModAssemblyGraph::NormalizeBodyChildLinks() {
 }
 
 void ModAssemblyGraph::NormalizeHeadLinks() {
-  const int neckId = FindFirstPartId(ModBodyPart::Neck);
-
   std::vector<int> ids = GetNodeIdsSorted();
 
   for (size_t i = 0; i < ids.size(); ++i) {
     const int id = ids[i];
 
-    std::unordered_map<int, PartNode>::const_iterator it = nodes_.find(id);
+    std::unordered_map<int, PartNode>::iterator it = nodes_.find(id);
     if (it == nodes_.end()) {
       continue;
     }
 
-    if (it->second.part != ModBodyPart::Head) {
+    PartNode &head = it->second;
+    if (head.part != ModBodyPart::Head) {
       continue;
     }
 
-    if (neckId >= 0 && neckId != id) {
-      AttachPartToParent(id, neckId);
+    // すでに Neck の子ならそのまま維持する
+    if (head.parentId >= 0 && nodes_.count(head.parentId) > 0) {
+      const PartNode &parent = nodes_.at(head.parentId);
+      if (parent.part == ModBodyPart::Neck) {
+        continue;
+      }
+    }
+
+    // Neck 親でない、または親を失った Head だけ再接続先を探す
+    int targetNeckId = -1;
+
+    // できればまだ Head を持っていない Neck を優先する
+    for (size_t j = 0; j < ids.size(); ++j) {
+      const int neckCandidateId = ids[j];
+
+      std::unordered_map<int, PartNode>::const_iterator neckIt =
+          nodes_.find(neckCandidateId);
+      if (neckIt == nodes_.end()) {
+        continue;
+      }
+
+      if (neckIt->second.part != ModBodyPart::Neck) {
+        continue;
+      }
+
+      const int existingHeadChild =
+          FindFirstChildPartId(*this, neckCandidateId, ModBodyPart::Head);
+
+      if (existingHeadChild < 0) {
+        targetNeckId = neckCandidateId;
+        break;
+      }
+    }
+
+    // 空き Neck が無ければ、どれか1つの Neck へ
+    if (targetNeckId < 0) {
+      targetNeckId = FindFirstPartId(ModBodyPart::Neck);
+    }
+
+    if (targetNeckId >= 0 && targetNeckId != id) {
+      AttachPartToParent(id, targetNeckId);
       continue;
     }
 
+    // Neck が無ければ Body へ
     if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 && bodyId_ != id) {
       AttachPartToParent(id, bodyId_);
       continue;
     }
 
+    // どこにも付けられなければ親なし
     DetachPartFromParent(id);
   }
 
@@ -939,6 +979,7 @@ bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
 void ModAssemblyGraph::RefreshManagedPartIds() {
   bodyId_ = -1;
   headId_ = -1;
+  neckId_ = -1;
 
   for (std::unordered_map<int, PartNode>::const_iterator it = nodes_.begin();
        it != nodes_.end(); ++it) {
@@ -948,8 +989,11 @@ void ModAssemblyGraph::RefreshManagedPartIds() {
     if (headId_ < 0 && it->second.part == ModBodyPart::Head) {
       headId_ = it->first;
     }
+    if (neckId_ < 0 && it->second.part == ModBodyPart::Neck) {
+      neckId_ = it->first;
+    }
 
-    if (bodyId_ >= 0 && headId_ >= 0) {
+    if (bodyId_ >= 0 && headId_ >= 0 && neckId_ >= 0) {
       break;
     }
   }
@@ -1062,11 +1106,40 @@ bool ModAssemblyGraph::ReattachChildrenOf(int removedPartId) {
 
     PartNode &child = nodes_[childId];
 
-    if (child.part == ModBodyPart::Head) {
-      const int neckId = FindFirstPartId(ModBodyPart::Neck, removedPartId);
+        if (child.part == ModBodyPart::Head) {
+      int targetNeckId = -1;
+      const std::vector<int> allIds = GetNodeIdsSorted();
 
-      if (neckId >= 0 && neckId != childId) {
-        AttachPartToParent(childId, neckId);
+      for (size_t j = 0; j < allIds.size(); ++j) {
+        const int candidateId = allIds[j];
+        if (candidateId == removedPartId || candidateId == childId) {
+          continue;
+        }
+
+        if (nodes_.count(candidateId) == 0) {
+          continue;
+        }
+
+        const PartNode &candidate = nodes_.at(candidateId);
+        if (candidate.part != ModBodyPart::Neck) {
+          continue;
+        }
+
+        const int existingHeadChild =
+            FindFirstChildPartId(*this, candidateId, ModBodyPart::Head);
+
+        if (existingHeadChild < 0) {
+          targetNeckId = candidateId;
+          break;
+        }
+      }
+
+      if (targetNeckId < 0) {
+        targetNeckId = FindFirstPartId(ModBodyPart::Neck, removedPartId);
+      }
+
+      if (targetNeckId >= 0 && targetNeckId != childId) {
+        AttachPartToParent(childId, targetNeckId);
       } else if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0 &&
                  bodyId_ != removedPartId && bodyId_ != childId) {
         AttachPartToParent(childId, bodyId_);
@@ -1216,6 +1289,19 @@ bool ModAssemblyGraph::SetPartLocalTranslate(int partId,
   return true;
 }
 
+int ModAssemblyGraph::FindFirstChildPartId(const ModAssemblyGraph &assembly,
+                                           int parentId,
+                         ModBodyPart wantedPart) {
+  const std::vector<int> children = assembly.GetChildren(parentId);
+  for (size_t i = 0; i < children.size(); ++i) {
+    const PartNode *child = assembly.FindNode(children[i]);
+    if (child != nullptr && child->part == wantedPart) {
+      return child->id;
+    }
+  }
+  return -1;
+}
+
 bool ModAssemblyGraph::SetPartLocalRotate(int partId,
                                           const Vector3 &localRotate) {
   std::unordered_map<int, PartNode>::iterator it = nodes_.find(partId);
@@ -1320,33 +1406,34 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
 }
 
 bool ModAssemblyGraph::AddNeckPart() {
-  int parentId = -1;
+  RefreshManagedPartIds();
 
+  int parentId = -1;
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
     parentId = bodyId_;
   }
 
-  const int neckId =
+  const int newNeckId =
       AddPart(ModBodyPart::Neck, PartSide::Center, parentId, false);
-
-  if (neckId < 0) {
+  if (newNeckId < 0) {
     return false;
   }
 
-  const int headId =
-      AddPart(ModBodyPart::Head, PartSide::Center, neckId, false);
-
-  if (headId < 0) {
+  const int newHeadId =
+      AddPart(ModBodyPart::Head, PartSide::Center, newNeckId, false);
+  if (newHeadId < 0) {
+    nodes_.erase(newNeckId);
+    RefreshManagedPartIds();
     return false;
   }
 
   RefreshManagedPartIds();
-  NormalizeHeadLinks();
   return true;
 }
 
 bool ModAssemblyGraph::AddHeadPart() {
-  return false;
+  // 互換用。頭単体ではなく頭首セット追加へ統一する
+  return AddNeckPart();
 }
 
 bool ModAssemblyGraph::AddBodyPart() {

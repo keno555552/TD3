@@ -86,7 +86,6 @@ public:
   /// </summary>
   std::vector<ControlPointNode> &GetNodes() { return nodes_; }
 
-private:
   /// <summary>
   /// 階層キャッシュ更新用フック
   /// 現状は逐次計算のため空実装（将来キャッシュ化する場合の差し込み口）

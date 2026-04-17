@@ -1,6 +1,6 @@
 #pragma once
-#include "ModBody.h"
 #include "GAME/actor/ModAssemblyTypes.h"
+#include "ModBody.h"
 #include <unordered_map>
 #include <vector>
 
@@ -73,6 +73,12 @@ public:
   int GetHeadId() const { return headId_; }
 
   /// <summary>
+  /// 現在の Head 部位IDを返す
+  /// </summary>
+  /// <returns>Head の部位ID。存在しない場合は -1</returns>
+  int GetNeckId() const { return neckId_; }
+
+  /// <summary>
   /// 全ノード一覧を参照で返す
   /// </summary>
   const std::unordered_map<int, PartNode> &GetNodes() const { return nodes_; }
@@ -124,14 +130,15 @@ public:
   /// </summary>
   bool AddLegAssembly(PartSide side);
 
-    /// <summary>
+  /// <summary>
   /// Neck + Head セットを追加する
+  /// 既に首または頭が存在する場合は追加しない
   /// </summary>
   bool AddNeckPart();
 
   /// <summary>
-  /// Head 単体追加は行わない
-  /// 互換用に残すが内部では false を返す
+  /// 互換用
+  /// 単体Head追加は行わず、内部では AddNeckPart() を呼ぶ
   /// </summary>
   bool AddHeadPart();
 
@@ -163,6 +170,16 @@ public:
   /// 指定種類の最初の部位IDを返す
   /// </summary>
   int FindFirstPartId(ModBodyPart part, int excludeId = -1) const;
+
+  /// <summary>
+  /// 指定部位の子孫の中から、指定種類の最初の部位IDを返す
+  /// </summary>
+  /// <param name="assembly">部位構造グラフ</param>
+  /// <param name="parentId">親部位ID</param>
+  /// <param name="wantedPart">検索する部位種類</param>
+  /// <returns>最初に見つかった部位ID。存在しない場合は -1</returns>
+  int FindFirstChildPartId(const ModAssemblyGraph &assembly, int parentId,
+                           ModBodyPart wantedPart);
 
   bool SetPartLocalRotate(int partId, const Vector3 &localRotate);
 
@@ -334,4 +351,5 @@ private:
 
   int bodyId_ = -1; // 現在の Body 部位ID
   int headId_ = -1; // 現在の Head 部位ID
+  int neckId_ = -1; // 現在の Neck 部位ID
 };
