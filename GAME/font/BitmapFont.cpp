@@ -178,6 +178,9 @@ void BitmapFont::RenderText(const std::string& text,
 
 		// TODO: color適用（MaterialConfigに対応したら実装）
 
+		// 色適用
+        sprite->objectParts_[0].materialConfig->textureColor = color;
+
 		// 描画
 		sprite->Draw();
 
