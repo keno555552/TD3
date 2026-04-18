@@ -8,7 +8,9 @@
 #include "GAME/actor/ModAttachCandidate.h"
 #include "GAME/actor/ModBody.h"
 #include "GAME/font/BitmapFont.h"
+#include "GameObject/Object/Sprite.h"
 #include "Object/Object.h"
+#include <array>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -75,6 +77,34 @@ private:
     bool acceptsParent = false;              // 親接続を受け入れるかどうか
     bool acceptsChild = false;               // 子接続を受け入れるかどうか
   };
+
+  /// <summary>
+  /// UIの部位追加ボタンの種類
+  /// </summary>
+  enum class UiAddButtonType {
+    AddLeftArm = 0,
+    AddRightArm,
+    AddLeftLeg,
+    AddRightLeg,
+    AddHeadSet,
+    AddBody,
+    Count
+  };
+
+  /// <summary>
+  /// UIの部位追加ボタンの情報
+  /// </summary>
+  struct UiIconButton {
+    Vector2 center{0.0f, 0.0f}; // 画面上の中心位置
+    Vector2 size{50.0f, 30.0f}; // ボタンの幅と高さ
+    int textureHandle = 0;      // ボタンに表示するアイコンのテクスチャハンドル
+    std::unique_ptr<SimpleSprite>
+        sprite;          // ボタンの描画に使うスプライトオブジェクト
+    bool visible = true; // ボタンが表示されているかどうか
+    std::string label;   // ボタンのラベルテキスト
+  };
+
+  int uiFrameTextureHandle_ = 0; // UIのフレーム用テクスチャハンドル
 
   Light *light1_ = nullptr; // シーン内で使用するライト
 
@@ -148,6 +178,27 @@ private:
 
   mutable std::unordered_map<int, float> modelLocalVisualRadiusCache_;
   mutable std::unordered_map<int, float> modelLocalVisualHalfHeightCache_;
+
+  BitmapFont bitmapFont_; // テキスト描画用のビットマップフォント
+
+  // UIの部位追加ボタン
+  std::array<UiIconButton, static_cast<size_t>(UiAddButtonType::Count)>
+      addButtons_{};
+
+  // UIの部位削除ボタン
+  UiIconButton trashButton_{};
+
+  // マウスが削除ボタンの上にあるかどうか
+  bool isHoverTrash_ = false;
+
+  // UIの部位追加ボタンと削除ボタンのテクスチャハンドル
+  int addLeftArmTextureHandle_ = 0;
+  int addRightArmTextureHandle_ = 0;
+  int addLeftLegTextureHandle_ = 0;
+  int addRightLegTextureHandle_ = 0;
+  int addHeadSetTextureHandle_ = 0;
+  int addBodyTextureHandle_ = 0;
+  int trashTextureHandle_ = 0;
 
 private:
   /// <summary>
@@ -755,7 +806,6 @@ private:
   bool BuildHeadPickBox(int partId, ModSceneSegmentBoxSet &outBoxes) const;
 
 public:
-
   bool ShouldBlockDebugCameraMouseControl() const;
 
 private:
@@ -806,5 +856,82 @@ private:
   float GetNpcSkillMultiplierByIndex(int index) const;
   float GetNpcRunTimingSkillByIndex(int index) const;
 
-  BitmapFont bitmapFont;
+  /*----- 部位の追加削除ボタン関連関数 -----*/
+
+  /// <summary>
+  /// 画面上の部位追加ボタンと削除ボタンのスプライトを初期化する
+  /// </summary>
+  void InitializeScreenUi();
+
+  /// <summary>
+  /// 画面上の部位追加ボタンと削除ボタンの状態を更新する
+  /// </summary>
+  void UpdateScreenUi();
+
+  /// <summary>
+  /// 画面上の部位追加ボタンと削除ボタンを描画する
+  /// </summary>
+  void DrawScreenUi();
+
+  /// <summary>
+  /// UIの部位追加ボタンを初期化する
+  /// </summary>
+  /// <param name="button"></param>
+  /// <param name="center"></param>
+  /// <param name="size"></param>
+  /// <param name="textureHandle"></param>
+  void SetupUiSprite(UiIconButton &button, const Vector2 &center,
+                     const Vector2 &size, int textureHandle);
+
+  /// <summary>
+  /// UIの部位追加ボタンを、現在の画面状態に合わせて変換する
+  /// </summary>
+  /// <param name="button"></param>
+  void UpdateUiSpriteTransform(UiIconButton &button);
+
+  /// <summary>
+  /// 画面上の部位追加ボタンと削除ボタンに、マウス位置が重なっているかどうかを判定する
+  /// </summary>
+  /// <param name="point"></param>
+  /// <param name="button"></param>
+  /// <returns></returns>
+  bool IsPointInUiButton(const Vector2 &point,
+                         const UiIconButton &button) const;
+
+  /// <summary>
+  /// 現在のマウス位置に基づいて、部位追加ボタンや削除ボタンのどれかがクリックされたかを判定する
+  /// </summary>
+  /// <returns></returns>
+  bool TryHandleAddButtonClick();
+
+  /// <summary>
+  /// 指定した部位追加ボタンの種類に応じて、対応する部位を追加する
+  /// </summary>
+  /// <param name="type"></param>
+  /// <returns></returns>
+  bool ExecuteAddButton(UiAddButtonType type);
+
+  /// <summary>
+  /// 現在のマウス位置が、部位追加ボタンや削除ボタンのどれかと重なっているかを判定する
+  /// </summary>
+  /// <returns></returns>
+  bool IsMouseOverAnyScreenUi() const;
+
+  /// <summary>
+  /// 現在のマウス位置が、削除ボタンと重なっているかどうかを判定する
+  /// </summary>
+  /// <returns></returns>
+  bool IsMouseOverTrashArea() const;
+
+  /// <summary>
+  /// 現在の選択中部位を削除する処理を実行する
+  /// </summary>
+  /// <returns></returns>
+  bool DeleteDraggingAssemblyByTrashDrop();
+
+  /// <summary>
+  /// 部位構造の変更に伴って、シーン上の Object 一覧を同期する
+  /// </summary>
+  void SyncAfterAssemblyChanged();
+  /*------------------------------------------*/
 };

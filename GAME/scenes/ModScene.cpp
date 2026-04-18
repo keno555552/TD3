@@ -760,6 +760,19 @@ bool IntersectSegmentBoxes(const ModSceneSegmentBox &a,
   return true;
 }
 
+Vector2 MakeVector2(float x, float y) { return {x, y}; }
+
+bool PointInRect(const Vector2 &point, const Vector2 &center,
+                 const Vector2 &size) {
+  const float left = center.x - size.x * 0.5f;
+  const float right = center.x + size.x * 0.5f;
+  const float top = center.y - size.y * 0.5f;
+  const float bottom = center.y + size.y * 0.5f;
+
+  return point.x >= left && point.x <= right && point.y >= top &&
+         point.y <= bottom;
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -817,7 +830,11 @@ ModScene::ModScene(kEngine *system) {
 
   InitializeNpcModProgress();
 
-  bitmapFont.Initialize(system_);
+  // テキスト描画用のビットマップフォントを初期化する
+  bitmapFont_.Initialize(system);
+
+  // 画面UIを初期化する
+  InitializeScreenUi();
 }
 
 ModScene::~ModScene() {
@@ -832,7 +849,8 @@ ModScene::~ModScene() {
   // 使用していないマテリアルをクリーンアップする
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
-  bitmapFont.Cleanup();
+  // ビットマップフォントをクリーンアップする
+  bitmapFont_.Cleanup();
 }
 
 void ModScene::Update() {
@@ -840,38 +858,36 @@ void ModScene::Update() {
   // 使用中カメラを更新する
   CameraPart();
 
+  // 画面UIの状態を更新する
+  UpdateScreenUi();
+
+  // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
+  if (TryHandleAddButtonClick()) {
+    UpdateModObjects();
+    SyncCustomizeDataFromScene();
+
+    if (system_->GetTriggerOn(DIK_0)) {
+      useDebugCamera_ = !useDebugCamera_;
+    }
+
+    if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
+      fade_.StartFadeOut();
+      isStartTransition_ = true;
+    }
+
+    fade_.Update(usingCamera_);
+
+    if (isStartTransition_ && fade_.IsFinished()) {
+      if (customizeData_ != nullptr) {
+        ModBody::SetSharedCustomizeData(*customizeData_);
+      }
+      outcome_ = SceneOutcome::NEXT;
+    }
+    return;
+  }
+
   // このフレームで構造変更が発生したかを記録する
   bool assemblyChanged = false;
-
-  // キー入力で腕セットを追加する
-  if (system_->GetTriggerOn(DIK_1)) {
-    assemblyChanged |= assembly_.AddArmAssembly(PartSide::Left);
-  }
-  if (system_->GetTriggerOn(DIK_2)) {
-    assemblyChanged |= assembly_.AddArmAssembly(PartSide::Right);
-  }
-
-  // キー入力で脚セットを追加する
-  if (system_->GetTriggerOn(DIK_3)) {
-    assemblyChanged |= assembly_.AddLegAssembly(PartSide::Left);
-  }
-  if (system_->GetTriggerOn(DIK_4)) {
-    assemblyChanged |= assembly_.AddLegAssembly(PartSide::Right);
-  }
-
-  // キー入力で首と胴体と頭を追加する
-  if (system_->GetTriggerOn(DIK_5)) {
-    assemblyChanged |= assembly_.AddNeckPart();
-  }
-  if (system_->GetTriggerOn(DIK_6)) {
-    assemblyChanged |= assembly_.AddBodyPart();
-  }
-
-  // Delete キーで選択部位を削除する
-  if (system_->GetTriggerOn(DIK_DELETE)) {
-    DeleteSelectedPart();
-    assemblyChanged = true;
-  }
 
   // 構造変更があった場合は Object 一覧と選択状態を同期し直す
   if (assemblyChanged) {
@@ -944,12 +960,6 @@ void ModScene::Draw() {
   ImGui::Text("ModScene");
   ImGui::Text("Selected Prompt:");
   ImGui::Text("%s", selectedPrompt_.c_str());
-  ImGui::Separator();
-  ImGui::Text("DIK_1/2 : Add Arm Assembly");
-  ImGui::Text("DIK_3/4 : Add Leg Assembly");
-  ImGui::Text("DIK_5   : Add Neck");
-  ImGui::Text("DIK_6   : Add Body");
-  ImGui::Text("Delete  : Remove Selected Part");
   ImGui::End();
 
   // 改造用UI本体を表示する
@@ -988,7 +998,10 @@ void ModScene::Draw() {
   ImGui::End();
 #endif
 
-  bitmapFont.BeginFrame();
+  bitmapFont_.BeginFrame();
+  // 画面固定の追加ボタン・ゴミ箱UIを描画する
+  DrawScreenUi();
+
   DrawStartNotifications();
 
   // フェードを描画する
@@ -1367,12 +1380,10 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
 }
 
 void ModScene::LoadCustomizeData() {
-  // 共有データが無い場合は何もしない
   if (customizeData_ == nullptr) {
     return;
   }
 
-  // 新方式の partId 単位データがある場合はそちらを優先して読み込む
   if (!customizeData_->partInstances.empty()) {
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const int id = orderedPartIds_[i];
@@ -1387,10 +1398,8 @@ void ModScene::LoadCustomizeData() {
           continue;
         }
 
-        // 一致する partId の見た目パラメータを適用する
         modBodies_[id].SetParam(instance.param);
 
-        // 保存されているローカル位置を Graph へ戻す
         if (assembly_.FindNode(id) != nullptr) {
           assembly_.SetPartLocalTranslate(id,
                                           instance.localTransform.translate);
@@ -1400,20 +1409,13 @@ void ModScene::LoadCustomizeData() {
         break;
       }
 
-      // 新方式データが無い部位は旧方式データからフォールバックする
+      // partId 一致が無い部位は「新規追加部位」とみなして、
+      // 旧方式 partParams へはフォールバックしない。
+      // ModBody::Initialize / Reset で入っている初期値をそのまま使う。
       if (!found) {
-        const PartNode *node = assembly_.FindNode(id);
-        if (node == nullptr) {
-          continue;
-        }
-
-        const size_t index = ToIndex(node->part);
-        if (index >= static_cast<size_t>(ModBodyPart::Count)) {
-          continue;
-        }
-
-        ModBodyPartParam param = customizeData_->partParams[index];
+        ModBodyPartParam param = modBodies_[id].GetParam();
         param.count = 1;
+        param.enabled = true;
         modBodies_[id].SetParam(param);
       }
     }
@@ -1421,7 +1423,7 @@ void ModScene::LoadCustomizeData() {
     return;
   }
 
-  // 新方式データが無い場合は旧方式の部位種別配列から読み込む
+  // 新方式データが無い場合だけ旧方式にフォールバックする
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     const PartNode *node = assembly_.FindNode(id);
@@ -1440,6 +1442,15 @@ void ModScene::LoadCustomizeData() {
 
     ModBodyPartParam param = customizeData_->partParams[index];
     param.count = 1;
+
+    // 旧方式しかないときは、最低限見えるようにする
+    if (param.count <= 0) {
+      param.scale = {1.0f, 1.0f, 1.0f};
+      param.length = 1.0f;
+      param.enabled = true;
+      param.count = 1;
+    }
+
     modBodies_[id].SetParam(param);
   }
 }
@@ -1939,6 +1950,7 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
   return partId;
 }
 
+
 void ModScene::UpdateControlPointEditing() {
 #ifdef USE_IMGUI
   if (ImGui::GetIO().WantCaptureMouse) {
@@ -1956,22 +1968,27 @@ void ModScene::UpdateControlPointEditing() {
 
   Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
 
+  // 画面UI上では3D側の選択・ドラッグ開始をさせない
+  if (!assemblyDrag_.isDragging && IsMouseOverAnyScreenUi()) {
+    hoveredPartId_ = -1;
+    return;
+  }
+
   // Assembly ドラッグ中はそちらを最優先
   if (assemblyDrag_.isDragging) {
     UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
     ApplyAssemblyDragPreview();
 
     if (IsMouseLeftReleasedNow()) {
+      if (DeleteDraggingAssemblyByTrashDrop()) {
+        return;
+      }
+
       if (assemblyDrag_.isPlacementValid) {
         ConfirmAssemblyDragPlacement();
       } else {
         CancelAssemblyDragPlacement();
       }
-      return;
-    }
-
-    if (system_->GetTriggerOn(DIK_ESCAPE)) {
-      CancelAssemblyDragPlacement();
       return;
     }
 
@@ -4838,51 +4855,6 @@ void ModScene::DrawModGui() {
   ImGui::Text("MouseLeftDrag   : Move Control Point");
   ImGui::Text("DIK_0           : Toggle DebugCamera");
 
-  ImGui::Separator();
-  ImGui::Text("Add Parts");
-
-  if (ImGui::Button("Add Left Arm")) {
-    if (assembly_.AddArmAssembly(PartSide::Left)) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Add Right Arm")) {
-    if (assembly_.AddArmAssembly(PartSide::Right)) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-
-  if (ImGui::Button("Add Left Leg")) {
-    if (assembly_.AddLegAssembly(PartSide::Left)) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Add Right Leg")) {
-    if (assembly_.AddLegAssembly(PartSide::Right)) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-
-  if (ImGui::Button("Add Head Set")) {
-    if (assembly_.AddNeckPart()) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Add Body")) {
-    if (assembly_.AddBodyPart()) {
-      SyncObjectsWithAssembly();
-      EnsureValidSelection();
-    }
-  }
-
   DrawAssemblyGui();
   DrawSelectedPartGui();
 
@@ -5573,7 +5545,7 @@ void ModScene::DrawStartNotifications() {
     float y = notification.startY + fallDistance * t;
     float alpha = 1.0f - t;
 
-    bitmapFont.RenderText(notification.text, {x, y}, fontSize,
+    bitmapFont_.RenderText(notification.text, {x, y}, fontSize,
                           BitmapFont::Align::Left, 5.0f,
                           {1.0f, 1.0f, 1.0f, alpha});
   }
@@ -5666,4 +5638,322 @@ float ModScene::GetNpcRunTimingSkillByIndex(int index) const {
   default:
     return 1.0f;
   }
+}
+
+void ModScene::SetupUiSprite(UiIconButton &button, const Vector2 &center,
+                             const Vector2 &size, int textureHandle) {
+  button.center = center;
+  button.size = size;
+  button.textureHandle = textureHandle;
+  button.visible = true;
+
+  button.sprite = std::make_unique<SimpleSprite>();
+  button.sprite->IntObject(system_);
+  button.sprite->CreateDefaultData();
+
+  if (!button.sprite->objectParts_.empty()) {
+    auto &part = button.sprite->objectParts_[0];
+
+    part.materialConfig->textureHandle = textureHandle;
+    part.materialConfig->useModelTexture = false;
+    part.materialConfig->enableLighting = false;
+    part.materialConfig->textureColor = MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+    part.cropLT = {0.0f, 0.0f};
+    part.cropSize = {0.0f, 0.0f};
+
+    button.sprite->mainPosition.transform = CreateDefaultTransform();
+    button.sprite->mainPosition.transform.translate = {
+        center.x - size.x * 0.5f, center.y - size.y * 0.5f, 0.0f};
+
+    button.sprite->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+
+    part.anchorPoint = {0.0f, 0.0f};
+
+    part.conerData.coner[0] = {0.0f, 0.0f};
+    part.conerData.coner[1] = {0.0f, size.y};
+    part.conerData.coner[2] = {size.x, size.y};
+    part.conerData.coner[3] = {size.x, 0.0f};
+
+    part.transform.translate = {0.0f, 0.0f, 0.0f};
+    part.transform.rotate = {0.0f, 0.0f, 0.0f};
+    part.transform.scale = {1.0f, 1.0f, 1.0f};
+  }
+}
+
+void ModScene::UpdateUiSpriteTransform(UiIconButton &button) {
+  if (button.sprite == nullptr || button.sprite->objectParts_.empty()) {
+    return;
+  }
+
+  button.sprite->mainPosition.transform.translate = {
+      button.center.x - button.size.x * 0.5f,
+      button.center.y - button.size.y * 0.5f, 0.0f};
+
+  button.sprite->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+
+  auto &part = button.sprite->objectParts_[0];
+  part.conerData.coner[0] = {0.0f, 0.0f};
+  part.conerData.coner[1] = {0.0f, button.size.y};
+  part.conerData.coner[2] = {button.size.x, button.size.y};
+  part.conerData.coner[3] = {button.size.x, 0.0f};
+
+  part.transform.translate = {0.0f, 0.0f, 0.0f};
+  part.transform.rotate = {0.0f, 0.0f, 0.0f};
+  part.transform.scale = {1.0f, 1.0f, 1.0f};
+}
+
+bool ModScene::IsPointInUiButton(const Vector2 &point,
+                                 const UiIconButton &button) const {
+  if (!button.visible) {
+    return false;
+  }
+  return PointInRect(point, button.center, button.size);
+}
+
+void ModScene::InitializeScreenUi() {
+  // フレーム画像
+  uiFrameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
+
+  // ゴミ箱画像
+  trashTextureHandle_ = system_->LoadTexture("GAME/resources/texture/trash.png");
+
+  const float left = 110.0f;
+  const float top = 40.0f;
+  const float width = 220.0f;
+  const float height = 44.0f;
+  const float spacingY = 52.0f;
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddHeadSet)],
+                {left, top + spacingY * 0.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddHeadSet)].label =
+      "あたま";
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)],
+                {left, top + spacingY * 1.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)].label =
+      "みぎうで";
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)],
+                {left, top + spacingY * 2.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)].label =
+      "ひだりうで";
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)],
+                {left, top + spacingY * 3.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)].label =
+      "みぎあし";
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)],
+                {left, top + spacingY * 4.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)].label =
+      "ひだりあし";
+
+  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)],
+                {left, top + spacingY * 5.0f}, {width, height},
+                uiFrameTextureHandle_);
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "からだ";
+
+  SetupUiSprite(trashButton_, {1180.0f, 620.0f}, {84.0f, 84.0f},
+                trashTextureHandle_);
+  trashButton_.label = "ごみばこ";
+}
+
+bool ModScene::ExecuteAddButton(UiAddButtonType type) {
+  bool changed = false;
+
+  switch (type) {
+  case UiAddButtonType::AddLeftArm:
+    changed = assembly_.AddArmAssembly(PartSide::Left);
+    break;
+
+  case UiAddButtonType::AddRightArm:
+    changed = assembly_.AddArmAssembly(PartSide::Right);
+    break;
+
+  case UiAddButtonType::AddLeftLeg:
+    changed = assembly_.AddLegAssembly(PartSide::Left);
+    break;
+
+  case UiAddButtonType::AddRightLeg:
+    changed = assembly_.AddLegAssembly(PartSide::Right);
+    break;
+
+  case UiAddButtonType::AddHeadSet:
+    changed = assembly_.AddNeckPart();
+    break;
+
+  case UiAddButtonType::AddBody:
+    changed = assembly_.AddBodyPart();
+    break;
+
+  default:
+    break;
+  }
+
+  if (changed) {
+    SyncAfterAssemblyChanged();
+  }
+
+  return changed;
+}
+
+bool ModScene::TryHandleAddButtonClick() {
+  if (!IsMouseLeftTriggeredNow()) {
+    return false;
+  }
+
+  const Vector2 mouse = system_->GetMousePosVector2();
+
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    if (!IsPointInUiButton(mouse, addButtons_[i])) {
+      continue;
+    }
+
+    ExecuteAddButton(static_cast<UiAddButtonType>(i));
+    return true;
+  }
+
+  return false;
+}
+
+bool ModScene::IsMouseOverAnyScreenUi() const {
+  const Vector2 mouse = system_->GetMousePosVector2();
+
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    if (IsPointInUiButton(mouse, addButtons_[i])) {
+      return true;
+    }
+  }
+
+  if (IsPointInUiButton(mouse, trashButton_)) {
+    return true;
+  }
+
+  return false;
+}
+
+bool ModScene::IsMouseOverTrashArea() const {
+  const Vector2 mouse = system_->GetMousePosVector2();
+  return IsPointInUiButton(mouse, trashButton_);
+}
+
+void ModScene::UpdateScreenUi() {
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    UpdateUiSpriteTransform(addButtons_[i]);
+  }
+
+  UpdateUiSpriteTransform(trashButton_);
+
+  isHoverTrash_ = assemblyDrag_.isDragging && IsMouseOverTrashArea();
+
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    if (addButtons_[i].sprite == nullptr ||
+        addButtons_[i].sprite->objectParts_.empty()) {
+      continue;
+    }
+
+    Vector4 &color =
+        addButtons_[i].sprite->objectParts_[0].materialConfig->textureColor;
+    color = MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+    if (IsPointInUiButton(system_->GetMousePosVector2(), addButtons_[i])) {
+      color = MakeColor(0.8f, 1.0f, 0.8f, 1.0f);
+    }
+  }
+
+  if (trashButton_.sprite != nullptr &&
+      !trashButton_.sprite->objectParts_.empty()) {
+    Vector4 &color =
+        trashButton_.sprite->objectParts_[0].materialConfig->textureColor;
+    color = isHoverTrash_ ? MakeColor(1.0f, 0.45f, 0.45f, 1.0f)
+                          : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+  }
+}
+
+void ModScene::DrawScreenUi() {
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    if (addButtons_[i].visible && addButtons_[i].sprite != nullptr) {
+      addButtons_[i].sprite->Draw();
+    }
+  }
+
+  if (trashButton_.visible && trashButton_.sprite != nullptr) {
+    trashButton_.sprite->Draw();
+  }
+
+  const float fontHeight = 28.0f;
+  const float textPaddingX = 14.0f;
+  const float textPaddingY = 8.0f;
+
+  for (size_t i = 0; i < addButtons_.size(); ++i) {
+    const UiIconButton &button = addButtons_[i];
+    if (!button.visible) {
+      continue;
+    }
+
+    const float left = button.center.x - button.size.x * 0.5f;
+    const float top = button.center.y - button.size.y * 0.5f;
+
+    Vector4 textColor = {1.0f, 1.0f, 1.0f, 1.0f};
+    if (IsPointInUiButton(system_->GetMousePosVector2(), button)) {
+      textColor = {1.0f, 0.95f, 0.65f, 1.0f};
+    }
+
+    bitmapFont_.RenderText(
+        button.label, {left + textPaddingX, top + textPaddingY}, fontHeight,
+        BitmapFont::Align::Left, 5.0f, textColor);
+  }
+
+  if (trashButton_.visible) {
+    const float left = trashButton_.center.x - trashButton_.size.x * 0.5f;
+    const float top = trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
+
+    bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
+                           BitmapFont::Align::Left, 5.0f,
+                           {1.0f, 1.0f, 1.0f, 1.0f});
+  }
+}
+
+bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
+  if (!assemblyDrag_.isDragging) {
+    return false;
+  }
+
+  if (!IsMouseOverTrashArea()) {
+    return false;
+  }
+
+  const int rootPartId = assemblyDrag_.assemblyRootPartId;
+  if (rootPartId < 0) {
+    assemblyDrag_.Clear();
+    return false;
+  }
+
+  const int deleteTargetId = ResolveAssemblyOperationPartId(rootPartId);
+  assemblyDrag_.Clear();
+
+  if (deleteTargetId < 0) {
+    return false;
+  }
+
+  if (!assembly_.RemovePart(deleteTargetId)) {
+    return false;
+  }
+
+  selectedPartId_ = deleteTargetId;
+  SyncAfterAssemblyChanged();
+  return true;
+}
+
+void ModScene::SyncAfterAssemblyChanged() {
+  SyncObjectsWithAssembly();
+  LoadCustomizeData();
+  EnsureValidSelection();
+  ClearControlPointSelection();
 }
