@@ -755,6 +755,7 @@ private:
   bool BuildHeadPickBox(int partId, ModSceneSegmentBoxSet &outBoxes) const;
 
 public:
+
   bool ShouldBlockDebugCameraMouseControl() const;
 
 private:
