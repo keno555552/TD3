@@ -121,6 +121,29 @@ struct ModControlPointData {
   Vector3 headCenterPos{0.0f, 0.0f, 0.0f};
 };
 
+enum class NpcPresetType {
+  Default,
+  HeadBig,
+  LongLeg,
+  BigTorso,
+};
+
+struct NpcStartProgressData {
+  std::string name;
+
+  float totalTime = 0.0f;
+  float elapsedTime = 0.0f;
+
+  bool isFinished = false;
+  bool hasStartedMoving = false;
+
+  float moveElapsedTime = 0.0f;
+
+  NpcPresetType presetType = NpcPresetType::Default;
+
+  float runTimingSkill = 1.0f;
+};
+
 /// <summary>
 /// シーン間で共有する改造データ
 /// 旧固定配列は互換維持のため残し、新方式の可変データも併せて持つ
@@ -141,6 +164,9 @@ struct ModBodyCustomizeData {
   std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
       bodyJointOffsets{};
   ModControlPointData controlPoints;
+
+  // NPC情報
+  std::vector<NpcStartProgressData> npcStartProgressList;
 };
 
 /// <summary>
@@ -403,7 +429,7 @@ private:
   Vector3 TransformControlPointLocalToWorld(const Object *target,
                                             const Vector3 &localPoint) const;
 
-    /// <summary>
+  /// <summary>
   /// 外部参照している操作点ローカル座標を、この部位 Object
   /// のローカル座標へ変換する
   /// </summary>

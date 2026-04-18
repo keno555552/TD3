@@ -7,6 +7,7 @@
 #include "GAME/actor/ModAssemblyUtil.h"
 #include "GAME/actor/ModAttachCandidate.h"
 #include "GAME/actor/ModBody.h"
+#include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
 #include <memory>
 #include <string>
@@ -756,4 +757,54 @@ private:
 public:
 
   bool ShouldBlockDebugCameraMouseControl() const;
+
+private:
+  //===========================
+  // NPC
+  //===========================
+  struct NpcModProgress {
+    std::string name;
+
+    float totalTime;   // 必要時間
+    float elapsedTime; // 経過時間
+
+    bool isFinished; // 改造完了
+    bool hasStartedMoving;
+
+    float moveElapsedTime;
+
+    NpcPresetType presetType;
+
+    float skillMultiplier;
+    float runTimingSkill = 1.0f;
+  };
+
+  struct StartNotification {
+    std::string text;
+    float timer;
+    float duration;
+
+    float startY;
+  };
+
+  std::vector<NpcModProgress> npcProgress_;
+  std::vector<StartNotification> notifications_;
+
+  void InitializeNpcModProgress();
+  void UpdateNpcProgress();
+  void AddStartNotification(const std::string &text);
+  void UpdateNotifications();
+  void DrawStartNotifications();
+
+  void SyncNpcProgressToCustomizeData();
+
+  float CalculateNpcModTime(NpcPresetType presetType,
+                            float skillMultiplier) const;
+
+  float GetNpcBaseModTime() const;
+  float GetNpcPresetTimeBonus(NpcPresetType presetType) const;
+  float GetNpcSkillMultiplierByIndex(int index) const;
+  float GetNpcRunTimingSkillByIndex(int index) const;
+
+  BitmapFont bitmapFont;
 };

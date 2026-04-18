@@ -6453,7 +6453,15 @@ void TravelScene::ResolveVisualGroundPenetration() {
 
 void TravelScene::InitializeNpcRunners() {
   npcRunners_.clear();
-  npcRunners_.resize(4);
+
+  // まずは ModScene から来た人数を優先
+  size_t npcCount = 4;
+  if (customizeData_ != nullptr &&
+      !customizeData_->npcStartProgressList.empty()) {
+    npcCount = customizeData_->npcStartProgressList.size();
+  }
+
+  npcRunners_.resize(npcCount);
 
   for (size_t i = 0; i < npcRunners_.size(); ++i) {
     npcRunners_[i].moveX = -18.0f;
@@ -6466,33 +6474,60 @@ void TravelScene::InitializeNpcRunners() {
     npcRunners_[i].rightLegBend = 0.0f;
     npcRunners_[i].leftLegBendSpeed = 0.0f;
     npcRunners_[i].rightLegBendSpeed = 0.0f;
+
+    npcRunners_[i].bodyTilt = 0.0f;
+    npcRunners_[i].bodyTiltVelocity = 0.0f;
+    npcRunners_[i].landTimer = 999.0f;
+
     npcRunners_[i].leftInput = false;
     npcRunners_[i].rightInput = false;
     npcRunners_[i].isGrounded = true;
     npcRunners_[i].finished = false;
-    npcRunners_[i].started = true;
-    npcRunners_[i].startDelay = 0.0f;
     npcRunners_[i].finishRank = -1;
 
     npcRunners_[i].phaseTimer = 0.0f;
     npcRunners_[i].phase = static_cast<int>(i % 4);
 
-    switch (i) {
-    case 0:
-      npcRunners_[i].timingSkill = 0.85f;
-      break;
-    case 1:
-      npcRunners_[i].timingSkill = 0.95f;
-      break;
-    case 2:
-      npcRunners_[i].timingSkill = 1.00f;
-      break;
-    default:
-      npcRunners_[i].timingSkill = 1.10f;
-      break;
+    npcRunners_[i].inputHoldTimer = 0.0f;
+    npcRunners_[i].inputLeftActive = false;
+    npcRunners_[i].isKickHolding = false;
+    npcRunners_[i].kickHoldLeft = false;
+    npcRunners_[i].hasKickPlan = false;
+    npcRunners_[i].prevGrounded = false;
+    npcRunners_[i].lastTimingResult = 0;
+    npcRunners_[i].timingSkill = 1.0f;
+
+//==============================
+    // ModScene から開始状態を受け取る
+    //==============================
+    npcRunners_[i].started = false;
+    npcRunners_[i].startDelay = 0.0f;
+
+    if (customizeData_ != nullptr &&
+        i < customizeData_->npcStartProgressList.size()) {
+      const auto &progress = customizeData_->npcStartProgressList[i];
+
+      npcRunners_[i].timingSkill = progress.runTimingSkill;
+
+      if (progress.hasStartedMoving) {
+        npcRunners_[i].started = true;
+        npcRunners_[i].startDelay = 0.0f;
+
+        npcRunners_[i].moveX += progress.moveElapsedTime * 2.5f;
+      } else {
+        npcRunners_[i].started = false;
+
+        float remainTime = progress.totalTime - progress.elapsedTime;
+        if (remainTime < 0.0f) {
+          remainTime = 0.0f;
+        }
+        npcRunners_[i].startDelay = remainTime;
+      }
     }
 
-    // 既存debugObject
+    //==============================
+    // debugObject
+    //==============================
     npcRunners_[i].debugObject = std::make_unique<Object>();
     npcRunners_[i].debugObject->IntObject(system_);
     npcRunners_[i].debugObject->CreateModelData(npcModelHandle_);
@@ -6501,18 +6536,48 @@ void TravelScene::InitializeNpcRunners() {
     npcRunners_[i].debugObject->mainPosition.transform.scale = {0.6f, 0.6f,
                                                                 0.6f};
 
-    // 0番NPCだけ改造体化
-    if (i == 0) {
-      npcRunners_[i].customizeData = CreateNpcPresetHeadBig();
-    } else if (i == 1) {
-      npcRunners_[i].customizeData = CreateNpcPresetLongLeg();
-    } else if (i == 2) {
-      npcRunners_[i].customizeData = CreateNpcPresetBigTorso();
-    } else {
-      npcRunners_[i].customizeData = CreateNpcPresetDefault();
+    //==============================
+    // customized visual
+    // ModScene から渡ってきた presetType を使う
+    //==============================
+    std::unique_ptr<ModBodyCustomizeData> preset;
+
+    NpcPresetType presetType = NpcPresetType::Default;
+    if (customizeData_ != nullptr &&
+        i < customizeData_->npcStartProgressList.size()) {
+      presetType = customizeData_->npcStartProgressList[i].presetType;
     }
 
-    SetupNpcCustomizedVisual(npcRunners_[i]);
+
+    switch (presetType) {
+    case NpcPresetType::Default:
+      preset = CreateNpcPresetDefault();
+      break;
+
+    case NpcPresetType::HeadBig:
+      preset = CreateNpcPresetHeadBig();
+      break;
+
+    case NpcPresetType::LongLeg:
+      preset = CreateNpcPresetLongLeg();
+      break;
+
+    case NpcPresetType::BigTorso:
+      preset = CreateNpcPresetBigTorso();
+      break;
+
+    default:
+      preset = CreateNpcPresetDefault();
+      break;
+    }
+
+    npcRunners_[i].useCustomizedVisual = false;
+    npcRunners_[i].visualInitialized = false;
+    npcRunners_[i].customizeData = std::move(preset);
+
+    if (npcRunners_[i].customizeData != nullptr) {
+      SetupNpcCustomizedVisual(npcRunners_[i]);
+    }
   }
 }
 
@@ -7100,8 +7165,13 @@ void TravelScene::UpdateRaceFinishState() {
 }
 
 std::unique_ptr<ModBodyCustomizeData> TravelScene::CreateNpcPresetDefault() {
-  std::unique_ptr<ModBodyCustomizeData> data =
-      ModBody::CreateDefaultCustomizeData();
+  std::unique_ptr<ModBodyCustomizeData> data;
+
+  if (customizeData_ != nullptr) {
+    data = std::make_unique<ModBodyCustomizeData>(*customizeData_);
+  } else {
+    data = ModBody::CreateDefaultCustomizeData();
+  }
 
   if (data == nullptr) {
     return nullptr;

@@ -5,9 +5,10 @@
 #include "GAME/actor/prompt/PromptData.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
-#include <cfloat>
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
+#include <random>
 #include <unordered_set>
 
 namespace {
@@ -813,6 +814,10 @@ ModScene::ModScene(kEngine *system) {
   orbitYaw_ = 0.0f;
   orbitPitch_ = 0.0f;
   orbitDistance_ = 8.0f;
+
+  InitializeNpcModProgress();
+
+  bitmapFont.Initialize(system_);
 }
 
 ModScene::~ModScene() {
@@ -826,6 +831,8 @@ ModScene::~ModScene() {
 
   // 使用していないマテリアルをクリーンアップする
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
+
+  bitmapFont.Cleanup();
 }
 
 void ModScene::Update() {
@@ -879,6 +886,9 @@ void ModScene::Update() {
 
   // 現在の構造とパラメータを見た目へ反映する
   UpdateModObjects();
+
+  // NPCの裏改造進行を更新する
+  UpdateNpcProgress();
 
   if (isStartTransition_) {
     // 胴体(id=1)と頭(id=4)の操作点を確認する
@@ -944,7 +954,42 @@ void ModScene::Draw() {
 
   // 改造用UI本体を表示する
   DrawModGui();
+
+  // NPC進行確認用
+  ImGui::Begin("NpcModProgress");
+
+  ImGui::Text("NPC Count : %zu", npcProgress_.size());
+  ImGui::Text("Notification Count : %zu", notifications_.size());
+  ImGui::Separator();
+
+  for (size_t i = 0; i < npcProgress_.size(); ++i) {
+    const NpcModProgress &npc = npcProgress_[i];
+
+    float remainTime = npc.totalTime - npc.elapsedTime;
+    if (remainTime < 0.0f) {
+      remainTime = 0.0f;
+    }
+
+    ImGui::PushID(static_cast<int>(i));
+
+    ImGui::Text("%s", npc.name.c_str());
+    ImGui::Text("  elapsedTime      : %.2f", npc.elapsedTime);
+    ImGui::Text("  totalTime        : %.2f", npc.totalTime);
+    ImGui::Text("  remainTime       : %.2f", remainTime);
+    ImGui::Text("  isFinished       : %s", npc.isFinished ? "true" : "false");
+    ImGui::Text("  hasStartedMoving : %s",
+                npc.hasStartedMoving ? "true" : "false");
+    ImGui::Text("  moveElapsedTime  : %.2f", npc.moveElapsedTime);
+
+    ImGui::Separator();
+    ImGui::PopID();
+  }
+
+  ImGui::End();
 #endif
+
+  bitmapFont.BeginFrame();
+  DrawStartNotifications();
 
   // フェードを描画する
   fade_.Draw();
@@ -961,7 +1006,6 @@ void ModScene::CameraPart() {
 
   system_->SetCamera(usingCamera_);
 }
-
 
 Vector3 ModScene::ComputeOrbitTarget() const {
   // まず胴体中心を優先して見る
@@ -1269,10 +1313,10 @@ void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
   modBodies_[partId].Initialize(modObjects_[partId].get(), node.part);
 
   if (node.part == ModBodyPart::Head && modObjects_[partId] != nullptr) {
-    Logger::Log("HEAD CREATE");
-    Logger::Log("partId = %d", partId);
-    Logger::Log("objectParts size = %zu",
-                modObjects_[partId]->objectParts_.size());
+    // Logger::Log("HEAD CREATE");
+    // Logger::Log("partId = %d", partId);
+    // Logger::Log("objectParts size = %zu",
+    //             modObjects_[partId]->objectParts_.size());
   }
 }
 
@@ -1442,6 +1486,9 @@ void ModScene::SyncCustomizeDataFromScene() {
   // 旧方式配列も互換用に再構築する
   RebuildLegacyCustomizeDataFromInstances();
 
+  // NPCの進行状態も共有データへ保存する
+  SyncNpcProgressToCustomizeData();
+
   // shared に積む前に整合性を揃えておく
   ModBody::NormalizeCustomizeData(*customizeData_);
 }
@@ -1607,13 +1654,14 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
       customizeData_->controlPointSnapshots.push_back(snapshot);
 
       if (node->part == ModBodyPart::Neck || node->part == ModBodyPart::Head) {
-        Logger::Log("=== MODSCENE SNAP CHECK ===");
-        Logger::Log("partType   : %d", static_cast<int>(node->part));
-        Logger::Log("ownerPartId: %d", id);
-        Logger::Log("role       : %d", static_cast<int>(snapshot.role));
-        Logger::Log("localPos   : (%.3f, %.3f, %.3f)", snapshot.localPosition.x,
-                    snapshot.localPosition.y, snapshot.localPosition.z);
-        Logger::Log("radius     : %.3f", snapshot.radius);
+        // Logger::Log("=== MODSCENE SNAP CHECK ===");
+        // Logger::Log("partType   : %d", static_cast<int>(node->part));
+        // Logger::Log("ownerPartId: %d", id);
+        // Logger::Log("role       : %d", static_cast<int>(snapshot.role));
+        // Logger::Log("localPos   : (%.3f, %.3f, %.3f)",
+        // snapshot.localPosition.x,
+        //             snapshot.localPosition.y, snapshot.localPosition.z);
+        // Logger::Log("radius     : %.3f", snapshot.radius);
       }
     }
   }
@@ -3923,7 +3971,7 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
   assemblyDrag_.snappedWorldNormal = search.bestCandidate.worldNormal;
   assemblyDrag_.hasSnappedCandidate = true;
 
-      const float snapDistSq =
+  const float snapDistSq =
       assemblyAttachSnapRadius_ * assemblyAttachSnapRadius_;
 
   const bool insideSnapRange = (search.bestCandidate.distanceSq <= snapDistSq);
@@ -4449,12 +4497,12 @@ void ModScene::UpdateModObjects() {
     const PartNode *node = assembly_.FindNode(id);
     if (node != nullptr && node->part == ModBodyPart::Head) {
       const ModBodyPartParam &param = modBodies_[id].GetParam();
-      Logger::Log("HEAD APPLY");
-      Logger::Log("id = %d", id);
-      Logger::Log("enabled = %d", param.enabled ? 1 : 0);
-      Logger::Log("scale = (%.3f, %.3f, %.3f)", param.scale.x, param.scale.y,
-                  param.scale.z);
-      Logger::Log("length = %.3f", param.length);
+      // Logger::Log("HEAD APPLY");
+      // Logger::Log("id = %d", id);
+      // Logger::Log("enabled = %d", param.enabled ? 1 : 0);
+      // Logger::Log("scale = (%.3f, %.3f, %.3f)", param.scale.x, param.scale.y,
+      //             param.scale.z);
+      // Logger::Log("length = %.3f", param.length);
     }
 
     Object *object = modObjects_[id].get();
@@ -5413,4 +5461,209 @@ bool ModScene::BuildHeadPickBox(int partId,
 
   outBoxes.count = 1;
   return true;
+}
+
+void ModScene::UpdateNpcProgress() {
+  const float deltaTime = system_->GetDeltaTime();
+
+  for (size_t i = 0; i < npcProgress_.size(); ++i) {
+    NpcModProgress &npc = npcProgress_[i];
+
+    // すでに移動開始しているなら、先行移動時間だけ増やす
+    if (npc.hasStartedMoving) {
+      npc.moveElapsedTime += deltaTime;
+      continue;
+    }
+
+    // まだ改造中なら時間を進める
+    npc.elapsedTime += deltaTime;
+
+    if (!npc.isFinished && npc.elapsedTime >= npc.totalTime) {
+      npc.elapsedTime = npc.totalTime;
+      npc.isFinished = true;
+      npc.hasStartedMoving = true;
+      npc.moveElapsedTime = 0.0f;
+
+      AddStartNotification(npc.name + "がスタート！");
+    }
+  }
+
+  UpdateNotifications();
+}
+
+void ModScene::AddStartNotification(const std::string &text) {
+  StartNotification notification{};
+  notification.text = text;
+  notification.timer = 0.0f;
+  notification.duration = 1.5f;
+  notification.startY = 80.0f;
+
+  notifications_.push_back(notification);
+}
+
+void ModScene::UpdateNotifications() {
+  const float deltaTime = system_->GetDeltaTime();
+
+  std::vector<StartNotification> aliveNotifications;
+  aliveNotifications.reserve(notifications_.size());
+
+  for (size_t i = 0; i < notifications_.size(); ++i) {
+    StartNotification notification = notifications_[i];
+    notification.timer += deltaTime;
+
+    if (notification.timer < notification.duration) {
+      aliveNotifications.push_back(notification);
+    }
+  }
+
+  notifications_ = std::move(aliveNotifications);
+}
+
+void ModScene::InitializeNpcModProgress() {
+  npcProgress_.clear();
+  npcProgress_.reserve(4);
+
+  std::vector<NpcPresetType> presetPool = {
+      NpcPresetType::Default, NpcPresetType::HeadBig, NpcPresetType::BigTorso,
+      NpcPresetType::LongLeg};
+
+  std::random_device rd;
+  std::mt19937 rng(rd());
+  std::shuffle(presetPool.begin(), presetPool.end(), rng);
+
+  for (int i = 0; i < 4; ++i) {
+    NpcModProgress npc{};
+    npc.name = "NPC" + std::to_string(i + 1);
+
+    npc.presetType = presetPool[i];
+    npc.skillMultiplier = GetNpcSkillMultiplierByIndex(i);
+    npc.runTimingSkill = GetNpcRunTimingSkillByIndex(i);
+
+    npc.totalTime = CalculateNpcModTime(npc.presetType, npc.skillMultiplier);
+    npc.elapsedTime = 0.0f;
+    npc.isFinished = false;
+    npc.hasStartedMoving = false;
+    npc.moveElapsedTime = 0.0f;
+
+    npcProgress_.push_back(npc);
+  }
+
+  notifications_.clear();
+}
+
+void ModScene::DrawStartNotifications() {
+  if (notifications_.empty()) {
+    return;
+  }
+
+  const float baseX = 900.0f;
+  const float fontSize = 32.0f;
+  const float fallDistance = 80.0f;
+
+  for (size_t i = 0; i < notifications_.size(); ++i) {
+    const StartNotification &notification = notifications_[i];
+
+    float t = 0.0f;
+    if (notification.duration > 0.0f) {
+      t = notification.timer / notification.duration;
+    }
+    t = std::clamp(t, 0.0f, 1.0f);
+
+    float x = baseX;
+    float y = notification.startY + fallDistance * t;
+    float alpha = 1.0f - t;
+
+    bitmapFont.RenderText(notification.text, {x, y}, fontSize,
+                          BitmapFont::Align::Left, 5.0f,
+                          {1.0f, 1.0f, 1.0f, alpha});
+  }
+}
+
+void ModScene::SyncNpcProgressToCustomizeData() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  customizeData_->npcStartProgressList.clear();
+  customizeData_->npcStartProgressList.reserve(npcProgress_.size());
+
+  for (size_t i = 0; i < npcProgress_.size(); ++i) {
+    const NpcModProgress &src = npcProgress_[i];
+
+    NpcStartProgressData dst;
+    dst.name = src.name;
+    dst.totalTime = src.totalTime;
+    dst.elapsedTime = src.elapsedTime;
+    dst.isFinished = src.isFinished;
+    dst.hasStartedMoving = src.hasStartedMoving;
+    dst.moveElapsedTime = src.moveElapsedTime;
+    dst.presetType = src.presetType;
+    dst.runTimingSkill = src.runTimingSkill;
+
+    customizeData_->npcStartProgressList.push_back(dst);
+  }
+}
+
+float ModScene::CalculateNpcModTime(NpcPresetType presetType,
+                                    float skillMultiplier) const {
+  const float baseTime = GetNpcBaseModTime();
+  const float presetBonus = GetNpcPresetTimeBonus(presetType);
+
+  return (baseTime + presetBonus) / skillMultiplier;
+}
+
+float ModScene::GetNpcBaseModTime() const { return 15.0f; }
+
+float ModScene::GetNpcPresetTimeBonus(NpcPresetType presetType) const {
+  switch (presetType) {
+  case NpcPresetType::Default:
+    return 0.0f;
+
+  case NpcPresetType::HeadBig:
+    return 1.5f;
+
+  case NpcPresetType::LongLeg:
+    return 3.0f;
+
+  case NpcPresetType::BigTorso:
+    return 2.0f;
+
+  default:
+    return 0.0f;
+  }
+}
+
+float ModScene::GetNpcSkillMultiplierByIndex(int index) const {
+  switch (index) {
+  case 0:
+    return 1.00f;
+
+  case 1:
+    return 0.95f;
+
+  case 2:
+    return 1.10f;
+
+  default:
+    return 0.90f;
+  }
+}
+
+float ModScene::GetNpcRunTimingSkillByIndex(int index) const {
+  switch (index) {
+  case 0:
+    return 1.15f;
+
+  case 1:
+    return 1.05f;
+
+  case 2:
+    return 0.95f;
+
+  case 3:
+    return 0.85f;
+
+  default:
+    return 1.0f;
+  }
 }
