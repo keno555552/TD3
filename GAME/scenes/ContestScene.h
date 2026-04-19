@@ -31,6 +31,13 @@ enum class ContestPhase {
 	Trophy,   /// トロフィー・選択
 };
 
+struct SceneObject {
+	std::unique_ptr<Object> object;
+	Vector3 position;
+	Vector3 rotation;
+	Vector3 scale;
+};
+
 class ContestScene : public BaseScene {
 public:
 	ContestScene(kEngine* system);
@@ -48,6 +55,44 @@ private:
 	DebugCamera* debugCamera_ = nullptr;
 	Camera* usingCamera_ = nullptr;
 	bool useDebugCamera_ = false;
+
+	//========
+	// model
+	//========
+	// ステージオブジェクト
+	int stageModelHandle_ = 0;
+	SceneObject stage_;
+
+	int backScreenModelHandle_ = 0;
+	SceneObject backScreen_;
+
+	int rightSideScreenModelHandle_ = 0;
+	std::vector<SceneObject> rightSideScreens_;
+
+	int leftSideScreenModelHandle_ = 0;
+	std::vector<SceneObject> leftSideScreens_;
+
+	int floorModelHandle_ = 0;
+	SceneObject floor_;
+
+	int judgesStageModelHandle_ = 0;
+	SceneObject judgesStage_;
+
+	int judgesDeskModelHandle_ = 0;
+	SceneObject judgesDesk_;
+
+	int judgesChairModelHandle_ = 0;
+	std::vector<SceneObject> judgesChairs_;
+
+	int audienceChairsMidModelHandle_ = 0;
+	std::vector<SceneObject> audienceChairsMid_;
+
+	int audienceChairsSideModelHandle_ = 0;
+	std::vector<SceneObject> audienceChairsRightSide_;
+	std::vector<SceneObject> audienceChairsLeftSide_;
+
+	// 複数モデルの初期化
+	void SetupSceneObject(SceneObject& obj, int modelHandle,const Vector3& pos, const Vector3& rot, float scale);
 
 	// フェード
 	Fade fade_;

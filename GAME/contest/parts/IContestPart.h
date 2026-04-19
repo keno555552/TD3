@@ -1,7 +1,16 @@
 #pragma once
+#include "Vector3.h"
 
 class kEngine;
 class BitmapFont;
+
+/// <summary>
+/// パートのカメラ設定
+/// </summary>
+struct PartCameraTransform {
+	Vector3 position = { 0.0f, 0.0f, 0.0f };
+	Vector3 rotation = { 0.0f, 0.0f, 0.0f };
+};
 
 /// <summary>
 /// コンテストシーン内の各パートの基底クラス（ステートパターン）
@@ -13,21 +22,14 @@ public:
 	}
 	virtual ~IContestPart() = default;
 
-	/// <summary>
-	/// パートの更新処理
-	/// </summary>
 	virtual void Update() = 0;
-
-	/// <summary>
-	/// パートの描画処理
-	/// </summary>
 	virtual void Draw() = 0;
+	virtual bool IsFinished() const = 0;
 
 	/// <summary>
-	/// このパートが完了したかどうか
+	/// 現在のカメラ設定を返す
 	/// </summary>
-	/// <returns>true: 次のパートへ遷移する</returns>
-	virtual bool IsFinished() const = 0;
+	virtual PartCameraTransform GetCameraTransform() const = 0;
 
 protected:
 	kEngine* system_ = nullptr;
