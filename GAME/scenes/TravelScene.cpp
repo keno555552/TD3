@@ -150,6 +150,14 @@ TravelScene::TravelScene(kEngine *system) {
   // パーティクル
   //===============================
   perfectParticle_ = std::make_unique<Perfect_Particle>(system_);
+
+  for (auto &obj : npcDebugCpObjects_) {
+    obj = new Object;
+    obj->IntObject(system_);
+    obj->CreateModelData(modModelHandles_[ToIndex(ModBodyPart::Head)]);
+    obj->mainPosition.transform = CreateDefaultTransform();
+    obj->mainPosition.transform.scale = {0.08f, 0.08f, 0.08f};
+  }
 }
 
 TravelScene::~TravelScene() {
@@ -180,19 +188,30 @@ TravelScene::~TravelScene() {
   bitmapFont.Cleanup();
 
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
+
+  for (auto &obj : npcDebugCpObjects_) {
+    delete obj;
+    obj = nullptr;
+  }
 }
 
 void TravelScene::Update() {
   //===============================
   // カメラ更新
   //===============================
-
   CameraPart();
+
+  //===============================
+  // フェード中はレース進行を止める
+  //===============================
+  if (isStartTransition_) {
+    UpdateSceneTransition();
+    return;
+  }
 
   //===============================
   // プレイヤー移動
   //===============================
-
   if (!HasRequiredParts()) {
     return;
   }
@@ -210,17 +229,13 @@ void TravelScene::Update() {
   UpdateTimeLimit(deltaTime);
 
   if (!isRaceFinished_) {
-
     UpdateHoldState(leftNowInput, rightNowInput, deltaTime);
-
     UpdateLegBendState(leftNowInput, rightNowInput);
-
     UpdateMovementState(leftNowInput, rightNowInput);
 
     UpdateNpcRunners(deltaTime);
 
     UpdateRaceRanking();
-
     UpdateRaceFinishState();
   }
 
@@ -250,6 +265,14 @@ void TravelScene::Draw() {
   DrawExtraVisualParts();
 
   for (auto &npc : npcRunners_) {
+    if (!npc.started) {
+      continue;
+    }
+
+    if (!showNpcModel_) {
+      continue;
+    }
+
     if (npc.useCustomizedVisual) {
       DrawNpcCustomizedVisual(npc);
     } else if (npc.debugObject != nullptr) {
@@ -258,6 +281,12 @@ void TravelScene::Draw() {
   }
 
   ground_->Draw();
+
+  for (auto *obj : npcDebugCpObjects_) {
+    if (obj != nullptr) {
+      obj->Draw();
+    }
+  }
 
 #ifdef USE_IMGUI
   // 現在シーン表示
@@ -351,6 +380,8 @@ void TravelScene::Draw() {
 
 #ifdef USE_IMGUI
   ImGui::Begin("NpcDebug");
+
+  ImGui::Checkbox("Show NPC Model", &showNpcModel_);
 
   for (size_t i = 0; i < npcRunners_.size(); ++i) {
     const auto &npc = npcRunners_[i];
@@ -3745,6 +3776,9 @@ void TravelScene::DrawExtraVisualParts() {
 
 void TravelScene::UpdatePartRootsFromControlPoints() {
 
+  // 見た目補正用
+  const float modelVisualScaleFix = 0.8f;
+
   const ModControlPointData *cp = GetControlPoints();
   if (cp == nullptr) {
     return;
@@ -4914,18 +4948,21 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     const float neckBendR = GetSnapshotRadius(ModBodyPart::Neck, 2);
     const float neckThicknessScale = (std::max)(neckRootR, neckBendR) / 0.1f;
 
-    neck->mainPosition.transform.translate = neckBaseAnchorLocal;
+    // neck->mainPosition.transform.translate = neckBaseAnchorLocal;
+    neck->mainPosition.transform.translate =
+        Add(neckBaseAnchorLocal, neckRootLocal);
     neck->mainPosition.transform.rotate = {neckAngleX, 0.0f, neckAngleZ};
 
     if (!neck->objectParts_.empty()) {
       neck->objectParts_[0].transform.translate = {0.0f, neckLength * 0.5f,
                                                    0.0f};
       neck->objectParts_[0].transform.scale.x =
-          neckThicknessScale * neckParam.scale.x;
-      neck->objectParts_[0].transform.scale.y =
-          neckLength * neckParam.scale.y * neckParam.length;
+          neckThicknessScale * neckParam.scale.x * modelVisualScaleFix;
+      neck->objectParts_[0].transform.scale.y = neckLength * neckParam.scale.y *
+                                                neckParam.length *
+                                                modelVisualScaleFix;
       neck->objectParts_[0].transform.scale.z =
-          neckThicknessScale * neckParam.scale.z;
+          neckThicknessScale * neckParam.scale.z * modelVisualScaleFix;
     }
 
     static bool neckAnchorCheckOnce = false;
@@ -4964,14 +5001,14 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     head->mainPosition.transform.rotate = {headAngleX, 0.0f, headAngleZ};
 
     if (!head->objectParts_.empty()) {
-      head->objectParts_[0].transform.translate = {0.0f, headLength * 0.5f,
-                                                   0.0f};
+      head->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       head->objectParts_[0].transform.scale.x =
-          headThicknessScale * headParam.scale.x;
-      head->objectParts_[0].transform.scale.y =
-          headLength * headParam.scale.y * headParam.length;
+          headThicknessScale * headParam.scale.x * modelVisualScaleFix;
+      head->objectParts_[0].transform.scale.y = headLength * headParam.scale.y *
+                                                headParam.length *
+                                                modelVisualScaleFix * 0.8f;
       head->objectParts_[0].transform.scale.z =
-          headThicknessScale * headParam.scale.z;
+          headThicknessScale * headParam.scale.z * modelVisualScaleFix;
     }
 
     static bool headAnchorCheckOnce = false;
@@ -5011,8 +5048,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                    leftUpperArmAngleZ};
 
     if (!leftUpperArm->objectParts_.empty()) {
-      leftUpperArm->objectParts_[0].transform.translate = {
-          0.0f, -upperLength * 0.5f, 0.0f};
+      leftUpperArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       leftUpperArm->objectParts_[0].transform.scale.x =
           leftUpperArmThicknessScale * leftUpperArmParam.scale.x;
       leftUpperArm->objectParts_[0].transform.scale.y =
@@ -5052,12 +5088,12 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                   leftForeArmAngleZ};
 
     if (!leftForeArm->objectParts_.empty()) {
-      leftForeArm->objectParts_[0].transform.translate = {
-          0.0f, -foreLength * 0.5f, 0.0f};
+      leftForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       leftForeArm->objectParts_[0].transform.scale.x =
           leftForeArmThicknessScale * leftForeArmParam.scale.x;
       leftForeArm->objectParts_[0].transform.scale.y =
-          foreLength * leftForeArmParam.scale.y * leftForeArmParam.length;
+          foreLength * leftForeArmParam.scale.y * leftForeArmParam.length *
+          0.4f;
       leftForeArm->objectParts_[0].transform.scale.z =
           leftForeArmThicknessScale * leftForeArmParam.scale.z;
     }
@@ -5105,8 +5141,7 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                     rightUpperArmAngleZ};
 
     if (!rightUpperArm->objectParts_.empty()) {
-      rightUpperArm->objectParts_[0].transform.translate = {
-          0.0f, -upperLength * 0.5f, 0.0f};
+      rightUpperArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       rightUpperArm->objectParts_[0].transform.scale.x =
           rightUpperArmThicknessScale * rightUpperArmParam.scale.x;
       rightUpperArm->objectParts_[0].transform.scale.y =
@@ -5151,12 +5186,12 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                    rightForeArmAngleZ};
 
     if (!rightForeArm->objectParts_.empty()) {
-      rightForeArm->objectParts_[0].transform.translate = {
-          0.0f, -foreLength * 0.5f, 0.0f};
+      rightForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       rightForeArm->objectParts_[0].transform.scale.x =
           rightForeArmThicknessScale * rightForeArmParam.scale.x;
       rightForeArm->objectParts_[0].transform.scale.y =
-          foreLength * rightForeArmParam.scale.y * rightForeArmParam.length;
+          foreLength * rightForeArmParam.scale.y * rightForeArmParam.length *
+          0.4f;
       rightForeArm->objectParts_[0].transform.scale.z =
           rightForeArmThicknessScale * rightForeArmParam.scale.z;
     }
@@ -5189,17 +5224,23 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     float leftThighAngleX = leftThighBaseX + leftThighAnimX;
 
     // 脚は stomachRoot の子なので、belly 基準の相対座標を使う
+    Vector3 leftKneePos = BuildAnimatedChildRoot(
+        leftHipFromBelly, leftThighAngleZ, leftThighAngleX, thighLength);
+
+    Vector3 leftThighCenter = {(leftHipFromBelly.x + leftKneePos.x) * 0.5f,
+                               (leftHipFromBelly.y + leftKneePos.y) * 0.5f,
+                               (leftHipFromBelly.z + leftKneePos.z) * 0.5f};
+
     leftThigh->mainPosition.transform.translate = leftHipFromBelly;
     leftThigh->mainPosition.transform.rotate = {leftThighAngleX, 0.0f,
                                                 leftThighAngleZ};
 
     if (!leftThigh->objectParts_.empty()) {
-      leftThigh->objectParts_[0].transform.translate = {
-          0.0f, -thighLength * 0.5f, 0.0f};
+      leftThigh->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       leftThigh->objectParts_[0].transform.scale.x =
           leftThighThicknessScale * leftThighParam.scale.x;
       leftThigh->objectParts_[0].transform.scale.y =
-          thighLength * leftThighParam.scale.y * leftThighParam.length;
+          thighLength * leftThighParam.scale.y * leftThighParam.length * 0.8f;
       leftThigh->objectParts_[0].transform.scale.z =
           leftThighThicknessScale * leftThighParam.scale.z;
     }
@@ -5232,17 +5273,23 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
     Vector3 leftShinRoot = BuildAnimatedChildRoot(
         leftThighRoot, leftThighAngleZ, leftThighAngleX, thighLength);
 
+    Vector3 leftFootPos = BuildAnimatedChildRoot(leftShinRoot, leftShinAngleZ,
+                                                 leftShinAngleX, shinLength);
+
+    Vector3 leftShinCenter = {(leftShinRoot.x + leftFootPos.x) * 0.5f,
+                              (leftShinRoot.y + leftFootPos.y) * 0.5f,
+                              (leftShinRoot.z + leftFootPos.z) * 0.5f};
+
     leftShin->mainPosition.transform.translate = leftShinRoot;
     leftShin->mainPosition.transform.rotate = {leftShinAngleX, 0.0f,
                                                leftShinAngleZ};
 
     if (!leftShin->objectParts_.empty()) {
-      leftShin->objectParts_[0].transform.translate = {0.0f, -shinLength * 0.5f,
-                                                       0.0f};
+      leftShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       leftShin->objectParts_[0].transform.scale.x =
           leftShinThicknessScale * leftShinParam.scale.x;
       leftShin->objectParts_[0].transform.scale.y =
-          shinLength * leftShinParam.scale.y * leftShinParam.length;
+          shinLength * leftShinParam.scale.y * leftShinParam.length * 0.4f;
       leftShin->objectParts_[0].transform.scale.z =
           leftShinThicknessScale * leftShinParam.scale.z;
     }
@@ -5280,12 +5327,11 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                  rightThighAngleZ};
 
     if (!rightThigh->objectParts_.empty()) {
-      rightThigh->objectParts_[0].transform.translate = {
-          0.0f, -thighLength * 0.5f, 0.0f};
+      rightThigh->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       rightThigh->objectParts_[0].transform.scale.x =
           rightThighThicknessScale * rightThighParam.scale.x;
       rightThigh->objectParts_[0].transform.scale.y =
-          thighLength * rightThighParam.scale.y * rightThighParam.length;
+          thighLength * rightThighParam.scale.y * rightThighParam.length * 0.8f;
       rightThigh->objectParts_[0].transform.scale.z =
           rightThighThicknessScale * rightThighParam.scale.z;
     }
@@ -5323,12 +5369,11 @@ void TravelScene::UpdatePartRootsFromControlPoints() {
                                                 rightShinAngleZ};
 
     if (!rightShin->objectParts_.empty()) {
-      rightShin->objectParts_[0].transform.translate = {
-          0.0f, -shinLength * 0.5f, 0.0f};
+      rightShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
       rightShin->objectParts_[0].transform.scale.x =
           rightShinThicknessScale * rightShinParam.scale.x;
       rightShin->objectParts_[0].transform.scale.y =
-          shinLength * rightShinParam.scale.y * rightShinParam.length;
+          shinLength * rightShinParam.scale.y * rightShinParam.length * 0.4f;
       rightShin->objectParts_[0].transform.scale.z =
           rightShinThicknessScale * rightShinParam.scale.z;
     }
@@ -6496,8 +6541,9 @@ void TravelScene::InitializeNpcRunners() {
     npcRunners_[i].prevGrounded = false;
     npcRunners_[i].lastTimingResult = 0;
     npcRunners_[i].timingSkill = 1.0f;
+    npcRunners_[i].headStartSpeed = 2.0f * npcRunners_[i].timingSkill;
 
-//==============================
+    //==============================
     // ModScene から開始状態を受け取る
     //==============================
     npcRunners_[i].started = false;
@@ -6513,7 +6559,8 @@ void TravelScene::InitializeNpcRunners() {
         npcRunners_[i].started = true;
         npcRunners_[i].startDelay = 0.0f;
 
-        npcRunners_[i].moveX += progress.moveElapsedTime * 2.5f;
+        SimulateNpcHeadStart(npcRunners_[i], progress.moveElapsedTime);
+
       } else {
         npcRunners_[i].started = false;
 
@@ -6548,21 +6595,23 @@ void TravelScene::InitializeNpcRunners() {
       presetType = customizeData_->npcStartProgressList[i].presetType;
     }
 
-
     switch (presetType) {
     case NpcPresetType::Default:
       preset = CreateNpcPresetDefault();
       break;
 
     case NpcPresetType::HeadBig:
+      preset = CreateNpcPresetDefault();
       preset = CreateNpcPresetHeadBig();
       break;
 
     case NpcPresetType::LongLeg:
+      preset = CreateNpcPresetDefault();
       preset = CreateNpcPresetLongLeg();
       break;
 
     case NpcPresetType::BigTorso:
+      preset = CreateNpcPresetDefault();
       preset = CreateNpcPresetBigTorso();
       break;
 
@@ -6686,7 +6735,13 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
   npc.prevGrounded = npc.isGrounded;
 }
 
-void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
+void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
+  // 前フレームの接地状態を保存
+  bool wasGrounded = npc.isGrounded;
+
+  //================================
+  // 脚の曲げ計算
+  //================================
   float leftTargetLegAngle = npc.leftInput ? legKickAngle_ : legRecoverAngle_;
   float rightTargetLegAngle = npc.rightInput ? legKickAngle_ : legRecoverAngle_;
 
@@ -6710,65 +6765,52 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
   npc.rightLegBend = std::clamp(npc.rightLegBend, -0.8f, 1.0f);
 
   //================================
-  // 接地高さ
+  // 物理判定と接地更新
+  // 見た目で使っている足先ワールド座標をそのまま使う
   //================================
-  float npcGroundY = 1.94f;
-
   if (npc.useCustomizedVisual) {
-    Object *leftThigh = npc.modObjects[ToIndex(ModBodyPart::LeftThigh)];
-    Object *leftShin = npc.modObjects[ToIndex(ModBodyPart::LeftShin)];
-    Object *rightThigh = npc.modObjects[ToIndex(ModBodyPart::RightThigh)];
-    Object *rightShin = npc.modObjects[ToIndex(ModBodyPart::RightShin)];
-    Object *chestBody = npc.modObjects[ToIndex(ModBodyPart::ChestBody)];
-    Object *stomachBody = npc.modObjects[ToIndex(ModBodyPart::StomachBody)];
+    const float leftFootBottomY = npc.leftFootWorld.y - npc.leftFootRadius;
+    const float rightFootBottomY = npc.rightFootWorld.y - npc.rightFootRadius;
+    const float lowestFootY = (std::min)(leftFootBottomY, rightFootBottomY);
 
-    auto SafePartLength = [](Object *obj) -> float {
-      if (obj == nullptr || obj->objectParts_.empty()) {
-        return 1.0f;
-      }
-      return (std::max)(0.05f, obj->objectParts_[0].transform.scale.y);
-    };
+    const float groundEpsilon = 0.01f;
 
-    const float leftThighLength = SafePartLength(leftThigh);
-    const float leftShinLength = SafePartLength(leftShin);
-    const float rightThighLength = SafePartLength(rightThigh);
-    const float rightShinLength = SafePartLength(rightShin);
-
-    const float chestLength = SafePartLength(chestBody);
-    const float stomachLength = SafePartLength(stomachBody);
-
-    const float avgLegLength = (leftThighLength + leftShinLength +
-                                rightThighLength + rightShinLength) *
-                               0.25f;
-
-    const float avgTorsoLength = (chestLength + stomachLength) * 0.5f;
-
-    const float baseLegLength = 1.0f;
-    const float baseTorsoLength = 1.0f;
-
-    npcGroundY = 1.94f;
-    npcGroundY += (avgLegLength - baseLegLength) * 2.0f;
-    npcGroundY += (avgTorsoLength - baseTorsoLength) * 1.2f;
+    if (lowestFootY <= groundY_ + groundEpsilon) {
+      const float pushUp = groundY_ - lowestFootY;
+      npc.moveY += pushUp;
+      npc.velocityY = 0.0f;
+      npc.isGrounded = true;
+    } else {
+      npc.isGrounded = false;
+    }
+  } else {
+    if (npc.moveY <= groundY_) {
+      npc.moveY = groundY_;
+      npc.velocityY = 0.0f;
+      npc.isGrounded = true;
+    } else {
+      npc.isGrounded = false;
+    }
   }
 
-  bool wasGrounded = npc.isGrounded;
-
-  if (npc.moveY <= npcGroundY) {
-    npc.moveY = npcGroundY;
-    npc.velocityY = 0.0f;
-    npc.isGrounded = true;
+  // 着地タイマー更新 (これが Input 側の判定タイミングになる)
+  bool justLanded = (!wasGrounded && npc.isGrounded);
+  if (justLanded) {
+    npc.landTimer = 0.0f;
+    npc.leftLegBendSpeed = 0.0f;
+    npc.rightLegBendSpeed = 0.0f;
+  } else if (npc.isGrounded) {
+    npc.landTimer += deltaTime;
   } else {
-    npc.isGrounded = false;
+    npc.landTimer = 999.0f;
   }
 
   //================================
-  // 改造から NPC 用の簡易 tuning を作る
-  // 脚長はここで直接強化せず、一歩の大きさだけに使う
+  // 個体別のチューニングパラメータ作成
   //================================
   float runPower = 1.0f;
   float lift = 1.0f;
   float maxSpeed = 1.0f;
-
   float headScale = 1.0f;
   float avgTorsoScale = 1.0f;
 
@@ -6783,15 +6825,11 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
     avgTorsoScale = (chest.scale.x + chest.scale.y + chest.scale.z +
                      stomach.scale.x + stomach.scale.y + stomach.scale.z) /
                     6.0f;
-
     headScale = (head.scale.x + head.scale.y + head.scale.z) / 3.0f;
 
-    // 頭デカ：弱体
     runPower -= (headScale - 1.0f) * 0.6f;
     lift -= (headScale - 1.0f) * 0.4f;
     maxSpeed -= (headScale - 1.0f) * 0.5f;
-
-    // 胴体デカ：少し鈍くする
     maxSpeed -= (avgTorsoScale - 1.0f) * 0.1f;
 
     runPower = std::clamp(runPower, 0.4f, 2.5f);
@@ -6800,42 +6838,35 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
   }
 
   //================================
-  // 姿勢：通常時は少し戻すだけ
-  // プレイヤーと同じく、蹴った瞬間にだけ tiltImpulse を入れる
+  // 姿勢（bodyTilt）の更新
   //================================
   const float npcIdealRunTilt = -0.12f;
   const float npcNeutralTilt = -0.03f;
   const float npcRecoverStartTilt = 0.42f;
   const float npcRecoverTargetTilt = -0.12f;
-  const float npcHeavyFallTilt = 0.65f;
 
   float headRecoveryPenalty =
       std::clamp(1.0f - (headScale - 1.0f) * 0.55f, 0.25f, 1.0f);
-
   float torsoStabilityScale =
       std::clamp(1.0f + (avgTorsoScale - 1.0f) * 3.0f, 0.45f, 4.2f);
-
   float torsoTiltResistance =
       std::clamp(1.0f - (avgTorsoScale - 1.0f) * 1.8f, 0.10f, 1.15f);
 
   float neutralReturnPower = 0.002f * headRecoveryPenalty * torsoStabilityScale;
-
   if (!npc.isGrounded) {
     neutralReturnPower *= 0.35f;
   }
 
+  // 中立への戻り
   npc.bodyTiltVelocity += (npcNeutralTilt - npc.bodyTilt) * neutralReturnPower;
 
   //================================
-  // NPC の蹴り
-  // 脚長は「一歩の大きさ」だけに影響
-  // 姿勢は landTimer に応じた蹴りタイミングで決める
+  // 蹴り（加速と姿勢変化）
   //================================
   bool doKick = npc.isGrounded && (npc.leftInput || npc.rightInput);
 
   if (doKick) {
     float avgLegScaleY = 1.0f;
-
     if (npc.customizeData != nullptr) {
       const auto &leftThigh =
           npc.customizeData->partParams[ToIndex(ModBodyPart::LeftThigh)];
@@ -6845,7 +6876,6 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
           npc.customizeData->partParams[ToIndex(ModBodyPart::LeftShin)];
       const auto &rightShin =
           npc.customizeData->partParams[ToIndex(ModBodyPart::RightShin)];
-
       avgLegScaleY = (leftThigh.scale.y + rightThigh.scale.y +
                       leftShin.scale.y + rightShin.scale.y) *
                      0.25f;
@@ -6853,121 +6883,74 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
 
     float legLengthScale =
         std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.45f, 0.70f, 2.0f);
-
-    float kickLegBend = 0.0f;
-    if (npc.leftInput) {
-      kickLegBend = npc.leftLegBend;
-    } else if (npc.rightInput) {
-      kickLegBend = npc.rightLegBend;
-    }
-
+    float kickLegBend = npc.leftInput ? npc.leftLegBend : npc.rightLegBend;
     float kickLegForwardness =
         1.0f - std::clamp((kickLegBend - legKickAngle_) /
                               (legRecoverAngle_ - legKickAngle_),
                           0.0f, 1.0f);
-
     float kickEfficiency = 0.75f + kickLegForwardness * 0.75f;
-    float groundBoost = npc.isGrounded ? 1.2f : 0.6f;
+    float groundBoost = 1.2f;
 
     float totalPush = 0.09f;
 
-    //================================
-    // 蹴ったタイミングで姿勢インパルス
-    // Perfect / Good / Bad をちゃんと分ける
-    //================================
+    // landTimer に基づいた判定結果（インパルス）
     const float bestTimingEnd = 0.08f;
     const float lateTimingEnd = 0.22f;
     const float perfectTimingEnd = bestTimingEnd * 0.45f;
-
     float tiltImpulse = 0.0f;
 
     if (npc.landTimer <= perfectTimingEnd) {
-      // Perfect：はっきり前傾
       tiltImpulse = -0.055f;
-      npc.lastTimingResult = 1;
-
+      npc.lastTimingResult = 1; // Perfect
     } else if (npc.landTimer <= bestTimingEnd) {
-      // Good：少し前傾
       float goodRatio = (npc.landTimer - perfectTimingEnd) /
                         (bestTimingEnd - perfectTimingEnd);
-      goodRatio = std::clamp(goodRatio, 0.0f, 1.0f);
-
-      tiltImpulse = -0.035f + goodRatio * 0.015f;
-      npc.lastTimingResult = 2;
-
-    } else if (npc.landTimer <= lateTimingEnd) {
-      // Bad前半：少しずつ後傾
+      tiltImpulse = -0.035f + std::clamp(goodRatio, 0.0f, 1.0f) * 0.015f;
+      npc.lastTimingResult = 2; // Good
+    } else {
       float badRatio =
           (npc.landTimer - bestTimingEnd) / (lateTimingEnd - bestTimingEnd);
-      badRatio = std::clamp(badRatio, 0.0f, 1.0f);
-
-      tiltImpulse = 0.020f + badRatio * 0.035f;
-      npc.lastTimingResult = 3;
-
-    } else {
-      // Bad後半：かなり後傾
-      tiltImpulse = 0.075f;
-      npc.lastTimingResult = 3;
+      tiltImpulse = 0.020f + std::clamp(badRatio, 0.0f, 1.0f) * 0.035f;
+      npc.lastTimingResult = 3; // Bad
     }
 
     float headHeavyFactor =
         std::clamp(1.0f + (headScale - 1.0f) * 1.6f, 1.0f, 2.4f);
-
-    float turnResponse = 1.0f;
-
-    // 頭が大きいほど振られやすい
-    turnResponse += (headScale - 1.0f) * 1.2f;
-
-    // 胴体が大きいほど少し落ち着く
-    turnResponse -= (avgTorsoScale - 1.0f) * 0.5f;
-
-    turnResponse = std::clamp(turnResponse, 0.7f, 2.5f);
-
+    float turnResponse = std::clamp(1.0f + (headScale - 1.0f) * 1.2f -
+                                        (avgTorsoScale - 1.0f) * 0.5f,
+                                    0.7f, 2.5f);
     float npcBaseTiltResponse = 2.2f;
 
+    // 姿勢に回転力を与える
     npc.bodyTiltVelocity += tiltImpulse * npcBaseTiltResponse *
                             headHeavyFactor * torsoTiltResistance;
 
+    // 加速計算
     float pushMagnitude = totalPush *
                           (0.55f + runPower * 1.10f + lift * 0.75f) *
                           legLengthScale * kickEfficiency * groundBoost;
-
-    //================================
-    // 姿勢から方向だけ決める
-    //================================
     float tiltDiff = npc.bodyTilt - npcIdealRunTilt;
-
-    float forwardRatio = 0.5f - tiltDiff * 0.25f;
-    float upwardRatio = 0.5f + tiltDiff * 0.25f;
+    float forwardRatio = std::clamp(0.5f - tiltDiff * 0.25f, 0.15f, 1.50f);
+    float upwardRatio = std::clamp(0.5f + tiltDiff * 0.25f, 0.15f, 1.50f);
 
     if (tiltDiff > 0.0f) {
       float backwardPenalty = std::clamp(tiltDiff / 0.22f, 0.0f, 1.0f);
       forwardRatio *= (1.0f - backwardPenalty * 0.55f);
     }
 
-    forwardRatio = std::clamp(forwardRatio, 0.15f, 1.50f);
-    upwardRatio = std::clamp(upwardRatio, 0.15f, 1.50f);
-
     float dirLen =
         std::sqrt(forwardRatio * forwardRatio + upwardRatio * upwardRatio);
-
     if (dirLen > 0.0001f) {
       forwardRatio /= dirLen;
       upwardRatio /= dirLen;
-    } else {
-      forwardRatio = 0.707f;
-      upwardRatio = 0.707f;
     }
 
-    float pushX = pushMagnitude * forwardRatio;
-    float pushY = pushMagnitude * upwardRatio;
-
-    npc.velocityX += pushX;
-    npc.velocityY += pushY;
+    npc.velocityX += pushMagnitude * forwardRatio;
+    npc.velocityY += pushMagnitude * upwardRatio;
   }
 
   //================================
-  // 姿勢更新
+  // 速度と姿勢の最終更新
   //================================
   float tiltDamping =
       std::clamp(0.82f + (avgTorsoScale - 1.0f) * 0.08f, 0.76f, 0.92f);
@@ -6975,68 +6958,43 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc) {
 
   float headTiltRangeFactor =
       std::clamp(1.0f + (headScale - 1.0f) * 1.60f, 1.0f, 3.20f);
-
   float torsoTiltRangeFactor =
       std::clamp(1.0f - (avgTorsoScale - 1.0f) * 0.45f, 0.65f, 1.10f);
 
-  float dynamicForwardTilt =
-      maxForwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor;
-  float dynamicBackwardTilt =
-      maxBackwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor;
-
   npc.bodyTilt += npc.bodyTiltVelocity;
   npc.bodyTilt =
-      std::clamp(npc.bodyTilt, dynamicForwardTilt, dynamicBackwardTilt);
+      std::clamp(npc.bodyTilt,
+                 maxForwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor,
+                 maxBackwardTilt_ * headTiltRangeFactor * torsoTiltRangeFactor);
 
+  // 起き上がり処理
   if (std::abs(npc.bodyTilt) > npcRecoverStartTilt) {
     float recoverPower = 0.010f * headRecoveryPenalty * torsoStabilityScale;
-
-    if (std::abs(npc.bodyTilt) > npcHeavyFallTilt) {
+    if (std::abs(npc.bodyTilt) > 0.65f) { // 重度の転倒
       recoverPower *= 1.4f;
       npc.velocityX *= 0.96f;
     }
-
     npc.bodyTiltVelocity +=
         (npcRecoverTargetTilt - npc.bodyTilt) * recoverPower;
   }
 
-  //================================
-  // 速度更新
-  //================================
+  // 移動更新
   npc.velocityX *= inertia_;
   npc.velocityX = std::clamp(npc.velocityX, -1.2f * maxSpeed, 1.2f * maxSpeed);
 
   npc.moveX += npc.velocityX;
-
   npc.velocityY -= gravity_;
   npc.moveY += npc.velocityY;
-
-  //================================
-  // 着地更新
-  //================================
-  if (npc.moveY <= npcGroundY) {
-    npc.moveY = npcGroundY;
-    npc.velocityY = 0.0f;
-    npc.isGrounded = true;
-  } else {
-    npc.isGrounded = false;
-  }
-
-  bool justLanded = (!wasGrounded && npc.isGrounded);
-
-  if (justLanded) {
-    npc.landTimer = 0.0f;
-    npc.leftLegBendSpeed = 0.0f;
-    npc.rightLegBendSpeed = 0.0f;
-  } else if (npc.isGrounded) {
-    npc.landTimer += system_->GetDeltaTime();
-  } else {
-    npc.landTimer = 999.0f;
-  }
 }
 
 void TravelScene::UpdateNpcRunners(float deltaTime) {
-  for (auto &npc : npcRunners_) {
+  static float speedLogTimer = 0.0f;
+  static std::array<float, 4> prevMoveX = {-18.0f, -18.0f, -18.0f, -18.0f};
+
+  speedLogTimer += deltaTime;
+
+  for (size_t i = 0; i < npcRunners_.size(); ++i) {
+    auto &npc = npcRunners_[i];
 
     if (!npc.started) {
       npc.startDelay -= deltaTime;
@@ -7051,7 +7009,13 @@ void TravelScene::UpdateNpcRunners(float deltaTime) {
     }
 
     UpdateNpcInput(npc, deltaTime);
-    UpdateNpcMovement(npc);
+    UpdateNpcMovement(npc, deltaTime);
+
+    if (speedLogTimer >= 1.0f) {
+      float deltaX = npc.moveX - prevMoveX[i];
+
+      prevMoveX[i] = npc.moveX;
+    }
 
     if (npc.moveX >= goalX_) {
       npc.finished = true;
@@ -7068,6 +7032,10 @@ void TravelScene::UpdateNpcRunners(float deltaTime) {
                                                            npc.moveX};
       npc.debugObject->Update(usingCamera_);
     }
+  }
+
+  if (speedLogTimer >= 1.0f) {
+    speedLogTimer = 0.0f;
   }
 }
 
@@ -7177,14 +7145,14 @@ std::unique_ptr<ModBodyCustomizeData> TravelScene::CreateNpcPresetDefault() {
     return nullptr;
   }
 
-  Logger::Log("NPC PRESET DEFAULT partInstances=%d snapshots=%d",
-              (int)data->partInstances.size(),
-              (int)data->controlPointSnapshots.size());
+  // Logger::Log("NPC PRESET DEFAULT partInstances=%d snapshots=%d",
+  //             (int)data->partInstances.size(),
+  //             (int)data->controlPointSnapshots.size());
 
-  for (const auto &inst : data->partInstances) {
-    Logger::Log("NPC PRESET partType=%d partId=%d parentId=%d",
-                (int)inst.partType, inst.partId, inst.parentId);
-  }
+  // for (const auto &inst : data->partInstances) {
+  //   Logger::Log("NPC PRESET partType=%d partId=%d parentId=%d",
+  //               (int)inst.partType, inst.partId, inst.parentId);
+  // }
 
   return data;
 }
@@ -7401,6 +7369,25 @@ void TravelScene::ClearNpcCustomizedVisual(NpcRunner &npc) {
   npc.useCustomizedVisual = false;
 }
 
+void TravelScene::SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime) {
+  const float simDeltaTime = 1.0f / 60.0f;
+  float remain = elapsedTime;
+
+  while (remain > 0.0f) {
+    float dt = (remain < simDeltaTime) ? remain : simDeltaTime;
+
+    UpdateNpcInput(npc, dt);
+    UpdateNpcMovement(npc, dt);
+
+    if (npc.moveX >= goalX_) {
+      npc.finished = true;
+      break;
+    }
+
+    remain -= dt;
+  }
+}
+
 void TravelScene::BuildNpcCustomizedVisual(NpcRunner &npc) {
   for (size_t i = 0; i < npc.modObjects.size(); ++i) {
     if (npc.modObjects[i] != nullptr) {
@@ -7451,14 +7438,14 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   const float neckLength = SafePartLength(neck);
 
   const float leftUpperArmLength = SafePartLength(leftUpperArm);
-  const float leftForeArmLength = SafePartLength(leftForeArm);
+  const float leftForeArmLength = SafePartLength(leftForeArm) * 2.0f;
   const float rightUpperArmLength = SafePartLength(rightUpperArm);
-  const float rightForeArmLength = SafePartLength(rightForeArm);
+  const float rightForeArmLength = SafePartLength(rightForeArm) * 2.0f;
 
-  const float leftThighLength = SafePartLength(leftThigh);
-  const float leftShinLength = SafePartLength(leftShin);
-  const float rightThighLength = SafePartLength(rightThigh);
-  const float rightShinLength = SafePartLength(rightShin);
+  const float leftThighLength = SafePartLength(leftThigh) * 2.0f;
+  const float leftShinLength = SafePartLength(leftShin) * 2.0f;
+  const float rightThighLength = SafePartLength(rightThigh) * 2.0f;
+  const float rightShinLength = SafePartLength(rightShin) * 2.0f;
 
   //==============================
   // bend の中間を基準に使う
@@ -7514,42 +7501,57 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   chestBody->mainPosition.transform.translate.z = npc.moveX;
   chestBody->mainPosition.transform.rotate = {-npc.bodyTilt, 0.0f, 0.0f};
 
+  if (!chestBody->objectParts_.empty()) {
+    chestBody->objectParts_[0].transform.translate = {0.0f, chestLength * 0.5f,
+                                                      0.0f};
+    float torsoTotalHeight = (chestLength + stomachLength) * 0.8f;
+    chestBody->mainPosition.transform.translate.y =
+        npc.moveY + torsoTotalHeight;
+  }
+
   //==============================
   // 腹
   //==============================
-  stomachBody->mainPosition.transform.translate = {0.0f, -chestLength * 0.78f,
+  stomachBody->mainPosition.transform.translate = {0.0f, -chestLength * 2.0f,
                                                    0.0f};
   stomachBody->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+
+  if (!stomachBody->objectParts_.empty()) {
+    stomachBody->objectParts_[0].transform.translate = {0.0f, 1.5f, 0.0f};
+
+    float chestToStomachOffset = (chestLength + stomachLength) * 0.4f;
+    stomachBody->mainPosition.transform.translate = {
+        0.0f, -chestToStomachOffset, 0.0f};
+  }
 
   //==============================
   // 首・頭
   //==============================
-  const Vector3 neckBaseLocal = {0.0f, chestLength * 0.72f, 0.0f};
+  const Vector3 neckBaseLocal = {0.0f, chestLength * 0.5f, 0.0f};
 
   neck->mainPosition.transform.translate = neckBaseLocal;
   neck->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
-  head->mainPosition.transform.translate = {
-      0.0f, neckLength * 0.62f * neckHeightScale, 0.0f};
+  head->mainPosition.transform.translate = {0.0f, neckLength * 0.05f, 0.0f};
   head->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
 
   //==============================
   // 肩位置
   //==============================
   const Vector3 leftShoulderLocal = {
-      -0.52f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
+      -1.5f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
 
   const Vector3 rightShoulderLocal = {
-      0.52f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
+      1.5f * chestWidthScale, chestLength * 0.32f * chestHeightScale, 0.0f};
 
   //==============================
   // 股関節位置
   //==============================
-  const Vector3 leftHipLocal = {-0.30f * stomachWidthScale,
+  const Vector3 leftHipLocal = {-0.5f * stomachWidthScale,
                                 -stomachLength * 0.28f * stomachHeightScale,
                                 0.0f};
 
-  const Vector3 rightHipLocal = {0.30f * stomachWidthScale,
+  const Vector3 rightHipLocal = {0.5f * stomachWidthScale,
                                  -stomachLength * 0.28f * stomachHeightScale,
                                  0.0f};
 
@@ -7569,6 +7571,85 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   Vector3 rightKneeLocal =
       BuildAnimatedChildRoot(rightHipLocal, rightThighRotX, rightThighLength);
 
+  Vector3 leftHandLocal = BuildAnimatedChildRoot(
+      leftElbowLocal, leftUpperArmRotX, leftForeArmLength);
+
+  Vector3 rightHandLocal = BuildAnimatedChildRoot(
+      rightElbowLocal, rightUpperArmRotX, rightForeArmLength);
+
+  Vector3 leftFootLocal =
+      BuildAnimatedChildRoot(leftKneeLocal, leftThighRotX, leftShinLength);
+
+  Vector3 rightFootLocal =
+      BuildAnimatedChildRoot(rightKneeLocal, rightThighRotX, rightShinLength);
+
+  auto Add = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
+    return {a.x + b.x, a.y + b.y, a.z + b.z};
+  };
+
+  auto SetNpcDebugMarker = [&](int index, const Vector3 &worldPos) {
+    if (index < 0 || index >= static_cast<int>(npcDebugCpObjects_.size())) {
+      return;
+    }
+
+    Object *obj = npcDebugCpObjects_[index];
+    if (obj == nullptr) {
+      return;
+    }
+
+    obj->mainPosition.transform.translate = worldPos;
+    obj->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+    obj->Update(usingCamera_);
+  };
+
+  const Vector3 chestWorld = chestBody->mainPosition.transform.translate;
+  const Vector3 stomachWorld =
+      Add(chestWorld, stomachBody->mainPosition.transform.translate);
+
+  const Vector3 neckBaseWorld = Add(chestWorld, neckBaseLocal);
+  const Vector3 headAnchorWorld =
+      Add(neckBaseWorld, head->mainPosition.transform.translate);
+
+  const Vector3 leftShoulderWorld = Add(chestWorld, leftShoulderLocal);
+  const Vector3 rightShoulderWorld = Add(chestWorld, rightShoulderLocal);
+
+  const Vector3 leftElbowWorld = Add(chestWorld, leftElbowLocal);
+  const Vector3 rightElbowWorld = Add(chestWorld, rightElbowLocal);
+
+  const Vector3 leftHandWorld = Add(chestWorld, leftHandLocal);
+  const Vector3 rightHandWorld = Add(chestWorld, rightHandLocal);
+
+  const Vector3 leftHipWorld = Add(stomachWorld, leftHipLocal);
+  const Vector3 rightHipWorld = Add(stomachWorld, rightHipLocal);
+
+  const Vector3 leftKneeWorld = Add(stomachWorld, leftKneeLocal);
+  const Vector3 rightKneeWorld = Add(stomachWorld, rightKneeLocal);
+
+  const Vector3 leftFootWorld = Add(stomachWorld, leftFootLocal);
+  const Vector3 rightFootWorld = Add(stomachWorld, rightFootLocal);
+
+  SetNpcDebugMarker(0, neckBaseWorld);
+  SetNpcDebugMarker(1, headAnchorWorld);
+
+  SetNpcDebugMarker(2, leftShoulderWorld);
+  SetNpcDebugMarker(3, leftElbowWorld);
+  SetNpcDebugMarker(4, leftHandWorld);
+
+  SetNpcDebugMarker(5, rightShoulderWorld);
+  SetNpcDebugMarker(6, rightElbowWorld);
+  SetNpcDebugMarker(7, rightHandWorld);
+
+  SetNpcDebugMarker(8, leftHipWorld);
+  SetNpcDebugMarker(9, leftKneeWorld);
+  SetNpcDebugMarker(10, leftFootWorld);
+
+  SetNpcDebugMarker(11, rightHipWorld);
+  SetNpcDebugMarker(12, rightKneeWorld);
+  SetNpcDebugMarker(13, rightFootWorld);
+
+  SetNpcDebugMarker(14, chestWorld);
+  SetNpcDebugMarker(15, stomachWorld);
+
   //==============================
   // 上腕
   //==============================
@@ -7580,13 +7661,13 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
                                                   0.0f};
 
   if (!leftUpperArm->objectParts_.empty()) {
-    leftUpperArm->objectParts_[0].transform.translate = {
-        0.0f, -leftUpperArmLength * 0.5f, 0.0f};
+    leftUpperArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //  leftUpperArm->objectParts_[0].transform.scale = {1.0f, 0.8f, 1.0f};
   }
 
   if (!rightUpperArm->objectParts_.empty()) {
-    rightUpperArm->objectParts_[0].transform.translate = {
-        0.0f, -rightUpperArmLength * 0.5f, 0.0f};
+    rightUpperArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //   rightUpperArm->objectParts_[0].transform.scale = {1.0f, 0.8f, 1.0f};
   }
 
   //==============================
@@ -7601,13 +7682,13 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
                                                  0.0f, 0.0f};
 
   if (!leftForeArm->objectParts_.empty()) {
-    leftForeArm->objectParts_[0].transform.translate = {
-        0.0f, -leftForeArmLength * 0.5f, 0.0f};
+    leftForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //  leftForeArm->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
 
   if (!rightForeArm->objectParts_.empty()) {
-    rightForeArm->objectParts_[0].transform.translate = {
-        0.0f, -rightForeArmLength * 0.5f, 0.0f};
+    rightForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //   rightForeArm->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
 
   //==============================
@@ -7620,13 +7701,13 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   rightThigh->mainPosition.transform.rotate = {rightThighRotX, 0.0f, 0.0f};
 
   if (!leftThigh->objectParts_.empty()) {
-    leftThigh->objectParts_[0].transform.translate = {
-        0.0f, -leftThighLength * 0.5f, 0.0f};
+    leftThigh->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //  leftThigh->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
 
   if (!rightThigh->objectParts_.empty()) {
-    rightThigh->objectParts_[0].transform.translate = {
-        0.0f, -rightThighLength * 0.5f, 0.0f};
+    rightThigh->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    //  rightThigh->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
 
   //==============================
@@ -7640,14 +7721,25 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
                                               0.0f};
 
   if (!leftShin->objectParts_.empty()) {
-    leftShin->objectParts_[0].transform.translate = {
-        0.0f, -leftShinLength * 0.5f, 0.0f};
+    leftShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    // leftShin->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
 
   if (!rightShin->objectParts_.empty()) {
-    rightShin->objectParts_[0].transform.translate = {
-        0.0f, -rightShinLength * 0.5f, 0.0f};
+    rightShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+    // rightShin->objectParts_[0].transform.scale = {1.0f, 0.5f, 1.0f};
   }
+
+  auto SafePartRadius = [](Object *obj) -> float {
+    if (obj == nullptr || obj->objectParts_.empty()) {
+      return 0.1f;
+    }
+    return (std::max)(0.01f, obj->objectParts_[0].transform.scale.x * 0.5f);
+  };
+
+  // 当たり判定用
+  npc.leftFootWorld = leftFootWorld;
+  npc.rightFootWorld = rightFootWorld;
 
   //==============================
   // 反映
