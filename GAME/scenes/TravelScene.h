@@ -441,6 +441,7 @@ private:
 
     float startDelay = 0.0f;
     bool started = false;
+    float headStartSpeed = 2.0f;
 
     float inputHoldTimer = 0.0f;
     bool inputLeftActive = false;
@@ -469,6 +470,12 @@ private:
     std::vector<Object *> extraObjects;
 
     bool visualInitialized = false;
+
+    Vector3 leftFootWorld = {};
+    Vector3 rightFootWorld = {};
+    float leftFootRadius = 1.0f;
+    float rightFootRadius = 1.0f;
+
   };
 
   std::vector<NpcRunner> npcRunners_;
@@ -477,7 +484,7 @@ private:
   void InitializeNpcRunners();
   void UpdateNpcRunners(float deltaTime);
   void UpdateNpcInput(NpcRunner &npc, float deltaTime);
-  void UpdateNpcMovement(NpcRunner &npc);
+  void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
 
   // 順位
   struct RaceEntry {
@@ -522,7 +529,11 @@ private:
   void UpdateNpcCustomizedVisual(NpcRunner &npc);
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);
+  void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
 
   // Particle
   std::unique_ptr<Perfect_Particle> perfectParticle_;
+
+  std::array<Object *, 16> npcDebugCpObjects_{};
+  bool showNpcModel_ = true;
 };
