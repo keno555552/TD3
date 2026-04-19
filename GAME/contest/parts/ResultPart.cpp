@@ -19,6 +19,8 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 		scoreResult_.starCommitment,
 		scoreResult_.starEfficiency,
 		scoreResult_.starJudgeBonus);
+
+	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
 }
 
 ResultPart::~ResultPart() {
@@ -92,6 +94,11 @@ void ResultPart::Draw() {
 
 bool ResultPart::IsFinished() const {
 	return isFinished_;
+}
+
+PartCameraTransform ResultPart::GetCameraTransform() const
+{
+	return cameraTransform_;
 }
 
 void ResultPart::UpdateStarChart() {

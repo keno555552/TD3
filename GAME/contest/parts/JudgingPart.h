@@ -23,8 +23,12 @@ private:
 	const ScoreResult& scoreResult_;
 	const std::vector<JudgeCommentResult>& judgeCommentResults_;
 
+	PartCameraTransform GetCameraTransform() const override;
+
 	int currentJudgeIndex_ = 0;
 	bool isFinished_ = false;
+
+	PartCameraTransform cameraTransforms_[3]; // 審査員ごとのカメラ
 
 	/// ★を文字列に変換
 	static std::string StarsToString(int stars);

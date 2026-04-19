@@ -35,6 +35,10 @@ private:
 	ResultStep step_ = ResultStep::StarsAndChart;
 	bool isFinished_ = false;
 
+	PartCameraTransform cameraTransform_;
+
+	PartCameraTransform GetCameraTransform() const override;
+
 	/// 五芒星レーダーチャート
 	StarChart starChart_;
 

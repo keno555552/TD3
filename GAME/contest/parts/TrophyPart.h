@@ -30,5 +30,9 @@ public:
 	TrophyChoice GetChoice() const;
 
 private:
+	PartCameraTransform GetCameraTransform() const override;
+
+	PartCameraTransform cameraTransform_;
+
 	TrophyChoice choice_ = TrophyChoice::None;
 };

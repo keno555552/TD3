@@ -2,7 +2,10 @@
 #include "kEngine.h"
 
 TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
-	: IContestPart(system, font) {
+	: IContestPart(system, font) 
+{
+	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
+
 }
 
 void TrophyPart::Update() {
@@ -49,4 +52,9 @@ bool TrophyPart::IsFinished() const {
 
 TrophyChoice TrophyPart::GetChoice() const {
 	return choice_;
+}
+
+PartCameraTransform TrophyPart::GetCameraTransform() const
+{
+	return cameraTransform_;
 }

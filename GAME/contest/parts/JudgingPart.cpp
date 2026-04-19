@@ -7,7 +7,12 @@ JudgingPart::JudgingPart(kEngine* system, BitmapFont* font,
 	const std::vector<JudgeCommentResult>& judgeCommentResults)
 	: IContestPart(system, font)
 	, scoreResult_(scoreResult)
-	, judgeCommentResults_(judgeCommentResults) {
+	, judgeCommentResults_(judgeCommentResults) 
+{
+	// 審査員ごとのカメラ位置（後でImGuiで調整）
+	cameraTransforms_[0] = { { -2.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransforms_[1] = { {  0.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransforms_[2] = { {  2.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
 }
 
 void JudgingPart::Update() {
@@ -57,6 +62,13 @@ void JudgingPart::Draw() {
 		}
 	}
 
+	ImGui::Separator();
+	ImGui::Text("Camera (Judge %d):", currentJudgeIndex_ + 1);
+	ImGui::DragFloat3("Pos##judging",
+		&cameraTransforms_[currentJudgeIndex_].position.x, 0.1f);
+	ImGui::DragFloat3("Rot##judging",
+		&cameraTransforms_[currentJudgeIndex_].rotation.x, 0.01f);
+
 	ImGui::Spacing();
 	if (!isFinished_) {
 		ImGui::Text("Press SPACE for next judge");
@@ -68,6 +80,14 @@ void JudgingPart::Draw() {
 
 bool JudgingPart::IsFinished() const {
 	return isFinished_;
+}
+
+PartCameraTransform JudgingPart::GetCameraTransform() const
+{
+	if (currentJudgeIndex_ >= 0 && currentJudgeIndex_ < 3) {
+		return cameraTransforms_[currentJudgeIndex_];
+	}
+	return cameraTransforms_[0];
 }
 
 std::string JudgingPart::StarsToString(int stars) {
