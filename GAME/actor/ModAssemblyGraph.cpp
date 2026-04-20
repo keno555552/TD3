@@ -34,6 +34,32 @@ float ClampScale(float v) {
 
 } // namespace
 
+void ModAssemblyGraph::Clear() {
+  nodes_.clear();
+  nextPartId_ = 1;
+  nextConnectorId_ = 1;
+  bodyId_ = -1;
+  headId_ = -1;
+  neckId_ = -1;
+}
+
+void ModAssemblyGraph::AddNode(const PartNode &node) {
+  nodes_[node.id] = node;
+
+  if (node.id >= nextPartId_) {
+    nextPartId_ = node.id + 1;
+  }
+
+  for (size_t i = 0; i < node.connectors.size(); ++i) {
+    const int connectorId = node.connectors[i].id;
+    if (connectorId >= nextConnectorId_) {
+      nextConnectorId_ = connectorId + 1;
+    }
+  }
+
+  RefreshManagedPartIds();
+}
+
 Vector3 ModAssemblyGraph::MakeDefaultLocalTranslate(ModBodyPart part,
                                                     PartSide side) const {
   switch (part) {

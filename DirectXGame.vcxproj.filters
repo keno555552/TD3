@@ -181,6 +181,8 @@
     <ClCompile Include="GAME\contest\parts\TrophyPart.cpp" />
     <ClCompile Include="GAME\contest\ui\StarChart.cpp" />
     <ClCompile Include="GAME\font\BitmapFont.cpp" />
+    <ClCompile Include="GAME\effect\Perfect_Particle.cpp" />
+    <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="GAME\actor\ControlPointChain.h" />
@@ -436,6 +438,8 @@
     <ClInclude Include="GAME\contest\parts\TrophyPart.h" />
     <ClInclude Include="GAME\contest\ui\StarChart.h" />
     <ClInclude Include="GAME\font\BitmapFont.h" />
+    <ClInclude Include="GAME\effect\Perfect_Particle.h" />
+    <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="externals\assimp\include\assimp\color4.inl" />
