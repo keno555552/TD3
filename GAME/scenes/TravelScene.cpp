@@ -6522,10 +6522,14 @@ void TravelScene::InitializeNpcRunners() {
 
     npcRunners_[i].bodyTilt = 0.0f;
     npcRunners_[i].bodyTiltVelocity = 0.0f;
-    npcRunners_[i].landTimer = 999.0f;
+    npcRunners_[i].landTimer = 0.0f;
 
     npcRunners_[i].leftInput = false;
     npcRunners_[i].rightInput = false;
+
+    npcRunners_[i].kickThisFrame = false;
+    npcRunners_[i].kickSideThisFrame = 0;
+
     npcRunners_[i].isGrounded = true;
     npcRunners_[i].finished = false;
     npcRunners_[i].finishRank = -1;
@@ -6543,6 +6547,8 @@ void TravelScene::InitializeNpcRunners() {
     npcRunners_[i].timingSkill = 1.0f;
     npcRunners_[i].headStartSpeed = 2.0f * npcRunners_[i].timingSkill;
 
+    npcRunners_[i].kickedThisAirborne = false;
+
     //==============================
     // ModScene から開始状態を受け取る
     //==============================
@@ -6559,8 +6565,8 @@ void TravelScene::InitializeNpcRunners() {
         npcRunners_[i].started = true;
         npcRunners_[i].startDelay = 0.0f;
 
-        SimulateNpcHeadStart(npcRunners_[i], progress.moveElapsedTime);
-
+        SimulateNpcHeadStart(npcRunners_[i], progress.moveElapsedTime,
+                             static_cast<int>(i));
       } else {
         npcRunners_[i].started = false;
 
@@ -6624,15 +6630,47 @@ void TravelScene::InitializeNpcRunners() {
     npcRunners_[i].visualInitialized = false;
     npcRunners_[i].customizeData = std::move(preset);
 
+    //==============================
+    // 脚長から接地オフセット計算
+    //==============================
+    if (npcRunners_[i].customizeData != nullptr) {
+      const auto &leftThigh =
+          npcRunners_[i]
+              .customizeData->partParams[ToIndex(ModBodyPart::LeftThigh)];
+      const auto &rightThigh =
+          npcRunners_[i]
+              .customizeData->partParams[ToIndex(ModBodyPart::RightThigh)];
+      const auto &leftShin =
+          npcRunners_[i]
+              .customizeData->partParams[ToIndex(ModBodyPart::LeftShin)];
+      const auto &rightShin =
+          npcRunners_[i]
+              .customizeData->partParams[ToIndex(ModBodyPart::RightShin)];
+
+      float avgThigh = (leftThigh.scale.y + rightThigh.scale.y) * 0.5f;
+      float avgShin = (leftShin.scale.y + rightShin.scale.y) * 0.5f;
+
+      float legScale = (avgThigh + avgShin) * 0.5f;
+
+      npcRunners_[i].legGroundOffset = 3.5f * legScale;
+    } else {
+      npcRunners_[i].legGroundOffset = 3.5f;
+    }
+
     if (npcRunners_[i].customizeData != nullptr) {
       SetupNpcCustomizedVisual(npcRunners_[i]);
     }
   }
 }
 
-void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
+void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime,
+                                 int npcIndex) {
   npc.leftInput = false;
   npc.rightInput = false;
+
+  // 物理用の蹴りフラグは毎フレームリセット
+  npc.kickThisFrame = false;
+  npc.kickSideThisFrame = 0;
 
   const float perfectTimingEnd = 0.08f * 0.45f;
   const float bestTimingEnd = 0.08f;
@@ -6640,13 +6678,21 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
 
   bool justLanded = (!npc.prevGrounded && npc.isGrounded);
 
+  if (npc.isKickHolding || npc.leftInput || npc.rightInput) {
+    Logger::Log("NPC[%d] INPUT | hold=%d L=%d R=%d prevGround=%d nowGround=%d",
+                npcIndex, npc.isKickHolding ? 1 : 0, npc.leftInput ? 1 : 0,
+                npc.rightInput ? 1 : 0, npc.prevGrounded ? 1 : 0,
+                npc.isGrounded ? 1 : 0);
+  }
+
   //==============================
-  // 着地した瞬間に「今回いつ蹴るか」を決める
-  // timingSkill が高いほど Perfect を引きやすい
+  // 着地した瞬間に今回のキック計画を作る
+  // ここで「この着地中にはまだ蹴っていない」状態に戻す
   //==============================
   if (justLanded) {
     npc.isKickHolding = false;
     npc.hasKickPlan = true;
+    npc.kickedThisAirborne = false;
 
     float skill = std::clamp(npc.timingSkill, 0.70f, 1.30f);
     float skill01 = std::clamp((skill - 0.70f) / (1.30f - 0.70f), 0.0f, 1.0f);
@@ -6663,18 +6709,19 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
 
     if (roll < perfectWeight) {
       npc.targetKickTime = RandomFloat(0.0f, perfectTimingEnd * 0.95f);
-      npc.lastTimingResult = 1; // Perfect狙い
+      npc.lastTimingResult = 1;
     } else if (roll < perfectWeight + goodWeight) {
       npc.targetKickTime = RandomFloat(perfectTimingEnd, bestTimingEnd);
-      npc.lastTimingResult = 2; // Good狙い
+      npc.lastTimingResult = 2;
     } else {
       npc.targetKickTime = RandomFloat(bestTimingEnd, lateTimingEnd + 0.05f);
-      npc.lastTimingResult = 3; // Bad狙い
+      npc.lastTimingResult = 3;
     }
   }
 
   //==============================
-  // いま蹴った足を着地まで保持中
+  // 蹴った足を空中の間だけ保持
+  // 地面に触れたら保持終了
   //==============================
   if (npc.isKickHolding) {
     if (npc.kickHoldLeft) {
@@ -6685,11 +6732,13 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
       npc.rightInput = true;
     }
 
-    // 着地した瞬間だけ保持終了
-    if (justLanded) {
+    // 地面に触れても少しだけ見た目保持を続ける
+    if (npc.isGrounded && npc.landTimer >= 0.08f) {
       npc.isKickHolding = false;
       npc.leftInput = false;
       npc.rightInput = false;
+      npc.prevGrounded = npc.isGrounded;
+      return;
     }
 
     npc.prevGrounded = npc.isGrounded;
@@ -6705,8 +6754,7 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
   }
 
   //==============================
-  // まだ今回の蹴り予定が無いなら、最低限作る
-  // （初回や保険）
+  // 初回や保険で計画が無ければ作る
   //==============================
   if (!npc.hasKickPlan) {
     npc.hasKickPlan = true;
@@ -6715,27 +6763,32 @@ void TravelScene::UpdateNpcInput(NpcRunner &npc, float deltaTime) {
   }
 
   //==============================
-  // 狙いタイミングが来たら蹴る
-  // 左右交互
+  // 1着地につき1回だけ蹴る
   //==============================
-  if (npc.landTimer >= npc.targetKickTime) {
+  if (!npc.kickedThisAirborne && npc.landTimer >= npc.targetKickTime) {
     npc.kickHoldLeft = !npc.kickHoldLeft;
     npc.isKickHolding = true;
     npc.hasKickPlan = false;
+    npc.kickedThisAirborne = true;
 
     if (npc.kickHoldLeft) {
       npc.leftInput = true;
       npc.rightInput = false;
+      npc.kickThisFrame = true;
+      npc.kickSideThisFrame = -1;
     } else {
       npc.leftInput = false;
       npc.rightInput = true;
+      npc.kickThisFrame = true;
+      npc.kickSideThisFrame = 1;
     }
   }
 
   npc.prevGrounded = npc.isGrounded;
 }
 
-void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
+void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime,
+                                    int npcIndex) {
   // 前フレームの接地状態を保存
   bool wasGrounded = npc.isGrounded;
 
@@ -6768,33 +6821,26 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
   // 物理判定と接地更新
   // 見た目で使っている足先ワールド座標をそのまま使う
   //================================
-  if (npc.useCustomizedVisual) {
-    const float leftFootBottomY = npc.leftFootWorld.y - npc.leftFootRadius;
-    const float rightFootBottomY = npc.rightFootWorld.y - npc.rightFootRadius;
-    const float lowestFootY = (std::min)(leftFootBottomY, rightFootBottomY);
-
-    const float groundEpsilon = 0.01f;
-
-    if (lowestFootY <= groundY_ + groundEpsilon) {
-      const float pushUp = groundY_ - lowestFootY;
-      npc.moveY += pushUp;
-      npc.velocityY = 0.0f;
-      npc.isGrounded = true;
-    } else {
-      npc.isGrounded = false;
-    }
+  if (npc.moveY <= groundY_ + npc.legGroundOffset) {
+    npc.moveY = groundY_ + npc.legGroundOffset;
+    npc.velocityY = 0.0f;
+    npc.isGrounded = true;
   } else {
-    if (npc.moveY <= groundY_) {
-      npc.moveY = groundY_;
-      npc.velocityY = 0.0f;
-      npc.isGrounded = true;
-    } else {
-      npc.isGrounded = false;
-    }
+    npc.isGrounded = false;
   }
 
   // 着地タイマー更新 (これが Input 側の判定タイミングになる)
   bool justLanded = (!wasGrounded && npc.isGrounded);
+
+  if (justLanded) {
+    Logger::Log("NPC[%d] LAND | L=%d R=%d hold=%d kickHoldLeft=%d velX=%.3f "
+                "velY=%.3f landTimer=%.3f wasGround=%d nowGround=%d",
+                npcIndex, npc.leftInput ? 1 : 0, npc.rightInput ? 1 : 0,
+                npc.isKickHolding ? 1 : 0, npc.kickHoldLeft ? 1 : 0,
+                npc.velocityX, npc.velocityY, npc.landTimer,
+                wasGrounded ? 1 : 0, npc.isGrounded ? 1 : 0);
+  }
+
   if (justLanded) {
     npc.landTimer = 0.0f;
     npc.leftLegBendSpeed = 0.0f;
@@ -6863,7 +6909,7 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
   //================================
   // 蹴り（加速と姿勢変化）
   //================================
-  bool doKick = npc.isGrounded && (npc.leftInput || npc.rightInput);
+  bool doKick = npc.isGrounded && npc.kickThisFrame;
 
   if (doKick) {
     float avgLegScaleY = 1.0f;
@@ -6883,7 +6929,12 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
 
     float legLengthScale =
         std::clamp(1.0f + (avgLegScaleY - 1.0f) * 0.45f, 0.70f, 2.0f);
-    float kickLegBend = npc.leftInput ? npc.leftLegBend : npc.rightLegBend;
+    float kickLegBend = 0.0f;
+    if (npc.kickSideThisFrame == -1) {
+      kickLegBend = npc.leftLegBend;
+    } else if (npc.kickSideThisFrame == 1) {
+      kickLegBend = npc.rightLegBend;
+    }
     float kickLegForwardness =
         1.0f - std::clamp((kickLegBend - legKickAngle_) /
                               (legRecoverAngle_ - legKickAngle_),
@@ -6947,6 +6998,12 @@ void TravelScene::UpdateNpcMovement(NpcRunner &npc, float deltaTime) {
 
     npc.velocityX += pushMagnitude * forwardRatio;
     npc.velocityY += pushMagnitude * upwardRatio;
+
+    Logger::Log("NPC[%d] PUSH | kick=%d side=%d hold=%d kickHoldLeft=%d "
+                "velX=%.3f velY=%.3f landTimer=%.3f",
+                npcIndex, npc.kickThisFrame ? 1 : 0, npc.kickSideThisFrame,
+                npc.isKickHolding ? 1 : 0, npc.kickHoldLeft ? 1 : 0,
+                npc.velocityX, npc.velocityY, npc.landTimer);
   }
 
   //================================
@@ -7008,12 +7065,11 @@ void TravelScene::UpdateNpcRunners(float deltaTime) {
       continue;
     }
 
-    UpdateNpcInput(npc, deltaTime);
-    UpdateNpcMovement(npc, deltaTime);
+    UpdateNpcInput(npc, deltaTime, static_cast<int>(i));
+    UpdateNpcMovement(npc, deltaTime, static_cast<int>(i));
 
     if (speedLogTimer >= 1.0f) {
       float deltaX = npc.moveX - prevMoveX[i];
-
       prevMoveX[i] = npc.moveX;
     }
 
@@ -7369,15 +7425,27 @@ void TravelScene::ClearNpcCustomizedVisual(NpcRunner &npc) {
   npc.useCustomizedVisual = false;
 }
 
-void TravelScene::SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime) {
+void TravelScene::SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime,
+                                       int npcIndex) {
   const float simDeltaTime = 1.0f / 60.0f;
   float remain = elapsedTime;
 
   while (remain > 0.0f) {
     float dt = (remain < simDeltaTime) ? remain : simDeltaTime;
 
-    UpdateNpcInput(npc, dt);
-    UpdateNpcMovement(npc, dt);
+    UpdateNpcInput(npc, dt, npcIndex);
+    UpdateNpcMovement(npc, dt, npcIndex);
+
+    static int npcHeadStartLogFrame = 0;
+    npcHeadStartLogFrame++;
+
+    if ((npcHeadStartLogFrame % 20) == 0) {
+      Logger::Log("NPC[%d] HEADSTART | moveX=%.3f moveY=%.3f leftFootY=%.3f "
+                  "rightFootY=%.3f visualInit=%d useCustom=%d",
+                  npcIndex, npc.moveX, npc.moveY, npc.leftFootWorld.y,
+                  npc.rightFootWorld.y, npc.visualInitialized ? 1 : 0,
+                  npc.useCustomizedVisual ? 1 : 0);
+    }
 
     if (npc.moveX >= goalX_) {
       npc.finished = true;
@@ -7740,6 +7808,17 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
   // 当たり判定用
   npc.leftFootWorld = leftFootWorld;
   npc.rightFootWorld = rightFootWorld;
+
+  static int npcVisualLogFrame = 0;
+  npcVisualLogFrame++;
+
+  if ((npcVisualLogFrame % 20) == 0) {
+    Logger::Log("NPC VISUAL FOOT       | moveX=%.3f moveY=%.3f "
+                "leftFoot=(%.3f, %.3f, %.3f) rightFoot=(%.3f, %.3f, %.3f)",
+                npc.moveX, npc.moveY, npc.leftFootWorld.x, npc.leftFootWorld.y,
+                npc.leftFootWorld.z, npc.rightFootWorld.x, npc.rightFootWorld.y,
+                npc.rightFootWorld.z);
+  }
 
   //==============================
   // 反映
