@@ -98,6 +98,9 @@ public:
   /// </summary>
   const ConnectorNode *FindConnector(int partId, int connectorId) const;
 
+  void Clear();
+  void AddNode(const PartNode &node);
+
   /// <summary>
   /// 指定した部位を構造から削除する
   /// 部位種別に応じて、子の付け替えや子ごとの連鎖削除も行う
