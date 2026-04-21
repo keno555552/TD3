@@ -64,6 +64,15 @@ ContestScene::ContestScene(kEngine* system) {
 	SetupSceneObject(floor_, floorModelHandle_,
 		{ 0.0f, 0.0f, -5.0f }, { 0.0f, PI, 0.0f }, objectScale);
 
+	// 審査員
+	judgesModelHandle_ = system_->SetModelObj("GAME/resources/judges/models/judges.obj");
+	judges_.resize(3);
+	SetupSceneObject(judges_[0], judgesModelHandle_,
+		{ -0.25f, 0.16f, -2.0f }, { 0.0f, 0.0f, 0.0f }, {0.03f});
+	SetupSceneObject(judges_[1], judgesModelHandle_,
+		{ 0.0f, 0.16f, -2.0f }, { 0.0f, 0.0f, 0.0f }, { 0.03f });
+	SetupSceneObject(judges_[2], judgesModelHandle_,
+		{ 0.25f, 0.16f, -2.0f }, { 0.0f, 0.0f, 0.0f }, { 0.03f });
 	// 審査員用ステージ
 	judgesStageModelHandle_ = system_->SetModelObj("GAME/resources/ContestStageObject/judgesStage.obj");
 	SetupSceneObject(judgesStage_, judgesStageModelHandle_,
@@ -174,6 +183,8 @@ ContestScene::~ContestScene() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 	system_->RemoveLight(light1_);
+
+	ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
 	delete light1_;
 
@@ -294,6 +305,17 @@ void ContestScene::Draw() {
 		}
 	}
 
+	for (int i = 0; i < (int)judges_.size(); ++i) {
+		char label[32];
+		snprintf(label, sizeof(label), "Judge %d", i);
+		if (ImGui::TreeNode(label)) {
+			ImGui::DragFloat3("Pos", &judges_[i].object->mainPosition.transform.translate.x, 0.1f);
+			ImGui::DragFloat3("Rot", &judges_[i].object->mainPosition.transform.rotate.x, 0.01f);
+			ImGui::DragFloat3("Scale", &judges_[i].object->mainPosition.transform.scale.x, 0.01f);
+			ImGui::TreePop();
+		}
+	}
+
 	for (int i = 0; i < (int)judgesChairs_.size(); ++i) {
 		char label[32];
 		snprintf(label, sizeof(label), "JudgesChair %d", i);
@@ -396,6 +418,13 @@ void ContestScene::Draw() {
 	if(floor_.object) {
 		floor_.object->Update(usingCamera_);
 		floor_.object->Draw();
+	}
+
+	for (auto& judge : judges_) {
+		if (judge.object) {
+			judge.object->Update(usingCamera_);
+			judge.object->Draw();
+		}
 	}
 
 	if(judgesStage_.object) {
