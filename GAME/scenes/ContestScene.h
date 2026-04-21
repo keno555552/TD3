@@ -78,6 +78,9 @@ private:
 	int judgesStageModelHandle_ = 0;
 	SceneObject judgesStage_;
 
+	int judgesModelHandle_ = 0;
+	std::vector<SceneObject> judges_;
+
 	int judgesDeskModelHandle_ = 0;
 	SceneObject judgesDesk_;
 

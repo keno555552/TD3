@@ -20,7 +20,7 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 		scoreResult_.starEfficiency,
 		scoreResult_.starJudgeBonus);
 
-	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.6f, 0.7f, -3.0f }, { 0.0f, 0.0f, 0.0f } };
 }
 
 ResultPart::~ResultPart() {

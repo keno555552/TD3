@@ -4,7 +4,7 @@
 TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
 	: IContestPart(system, font) 
 {
-	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.0f, 1.2f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
 
 }
 
