@@ -14,6 +14,7 @@ ContestScene::ContestScene(kEngine* system) {
 	light1_->intensity = 1.0f;
 	system_->AddLight(light1_);
 
+
 	// カメラ
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
@@ -21,6 +22,16 @@ ContestScene::ContestScene(kEngine* system) {
 	camera_->SetRotation({ 0.15f, 0.0f, 0.0f }); 
 	usingCamera_ = camera_;
 	system_->SetCamera(usingCamera_);
+
+	// 最初のパートを生成
+	phase_ = ContestPhase::ShowOff;
+	currentPart_ = CreatePart(phase_);
+
+	// カメラ初期値を設定
+	if (currentPart_) {
+		cameraTarget_ = currentPart_->GetCameraTransform();
+		cameraCurrent_ = cameraTarget_;
+	}
 
 	fade_.Initialize(system_);
 	fade_.StartFadeIn();
@@ -171,9 +182,6 @@ ContestScene::ContestScene(kEngine* system) {
 	// フォント初期化
 	bitmapFont_.Initialize(system_);
 
-	// 最初のパートを生成
-	phase_ = ContestPhase::ShowOff;
-	currentPart_ = CreatePart(phase_);
 }
 
 ContestScene::~ContestScene() {
@@ -197,14 +205,15 @@ void ContestScene::Update() {
 
 	// フェード中は操作を受け付けない
 	if (!fade_.IsBusy() && currentPart_) {
-		currentPart_->Update();
+		// カメラ補間中はパートの更新をスキップ（入力による遷移を無効にする）
+		if (!isCameraLerping_) {
+			currentPart_->Update();
+		}
 
 		if (currentPart_->IsFinished()) {
 			if (phase_ == ContestPhase::Trophy) {
-				// トロフィーパートの選択結果を処理
 				HandleTrophyChoice();
 			} else {
-				// 次のパートへ遷移
 				AdvancePhase();
 			}
 		}
@@ -565,15 +574,45 @@ void ContestScene::CameraPart() {
 		usingCamera_ = debugCamera_;
 		debugCamera_->MouseControlUpdate();
 	} else {
-
-		// パートからカメラ設定を取得して反映
+		
 		if (currentPart_) {
-			auto camTf = currentPart_->GetCameraTransform();
-			camera_->SetTranslate(camTf.position);
-			camera_->SetRotation(camTf.rotation);
-		}
+			PartCameraTransform target = currentPart_->GetCameraTransform();
 
-		usingCamera_ = camera_;
+			// ターゲットが変わったら補間開始
+			if (target.position.x != cameraTarget_.position.x ||
+				target.position.y != cameraTarget_.position.y ||
+				target.position.z != cameraTarget_.position.z ||
+				target.rotation.x != cameraTarget_.rotation.x ||
+				target.rotation.y != cameraTarget_.rotation.y ||
+				target.rotation.z != cameraTarget_.rotation.z) {
+
+				cameraTarget_ = target;
+				cameraLerpTimer_ = 0.0f;
+				isCameraLerping_ = true;
+			}
+
+			if (isCameraLerping_) {
+				cameraLerpTimer_ += 1.0f / 60.0f;
+				float t = cameraLerpTimer_ / cameraLerpDuration_;
+				if (t >= 1.0f) {
+					t = 1.0f;
+					isCameraLerping_ = false;
+				}
+
+				// 線形補間
+				cameraCurrent_.position.x = cameraCurrent_.position.x + (cameraTarget_.position.x - cameraCurrent_.position.x) * t;
+				cameraCurrent_.position.y = cameraCurrent_.position.y + (cameraTarget_.position.y - cameraCurrent_.position.y) * t;
+				cameraCurrent_.position.z = cameraCurrent_.position.z + (cameraTarget_.position.z - cameraCurrent_.position.z) * t;
+				cameraCurrent_.rotation.x = cameraCurrent_.rotation.x + (cameraTarget_.rotation.x - cameraCurrent_.rotation.x) * t;
+				cameraCurrent_.rotation.y = cameraCurrent_.rotation.y + (cameraTarget_.rotation.y - cameraCurrent_.rotation.y) * t;
+				cameraCurrent_.rotation.z = cameraCurrent_.rotation.z + (cameraTarget_.rotation.z - cameraCurrent_.rotation.z) * t;
+			}
+
+			camera_->SetTranslate(cameraCurrent_.position);
+			camera_->SetRotation(cameraCurrent_.rotation);
+
+			usingCamera_ = camera_;
+		}
 	}
 
 	system_->SetCamera(usingCamera_);

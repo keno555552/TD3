@@ -1,5 +1,6 @@
 #include "ResultPart.h"
 #include "kEngine.h"
+#include "GAME/font/BitmapFont.h"
 
 ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 	const ScoreResult& scoreResult,
@@ -49,6 +50,27 @@ void ResultPart::Update() {
 void ResultPart::Draw() {
 	// 五芒星レーダーチャート描画
 	starChart_.Draw();
+
+	// ランクをフォントで描画（星の中央）
+	if (step_ >= ResultStep::RankAndNickname) {
+		Vector4 rankColor = GetRankColor(scoreResult_.overallRank);
+
+		// ランク（星の中央 900, 360）
+		font_->RenderText(scoreResult_.overallRank,
+			{ 900.0f, 360.0f }, 96.0f,
+			BitmapFont::Align::Center, 4.0f, rankColor);
+
+		// ニックネーム（左上基準 64, 128）
+		if (earnedNickname_.isRare) {
+			font_->RenderText(earnedNickname_.nickname,
+				{ 64.0f, 128.0f }, 64.0f,
+				BitmapFont::Align::Left, 4.0f, rankColor);
+		} else {
+			font_->RenderText(earnedNickname_.nickname,
+				{ 64.0f, 128.0f }, 64.0f,
+				BitmapFont::Align::Left, 4.0f, rankColor);
+		}
+	}
 
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - Result");

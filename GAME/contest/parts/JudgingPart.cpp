@@ -32,7 +32,7 @@ void JudgingPart::Draw() {
 	if (currentJudgeIndex_ < (int)judgeCommentResults_.size()) {
 		font_->RenderText(
 			judgeCommentResults_[currentJudgeIndex_].comment,
-			{ 640.0f, 100.0f }, 64.0f,
+			{ 640.0f, 100.0f }, 48.0f,
 			BitmapFont::Align::Center);
 	}
 

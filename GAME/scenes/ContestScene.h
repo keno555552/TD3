@@ -56,6 +56,15 @@ private:
 	Camera* usingCamera_ = nullptr;
 	bool useDebugCamera_ = false;
 
+	// カメラ補間
+	PartCameraTransform cameraTarget_;
+	PartCameraTransform cameraCurrent_;
+	bool isCameraLerping_ = false;
+	float cameraLerpTimer_ = 0.0f;
+	float cameraLerpDuration_ = 1.0f; // 1秒で移動完了
+
+	bool IsCameraLerping() const { return isCameraLerping_; }
+
 	//========
 	// model
 	//========
