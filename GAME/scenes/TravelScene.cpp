@@ -2560,10 +2560,10 @@ void TravelScene::UpdateSceneTransition() {
   if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = nextOutcome_;
 
-    if (customizeData_ != nullptr) {
-      /*customizeData_->timeLimit_ = timeLimit_;
-      customizeData_->isTimeUp_ = isTimeUp_;*/
-      ModBody::SetSharedCustomizeData(*customizeData_);
+    if (nextOutcome_ != SceneOutcome::RETRY_MOD) {
+      if (customizeData_ != nullptr) {
+        ModBody::SetSharedCustomizeData(*customizeData_);
+      }
     }
   }
 }
@@ -7573,6 +7573,7 @@ void TravelScene::DecideFailureMenuTravel() {
 
   case RetryChoiceTravel::RetryMod:
     pendingFailureOutcome_ = SceneOutcome::RETRY_MOD;
+    ModBody::RequestResetOnNextModSceneEntry();
     break;
 
   case RetryChoiceTravel::RetryTravel:

@@ -66,6 +66,8 @@ public:
   /// </summary>
   void Draw() override;
 
+  void ResetForRetryFromFailure();
+
 private:
   /// 操作点の情報をまとめる構造体
   struct TorsoControlPoint {
