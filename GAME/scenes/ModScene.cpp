@@ -3733,10 +3733,18 @@ void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
 
   assemblyDrag_.previewLocalTranslate = rootNode->localTransform.translate;
 
-  assemblyDrag_.dragPlaneNormal = {0.0f, 0.0f, 1.0f};
-  assemblyDrag_.dragPlanePoint = GetAssemblyRootWorldPosition(rootPartId);
+  // ドラッグ平面は「掴んだ点を通る、カメラ正面向き平面」を使う
+  const Vector3 rootWorld = GetAssemblyRootWorldPosition(rootPartId);
+  assemblyDrag_.dragPlanePoint = rootWorld;
 
-  assemblyDrag_.previewLocalTranslate = assemblyDrag_.beforeLocalTranslate;
+  if (usingCamera_ != nullptr) {
+    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    assemblyDrag_.dragPlaneNormal =
+        NormalizeSafeV(Subtract(rootWorld, cameraPos), {0.0f, 0.0f, 1.0f});
+  } else {
+    assemblyDrag_.dragPlaneNormal = {0.0f, 0.0f, 1.0f};
+  }
+
   assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
 }
 
@@ -4068,8 +4076,8 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
   }
 
   Vector3 hitPoint{};
-  if (!RayPlaneIntersectionZ(mouseRay, assemblyDrag_.dragPlanePoint.z,
-                             &hitPoint)) {
+  if (!RayPlaneIntersection(mouseRay, assemblyDrag_.dragPlanePoint,
+                            assemblyDrag_.dragPlaneNormal, &hitPoint)) {
     assemblyDrag_.hoveredParentPartId = -1;
     assemblyDrag_.hoveredParentConnectorId = -1;
     assemblyDrag_.hoveredFace = ModAttachFace::PosY;
@@ -4083,7 +4091,6 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
 
   const Vector3 desiredRootWorld = Add(hitPoint, assemblyDrag_.dragRootOffset);
 
-  // まず自由ドラッグ位置へ追従
   assemblyDrag_.previewLocalTranslate = ComputeAssemblyFreeDragLocalTranslate(
       assemblyDrag_.assemblyRootPartId, desiredRootWorld);
 
@@ -4118,8 +4125,6 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
     assemblyDrag_.previewLocalTranslate = ComputeAssemblyPreviewLocalTranslate(
         assemblyDrag_.assemblyRootPartId, search.bestCandidate);
 
-    // まずは接続候補とスナップ挙動だけ確認する
-    // overlap 判定は後で親近傍許可を入れてから戻す
     assemblyDrag_.isPlacementValid = true;
   } else {
     assemblyDrag_.isPlacementValid = false;
@@ -4364,8 +4369,8 @@ bool ModScene::TryBeginAssemblyDragFromMouseRay(const Ray &mouseRay) {
   SelectPart(visiblePartId);
 
   Vector3 hitPoint{};
-  if (RayPlaneIntersectionZ(mouseRay, assemblyDrag_.dragPlanePoint.z,
-                            &hitPoint)) {
+  if (RayPlaneIntersection(mouseRay, assemblyDrag_.dragPlanePoint,
+                           assemblyDrag_.dragPlaneNormal, &hitPoint)) {
     assemblyDrag_.dragRootOffset = Subtract(rootWorld, hitPoint);
   } else {
     assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
