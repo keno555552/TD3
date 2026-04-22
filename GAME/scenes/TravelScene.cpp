@@ -200,6 +200,8 @@ TravelScene::TravelScene(kEngine *system) {
   spriteD_->mainPosition.transform.translate = {100.0f, 600.0f, 0.0f};
   spriteD_->mainPosition.transform.scale = {0.6f, 0.6f, 1.0f};
 
+  startUITextTimer_ = 4.0f; // 表示時間
+
   //===============================
   // NPC
   //===============================
@@ -294,11 +296,10 @@ void TravelScene::Update() {
     UpdateLegBendState(leftNowInput, rightNowInput);
     UpdateMovementState(leftNowInput, rightNowInput);
 
-    UpdateNpcRunners(deltaTime);
-
     UpdateRaceRanking();
     UpdateRaceFinishState();
   }
+  UpdateNpcRunners(deltaTime);
 
   if (kickFeedbackTimer_ > 0.0f) {
     kickFeedbackTimer_ -= deltaTime;
@@ -342,8 +343,11 @@ void TravelScene::Update() {
 
   UpdateSceneTransition();
 
-  const ModControlPointData *cp = GetControlPoints();
-  if (cp != nullptr) {
+  if (startUITextTimer_ > 0.0f) {
+    startUITextTimer_ -= system_->GetDeltaTime();
+    if (startUITextTimer_ < 0.0f) {
+      startUITextTimer_ = 0.0f;
+    }
   }
 }
 
@@ -359,6 +363,10 @@ void TravelScene::Draw() {
     }
 
     if (!showNpcModel_) {
+      continue;
+    }
+
+    if (npc.finished && npc.moveX > goalX_ + 20.0f) {
       continue;
     }
 
@@ -501,7 +509,8 @@ void TravelScene::Draw() {
   // 順位を表示
   std::string rankText = GetRankText(playerRank_);
 
-  bitmapFont.RenderText(rankText, {1100, 600}, 96, BitmapFont::Align::Left);
+  bitmapFont.RenderText(rankText, {1100, 600}, 96, BitmapFont::Align::Left,
+                        5.0f, {0.0f, 0.0f, 0.0f, 1.0f});
 
   // 残り枠表示
   std::string goalText = "GOAL " + std::to_string(goalCount_) + "/" +
@@ -509,10 +518,28 @@ void TravelScene::Draw() {
 
   bitmapFont.RenderText(goalText, {1000, 60}, 48, BitmapFont::Align::Left);
 
-  if (raceResultState_ == RaceResultState::Clear) {
-    bitmapFont.RenderText("CLEAR", {900, 300}, 96, BitmapFont::Align::Left);
-  } else if (raceResultState_ == RaceResultState::GameOver) {
-    bitmapFont.RenderText("GAME OVER", {800, 300}, 96, BitmapFont::Align::Left);
+  // if (raceResultState_ == RaceResultState::Clear) {
+  //   bitmapFont.RenderText("CLEAR", {900, 300}, 96, BitmapFont::Align::Left);
+  // } else
+  // if (raceResultState_ == RaceResultState::GameOver) {
+  //  bitmapFont.RenderText("GAME OVER", {800, 300}, 96,
+  //  BitmapFont::Align::Left);
+  //}
+
+  if (startUITextTimer_ > 0.0f) {
+
+    float alpha = 1.0f;
+    const float fadeOutTime = 0.5f;
+
+    if (startUITextTimer_ < fadeOutTime) {
+      alpha = startUITextTimer_ / fadeOutTime;
+    }
+
+    alpha = std::clamp(alpha, 0.0f, 1.0f);
+
+    bitmapFont.RenderText("せんちゃく3にん！ゴールまでいそげ！", {150, 100}, 64,
+                          BitmapFont::Align::Left, 5.0f,
+                          {1.0f, 1.0f, 1.0f, alpha});
   }
 
   perfectParticle_->Draw();
@@ -538,7 +565,12 @@ void TravelScene::CameraPart() {
 
     camPos.x = 48.0f;
     camPos.y = 5.0f;
-    camPos.z = moveX_ + 10.0f;
+
+    if (moveX_ + 10.0f <= goalX_ - 10.0f) {
+      camPos.z = moveX_ + 10.0f;
+    } else {
+      camPos.z = goalX_ - 10.0f;
+    }
 
     camera_->SetTranslate(camPos);
 
@@ -6721,7 +6753,11 @@ void TravelScene::UpdateNpcRunners(float deltaTime) {
       continue;
     }
 
-    if (npc.finished) {
+    // if (npc.finished) {
+    //   continue;
+    // }
+
+    if (npc.finished && npc.moveX > goalX_ + 20.0f) {
       continue;
     }
 

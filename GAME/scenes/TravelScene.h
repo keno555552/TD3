@@ -237,7 +237,7 @@ private:
   //===============================
   // ゴール判定
   //===============================
-  float goalX_ = 120.0f;
+  float goalX_ = 20.0f;
   bool isGoalReached_ = false;
 
   //===============================
@@ -575,4 +575,6 @@ private:
 
   float aKeyFlashTimer_ = 0.0f;
   float dKeyFlashTimer_ = 0.0f;
+
+  float startUITextTimer_ = 0.0f;
 };
