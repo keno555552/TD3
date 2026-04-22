@@ -10,9 +10,9 @@ JudgingPart::JudgingPart(kEngine* system, BitmapFont* font,
 	, judgeCommentResults_(judgeCommentResults) 
 {
 	// 審査員ごとのカメラ位置（後でImGuiで調整）
-	cameraTransforms_[0] = { { -2.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
-	cameraTransforms_[1] = { {  0.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
-	cameraTransforms_[2] = { {  2.0f, 1.5f, 4.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransforms_[0] = { { 0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
+	cameraTransforms_[1] = { {  0.0f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
+	cameraTransforms_[2] = { {  -0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
 }
 
 void JudgingPart::Update() {
@@ -32,7 +32,7 @@ void JudgingPart::Draw() {
 	if (currentJudgeIndex_ < (int)judgeCommentResults_.size()) {
 		font_->RenderText(
 			judgeCommentResults_[currentJudgeIndex_].comment,
-			{ 640.0f, 100.0f }, 64.0f,
+			{ 640.0f, 100.0f }, 48.0f,
 			BitmapFont::Align::Center);
 	}
 

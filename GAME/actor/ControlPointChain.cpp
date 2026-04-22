@@ -24,6 +24,41 @@ float ClampFloat(float value, float minValue, float maxValue) {
   return value;
 }
 
+float GetEditMinRatio(ModControlPointRole role) {
+  switch (role) {
+  case ModControlPointRole::Root:
+  case ModControlPointRole::Bend:
+  case ModControlPointRole::End:
+    // 首だけ特別扱い（あとで判定）
+    return 1.0f / 3.0f;
+  default:
+    return 1.0f / 3.0f;
+  }
+}
+
+float GetEditMaxRatio(ModControlPointRole role, bool isNeck) {
+  if (isNeck) {
+    return 4.0f; // ←ここを好きなだけ広げられる（例：4倍）
+  }
+  return 2.0f;
+}
+
+void MakeEditRangeFromBase(float baseValue, float *outMinValue,
+                           float *outMaxValue, ModControlPointRole role,
+                           bool isNeck) {
+  if (outMinValue == nullptr || outMaxValue == nullptr) {
+    return;
+  }
+
+  const float safeBase = (std::max)(baseValue, 0.0001f);
+
+  const float minRatio = GetEditMinRatio(role);
+  const float maxRatio = GetEditMaxRatio(role, isNeck);
+
+  *outMinValue = safeBase * minRatio;
+  *outMaxValue = safeBase * maxRatio;
+}
+
 } // namespace
 
 void ControlPointChain::Clear() { nodes_.clear(); }
@@ -60,6 +95,10 @@ void ControlPointChain::BuildArmChain() {
   wrist.acceptsChild = true;
   nodes_.push_back(wrist);
 
+  // 操作制限のため、既定値として腕の長さを保持しておく
+  defaultRootToBendLength_ = 1.08f;
+  defaultBendToEndLength_ = 2.14f;
+
   UpdateHierarchy();
 }
 
@@ -93,6 +132,10 @@ void ControlPointChain::BuildLegChain() {
   ankle.isConnectionPoint = true;
   ankle.acceptsChild = true;
   nodes_.push_back(ankle);
+
+  // 操作制限のため、既定値として脚の長さを保持しておく
+  defaultRootToBendLength_ = 1.57f;
+  defaultBendToEndLength_ = 4.19f - 1.57f;
 
   UpdateHierarchy();
 }
@@ -167,6 +210,10 @@ void ControlPointChain::BuildNeckChain() {
   end.acceptsChild = true;
   nodes_.push_back(end);
 
+  // 操作制限のため、既定値として首の長さを保持しておく
+  defaultRootToBendLength_ = 0.3462f;
+  defaultBendToEndLength_ = 2.0252f - 0.3462f;
+
   UpdateHierarchy();
 }
 
@@ -187,6 +234,19 @@ bool ControlPointChain::MovePoint(size_t index,
 
   if (!nodes_[index].movable) {
     return false;
+  }
+
+  bool isNeck = false;
+
+  // ノード構成で判定（首チェーンはRootが接続点でEndも接続点）
+  if (nodes_.size() == 3 && nodes_[0].role == ModControlPointRole::Root &&
+      nodes_[1].role == ModControlPointRole::Bend &&
+      nodes_[2].role == ModControlPointRole::End) {
+
+    // 首だけ特定する条件（雑だけど実用）
+    if (defaultRootToBendLength_ < 0.5f) {
+      isNeck = true;
+    }
   }
 
   auto ToLocalFromWorld = [this](size_t targetIndex,
@@ -216,8 +276,15 @@ bool ControlPointChain::MovePoint(size_t index,
     Vector3 rootToCandidate = Subtract(newLocalPosition, rootPos);
     Vector3 direction = NormalizeSafe(rootToCandidate, {0.0f, 1.0f, 0.0f});
 
+    const float baseRootToBendLength = GetDefaultBaseLengthForBend();
+
+    float minRadius = 0.0f;
+    float maxRadius = 0.0f;
+    MakeEditRangeFromBase(baseRootToBendLength, &minRadius, &maxRadius, role,
+                          isNeck);
+
     float radius = Length(rootToCandidate);
-    radius = ClampFloat(radius, 0.15f, 1.80f);
+    radius = ClampFloat(radius, minRadius, maxRadius);
 
     const Vector3 clampedBend = Add(rootPos, Multiply(radius, direction));
 
@@ -236,8 +303,15 @@ bool ControlPointChain::MovePoint(size_t index,
     Vector3 bendToCandidate = Subtract(newLocalPosition, bendPos);
 
     Vector3 direction = NormalizeSafe(bendToCandidate, {0.0f, 1.0f, 0.0f});
+
+    const float baseBendToEndLength = GetDefaultBaseLengthForEnd();
+
+    float minLength = 0.0f;
+    float maxLength = 0.0f;
+    MakeEditRangeFromBase(baseBendToEndLength, &minLength, &maxLength,role,isNeck);
+
     float length = Length(bendToCandidate);
-    length = ClampFloat(length, 0.20f, 2.50f);
+    length = ClampFloat(length, minLength, maxLength);
 
     const Vector3 clampedEnd = Add(bendPos, Multiply(length, direction));
     nodes_[index].localPosition = ToLocalFromWorld(index, clampedEnd);
@@ -274,3 +348,11 @@ Vector3 ControlPointChain::GetWorldPosition(size_t index) const {
 }
 
 void ControlPointChain::UpdateHierarchy() {}
+
+float ControlPointChain::GetDefaultBaseLengthForBend() const {
+  return defaultRootToBendLength_;
+}
+
+float ControlPointChain::GetDefaultBaseLengthForEnd() const {
+  return defaultBendToEndLength_;
+}

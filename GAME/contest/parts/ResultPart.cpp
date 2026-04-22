@@ -1,5 +1,6 @@
 #include "ResultPart.h"
 #include "kEngine.h"
+#include "GAME/font/BitmapFont.h"
 
 ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 	const ScoreResult& scoreResult,
@@ -20,7 +21,7 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 		scoreResult_.starEfficiency,
 		scoreResult_.starJudgeBonus);
 
-	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.6f, 0.7f, -3.0f }, { 0.0f, 0.0f, 0.0f } };
 }
 
 ResultPart::~ResultPart() {
@@ -34,9 +35,6 @@ void ResultPart::Update() {
 	if (system_->GetTriggerOn(DIK_SPACE)) {
 		switch (step_) {
 		case ResultStep::StarsAndChart:
-			step_ = ResultStep::Total;
-			break;
-		case ResultStep::Total:
 			step_ = ResultStep::RankAndNickname;
 			break;
 		case ResultStep::RankAndNickname:
@@ -49,6 +47,52 @@ void ResultPart::Update() {
 void ResultPart::Draw() {
 	// 五芒星レーダーチャート描画
 	starChart_.Draw();
+
+	if (step_ >= ResultStep::StarsAndChart) {
+
+		// 評価項目
+		font_->RenderText("テーマ",
+			{ 900.0f, 70.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f,{1.0f,0.0f,0.0f,1.0f});
+
+		font_->RenderText("インパクト",
+			{ 1150.0f, 230.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("こだわり",
+			{ 1050.0f, 580.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("効率",
+			{ 750.0f, 580.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("審査員評価",
+			{ 650.0f, 230.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+	}
+
+	// ランクをフォントで描画（星の中央）
+	if (step_ >= ResultStep::RankAndNickname) {
+		Vector4 rankColor = GetRankColor(scoreResult_.overallRank);
+
+		// ランク（星の中央 900, 360）
+		font_->RenderText(scoreResult_.overallRank,
+			{ 900.0f, 360.0f }, 96.0f,
+			BitmapFont::Align::Center, 4.0f, rankColor);
+
+		// ニックネーム（左上基準 64, 128）
+		if (earnedNickname_.isRare) {
+			font_->RenderText(earnedNickname_.nickname,
+				{ 64.0f, 128.0f }, 64.0f,
+				BitmapFont::Align::Left, 4.0f, rankColor);
+		} else {
+			font_->RenderText(earnedNickname_.nickname,
+				{ 64.0f, 128.0f }, 64.0f,
+				BitmapFont::Align::Left, 4.0f, rankColor);
+		}
+	}
 
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - Result");

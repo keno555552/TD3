@@ -577,4 +577,24 @@ private:
   float dKeyFlashTimer_ = 0.0f;
 
   float startUITextTimer_ = 0.0f;
+
+  /* 失敗時のリトライ選択
+  ---------------------------*/
+  enum class RetryChoiceTravel {
+    BackToPrompt = 0,
+    RetryMod,
+    RetryTravel,
+    Count
+  };
+
+  bool isFailureMenuOpen_ = false;
+  RetryChoiceTravel selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+  float failureMenuInputCooldown_ = 0.0f;
+
+  SceneOutcome pendingFailureOutcome_ = SceneOutcome::NONE;
+
+  void OpenFailureMenuTravel();
+  void UpdateFailureMenuInputTravel();
+  void DrawFailureMenuTravel();
+  void DecideFailureMenuTravel();
 };

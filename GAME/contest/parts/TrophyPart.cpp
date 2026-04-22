@@ -4,8 +4,16 @@
 TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
 	: IContestPart(system, font) 
 {
-	cameraTransform_ = { { 0.0f, 2.0f, -5.0f }, { 0.0f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.0f, 1.2f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
 
+	nextThemeButton_ = std::make_unique<DetailButton>(system);
+	nextThemeButton_->SetButton({ 640.0f, 180.0f }, 400.0f, 80.0f);
+
+	sameThemeButton_ = std::make_unique<DetailButton>(system);
+	sameThemeButton_->SetButton({ 640.0f, 360.0f }, 400.0f, 80.0f);
+
+	titleButton_ = std::make_unique<DetailButton>(system);
+	titleButton_->SetButton({ 640.0f, 540.0f }, 400.0f, 80.0f);
 }
 
 void TrophyPart::Update() {
@@ -23,9 +31,30 @@ void TrophyPart::Update() {
 	else if (system_->GetTriggerOn(DIK_1)) {
 		choice_ = TrophyChoice::Title;
 	}
+
+	if (nextThemeButton_->GetIsPress()) {
+		choice_ = TrophyChoice::NextTheme;
+	}
+
+	if (sameThemeButton_->GetIsPress()) {
+		choice_ = TrophyChoice::Retry;
+	}
+
+	if (titleButton_->GetIsPress()){
+		choice_ = TrophyChoice::Title;
+	}
+
+	nextThemeButton_->Update();
+	sameThemeButton_->Update();
+	titleButton_->Update();
 }
 
 void TrophyPart::Draw() {
+
+	nextThemeButton_->Render();
+	sameThemeButton_->Render();
+	titleButton_->Render();
+
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - Trophy");
 

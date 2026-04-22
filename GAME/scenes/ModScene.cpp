@@ -773,6 +773,21 @@ bool PointInRect(const Vector2 &point, const Vector2 &center,
          point.y <= bottom;
 }
 
+float GetEditMinRatio() { return 1.0f / 3.0f; }
+
+float GetEditMaxRatio() { return 2.0f; }
+
+void MakeEditRangeFromBase(float baseValue, float *outMinValue,
+                           float *outMaxValue) {
+  if (outMinValue == nullptr || outMaxValue == nullptr) {
+    return;
+  }
+
+  const float safeBase = (std::max)(baseValue, 0.0001f);
+  *outMinValue = safeBase * GetEditMinRatio();
+  *outMaxValue = safeBase * GetEditMaxRatio();
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -791,11 +806,12 @@ ModScene::ModScene(kEngine *system) {
   camera_ = system_->CreateCamera();
 
   // どちらのカメラも初期位置をそろえておく
-  debugCamera_->SetTranslate({0.0f, 0.0f, -8.0f});
+  /*debugCamera_->SetTranslate({0.0f, 0.0f, -8.0f});
+  debugCamera_->SetRotation({0.0f, 0.0f, 0.0f});
   debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
 
   camera_->SetTranslate({0.0f, 0.0f, -8.0f});
-  camera_->SetDefaultTransform(camera_->GetTransform());
+  camera_->SetDefaultTransform(camera_->GetTransform());*/
 
   // 初期状態ではデバッグカメラを使用する
   usingCamera_ = debugCamera_;
@@ -815,6 +831,43 @@ ModScene::ModScene(kEngine *system) {
   LoadCustomizeData();
   EnsureValidSelection();
 
+  // Orbitカメラの初期値を「モデル前面」基準で決める
+  orbitTarget_ = ComputeOrbitTarget();
+  orbitYaw_ = 3.14159265f;
+  orbitPitch_ = 0.0f;
+  orbitDistance_ = 25.0f;
+
+  // orbit値から初期カメラ位置を計算する
+  {
+    const float cosPitch = cosf(orbitPitch_);
+    const float sinPitch = sinf(orbitPitch_);
+    const float cosYaw = cosf(orbitYaw_);
+    const float sinYaw = sinf(orbitYaw_);
+
+    Vector3 cameraPos{};
+    cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
+    cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
+    cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
+
+    Vector3 toTarget = Subtract(orbitTarget_, cameraPos);
+    Vector3 dir = NormalizeSafeV(toTarget, {0.0f, 0.0f, 1.0f});
+
+    Vector3 cameraRotate{};
+    cameraRotate.y = atan2f(dir.x, dir.z);
+
+    const float horizontalLength = sqrtf(dir.x * dir.x + dir.z * dir.z);
+    cameraRotate.x = atan2f(-dir.y, horizontalLength);
+    cameraRotate.z = 0.0f;
+
+    debugCamera_->SetTranslate(cameraPos);
+    debugCamera_->SetRotation(cameraRotate);
+    debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
+
+    camera_->SetTranslate(cameraPos);
+    camera_->SetRotation(cameraRotate);
+    camera_->SetDefaultTransform(camera_->GetTransform());
+  }
+
   // フェードインを開始する
   fade_.Initialize(system_);
   fade_.StartFadeIn();
@@ -823,11 +876,6 @@ ModScene::ModScene(kEngine *system) {
   controlPointGizmoTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/white100x100.png");
 
-  orbitTarget_ = ComputeOrbitTarget();
-  orbitYaw_ = 0.0f;
-  orbitPitch_ = 0.0f;
-  orbitDistance_ = 8.0f;
-
   InitializeNpcModProgress();
 
   // テキスト描画用のビットマップフォントを初期化する
@@ -835,6 +883,8 @@ ModScene::ModScene(kEngine *system) {
 
   // 画面UIを初期化する
   InitializeScreenUi();
+
+  pendingFailureOutcome_ = SceneOutcome::NONE;
 }
 
 ModScene::~ModScene() {
@@ -860,6 +910,21 @@ void ModScene::Update() {
 
   // 画面UIの状態を更新する
   UpdateScreenUi();
+
+  // 失敗メニューが開いている場合は、3D操作は行わずにメニューの更新と遷移処理だけ行う
+  if (isFailureMenuOpen_) {
+    UpdateNotifications();
+    UpdateFailureMenuInputMod();
+    fade_.Update(usingCamera_);
+
+    if (isStartTransition_ && fade_.IsFinished()) {
+      if (customizeData_ != nullptr) {
+        ModBody::SetSharedCustomizeData(*customizeData_);
+      }
+      outcome_ = pendingFailureOutcome_;
+    }
+    return;
+  }
 
   // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
   if (TryHandleAddButtonClick()) {
@@ -970,6 +1035,7 @@ void ModScene::Draw() {
 
   ImGui::Text("NPC Count : %zu", npcProgress_.size());
   ImGui::Text("Notification Count : %zu", notifications_.size());
+  ImGui::Text("NpcGoalCountInMod : %d", npcGoalCountInMod_);
   ImGui::Separator();
 
   for (size_t i = 0; i < npcProgress_.size(); ++i) {
@@ -981,7 +1047,6 @@ void ModScene::Draw() {
     }
 
     ImGui::PushID(static_cast<int>(i));
-
     ImGui::Text("%s", npc.name.c_str());
     ImGui::Text("  elapsedTime      : %.2f", npc.elapsedTime);
     ImGui::Text("  totalTime        : %.2f", npc.totalTime);
@@ -990,7 +1055,8 @@ void ModScene::Draw() {
     ImGui::Text("  hasStartedMoving : %s",
                 npc.hasStartedMoving ? "true" : "false");
     ImGui::Text("  moveElapsedTime  : %.2f", npc.moveElapsedTime);
-
+    ImGui::Text("  hasReachedGoal   : %s",
+                npc.hasReachedGoal ? "true" : "false");
     ImGui::Separator();
     ImGui::PopID();
   }
@@ -1000,9 +1066,15 @@ void ModScene::Draw() {
 
   bitmapFont_.BeginFrame();
   // 画面固定の追加ボタン・ゴミ箱UIを描画する
-  DrawScreenUi();
+  if (!isFailureMenuOpen_) {
+    DrawScreenUi();
+  }
 
+  // 失敗メニューが開いていない場合は、NPC進行通知を描画する
   DrawStartNotifications();
+
+  // 失敗メニューが開いている場合は、メニューを描画する
+  DrawFailureMenuMod();
 
   // フェードを描画する
   fade_.Draw();
@@ -1021,10 +1093,15 @@ void ModScene::CameraPart() {
 }
 
 Vector3 ModScene::ComputeOrbitTarget() const {
-  // まず胴体中心を優先して見る
+  // 腰を最優先で注視する
+  const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
+  if (waistIndex >= 0) {
+    return GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
+  }
+
+  // 腰が取れないときは胴体中心
   const int chestIndex = FindTorsoControlPointIndex(ModControlPointRole::Chest);
   const int bellyIndex = FindTorsoControlPointIndex(ModControlPointRole::Belly);
-  const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
 
   if (chestIndex >= 0 && bellyIndex >= 0 && waistIndex >= 0) {
     const Vector3 chest =
@@ -1950,7 +2027,6 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
   return partId;
 }
 
-
 void ModScene::UpdateControlPointEditing() {
 #ifdef USE_IMGUI
   if (ImGui::GetIO().WantCaptureMouse) {
@@ -2623,7 +2699,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       Vector3 attach = currentChest;
       attach.x -= baseShoulderX * upperTorsoRadiusRatio;
       attach.y = currentChest.y;
-      attach.z = 0.0f;
+      attach.z = currentChest.z;
       return attach;
     }
 
@@ -2631,7 +2707,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       Vector3 attach = currentChest;
       attach.x += baseShoulderX * upperTorsoRadiusRatio;
       attach.y = currentChest.y;
-      attach.z = 0.0f;
+      attach.z = currentChest.z;
       return attach;
     }
 
@@ -2639,7 +2715,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       Vector3 attach = currentWaist;
       attach.x -= baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = 0.0f;
+      attach.z = currentWaist.z;
       return attach;
     }
 
@@ -2647,7 +2723,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       Vector3 attach = currentWaist;
       attach.x += baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = 0.0f;
+      attach.z = currentWaist.z;
       return attach;
     }
 
@@ -3085,10 +3161,16 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   Vector3 waistPos =
       torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition;
 
-  const float chestBellyMin = 0.20f;
-  const float chestBellyMax = 1.50f;
-  const float bellyWaistMin = 0.20f;
-  const float bellyWaistMax = 1.50f;
+  const float baseChestBellyLength = 1.2796f;
+  const float baseBellyWaistLength = 1.6880f;
+
+  float chestBellyMin = 0.0f;
+  float chestBellyMax = 0.0f;
+  float bellyWaistMin = 0.0f;
+  float bellyWaistMax = 0.0f;
+
+  MakeEditRangeFromBase(baseChestBellyLength, &chestBellyMin, &chestBellyMax);
+  MakeEditRangeFromBase(baseBellyWaistLength, &bellyWaistMin, &bellyWaistMax);
 
   if (index == static_cast<size_t>(chestIndex)) {
     Vector3 candidate = newLocalPosition;
@@ -3181,8 +3263,9 @@ bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
     break;
   }
 
-  const float minRadius = defaultRadius * 0.60f;
-  const float maxRadius = defaultRadius * 2.50f;
+  float minRadius = 0.0f;
+  float maxRadius = 0.0f;
+  MakeEditRangeFromBase(defaultRadius, &minRadius, &maxRadius);
 
   float newRadius = torsoControlPoints_[index].radius * scaleFactor;
   newRadius = ClampFloatLocal(newRadius, minRadius, maxRadius);
@@ -5441,13 +5524,26 @@ void ModScene::UpdateNpcProgress() {
   for (size_t i = 0; i < npcProgress_.size(); ++i) {
     NpcModProgress &npc = npcProgress_[i];
 
-    // すでに移動開始しているなら、先行移動時間だけ増やす
-    if (npc.hasStartedMoving) {
-      npc.moveElapsedTime += deltaTime;
+    if (npc.hasReachedGoal) {
       continue;
     }
 
-    // まだ改造中なら時間を進める
+    if (npc.hasStartedMoving) {
+      npc.moveElapsedTime += deltaTime;
+
+      if (IsNpcReachedGoalInModScene(npc)) {
+        npc.hasReachedGoal = true;
+
+        if (!npc.goalNotified) {
+          npc.goalNotified = true;
+          npcGoalCountInMod_++;
+          AddStartNotification(npc.name + "がゴール！");
+        }
+      }
+
+      continue;
+    }
+
     npc.elapsedTime += deltaTime;
 
     if (!npc.isFinished && npc.elapsedTime >= npc.totalTime) {
@@ -5460,6 +5556,7 @@ void ModScene::UpdateNpcProgress() {
     }
   }
 
+  CheckModFailureState();
   UpdateNotifications();
 }
 
@@ -5517,10 +5614,21 @@ void ModScene::InitializeNpcModProgress() {
     npc.hasStartedMoving = false;
     npc.moveElapsedTime = 0.0f;
 
+    npc.hasReachedGoal = false;
+    npc.goalNotified = false;
+
     npcProgress_.push_back(npc);
   }
 
   notifications_.clear();
+
+  npcGoalCountInMod_ = 0;
+  isModFailed_ = false;
+  isFailureMenuOpen_ = false;
+  failureNotified_ = false;
+  pendingFailureOutcome_ = SceneOutcome::NONE;
+  selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  failureMenuInputCooldown_ = 0.0f;
 }
 
 void ModScene::DrawStartNotifications() {
@@ -5546,8 +5654,8 @@ void ModScene::DrawStartNotifications() {
     float alpha = 1.0f - t;
 
     bitmapFont_.RenderText(notification.text, {x, y}, fontSize,
-                          BitmapFont::Align::Left, 5.0f,
-                          {1.0f, 1.0f, 1.0f, alpha});
+                           BitmapFont::Align::Left, 5.0f,
+                           {1.0f, 1.0f, 1.0f, alpha});
   }
 }
 
@@ -5584,7 +5692,7 @@ float ModScene::CalculateNpcModTime(NpcPresetType presetType,
   return (baseTime + presetBonus) / skillMultiplier;
 }
 
-float ModScene::GetNpcBaseModTime() const { return 15.0f; }
+float ModScene::GetNpcBaseModTime() const { return 25.0f; }
 
 float ModScene::GetNpcPresetTimeBonus(NpcPresetType presetType) const {
   switch (presetType) {
@@ -5611,13 +5719,13 @@ float ModScene::GetNpcSkillMultiplierByIndex(int index) const {
     return 1.00f;
 
   case 1:
-    return 0.95f;
+    return 0.85f;
 
   case 2:
-    return 1.10f;
+    return 1.20f;
 
   default:
-    return 0.90f;
+    return 0.70f;
   }
 }
 
@@ -5637,6 +5745,148 @@ float ModScene::GetNpcRunTimingSkillByIndex(int index) const {
 
   default:
     return 1.0f;
+  }
+}
+
+bool ModScene::IsNpcReachedGoalInModScene(const NpcModProgress &npc) const {
+  // 暫定実装
+  // ModScene には走行距離そのものが無いので、
+  // 先行移動時間が一定以上なら「もうゴール済み」とみなす
+  return npc.hasStartedMoving && npc.moveElapsedTime >= modNpcGoalLeadTime_;
+}
+
+void ModScene::OpenFailureMenuMod() {
+  isModFailed_ = true;
+  isFailureMenuOpen_ = true;
+  failureMenuInputCooldown_ = 0.15f;
+  selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+
+  // 失敗通知を消す
+  notifications_.clear();
+}
+
+void ModScene::DecideFailureMenuMod() {
+  if (fade_.IsBusy() || isStartTransition_) {
+    return;
+  }
+
+  switch (selectedRetryChoiceMod_) {
+  case RetryChoiceMod::BackToPrompt:
+    pendingFailureOutcome_ = SceneOutcome::RETURN_PROMPT;
+    break;
+
+  case RetryChoiceMod::RetryMod:
+    pendingFailureOutcome_ = SceneOutcome::RETRY;
+    break;
+
+  default:
+    pendingFailureOutcome_ = SceneOutcome::NONE;
+    break;
+  }
+
+  if (pendingFailureOutcome_ != SceneOutcome::NONE) {
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+  }
+}
+
+void ModScene::UpdateFailureMenuInputMod() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const float dt = system_->GetDeltaTime();
+  if (failureMenuInputCooldown_ > 0.0f) {
+    failureMenuInputCooldown_ -= dt;
+    if (failureMenuInputCooldown_ < 0.0f) {
+      failureMenuInputCooldown_ = 0.0f;
+    }
+  }
+
+  const Vector2 mouse = system_->GetMousePosVector2();
+
+  struct MenuRect {
+    Vector2 center;
+    Vector2 size;
+  };
+
+  const MenuRect promptRect{{640.0f, 330.0f}, {420.0f, 64.0f}};
+  const MenuRect retryRect{{640.0f, 410.0f}, {420.0f, 64.0f}};
+
+  auto IsInside = [](const Vector2 &p, const MenuRect &r) -> bool {
+    const float left = r.center.x - r.size.x * 0.5f;
+    const float right = r.center.x + r.size.x * 0.5f;
+    const float top = r.center.y - r.size.y * 0.5f;
+    const float bottom = r.center.y + r.size.y * 0.5f;
+    return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+  };
+
+  if (IsInside(mouse, promptRect)) {
+    selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+  } else if (IsInside(mouse, retryRect)) {
+    selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  }
+
+  if (failureMenuInputCooldown_ <= 0.0f) {
+    if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
+      if (selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod) {
+        selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
+      if (selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt) {
+        selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    const bool mouseClicked = IsMouseLeftTriggeredNow();
+    const bool keyConfirm =
+        system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
+
+    if (mouseClicked || keyConfirm) {
+      DecideFailureMenuMod();
+    }
+  }
+}
+
+void ModScene::DrawFailureMenuMod() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
+
+  bitmapFont_.RenderText("しっぱい", {640.0f, 220.0f}, 72.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         {1.0f, 0.35f, 0.35f, 1.0f});
+
+  const bool promptSelected =
+      selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt;
+  const bool retrySelected =
+      selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod;
+
+  bitmapFont_.RenderText("おだいにもどる", {640.0f, 330.0f},
+                         promptSelected ? 44.0f : 36.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         promptSelected ? selectedColor : normalColor);
+
+  bitmapFont_.RenderText("かいぞうにもどる", {640.0f, 410.0f},
+                         retrySelected ? 44.0f : 36.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         retrySelected ? selectedColor : normalColor);
+}
+
+void ModScene::CheckModFailureState() {
+  if (isModFailed_) {
+    return;
+  }
+
+  if (npcGoalCountInMod_ >= modFailureGoalCount_) {
+    OpenFailureMenuMod();
   }
 }
 
@@ -5713,10 +5963,12 @@ bool ModScene::IsPointInUiButton(const Vector2 &point,
 
 void ModScene::InitializeScreenUi() {
   // フレーム画像
-  uiFrameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
+  uiFrameTextureHandle_ =
+      system_->LoadTexture("GAME/resources/texture/frame.png");
 
   // ゴミ箱画像
-  trashTextureHandle_ = system_->LoadTexture("GAME/resources/texture/trash.png");
+  trashTextureHandle_ =
+      system_->LoadTexture("GAME/resources/texture/trash.png");
 
   const float left = 110.0f;
   const float top = 40.0f;
@@ -5759,9 +6011,13 @@ void ModScene::InitializeScreenUi() {
                 uiFrameTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "からだ";
 
-  SetupUiSprite(trashButton_, {1180.0f, 620.0f}, {84.0f, 84.0f},
+  SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
+
+  SetupUiSprite(nextSceneButton_, {1200.0f, 640.0f}, {100.0f, 100.0f},
+                uiFrameTextureHandle_);
+  nextSceneButton_.label = "つぎへ";
 }
 
 bool ModScene::ExecuteAddButton(UiAddButtonType type) {
@@ -5819,6 +6075,14 @@ bool ModScene::TryHandleAddButtonClick() {
     return true;
   }
 
+  if (IsPointInUiButton(mouse, nextSceneButton_)) {
+    if (!fade_.IsBusy()) {
+      fade_.StartFadeOut();
+      isStartTransition_ = true;
+    }
+    return true;
+  }
+
   return false;
 }
 
@@ -5832,6 +6096,10 @@ bool ModScene::IsMouseOverAnyScreenUi() const {
   }
 
   if (IsPointInUiButton(mouse, trashButton_)) {
+    return true;
+  }
+
+  if (IsPointInUiButton(mouse, nextSceneButton_)) {
     return true;
   }
 
@@ -5849,8 +6117,11 @@ void ModScene::UpdateScreenUi() {
   }
 
   UpdateUiSpriteTransform(trashButton_);
+  UpdateUiSpriteTransform(nextSceneButton_);
 
   isHoverTrash_ = assemblyDrag_.isDragging && IsMouseOverTrashArea();
+  isHoverNextScene_ =
+      IsPointInUiButton(system_->GetMousePosVector2(), nextSceneButton_);
 
   for (size_t i = 0; i < addButtons_.size(); ++i) {
     if (addButtons_[i].sprite == nullptr ||
@@ -5874,6 +6145,18 @@ void ModScene::UpdateScreenUi() {
     color = isHoverTrash_ ? MakeColor(1.0f, 0.45f, 0.45f, 1.0f)
                           : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
   }
+
+  if (nextSceneButton_.sprite != nullptr &&
+      !nextSceneButton_.sprite->objectParts_.empty()) {
+    Vector4 &color =
+        nextSceneButton_.sprite->objectParts_[0].materialConfig->textureColor;
+
+    if (isHoverNextScene_) {
+      color = MakeColor(1.0f, 0.95f, 0.55f, 1.0f);
+    } else {
+      color = MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+  }
 }
 
 void ModScene::DrawScreenUi() {
@@ -5885,6 +6168,10 @@ void ModScene::DrawScreenUi() {
 
   if (trashButton_.visible && trashButton_.sprite != nullptr) {
     trashButton_.sprite->Draw();
+  }
+
+  if (nextSceneButton_.visible && nextSceneButton_.sprite != nullptr) {
+    nextSceneButton_.sprite->Draw();
   }
 
   const float fontHeight = 28.0f;
@@ -5912,11 +6199,22 @@ void ModScene::DrawScreenUi() {
 
   if (trashButton_.visible) {
     const float left = trashButton_.center.x - trashButton_.size.x * 0.5f;
-    const float top = trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
+    const float top =
+        trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
 
     bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
                            BitmapFont::Align::Left, 5.0f,
                            {1.0f, 1.0f, 1.0f, 1.0f});
+  }
+
+  if (nextSceneButton_.visible) {
+    Vector4 textColor = isHoverNextScene_ ? Vector4{1.0f, 0.95f, 0.55f, 1.0f}
+                                          : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+
+    bitmapFont_.RenderText(
+        "つぎへ",
+        {nextSceneButton_.center.x, nextSceneButton_.center.y - 12.0f}, 28.0f,
+        BitmapFont::Align::Center, 5.0f, textColor);
   }
 }
 
@@ -5936,16 +6234,19 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
   }
 
   const int deleteTargetId = ResolveAssemblyOperationPartId(rootPartId);
-  assemblyDrag_.Clear();
-
   if (deleteTargetId < 0) {
+    CancelAssemblyDragPlacement();
     return false;
   }
 
+  // 削除失敗時に元の親・元の位置へ戻せるよう、
+  // 先に Clear しない
   if (!assembly_.RemovePart(deleteTargetId)) {
+    CancelAssemblyDragPlacement();
     return false;
   }
 
+  assemblyDrag_.Clear();
   selectedPartId_ = deleteTargetId;
   SyncAfterAssemblyChanged();
   return true;
