@@ -237,7 +237,7 @@ private:
   //===============================
   // ゴール判定
   //===============================
-  float goalX_ = 20.0f;
+  float goalX_ = 60.0f;
   bool isGoalReached_ = false;
 
   //===============================
@@ -390,6 +390,7 @@ private:
   // タイミング
   enum class KickFeedbackType {
     None,
+    Bad,
     Good,
     Perfect,
   };
@@ -556,4 +557,8 @@ private:
 
   std::array<Object *, 16> npcDebugCpObjects_{};
   bool showNpcModel_ = true;
+
+  // 影
+  std::unique_ptr<Object> shadow_;
+  int shadowModelHandle_ = 0;
 };

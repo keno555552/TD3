@@ -50,10 +50,10 @@ void Perfect_Particle::Spawn(const Vector3 &pos, KickEffectType type) {
     break;
 
   case KickEffectType::Bad:
-    spawnCount = 6;
-    speed = 3.5f;
-    life = 0.18f;
-    baseScale = {0.20f, 0.20f, 0.20f};
+    spawnCount = 8;
+    speed = 6.0f;
+    life = 0.25f;
+    baseScale = {0.30f, 0.30f, 0.30f};
     color = {1.0f, 0.2f, 0.2f, 1.0f};
     break;
   }
