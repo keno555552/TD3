@@ -22,6 +22,9 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 		scoreResult_.starJudgeBonus);
 
 	cameraTransform_ = { { 0.6f, 0.7f, -3.0f }, { 0.0f, 0.0f, 0.0f } };
+
+	nextButton_ = std::make_unique<DetailButton>(system);
+	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
 }
 
 ResultPart::~ResultPart() {
@@ -31,8 +34,10 @@ ResultPart::~ResultPart() {
 void ResultPart::Update() {
 	if (isFinished_) return;
 
+	nextButton_->Update();
+
 	// SPACEで次のステップへ
-	if (system_->GetTriggerOn(DIK_SPACE)) {
+	if (system_->GetTriggerOn(DIK_SPACE)||nextButton_->GetIsPress()) {
 		switch (step_) {
 		case ResultStep::StarsAndChart:
 			step_ = ResultStep::RankAndNickname;
@@ -93,6 +98,12 @@ void ResultPart::Draw() {
 				BitmapFont::Align::Left, 4.0f, rankColor);
 		}
 	}
+
+	nextButton_->Render();
+	font_->RenderText(
+		"To Next",
+		{ 640.0f, 620.0f }, 48.0f,
+		BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
 
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - Result");
@@ -156,12 +167,14 @@ void ResultPart::UpdateStarChart() {
 }
 
 void ResultPart::DrawStarItem(const char* label, int star, bool visible) const {
+#ifdef USE_IMGUI
 	if (visible) {
 #ifdef USE_IMGUI
 		ImGui::Text("  %-14s: %s (%d)", label,
 			StarsToString(star).c_str(), star);
 #endif // USE_IMGUI
 	}
+#endif
 }
 
 std::string ResultPart::StarsToString(int stars) {

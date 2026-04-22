@@ -1,5 +1,6 @@
 #include "TrophyPart.h"
 #include "kEngine.h"
+#include "GAME/font/BitmapFont.h"
 
 TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
 	: IContestPart(system, font) 
@@ -18,6 +19,10 @@ TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
 
 void TrophyPart::Update() {
 	if (choice_ != TrophyChoice::None) return;
+
+	nextThemeButton_->Update();
+	sameThemeButton_->Update();
+	titleButton_->Update();
 
 	// SPACE: 次のお題へ
 	if (system_->GetTriggerOn(DIK_SPACE)) {
@@ -43,17 +48,27 @@ void TrophyPart::Update() {
 	if (titleButton_->GetIsPress()){
 		choice_ = TrophyChoice::Title;
 	}
-
-	nextThemeButton_->Update();
-	sameThemeButton_->Update();
-	titleButton_->Update();
 }
 
 void TrophyPart::Draw() {
 
 	nextThemeButton_->Render();
+	font_->RenderText(
+		"お題を変えてリトライ",
+		{ 640.0f, 160.0f }, 32.0f,
+		BitmapFont::Align::Center, 5, { 0.0f,1.0f,1.0f,1.0f });
+
 	sameThemeButton_->Render();
+	font_->RenderText(
+		"同じお題でリトライ",
+		{ 640.0f, 340.0f }, 32.0f,
+		BitmapFont::Align::Center, 5, { 0.0f,1.0f,1.0f,1.0f });
+
 	titleButton_->Render();
+	font_->RenderText(
+		"タイトルへ戻る",
+		{ 640.0f, 520.0f }, 32.0f,
+		BitmapFont::Align::Center, 5, { 0.0f,1.0f,1.0f,1.0f });
 
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - Trophy");

@@ -3,6 +3,7 @@
 #include "GAME/score/ScoreResult.h"
 #include "GAME/userData/UserData.h"
 #include "GAME/contest/ui/StarChart.h"
+#include"GAME/Object/DetailButton/DetailButton.h"
 
 /// <summary>
 /// 結果パートのサブステート
@@ -29,6 +30,8 @@ public:
 	bool IsFinished() const override;
 
 private:
+
+	std::unique_ptr<DetailButton>nextButton_;
 	const ScoreResult& scoreResult_;
 	const EarnedNickname& earnedNickname_;
 

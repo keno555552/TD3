@@ -226,7 +226,6 @@ ContestScene::ContestScene(kEngine *system) {
 ContestScene::~ContestScene() {
   currentPart_.reset();
   bitmapFont_.Cleanup();
-
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
   system_->RemoveLight(light1_);
@@ -618,6 +617,7 @@ void ContestScene::AdvancePhase() {
 }
 
 std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
+  Logger::Log("[ContestScene] font=%p size=%d", &bitmapFont_, bitmapFont_.GetGlyphMapSize());
   switch (phase) {
   case ContestPhase::ShowOff:
     return std::make_unique<ShowOffPart>(system_, &bitmapFont_,

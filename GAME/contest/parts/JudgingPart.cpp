@@ -13,13 +13,18 @@ JudgingPart::JudgingPart(kEngine* system, BitmapFont* font,
 	cameraTransforms_[0] = { { 0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
 	cameraTransforms_[1] = { {  0.0f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
 	cameraTransforms_[2] = { {  -0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
+
+	nextButton_ = std::make_unique<DetailButton>(system);
+	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
 }
 
 void JudgingPart::Update() {
 	if (isFinished_) return;
 
+	nextButton_->Update();
+
 	// SPACEで次の審査員へ
-	if (system_->GetTriggerOn(DIK_SPACE)) {
+	if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsPress()) {
 		currentJudgeIndex_++;
 		if (currentJudgeIndex_ >= 3) {
 			isFinished_ = true;
@@ -29,11 +34,26 @@ void JudgingPart::Update() {
 
 void JudgingPart::Draw() {
 
+	nextButton_->Render();
+
 	if (currentJudgeIndex_ < (int)judgeCommentResults_.size()) {
 		font_->RenderText(
 			judgeCommentResults_[currentJudgeIndex_].comment,
 			{ 640.0f, 100.0f }, 48.0f,
 			BitmapFont::Align::Center);
+	}
+
+	if (currentJudgeIndex_ >= 2) {
+		font_->RenderText(
+			"To Result",
+			{ 640.0f, 620.0f }, 48.0f,
+			BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
+
+	} else {
+		font_->RenderText(
+			"Next judge",
+			{ 640.0f, 620.0f }, 48.0f,
+			BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
 	}
 
 #ifdef USE_IMGUI

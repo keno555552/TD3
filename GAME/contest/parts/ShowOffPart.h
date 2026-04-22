@@ -2,6 +2,7 @@
 #include "IContestPart.h"
 #include "GAME/audience/AudienceData.h"
 #include "GAME/font/BitmapFont.h"
+#include"GAME/Object/DetailButton/DetailButton.h"
 #include"Vector2.h"
 #include <random>
 
@@ -29,6 +30,7 @@ public:
 	PartCameraTransform GetCameraTransform() const override;
 
 private:
+	std::unique_ptr<DetailButton>nextButton_;
 	const AudienceResult& audienceResult_;
 	ShowOffStep step_ = ShowOffStep::StageView;
 	bool isFinished_ = false;
