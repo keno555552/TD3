@@ -237,7 +237,7 @@ private:
   //===============================
   // ゴール判定
   //===============================
-  float goalX_ = 60.0f;
+  float goalX_ = 120.0f;
   bool isGoalReached_ = false;
 
   //===============================
@@ -270,7 +270,7 @@ private:
   bool requireReleaseAfterLandRight_ = false;
 
   // 地面
-  std::unique_ptr<Object> ground_ = nullptr;
+  std::vector<std::unique_ptr<Object>> grounds_;
   uint32_t groundModelHandle_ = 0;
 
   // 制限時間
@@ -561,4 +561,18 @@ private:
   // 影
   std::unique_ptr<Object> shadow_;
   int shadowModelHandle_ = 0;
+
+  // ゴールオブジェクト
+  std::unique_ptr<Object> goalObject_;
+  int goalModelHandle_ = 0;
+
+  // UI
+  std::unique_ptr<SimpleSprite> spriteA_;
+  std::unique_ptr<SimpleSprite> spriteD_;
+
+  int spriteAHandle_ = 0;
+  int spriteDHandle_ = 0;
+
+  float aKeyFlashTimer_ = 0.0f;
+  float dKeyFlashTimer_ = 0.0f;
 };
