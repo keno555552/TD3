@@ -19,12 +19,23 @@ TitleScene::TitleScene(kEngine *system) {
   // フェード
   fade_.Initialize(system_);
   fade_.StartFadeIn();
+
+  titleTextObject_ = new Object;
+
+  titleTextModelHandle_ = system_->SetModelObj("GAME/resources/TitleScene/TitleText.obj");
+  titleTextObject_->IntObject(system_);
+  titleTextObject_->CreateModelData(titleTextModelHandle_);
+  titleTextObject_->mainPosition.transform = CreateDefaultTransform();
+  titleTextObject_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
+  titleTextObject_->mainPosition.transform.rotate = { 3.1415f/2.0f ,0.0f, 0.0f };
+  titleTextObject_->mainPosition.transform.scale = { 1.0f,1.0f,1.0f };
 }
 
 TitleScene::~TitleScene() {
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
   system_->RemoveLight(light1_);
+  delete titleTextObject_;
   delete light1_;
 }
 
@@ -47,6 +58,12 @@ void TitleScene::Update() {
 }
 
 void TitleScene::Draw() {
+
+    if (titleTextObject_) {
+        titleTextObject_->Update(usingCamera_);
+        titleTextObject_->Draw();
+    }
+
 #ifdef USE_IMGUI
   // 現在シーン表示
   ImGui::Begin("Scene");

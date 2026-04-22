@@ -476,6 +476,12 @@ private:
     float leftFootRadius = 1.0f;
     float rightFootRadius = 1.0f;
 
+    bool kickThisFrame = false;
+    int kickSideThisFrame = 0; // -1:左, 1:右, 0:なし
+
+    bool kickedThisAirborne = false;
+
+    float legGroundOffset = 5.0f;
   };
 
   std::vector<NpcRunner> npcRunners_;
@@ -483,8 +489,10 @@ private:
 
   void InitializeNpcRunners();
   void UpdateNpcRunners(float deltaTime);
-  void UpdateNpcInput(NpcRunner &npc, float deltaTime);
-  void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
+  //void UpdateNpcInput(NpcRunner &npc, float deltaTime);
+  //void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
+  void UpdateNpcInput(NpcRunner &npc, float deltaTime, int npcIndex);
+  void UpdateNpcMovement(NpcRunner &npc, float deltaTime, int npcIndex);
 
   // 順位
   struct RaceEntry {
@@ -529,7 +537,8 @@ private:
   void UpdateNpcCustomizedVisual(NpcRunner &npc);
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);
-  void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
+  //void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
+  void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex);
 
   // Particle
   std::unique_ptr<Perfect_Particle> perfectParticle_;

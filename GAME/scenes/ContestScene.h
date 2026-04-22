@@ -57,15 +57,21 @@ private:
   Camera *usingCamera_ = nullptr;
   bool useDebugCamera_ = false;
 
-  //========
-  // model
-  //========
-  // ステージオブジェクト
-  int stageModelHandle_ = 0;
-  SceneObject stage_;
+	// カメラ補間
+	PartCameraTransform cameraTarget_;
+	PartCameraTransform cameraCurrent_;
+	bool isCameraLerping_ = false;
+	float cameraLerpTimer_ = 0.0f;
+	float cameraLerpDuration_ = 1.0f; // 1秒で移動完了
 
-  int backScreenModelHandle_ = 0;
-  SceneObject backScreen_;
+	bool IsCameraLerping() const { return isCameraLerping_; }
+
+	//========
+	// model
+	//========
+	// ステージオブジェクト
+	int stageModelHandle_ = 0;
+	SceneObject stage_;
 
   int rightSideScreenModelHandle_ = 0;
   std::vector<SceneObject> rightSideScreens_;
@@ -82,8 +88,11 @@ private:
   int judgesDeskModelHandle_ = 0;
   SceneObject judgesDesk_;
 
-  int judgesChairModelHandle_ = 0;
-  std::vector<SceneObject> judgesChairs_;
+	int judgesModelHandle_ = 0;
+	std::vector<SceneObject> judges_;
+
+	int judgesDeskModelHandle_ = 0;
+	SceneObject judgesDesk_;
 
   int audienceChairsMidModelHandle_ = 0;
   std::vector<SceneObject> audienceChairsMid_;

@@ -1,6 +1,7 @@
 #pragma once
 #include "../effect/Fade.h"
 #include "BaseScene.h"
+#include <Object/Object.h>
 
 class TitleScene : public BaseScene {
 public:
@@ -11,6 +12,10 @@ public:
   void Draw() override;
 
 private:
+
+	Object* titleTextObject_ = nullptr;
+	int titleTextModelHandle_ = 0;
+
   // 仮ライト
   Light *light1_ = nullptr;
 
