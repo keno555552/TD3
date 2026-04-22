@@ -343,10 +343,21 @@ private:
   bool GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
                                      Vector3 &outBend, Vector3 &outEnd) const;
 
+  bool GetExtraInstanceLocalTranslate(int partId, Vector3 &outLocal) const;
+
+  bool GetFirstPartTypePartId(ModBodyPart partType, int &outPartId) const;
+  float GetSnapshotSegmentLength(ModBodyPart partType, int ownerPartId) const;
+  bool GetPartInstanceParentId(int partId, int &outParentId) const;
+
   bool GetExtraPartParentObject(
       ModBodyPart partType, int parentId,
       const std::unordered_map<int, Object *> &extraPartObjectMap,
       Object *&outParent) const;
+
+  bool GetPartInstanceLocalTranslate(int partId, Vector3 &outLocal) const;
+  bool GetPartInstanceLocalRotate(int partId, Vector3 &outRotate) const;
+  bool GetFirstPartTypeLocalTranslate(ModBodyPart partType,
+                                      Vector3 &outLocal) const;
 
   int GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
                               int parentId) const;
@@ -489,8 +500,8 @@ private:
 
   void InitializeNpcRunners();
   void UpdateNpcRunners(float deltaTime);
-  //void UpdateNpcInput(NpcRunner &npc, float deltaTime);
-  //void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
+  // void UpdateNpcInput(NpcRunner &npc, float deltaTime);
+  // void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
   void UpdateNpcInput(NpcRunner &npc, float deltaTime, int npcIndex);
   void UpdateNpcMovement(NpcRunner &npc, float deltaTime, int npcIndex);
 
@@ -537,7 +548,7 @@ private:
   void UpdateNpcCustomizedVisual(NpcRunner &npc);
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);
-  //void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
+  // void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
   void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex);
 
   // Particle
