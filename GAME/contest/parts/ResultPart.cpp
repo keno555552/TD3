@@ -35,9 +35,6 @@ void ResultPart::Update() {
 	if (system_->GetTriggerOn(DIK_SPACE)) {
 		switch (step_) {
 		case ResultStep::StarsAndChart:
-			step_ = ResultStep::Total;
-			break;
-		case ResultStep::Total:
 			step_ = ResultStep::RankAndNickname;
 			break;
 		case ResultStep::RankAndNickname:
@@ -50,6 +47,31 @@ void ResultPart::Update() {
 void ResultPart::Draw() {
 	// 五芒星レーダーチャート描画
 	starChart_.Draw();
+
+	if (step_ >= ResultStep::StarsAndChart) {
+
+		// 評価項目
+		font_->RenderText("テーマ",
+			{ 900.0f, 70.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f,{1.0f,0.0f,0.0f,1.0f});
+
+		font_->RenderText("インパクト",
+			{ 1150.0f, 230.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("こだわり",
+			{ 1050.0f, 580.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("効率",
+			{ 750.0f, 580.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText("審査員評価",
+			{ 650.0f, 230.0f }, 32.0f,
+			BitmapFont::Align::Center, 4.0f, { 1.0f,0.0f,0.0f,1.0f });
+
+	}
 
 	// ランクをフォントで描画（星の中央）
 	if (step_ >= ResultStep::RankAndNickname) {

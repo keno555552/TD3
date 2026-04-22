@@ -1,5 +1,6 @@
 #pragma once
 #include "IContestPart.h"
+#include"GAME/Object/DetailButton/DetailButton.h"
 
 /// <summary>
 /// トロフィーパートでの選択結果
@@ -30,6 +31,11 @@ public:
 	TrophyChoice GetChoice() const;
 
 private:
+
+	std::unique_ptr<DetailButton>titleButton_;
+	std::unique_ptr<DetailButton>sameThemeButton_;
+	std::unique_ptr<DetailButton>nextThemeButton_;
+	std::unique_ptr<bool>isGoTitle_;
 	PartCameraTransform GetCameraTransform() const override;
 
 	PartCameraTransform cameraTransform_;

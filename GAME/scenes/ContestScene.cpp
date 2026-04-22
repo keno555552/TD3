@@ -43,6 +43,12 @@ ContestScene::ContestScene(kEngine *system) {
   //==================
   // ステージオブジェクト
 
+  // 天球
+  contestVenueModelHandle_ =
+      system_->SetModelObj("GAME/resources/ContestStageObject/contestVenue.obj");
+  SetupSceneObject(contestVenue_, contestVenueModelHandle_, { 0.0f, 0.0f, 0.0f },
+      { 0.0f, 0.0f, 0.0f }, 10.0f);
+
   // ステージ
   stageModelHandle_ =
       system_->SetModelObj("GAME/resources/ContestStageObject/stage.obj");
@@ -199,13 +205,12 @@ ContestScene::ContestScene(kEngine *system) {
   customizedBodyActor_.Initialize(system_);
 
   if (playerData != nullptr) {
-    customizedBodyActor_.SetActorScale({0.18f, 0.18f, 0.18f});
+    customizedBodyActor_.SetActorScale({0.03f, 0.03f, 0.03f});
     customizedBodyActor_.SetActorTranslate({0.0f, 0.0f, -0.2f});
 
     // ステージ床の高さに合わせる
-    customizedBodyActor_.SetGroundY(0.0f);
+    customizedBodyActor_.SetGroundY(0.15f);
 
-    customizedBodyActor_.SetGroundY(0.0f);
     // 足首ではなく足裏っぽく少し上げ下げしたいときの微調整
     customizedBodyActor_.SetGroundOffsetY(0.02f);
 
@@ -487,6 +492,11 @@ void ContestScene::Draw() {
   ImGui::Text("Phase: %s", phaseNames[static_cast<int>(phase_)]);
   ImGui::End();
 #endif
+
+  if (contestVenue_.object) {
+      contestVenue_.object->Update(usingCamera_);
+      contestVenue_.object->Draw();
+  }
 
   if (stage_.object) {
     stage_.object->Update(usingCamera_);
