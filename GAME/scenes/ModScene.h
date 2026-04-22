@@ -123,7 +123,7 @@ private:
   float orbitRotateSpeed_ = 0.01f;
   float orbitZoomSpeed_ = 0.8f;
   float orbitMinDistance_ = 2.5f;
-  float orbitMaxDistance_ = 20.0f;
+  float orbitMaxDistance_ = 40.0f;
 
   void UpdateOrbitCamera();
   Vector3 ComputeOrbitTarget() const;
@@ -187,9 +187,13 @@ private:
 
   // UIの部位削除ボタン
   UiIconButton trashButton_{};
-
   // マウスが削除ボタンの上にあるかどうか
   bool isHoverTrash_ = false;
+
+  // UIの次シーンボタン
+  UiIconButton nextSceneButton_{};
+  // マウスが次シーンボタンの上にあるかどうか
+  bool isHoverNextScene_ = false;
 
   // UIの部位追加ボタンと削除ボタンのテクスチャハンドル
   int addLeftArmTextureHandle_ = 0;

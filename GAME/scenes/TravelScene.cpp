@@ -7983,14 +7983,14 @@ void TravelScene::DrawFailureMenuTravel() {
           : normalColor);
 
   bitmapFont.RenderText(
-      "かいぞうのさいしょからやりなおす", {640.0f, 380.0f},
+      "かいぞうにもどる", {640.0f, 380.0f},
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? 44.0f : 36.0f,
       BitmapFont::Align::Center, 5.0f,
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? selectedColor
                                                                 : normalColor);
 
   bitmapFont.RenderText(
-      "いどうのさいしょからやりなおす", {640.0f, 460.0f},
+      "いどうにもどる", {640.0f, 460.0f},
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel ? 44.0f
                                                                    : 36.0f,
       BitmapFont::Align::Center, 5.0f,

@@ -1057,8 +1057,15 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return false;
   }
 
-  PartNode target = it->second;
+  PartNode originalTarget = it->second;
+  PartNode target = originalTarget;
 
+  // 削除前に「元の要求」が Head セット削除かどうかを記録しておく
+  const bool isHeadSetDeleteRequest =
+      (originalTarget.part == ModBodyPart::Head ||
+       originalTarget.part == ModBodyPart::Neck);
+
+  // Head 単体を指定された場合は Neck を削除対象に昇格する
   if (target.part == ModBodyPart::Head) {
     if (target.parentId >= 0 && nodes_.count(target.parentId) > 0) {
       std::unordered_map<int, PartNode>::const_iterator parentIt =
@@ -1079,10 +1086,13 @@ bool ModAssemblyGraph::RemovePart(int partId) {
     return false;
   }
 
-  if (IsHead(target.part) && CountHeads() <= 1) {
+  // Head セットは常に 1 セット以上必要
+  // Head を直接掴んだ場合も Neck を掴んだ場合も、最後の1セットは削除禁止
+  if (isHeadSetDeleteRequest && CountHeads() <= 1) {
     return false;
   }
 
+  // 足セットは左右1セットずつ、計2セット以上必要
   if (IsLegRoot(target.part) && CountLegRoots() <= 2) {
     return false;
   }
