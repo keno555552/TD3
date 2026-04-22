@@ -415,6 +415,9 @@ public:
   float GetVisualSegmentRadius(ModControlPointRole startRole,
                                ModControlPointRole endRole) const;
 
+  static void RequestResetOnNextModSceneEntry();
+  static bool ConsumeResetOnNextModSceneEntry();
+
 private:
   /// <summary>
   /// 対象Objectの基準transformを必要に応じてキャッシュする

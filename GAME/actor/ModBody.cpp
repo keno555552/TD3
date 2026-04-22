@@ -381,6 +381,16 @@ void SyncChainNodesFromControlPoints(
   chain->UpdateHierarchy();
 }
 
+std::unique_ptr<ModBodyCustomizeData> &SharedCustomizeDataStorage() {
+  static std::unique_ptr<ModBodyCustomizeData> sharedData = nullptr;
+  return sharedData;
+}
+
+bool &ResetOnNextModSceneEntryFlag() {
+  static bool flag = false;
+  return flag;
+}
+
 } // namespace
 
 void ModBody::Initialize(Object *target, ModBodyPart part) {
@@ -1267,4 +1277,15 @@ void ModBody::SyncControlPointsFromChain(std::vector<ModControlPoint> *points,
   for (size_t i = 0; i < count; ++i) {
     (*points)[i].localPosition = chain.GetWorldPosition(i);
   }
+}
+
+void ModBody::RequestResetOnNextModSceneEntry() {
+  ResetOnNextModSceneEntryFlag() = true;
+}
+
+bool ModBody::ConsumeResetOnNextModSceneEntry() {
+  bool &flag = ResetOnNextModSceneEntryFlag();
+  const bool result = flag;
+  flag = false;
+  return result;
 }

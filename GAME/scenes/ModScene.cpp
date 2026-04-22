@@ -828,7 +828,13 @@ ModScene::ModScene(kEngine *system) {
 
   // 初期部位構成を作成し、保存データがあれば見た目へ読み込む
   SetupModObjects();
-  LoadCustomizeData();
+
+  if (ModBody::ConsumeResetOnNextModSceneEntry()) {
+    ResetForRetryFromFailure();
+  } else {
+    LoadCustomizeData();
+  }
+
   EnsureValidSelection();
 
   // Orbitカメラの初期値を「モデル前面」基準で決める
@@ -1090,6 +1096,38 @@ void ModScene::CameraPart() {
   }
 
   system_->SetCamera(usingCamera_);
+}
+
+void ModScene::ResetForRetryFromFailure() {
+  // 構造を初期人型へ戻す
+  assembly_.InitializeDefaultHumanoid();
+
+  // 胴体操作点を初期化
+  ResetTorsoControlPoints();
+
+  // Object を再同期
+  SyncObjectsWithAssembly();
+
+  // 初期レイアウト
+  SetupInitialLayout();
+
+  // 見た目パラメータ初期化
+  ResetModBodies();
+
+  // 選択状態・ドラッグ状態クリア
+  EnsureValidSelection();
+  ClearControlPointSelection();
+  reattachParentId_ = -1;
+  reattachConnectorId_ = -1;
+
+  // shared に積む用の customizeData も完全に再構築
+  SyncCustomizeDataFromScene();
+
+  // 念のため整合性
+  if (customizeData_ != nullptr) {
+    ModBody::NormalizeCustomizeData(*customizeData_);
+    ModBody::SetSharedCustomizeData(*customizeData_);
+  }
 }
 
 Vector3 ModScene::ComputeOrbitTarget() const {
@@ -5776,6 +5814,7 @@ void ModScene::DecideFailureMenuMod() {
     break;
 
   case RetryChoiceMod::RetryMod:
+    ResetForRetryFromFailure();
     pendingFailureOutcome_ = SceneOutcome::RETRY;
     break;
 
