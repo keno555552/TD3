@@ -6870,7 +6870,7 @@ void TravelScene::UpdateRaceFinishState() {
     } else {
       raceResultState_ = RaceResultState::GameOver;
       isRaceFinished_ = true;
-      OpenFailureMenuTravel();  
+      OpenFailureMenuTravel();
     }
     return;
   }
@@ -7668,9 +7668,9 @@ void TravelScene::DrawFailureMenuTravel() {
   const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
   const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
 
-  bitmapFont.RenderText("GAME OVER", {640.0f, 220.0f}, 72.0f,
-                        BitmapFont::Align::Center, 5.0f,
-                        {1.0f, 0.35f, 0.35f, 1.0f});
+  // bitmapFont.RenderText("game OVER", {640.0f, 220.0f}, 72.0f,
+  //                       BitmapFont::Align::Center, 5.0f,
+  //                       {1.0f, 0.35f, 0.35f, 1.0f});
 
   bitmapFont.RenderText(
       "おだいせんたくにもどる", {640.0f, 300.0f},

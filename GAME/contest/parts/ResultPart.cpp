@@ -157,8 +157,10 @@ void ResultPart::UpdateStarChart() {
 
 void ResultPart::DrawStarItem(const char* label, int star, bool visible) const {
 	if (visible) {
+#ifdef USE_IMGUI
 		ImGui::Text("  %-14s: %s (%d)", label,
 			StarsToString(star).c_str(), star);
+#endif // USE_IMGUI
 	}
 }
 
