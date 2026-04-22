@@ -70,6 +70,9 @@ private:
   // model
   //========
   // ステージオブジェクト
+  int contestVenueModelHandle_ = 0;
+  SceneObject contestVenue_;
+
   int stageModelHandle_ = 0;
   SceneObject stage_;
 

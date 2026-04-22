@@ -8,6 +8,8 @@ ShowOffPart::ShowOffPart(kEngine* system, BitmapFont* font,
 	// 初期カメラ位置（後でImGuiで調整）
 	cameraTransform_.position = { 0.0f, 3.5f, -13.0f };
 	cameraTransform_.rotation = { 0.15f, 0.0f, 0.0f };
+
+	GenerateRandomDisplays();
 }
 
 void ShowOffPart::Update() {
@@ -30,22 +32,22 @@ void ShowOffPart::Update() {
 
 void ShowOffPart::Draw() {
 
-	font_->RenderText("ざわ・・・", { 100,100 }, 64, BitmapFont::Align::Left);
-	font_->RenderText("ざわ・・・", { 200,10 }, 32, BitmapFont::Align::Left);
-	font_->RenderText("ざわ・・・", { 1000,600 }, 48, BitmapFont::Align::Right);
-	font_->RenderText("ざわ・・・", { 130,650 }, 64, BitmapFont::Align::Left);
-	font_->RenderText("ざわ・・・", { 400,370 }, 32, BitmapFont::Align::Left);
-	font_->RenderText("ざわ・・・", { 900,250 }, 64, BitmapFont::Align::Right);
-	font_->RenderText("ざわ・・・", { 1200,200 }, 48, BitmapFont::Align::Right);
-	font_->RenderText("// ざわ・・・", { 640,360 }, 48, BitmapFont::Align::Center);
+	// ざわをランダム配置で表示
+	for (const auto& zawa : zawaDisplays_) {
+		font_->RenderText("ざわ・・・", zawa.position, zawa.size,
+			BitmapFont::Align::Center);
+	}
 
-	// 観客コメントを常に表示
+	// 観客コメントをランダム配置で表示
 	for (int i = 0; i < 3; ++i) {
-		if (!audienceResult_.comments[i].empty()) {
+		if (i < (int)commentDisplays_.size() &&
+			!audienceResult_.comments[i].empty()) {
 			font_->RenderText(
 				audienceResult_.comments[i],
-				{ 640.0f, 100.0f + i * 80.0f }, 32.0f,
-				BitmapFont::Align::Center);
+				commentDisplays_[i].position,
+				commentDisplays_[i].size,
+				BitmapFont::Align::Center,
+				5,{1.0f,0.0f,0.0f,1.0f});
 		}
 	}
 
@@ -79,4 +81,28 @@ bool ShowOffPart::IsFinished() const {
 
 PartCameraTransform ShowOffPart::GetCameraTransform() const {
 	return cameraTransform_;
+}
+
+void ShowOffPart::GenerateRandomDisplays() {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<float> distX(70.0f, 1210.0f);
+	std::uniform_real_distribution<float> distY(50.0f, 670.0f);
+	std::uniform_int_distribution<int> distSize(0, 2);
+
+	float sizes[] = { 32.0f, 48.0f, 64.0f };
+
+	// ざわ8個
+	zawaDisplays_.resize(8);
+	for (auto& zawa : zawaDisplays_) {
+		zawa.position = { distX(gen), distY(gen) };
+		zawa.size = sizes[distSize(gen)];
+	}
+
+	// コメント3個
+	commentDisplays_.resize(3);
+	for (auto& comment : commentDisplays_) {
+		comment.position = { distX(gen), distY(gen) };
+		comment.size = sizes[distSize(gen)];
+	}
 }
