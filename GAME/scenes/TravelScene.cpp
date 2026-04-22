@@ -158,6 +158,11 @@ TravelScene::TravelScene(kEngine *system) {
     obj->mainPosition.transform = CreateDefaultTransform();
     obj->mainPosition.transform.scale = {0.08f, 0.08f, 0.08f};
   }
+
+  pendingFailureOutcome_ = SceneOutcome::NONE;
+  isFailureMenuOpen_ = false;
+  failureMenuInputCooldown_ = 0.0f;
+  selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
 }
 
 TravelScene::~TravelScene() {
@@ -206,6 +211,16 @@ void TravelScene::Update() {
   //===============================
   if (isStartTransition_) {
     UpdateSceneTransition();
+    return;
+  }
+
+  //===============================
+  // 失敗時のリトライ更新
+  //===============================
+  if (isFailureMenuOpen_) {
+    UpdateFailureMenuInputTravel();
+    perfectParticle_->Update(camera_);
+    fade_.Update(usingCamera_);
     return;
   }
 
@@ -412,9 +427,9 @@ void TravelScene::Draw() {
 
   if (raceResultState_ == RaceResultState::Clear) {
     bitmapFont.RenderText("CLEAR", {900, 300}, 96, BitmapFont::Align::Left);
-  } else if (raceResultState_ == RaceResultState::GameOver) {
-    bitmapFont.RenderText("GAME OVER", {800, 300}, 96, BitmapFont::Align::Left);
   }
+
+  DrawFailureMenuTravel();
 
   perfectParticle_->Draw();
 
@@ -2201,19 +2216,12 @@ void TravelScene::UpdateSceneTransition() {
   // Clear    -> 次シーン
   // GameOver -> リトライ
   //================================
+  // クリアで次シーンへ
   if (isRaceFinished_ && !fade_.IsBusy() && !isStartTransition_) {
     if (raceResultState_ == RaceResultState::Clear) {
       fade_.StartFadeOut();
       isStartTransition_ = true;
       nextOutcome_ = SceneOutcome::NEXT;
-    } else if (raceResultState_ == RaceResultState::GameOver) {
-      fade_.StartFadeOut();
-      isStartTransition_ = true;
-      nextOutcome_ = SceneOutcome::RETRY;
-
-      // リトライ用に時間だけ戻しておく
-      timeLimit_ = travelTimeLimit_;
-      isTimeUp_ = false;
     }
   }
 
@@ -7104,11 +7112,29 @@ void TravelScene::UpdateRaceFinishState() {
 
     if (playerFinishRank_ <= qualifyCount_) {
       raceResultState_ = RaceResultState::Clear;
+      isRaceFinished_ = true;
     } else {
       raceResultState_ = RaceResultState::GameOver;
+      isRaceFinished_ = true;
+      OpenFailureMenuTravel();  
     }
+    return;
+  }
 
+  for (auto &npc : npcRunners_) {
+    if (npc.finished && npc.finishRank < 0) {
+      finishCount_++;
+      npc.finishRank = finishCount_;
+    }
+  }
+
+  if (!isPlayerFinished_ && finishCount_ >= qualifyCount_) {
+    raceResultState_ = RaceResultState::GameOver;
     isRaceFinished_ = true;
+
+    if (!isFailureMenuOpen_) {
+      OpenFailureMenuTravel();
+    }
     return;
   }
 
@@ -7749,4 +7775,147 @@ void TravelScene::UpdateNpcCustomizedVisual(NpcRunner &npc) {
       npc.modObjects[i]->Update(usingCamera_);
     }
   }
+}
+
+void TravelScene::OpenFailureMenuTravel() {
+  isFailureMenuOpen_ = true;
+  selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+  failureMenuInputCooldown_ = 0.15f;
+}
+
+void TravelScene::DecideFailureMenuTravel() {
+  if (fade_.IsBusy() || isStartTransition_) {
+    return;
+  }
+
+  switch (selectedRetryChoiceTravel_) {
+  case RetryChoiceTravel::BackToPrompt:
+    pendingFailureOutcome_ = SceneOutcome::RETURN_PROMPT;
+    break;
+
+  case RetryChoiceTravel::RetryMod:
+    pendingFailureOutcome_ = SceneOutcome::RETRY_MOD;
+    break;
+
+  case RetryChoiceTravel::RetryTravel:
+    pendingFailureOutcome_ = SceneOutcome::RETRY;
+    break;
+
+  default:
+    pendingFailureOutcome_ = SceneOutcome::NONE;
+    break;
+  }
+
+  if (pendingFailureOutcome_ != SceneOutcome::NONE) {
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+    nextOutcome_ = pendingFailureOutcome_;
+  }
+}
+
+void TravelScene::UpdateFailureMenuInputTravel() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const float dt = system_->GetDeltaTime();
+  if (failureMenuInputCooldown_ > 0.0f) {
+    failureMenuInputCooldown_ -= dt;
+    if (failureMenuInputCooldown_ < 0.0f) {
+      failureMenuInputCooldown_ = 0.0f;
+    }
+  }
+
+  const Vector2 mouse = system_->GetMousePosVector2();
+
+  struct MenuRect {
+    Vector2 center;
+    Vector2 size;
+  };
+
+  const MenuRect promptRect{{640.0f, 300.0f}, {500.0f, 64.0f}};
+  const MenuRect retryModRect{{640.0f, 380.0f}, {500.0f, 64.0f}};
+  const MenuRect retryTravelRect{{640.0f, 460.0f}, {500.0f, 64.0f}};
+
+  auto IsInside = [](const Vector2 &p, const MenuRect &r) -> bool {
+    const float left = r.center.x - r.size.x * 0.5f;
+    const float right = r.center.x + r.size.x * 0.5f;
+    const float top = r.center.y - r.size.y * 0.5f;
+    const float bottom = r.center.y + r.size.y * 0.5f;
+    return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+  };
+
+  if (IsInside(mouse, promptRect)) {
+    selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
+  } else if (IsInside(mouse, retryModRect)) {
+    selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+  } else if (IsInside(mouse, retryTravelRect)) {
+    selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+  }
+
+  if (failureMenuInputCooldown_ <= 0.0f) {
+    if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
+      if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod) {
+        selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
+      } else if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel) {
+        selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
+      if (selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt) {
+        selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+      } else if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod) {
+        selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    const bool mouseClicked = system_->GetMouseTriggerOn(0);
+    const bool keyConfirm =
+        system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
+
+    if (mouseClicked || keyConfirm) {
+      DecideFailureMenuTravel();
+    }
+  }
+}
+
+void TravelScene::DrawFailureMenuTravel() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
+
+  bitmapFont.RenderText("GAME OVER", {640.0f, 220.0f}, 72.0f,
+                        BitmapFont::Align::Center, 5.0f,
+                        {1.0f, 0.35f, 0.35f, 1.0f});
+
+  bitmapFont.RenderText(
+      "おだいせんたくにもどる", {640.0f, 300.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt ? 44.0f
+                                                                    : 36.0f,
+      BitmapFont::Align::Center, 5.0f,
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt
+          ? selectedColor
+          : normalColor);
+
+  bitmapFont.RenderText(
+      "かいぞうのさいしょからやりなおす", {640.0f, 380.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? 44.0f : 36.0f,
+      BitmapFont::Align::Center, 5.0f,
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? selectedColor
+                                                                : normalColor);
+
+  bitmapFont.RenderText(
+      "いどうのさいしょからやりなおす", {640.0f, 460.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel ? 44.0f
+                                                                   : 36.0f,
+      BitmapFont::Align::Center, 5.0f,
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel
+          ? selectedColor
+          : normalColor);
 }

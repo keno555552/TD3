@@ -9,13 +9,14 @@ enum class ScenePhase {
 	TRANSITION,
 };
 
-enum class SceneOutcome{
-	LOSE = -1,
-	NONE,
-	WIN,
-	NEXT,
-	RETRY,
-	RETRY_MOD,
-	RETURN,
-	EXIT,
+enum class SceneOutcome {
+  LOSE = -1,
+  NONE,
+  WIN,
+  NEXT,
+  RETRY,
+  RETRY_MOD,
+  RETURN,
+  RETURN_PROMPT,
+  EXIT,
 };

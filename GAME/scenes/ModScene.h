@@ -827,6 +827,9 @@ private:
 
     float skillMultiplier;
     float runTimingSkill = 1.0f;
+
+    bool hasReachedGoal = false;
+    bool goalNotified = false;
   };
 
   struct StartNotification {
@@ -837,8 +840,24 @@ private:
     float startY;
   };
 
+  enum class RetryChoiceMod { BackToPrompt = 0, RetryMod, Count };
+
+  bool isFailureMenuOpen_ = false;
+  bool isModFailed_ = false;
+  bool failureNotified_ = false;
+
+  int npcGoalCountInMod_ = 0;
+  int modFailureGoalCount_ = 3;
+
   std::vector<NpcModProgress> npcProgress_;
   std::vector<StartNotification> notifications_;
+
+  RetryChoiceMod selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  SceneOutcome pendingFailureOutcome_ = SceneOutcome::NONE;
+
+  float failureMenuInputCooldown_ = 0.0f;
+
+  float modNpcGoalLeadTime_ = 8.0f;
 
   void InitializeNpcModProgress();
   void UpdateNpcProgress();
@@ -855,6 +874,14 @@ private:
   float GetNpcPresetTimeBonus(NpcPresetType presetType) const;
   float GetNpcSkillMultiplierByIndex(int index) const;
   float GetNpcRunTimingSkillByIndex(int index) const;
+
+  void UpdateFailureMenuInputMod();
+  void DrawFailureMenuMod();
+  void OpenFailureMenuMod();
+  void DecideFailureMenuMod();
+
+  bool IsNpcReachedGoalInModScene(const NpcModProgress &npc) const;
+  void CheckModFailureState();
 
   /*----- 部位の追加削除ボタン関連関数 -----*/
 

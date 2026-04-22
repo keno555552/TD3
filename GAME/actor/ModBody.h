@@ -128,6 +128,7 @@ enum class NpcPresetType {
   BigTorso,
 };
 
+// NPCのスタートからゴールまでの進行状況を保存する構造体
 struct NpcStartProgressData {
   std::string name;
 
@@ -142,6 +143,37 @@ struct NpcStartProgressData {
   NpcPresetType presetType = NpcPresetType::Default;
 
   float runTimingSkill = 1.0f;
+
+  bool hasReachedGoal = false;
+};
+
+// リトライ先の選択肢
+enum class ModRetryDestination {
+  TravelSceneRetry = 0,
+  ModSceneRestart,
+  PromptSceneRestart,
+};
+
+// リトライメニューの状態
+enum class RetryMenuState {
+  Hidden = 0,
+  Active,
+  Confirmed,
+};
+
+// モッドシーンでのリトライ選択肢
+enum class ModSceneRetryChoice {
+  ModRestart = 0,
+  PromptRestart,
+  Count,
+};
+
+// トラベルシーンでのリトライ選択肢
+enum class TravelSceneRetryChoice {
+  TravelRestart = 0,
+  ModRestart,
+  PromptRestart,
+  Count,
 };
 
 /// <summary>
@@ -167,6 +199,30 @@ struct ModBodyCustomizeData {
 
   // NPC情報
   std::vector<NpcStartProgressData> npcStartProgressList;
+
+  // ゴール最大規定数
+  int qualifyCount = 3;
+
+  // リトライ先設定
+  ModRetryDestination modLoseRetryDestination =
+      ModRetryDestination::ModSceneRestart;
+
+  // トラブル時のリトライ先は、モッドシーンでのリトライと、トラベルシーンでのリトライ（同じシーン再挑戦）を選べるようにする
+  ModRetryDestination travelLoseRetryDestination =
+      ModRetryDestination::TravelSceneRetry;
+
+  bool modNpcRaceClosed = false;
+
+  bool modSceneFailed = false;
+  bool travelSceneFailed = false;
+
+  RetryMenuState modRetryMenuState = RetryMenuState::Hidden;
+  RetryMenuState travelRetryMenuState = RetryMenuState::Hidden;
+
+  int modRetrySelectedIndex = 0;
+  int travelRetrySelectedIndex = 0;
+
+  bool retryDecisionConsumed = false;
 };
 
 /// <summary>
@@ -308,11 +364,20 @@ public:
   /// </summary>
   static void NormalizeCustomizeData(ModBodyCustomizeData &data);
 
-  /// <summary>
+    /// <summary>
   /// 外部から操作点一覧を丸ごと設定する（デバッグ用途 / 特殊用途向け）
   /// </summary>
   void SetControlPoints(const std::vector<ModControlPoint> &points) {
     controlPoints_ = points;
+
+    // 復元直後に Bend-End / Chest-Belly-Waist の整合を必ず取る
+    UpdateControlPointHierarchy();
+
+    // 外部復元時は chain の内部状態とズレる可能性があるため、
+    // 以降の操作はフォールバック経路で扱う
+    if (HasOwnControlPoints()) {
+      chain_.Clear();
+    }
   }
 
   /// <summary>

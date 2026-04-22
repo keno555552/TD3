@@ -1,20 +1,21 @@
 #pragma once
-#include "GAME/effect/Fade.h"
 #include "BaseScene.h"
+#include "GAME/actor/ModBody.h"
+#include "GAME/actor/ModCustomizedBodyActor.h"
 #include "GAME/actor/prompt/PromptData.h"
+#include "GAME/effect/Fade.h"
 #include "GAME/score/ScoreCalculator.h"
 #include "GAME/score/ScoreResult.h"
-#include "GAME/actor/ModBody.h"
 
-#include "GAME/nickname/NicknameManager.h"
 #include "GAME/nickname/NicknameData.h"
+#include "GAME/nickname/NicknameManager.h"
 #include "GAME/userData/UserDataManager.h"
 
-#include "GAME/judges/comment/JudgeCommentManager.h"
 #include "GAME/judges/comment/JudgeCommentData.h"
+#include "GAME/judges/comment/JudgeCommentManager.h"
 
-#include "GAME/audience/AudienceManager.h"
 #include "GAME/audience/AudienceData.h"
+#include "GAME/audience/AudienceManager.h"
 
 #include "GAME/font/BitmapFont.h"
 
@@ -25,121 +26,124 @@
 /// コンテストの進行フェーズ
 /// </summary>
 enum class ContestPhase {
-	ShowOff,  /// お披露目
-	Judging,  /// 審査
-	Result,   /// 結果
-	Trophy,   /// トロフィー・選択
+  ShowOff, /// お披露目
+  Judging, /// 審査
+  Result,  /// 結果
+  Trophy,  /// トロフィー・選択
 };
 
 struct SceneObject {
-	std::unique_ptr<Object> object;
-	Vector3 position;
-	Vector3 rotation;
-	Vector3 scale;
+  std::unique_ptr<Object> object;
+  Vector3 position;
+  Vector3 rotation;
+  Vector3 scale;
 };
 
 class ContestScene : public BaseScene {
 public:
-	ContestScene(kEngine* system);
-	~ContestScene();
+  ContestScene(kEngine *system);
+  ~ContestScene();
 
-	void Update() override;
-	void Draw() override;
+  void Update() override;
+  void Draw() override;
 
 private:
-	// ライト
-	Light* light1_ = nullptr;
+  // ライト
+  Light *light1_ = nullptr;
 
-	// カメラ
-	Camera* camera_ = nullptr;
-	DebugCamera* debugCamera_ = nullptr;
-	Camera* usingCamera_ = nullptr;
-	bool useDebugCamera_ = false;
+  // カメラ
+  Camera *camera_ = nullptr;
+  DebugCamera *debugCamera_ = nullptr;
+  Camera *usingCamera_ = nullptr;
+  bool useDebugCamera_ = false;
 
-	//========
-	// model
-	//========
-	// ステージオブジェクト
-	int stageModelHandle_ = 0;
-	SceneObject stage_;
+  //========
+  // model
+  //========
+  // ステージオブジェクト
+  int stageModelHandle_ = 0;
+  SceneObject stage_;
 
-	int backScreenModelHandle_ = 0;
-	SceneObject backScreen_;
+  int backScreenModelHandle_ = 0;
+  SceneObject backScreen_;
 
-	int rightSideScreenModelHandle_ = 0;
-	std::vector<SceneObject> rightSideScreens_;
+  int rightSideScreenModelHandle_ = 0;
+  std::vector<SceneObject> rightSideScreens_;
 
-	int leftSideScreenModelHandle_ = 0;
-	std::vector<SceneObject> leftSideScreens_;
+  int leftSideScreenModelHandle_ = 0;
+  std::vector<SceneObject> leftSideScreens_;
 
-	int floorModelHandle_ = 0;
-	SceneObject floor_;
+  int floorModelHandle_ = 0;
+  SceneObject floor_;
 
-	int judgesStageModelHandle_ = 0;
-	SceneObject judgesStage_;
+  int judgesStageModelHandle_ = 0;
+  SceneObject judgesStage_;
 
-	int judgesDeskModelHandle_ = 0;
-	SceneObject judgesDesk_;
+  int judgesDeskModelHandle_ = 0;
+  SceneObject judgesDesk_;
 
-	int judgesChairModelHandle_ = 0;
-	std::vector<SceneObject> judgesChairs_;
+  int judgesChairModelHandle_ = 0;
+  std::vector<SceneObject> judgesChairs_;
 
-	int audienceChairsMidModelHandle_ = 0;
-	std::vector<SceneObject> audienceChairsMid_;
+  int audienceChairsMidModelHandle_ = 0;
+  std::vector<SceneObject> audienceChairsMid_;
 
-	int audienceChairsSideModelHandle_ = 0;
-	std::vector<SceneObject> audienceChairsRightSide_;
-	std::vector<SceneObject> audienceChairsLeftSide_;
+  int audienceChairsSideModelHandle_ = 0;
+  std::vector<SceneObject> audienceChairsRightSide_;
+  std::vector<SceneObject> audienceChairsLeftSide_;
 
-	// 複数モデルの初期化
-	void SetupSceneObject(SceneObject& obj, int modelHandle,const Vector3& pos, const Vector3& rot, float scale);
+  // 複数モデルの初期化
+  void SetupSceneObject(SceneObject &obj, int modelHandle, const Vector3 &pos,
+                        const Vector3 &rot, float scale);
 
-	// フェード
-	Fade fade_;
-	bool isStartTransition_ = false;
-	SceneOutcome nextOutcome_ = SceneOutcome::NONE;
+  ModCustomizedBodyActor customizedBodyActor_;
 
-	// スコア・評価データ
-	ScoreResult scoreResult_{};
-	bool isScoreCalculated_ = false;
+  // フェード
+  Fade fade_;
+  bool isStartTransition_ = false;
+  SceneOutcome nextOutcome_ = SceneOutcome::NONE;
 
-	// 二つ名
-	NicknameTableData nicknameTable_{};
-	UserDataManager* userDataManager_ = nullptr;
-	EarnedNickname earnedNickname_{};
+  // スコア・評価データ
+  ScoreResult scoreResult_{};
+  bool isScoreCalculated_ = false;
 
-	// フォント
-	BitmapFont bitmapFont_;
+  // 二つ名
+  NicknameTableData nicknameTable_{};
+  UserDataManager *userDataManager_ = nullptr;
+  EarnedNickname earnedNickname_{};
 
-	// 審査員コメント
-	JudgeCommentTable judgeCommentTable_{};
-	std::vector<JudgeCommentResult> judgeCommentResults_;
+  // フォント
+  BitmapFont bitmapFont_;
 
-	// 観客コメント
-	AudienceCommentData audienceCommentData_{};
-	AudienceResult audienceResult_{};
+  // 審査員コメント
+  JudgeCommentTable judgeCommentTable_{};
+  std::vector<JudgeCommentResult> judgeCommentResults_;
 
-	// パート管理（ステートパターン）
-	ContestPhase phase_ = ContestPhase::ShowOff;
-	std::unique_ptr<IContestPart> currentPart_;
+  // 観客コメント
+  AudienceCommentData audienceCommentData_{};
+  AudienceResult audienceResult_{};
 
-	/// <summary>
-	/// 次のパートへ遷移する
-	/// </summary>
-	void AdvancePhase();
+  // パート管理（ステートパターン）
+  ContestPhase phase_ = ContestPhase::ShowOff;
+  std::unique_ptr<IContestPart> currentPart_;
 
-	/// <summary>
-	/// 指定フェーズのパートを生成する
-	/// </summary>
-	std::unique_ptr<IContestPart> CreatePart(ContestPhase phase);
+  /// <summary>
+  /// 次のパートへ遷移する
+  /// </summary>
+  void AdvancePhase();
 
-	/// <summary>
-	/// トロフィーパートの選択結果を処理する
-	/// </summary>
-	void HandleTrophyChoice();
+  /// <summary>
+  /// 指定フェーズのパートを生成する
+  /// </summary>
+  std::unique_ptr<IContestPart> CreatePart(ContestPhase phase);
 
-	/// <summary>
-	/// 使用するカメラを設定・更新する
-	/// </summary>
-	void CameraPart();
+  /// <summary>
+  /// トロフィーパートの選択結果を処理する
+  /// </summary>
+  void HandleTrophyChoice();
+
+  /// <summary>
+  /// 使用するカメラを設定・更新する
+  /// </summary>
+  void CameraPart();
 };
