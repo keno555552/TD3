@@ -784,8 +784,8 @@ bool ModBody::ScaleControlPoint(size_t index, float scaleFactor) {
   const ModControlPointRole role = point.role;
 
   const float defaultRadius = GetDefaultPointRadius(part_, role);
-  const float minRadius = defaultRadius * 0.60f;
-  const float maxRadius = defaultRadius * 2.50f;
+  const float minRadius = defaultRadius * (1.0f / 3.0f);
+  const float maxRadius = defaultRadius * 2.0f;
 
   const float oldRadius = point.radius;
 

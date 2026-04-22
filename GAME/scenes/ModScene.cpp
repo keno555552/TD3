@@ -773,6 +773,21 @@ bool PointInRect(const Vector2 &point, const Vector2 &center,
          point.y <= bottom;
 }
 
+float GetEditMinRatio() { return 1.0f / 3.0f; }
+
+float GetEditMaxRatio() { return 2.0f; }
+
+void MakeEditRangeFromBase(float baseValue, float *outMinValue,
+                           float *outMaxValue) {
+  if (outMinValue == nullptr || outMaxValue == nullptr) {
+    return;
+  }
+
+  const float safeBase = (std::max)(baseValue, 0.0001f);
+  *outMinValue = safeBase * GetEditMinRatio();
+  *outMaxValue = safeBase * GetEditMaxRatio();
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -3108,10 +3123,16 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   Vector3 waistPos =
       torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition;
 
-  const float chestBellyMin = 0.20f;
-  const float chestBellyMax = 1.50f;
-  const float bellyWaistMin = 0.20f;
-  const float bellyWaistMax = 1.50f;
+  const float baseChestBellyLength = 1.2796f;
+  const float baseBellyWaistLength = 1.6880f;
+
+  float chestBellyMin = 0.0f;
+  float chestBellyMax = 0.0f;
+  float bellyWaistMin = 0.0f;
+  float bellyWaistMax = 0.0f;
+
+  MakeEditRangeFromBase(baseChestBellyLength, &chestBellyMin, &chestBellyMax);
+  MakeEditRangeFromBase(baseBellyWaistLength, &bellyWaistMin, &bellyWaistMax);
 
   if (index == static_cast<size_t>(chestIndex)) {
     Vector3 candidate = newLocalPosition;
@@ -3204,8 +3225,9 @@ bool ModScene::ScaleTorsoControlPoint(size_t index, float scaleFactor) {
     break;
   }
 
-  const float minRadius = defaultRadius * 0.60f;
-  const float maxRadius = defaultRadius * 2.50f;
+  float minRadius = 0.0f;
+  float maxRadius = 0.0f;
+  MakeEditRangeFromBase(defaultRadius, &minRadius, &maxRadius);
 
   float newRadius = torsoControlPoints_[index].radius * scaleFactor;
   newRadius = ClampFloatLocal(newRadius, minRadius, maxRadius);

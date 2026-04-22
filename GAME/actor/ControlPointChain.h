@@ -92,6 +92,13 @@ public:
   /// </summary>
   void UpdateHierarchy();
 
+  float GetDefaultBaseLengthForBend() const;
+
+  float GetDefaultBaseLengthForEnd() const;
+
 private:
   std::vector<ControlPointNode> nodes_;
+
+  float defaultRootToBendLength_ = 1.0f;
+  float defaultBendToEndLength_ = 1.0f;
 };
