@@ -16,6 +16,7 @@ void BitmapFont::Initialize(kEngine* system, const std::string& fontMapPath) {
 	if (!result.has_value()) {
 		return;
 	}
+
 	nlohmann::json root = result.value();
 
 	colsPerRow_ = root.value("cols_per_row", 16);
