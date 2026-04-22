@@ -28,55 +28,62 @@ SceneManager& SceneManager::GetInstance() {
 
 void SceneManager::SceneChanger() {
 
-	if (sceneUsing_) {
-		bool isSceneChange = false;
+  if (sceneUsing_) {
+    bool isSceneChange = false;
 
-		switch (sceneUsing_->GetOutcome()) {
+    switch (sceneUsing_->GetOutcome()) {
 
-		case SceneOutcome::NEXT: {
-			auto targetScene = sceneFlow_.find(sceneUsingNameHandle_);
-			if (targetScene != sceneFlow_.end()) {
-				sceneUsingNameHandle_ = targetScene->second;
-				isSceneChange = true;
-			} else {
-				Logger::Log(
-					"[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " +
-					sceneUsingNameHandle_);
-			}
-		} break;
+    case SceneOutcome::NEXT: {
+      auto targetScene = sceneFlow_.find(sceneUsingNameHandle_);
+      if (targetScene != sceneFlow_.end()) {
+        sceneUsingNameHandle_ = targetScene->second;
+        isSceneChange = true;
+      } else {
+        Logger::Log(
+            "[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " +
+            sceneUsingNameHandle_);
+      }
+    } break;
 
-		case SceneOutcome::RETRY:
-			isSceneChange = true;
-			break;
+    case SceneOutcome::RETRY:
+      isSceneChange = true;
+      break;
 
-		case SceneOutcome::RETRY_MOD:
-			sceneUsingNameHandle_ = "MOD";
-			isSceneChange = true;
-			break;
+    case SceneOutcome::RETRY_MOD:
+      sceneUsingNameHandle_ = "MOD";
+      isSceneChange = true;
+      break;
 
-		case SceneOutcome::RETURN:
-			isSceneChange = true;
-			sceneUsingNameHandle_ = "TITLE";
-			break;
-		case SceneOutcome::EXIT:
-			kEngine::EndGame();
-			break;
-		}
+    case SceneOutcome::RETURN:
+      isSceneChange = true;
+      sceneUsingNameHandle_ = "TITLE";
+      break;
 
-		if (defaultMenu_->IsBack()) {
-			isSceneChange = true;
-			sceneUsingNameHandle_ = "TITLE";
-		}
+    case SceneOutcome::RETURN_PROMPT:
+      isSceneChange = true;
+      sceneUsingNameHandle_ = "PROMPT";
+      break;
 
-		if (defaultMenu_->IsRetry()) {
-			isSceneChange = true;
-		}
+    case SceneOutcome::EXIT:
+      kEngine::EndGame();
+      break;
+    }
 
-		if (!isSceneChange)
-			return;
-	}
+    if (defaultMenu_->IsBack()) {
+      isSceneChange = true;
+      sceneUsingNameHandle_ = "TITLE";
+    }
 
-	sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
+    if (defaultMenu_->IsRetry()) {
+      isSceneChange = true;
+    }
+
+    if (!isSceneChange) {
+      return;
+    }
+  }
+
+  sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
 }
 
 void SceneManager::Update() {

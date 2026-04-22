@@ -1,7 +1,7 @@
 #include "ContestScene.h"
-#include "GAME/contest/parts/ShowOffPart.h"
 #include "GAME/contest/parts/JudgingPart.h"
 #include "GAME/contest/parts/ResultPart.h"
+#include "GAME/contest/parts/ShowOffPart.h"
 #include "GAME/contest/parts/TrophyPart.h"
 
 ContestScene::ContestScene(kEngine* system) {
@@ -181,26 +181,47 @@ ContestScene::ContestScene(kEngine* system) {
 
 	// フォント初期化
 	bitmapFont_.Initialize(system_);
+  
+  customizedBodyActor_.Initialize(system_);
 
+  if (playerData != nullptr) {
+    customizedBodyActor_.SetActorScale({0.18f, 0.18f, 0.18f});
+    customizedBodyActor_.SetActorTranslate({0.0f, 0.0f, -0.2f});
+
+    // ステージ床の高さに合わせる
+    customizedBodyActor_.SetGroundY(0.0f);
+
+    customizedBodyActor_.SetGroundY(0.0f);
+    // 足首ではなく足裏っぽく少し上げ下げしたいときの微調整
+    customizedBodyActor_.SetGroundOffsetY(0.02f);
+
+    customizedBodyActor_.SetAutoGroundEnabled(true);
+    customizedBodyActor_.BuildFromCustomizeData(*playerData);
+  }
+
+  // 最初のパートを生成
+  phase_ = ContestPhase::ShowOff;
+  currentPart_ = CreatePart(phase_);
 }
 
 ContestScene::~ContestScene() {
-	currentPart_.reset();
-	bitmapFont_.Cleanup();
+  currentPart_.reset();
+  bitmapFont_.Cleanup();
 
-	system_->DestroyCamera(camera_);
-	system_->DestroyCamera(debugCamera_);
-	system_->RemoveLight(light1_);
+  system_->DestroyCamera(camera_);
+  system_->DestroyCamera(debugCamera_);
+  system_->RemoveLight(light1_);
 
 	ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
 	delete light1_;
 
-	delete userDataManager_;
-	userDataManager_ = nullptr;
+  delete userDataManager_;
+  userDataManager_ = nullptr;
 }
 
 void ContestScene::Update() {
+
 	CameraPart();
 
 	// フェード中は操作を受け付けない
@@ -231,6 +252,7 @@ void ContestScene::Update() {
 void ContestScene::Draw() {
 
 #ifdef USE_IMGUI
+
 	// ステージオブジェクト配置調整
 	ImGui::Begin("Stage Objects");
 
@@ -373,31 +395,28 @@ void ContestScene::Draw() {
 #endif
 
 #ifdef USE_IMGUI
-	ImGui::Begin("Camera Control");
-	ImGui::Checkbox("Use Debug Camera", &useDebugCamera_);
-	if (usingCamera_) {
-		ImGui::Text("Pos: %.1f, %.1f, %.1f",
-			usingCamera_->GetTransform().translate.x,
-			usingCamera_->GetTransform().translate.y,
-			usingCamera_->GetTransform().translate.z);
-		ImGui::Text("Rot: %.2f, %.2f, %.2f",
-			usingCamera_->GetTransform().rotate.x,
-			usingCamera_->GetTransform().rotate.y,
-			usingCamera_->GetTransform().rotate.z);
-	}
-	ImGui::End();
+  ImGui::Begin("Camera Control");
+  ImGui::Checkbox("Use Debug Camera", &useDebugCamera_);
+  if (usingCamera_) {
+    ImGui::Text("Pos: %.1f, %.1f, %.1f",
+                usingCamera_->GetTransform().translate.x,
+                usingCamera_->GetTransform().translate.y,
+                usingCamera_->GetTransform().translate.z);
+    ImGui::Text("Rot: %.2f, %.2f, %.2f", usingCamera_->GetTransform().rotate.x,
+                usingCamera_->GetTransform().rotate.y,
+                usingCamera_->GetTransform().rotate.z);
+  }
+  ImGui::End();
 #endif
 
 #ifdef USE_IMGUI
-	// 現在シーン・フェーズ表示
-	ImGui::Begin("Scene");
-	ImGui::Text("ContestScene");
+  // 現在シーン・フェーズ表示
+  ImGui::Begin("Scene");
+  ImGui::Text("ContestScene");
 
-	const char* phaseNames[] = {
-		"ShowOff", "Judging", "Result", "Trophy"
-	};
-	ImGui::Text("Phase: %s", phaseNames[static_cast<int>(phase_)]);
-	ImGui::End();
+  const char *phaseNames[] = {"ShowOff", "Judging", "Result", "Trophy"};
+  ImGui::Text("Phase: %s", phaseNames[static_cast<int>(phase_)]);
+  ImGui::End();
 #endif
 
 	if (stage_.object) {
@@ -483,90 +502,92 @@ void ContestScene::Draw() {
 	fade_.Draw();
 }
 
-void ContestScene::SetupSceneObject(SceneObject& obj, int modelHandle, const Vector3& pos, const Vector3& rot, float scale)
-{
-	obj.object = std::make_unique<Object>();
-	obj.object->IntObject(system_);
-	obj.object->CreateModelData(modelHandle);
-	obj.object->mainPosition.transform = CreateDefaultTransform();
-	obj.object->mainPosition.transform.translate = pos;
-	obj.object->mainPosition.transform.rotate = rot;
-	obj.object->mainPosition.transform.scale = { scale, scale, scale };
-	obj.position = pos;
-	obj.rotation = rot;
-	obj.scale = { scale, scale, scale };
+void ContestScene::SetupSceneObject(SceneObject &obj, int modelHandle,
+                                    const Vector3 &pos, const Vector3 &rot,
+                                    float scale) {
+  obj.object = std::make_unique<Object>();
+  obj.object->IntObject(system_);
+  obj.object->CreateModelData(modelHandle);
+  obj.object->mainPosition.transform = CreateDefaultTransform();
+  obj.object->mainPosition.transform.translate = pos;
+  obj.object->mainPosition.transform.rotate = rot;
+  obj.object->mainPosition.transform.scale = {scale, scale, scale};
+  obj.position = pos;
+  obj.rotation = rot;
+  obj.scale = {scale, scale, scale};
 }
 
 void ContestScene::AdvancePhase() {
-	switch (phase_) {
-	case ContestPhase::ShowOff:
-		phase_ = ContestPhase::Judging;
-		break;
-	case ContestPhase::Judging:
-		phase_ = ContestPhase::Result;
-		break;
-	case ContestPhase::Result:
-		phase_ = ContestPhase::Trophy;
-		break;
-	case ContestPhase::Trophy:
-		// Trophyは HandleTrophyChoice で処理するのでここには来ない
-		break;
-	}
+  switch (phase_) {
+  case ContestPhase::ShowOff:
+    phase_ = ContestPhase::Judging;
+    break;
+  case ContestPhase::Judging:
+    phase_ = ContestPhase::Result;
+    break;
+  case ContestPhase::Result:
+    phase_ = ContestPhase::Trophy;
+    break;
+  case ContestPhase::Trophy:
+    // Trophyは HandleTrophyChoice で処理するのでここには来ない
+    break;
+  }
 
-	currentPart_ = CreatePart(phase_);
+  currentPart_ = CreatePart(phase_);
 }
 
 std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
-	switch (phase) {
-	case ContestPhase::ShowOff:
-		return std::make_unique<ShowOffPart>(
-			system_, &bitmapFont_, audienceResult_);
+  switch (phase) {
+  case ContestPhase::ShowOff:
+    return std::make_unique<ShowOffPart>(system_, &bitmapFont_,
+                                         audienceResult_);
 
-	case ContestPhase::Judging:
-		return std::make_unique<JudgingPart>(
-			system_, &bitmapFont_, scoreResult_, judgeCommentResults_);
+  case ContestPhase::Judging:
+    return std::make_unique<JudgingPart>(system_, &bitmapFont_, scoreResult_,
+                                         judgeCommentResults_);
 
-	case ContestPhase::Result:
-		return std::make_unique<ResultPart>(
-			system_, &bitmapFont_, scoreResult_, earnedNickname_);
+  case ContestPhase::Result:
+    return std::make_unique<ResultPart>(system_, &bitmapFont_, scoreResult_,
+                                        earnedNickname_);
 
-	case ContestPhase::Trophy:
-		return std::make_unique<TrophyPart>(system_, &bitmapFont_);
+  case ContestPhase::Trophy:
+    return std::make_unique<TrophyPart>(system_, &bitmapFont_);
 
-	default:
-		return nullptr;
-	}
+  default:
+    return nullptr;
+  }
 }
 
 void ContestScene::HandleTrophyChoice() {
-	// TrophyPartにダウンキャストして選択結果を取得
-	auto* trophyPart = dynamic_cast<TrophyPart*>(currentPart_.get());
-	if (!trophyPart) return;
+  // TrophyPartにダウンキャストして選択結果を取得
+  auto *trophyPart = dynamic_cast<TrophyPart *>(currentPart_.get());
+  if (!trophyPart)
+    return;
 
-	TrophyChoice choice = trophyPart->GetChoice();
+  TrophyChoice choice = trophyPart->GetChoice();
 
-	switch (choice) {
-	case TrophyChoice::NextTheme:
-		fade_.StartFadeOut();
-		isStartTransition_ = true;
-		nextOutcome_ = SceneOutcome::NEXT;
-		break;
+  switch (choice) {
+  case TrophyChoice::NextTheme:
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+    nextOutcome_ = SceneOutcome::NEXT;
+    break;
 
-	case TrophyChoice::Retry:
-		fade_.StartFadeOut();
-		isStartTransition_ = true;
-		nextOutcome_ = SceneOutcome::RETRY_MOD;
-		break;
+  case TrophyChoice::Retry:
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+    nextOutcome_ = SceneOutcome::RETRY_MOD;
+    break;
 
-	case TrophyChoice::Title:
-		fade_.StartFadeOut();
-		isStartTransition_ = true;
-		nextOutcome_ = SceneOutcome::RETURN;
-		break;
+  case TrophyChoice::Title:
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+    nextOutcome_ = SceneOutcome::RETURN;
+    break;
 
-	default:
-		break;
-	}
+  default:
+    break;
+  }
 }
 
 void ContestScene::CameraPart() {

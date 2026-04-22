@@ -835,6 +835,8 @@ ModScene::ModScene(kEngine *system) {
 
   // 画面UIを初期化する
   InitializeScreenUi();
+
+  pendingFailureOutcome_ = SceneOutcome::NONE;
 }
 
 ModScene::~ModScene() {
@@ -860,6 +862,21 @@ void ModScene::Update() {
 
   // 画面UIの状態を更新する
   UpdateScreenUi();
+
+  // 失敗メニューが開いている場合は、3D操作は行わずにメニューの更新と遷移処理だけ行う
+  if (isFailureMenuOpen_) {
+    UpdateNotifications();
+    UpdateFailureMenuInputMod();
+    fade_.Update(usingCamera_);
+
+    if (isStartTransition_ && fade_.IsFinished()) {
+      if (customizeData_ != nullptr) {
+        ModBody::SetSharedCustomizeData(*customizeData_);
+      }
+      outcome_ = pendingFailureOutcome_;
+    }
+    return;
+  }
 
   // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
   if (TryHandleAddButtonClick()) {
@@ -970,6 +987,7 @@ void ModScene::Draw() {
 
   ImGui::Text("NPC Count : %zu", npcProgress_.size());
   ImGui::Text("Notification Count : %zu", notifications_.size());
+  ImGui::Text("NpcGoalCountInMod : %d", npcGoalCountInMod_);
   ImGui::Separator();
 
   for (size_t i = 0; i < npcProgress_.size(); ++i) {
@@ -981,7 +999,6 @@ void ModScene::Draw() {
     }
 
     ImGui::PushID(static_cast<int>(i));
-
     ImGui::Text("%s", npc.name.c_str());
     ImGui::Text("  elapsedTime      : %.2f", npc.elapsedTime);
     ImGui::Text("  totalTime        : %.2f", npc.totalTime);
@@ -990,7 +1007,8 @@ void ModScene::Draw() {
     ImGui::Text("  hasStartedMoving : %s",
                 npc.hasStartedMoving ? "true" : "false");
     ImGui::Text("  moveElapsedTime  : %.2f", npc.moveElapsedTime);
-
+    ImGui::Text("  hasReachedGoal   : %s",
+                npc.hasReachedGoal ? "true" : "false");
     ImGui::Separator();
     ImGui::PopID();
   }
@@ -1000,9 +1018,15 @@ void ModScene::Draw() {
 
   bitmapFont_.BeginFrame();
   // 画面固定の追加ボタン・ゴミ箱UIを描画する
-  DrawScreenUi();
+  if (!isFailureMenuOpen_) {
+    DrawScreenUi();
+  }
 
+  // 失敗メニューが開いていない場合は、NPC進行通知を描画する
   DrawStartNotifications();
+
+  // 失敗メニューが開いている場合は、メニューを描画する
+  DrawFailureMenuMod();
 
   // フェードを描画する
   fade_.Draw();
@@ -1949,7 +1973,6 @@ int ModScene::ResolveAssemblyOperationPartId(int partId) const {
 
   return partId;
 }
-
 
 void ModScene::UpdateControlPointEditing() {
 #ifdef USE_IMGUI
@@ -5441,13 +5464,26 @@ void ModScene::UpdateNpcProgress() {
   for (size_t i = 0; i < npcProgress_.size(); ++i) {
     NpcModProgress &npc = npcProgress_[i];
 
-    // すでに移動開始しているなら、先行移動時間だけ増やす
-    if (npc.hasStartedMoving) {
-      npc.moveElapsedTime += deltaTime;
+    if (npc.hasReachedGoal) {
       continue;
     }
 
-    // まだ改造中なら時間を進める
+    if (npc.hasStartedMoving) {
+      npc.moveElapsedTime += deltaTime;
+
+      if (IsNpcReachedGoalInModScene(npc)) {
+        npc.hasReachedGoal = true;
+
+        if (!npc.goalNotified) {
+          npc.goalNotified = true;
+          npcGoalCountInMod_++;
+          AddStartNotification(npc.name + "がゴール！");
+        }
+      }
+
+      continue;
+    }
+
     npc.elapsedTime += deltaTime;
 
     if (!npc.isFinished && npc.elapsedTime >= npc.totalTime) {
@@ -5460,6 +5496,7 @@ void ModScene::UpdateNpcProgress() {
     }
   }
 
+  CheckModFailureState();
   UpdateNotifications();
 }
 
@@ -5517,10 +5554,21 @@ void ModScene::InitializeNpcModProgress() {
     npc.hasStartedMoving = false;
     npc.moveElapsedTime = 0.0f;
 
+    npc.hasReachedGoal = false;
+    npc.goalNotified = false;
+
     npcProgress_.push_back(npc);
   }
 
   notifications_.clear();
+
+  npcGoalCountInMod_ = 0;
+  isModFailed_ = false;
+  isFailureMenuOpen_ = false;
+  failureNotified_ = false;
+  pendingFailureOutcome_ = SceneOutcome::NONE;
+  selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  failureMenuInputCooldown_ = 0.0f;
 }
 
 void ModScene::DrawStartNotifications() {
@@ -5546,8 +5594,8 @@ void ModScene::DrawStartNotifications() {
     float alpha = 1.0f - t;
 
     bitmapFont_.RenderText(notification.text, {x, y}, fontSize,
-                          BitmapFont::Align::Left, 5.0f,
-                          {1.0f, 1.0f, 1.0f, alpha});
+                           BitmapFont::Align::Left, 5.0f,
+                           {1.0f, 1.0f, 1.0f, alpha});
   }
 }
 
@@ -5640,6 +5688,148 @@ float ModScene::GetNpcRunTimingSkillByIndex(int index) const {
   }
 }
 
+bool ModScene::IsNpcReachedGoalInModScene(const NpcModProgress &npc) const {
+  // 暫定実装
+  // ModScene には走行距離そのものが無いので、
+  // 先行移動時間が一定以上なら「もうゴール済み」とみなす
+  return npc.hasStartedMoving && npc.moveElapsedTime >= modNpcGoalLeadTime_;
+}
+
+void ModScene::OpenFailureMenuMod() {
+  isModFailed_ = true;
+  isFailureMenuOpen_ = true;
+  failureMenuInputCooldown_ = 0.15f;
+  selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+
+  // 失敗通知を消す
+  notifications_.clear();
+}
+
+void ModScene::DecideFailureMenuMod() {
+  if (fade_.IsBusy() || isStartTransition_) {
+    return;
+  }
+
+  switch (selectedRetryChoiceMod_) {
+  case RetryChoiceMod::BackToPrompt:
+    pendingFailureOutcome_ = SceneOutcome::RETURN_PROMPT;
+    break;
+
+  case RetryChoiceMod::RetryMod:
+    pendingFailureOutcome_ = SceneOutcome::RETRY;
+    break;
+
+  default:
+    pendingFailureOutcome_ = SceneOutcome::NONE;
+    break;
+  }
+
+  if (pendingFailureOutcome_ != SceneOutcome::NONE) {
+    fade_.StartFadeOut();
+    isStartTransition_ = true;
+  }
+}
+
+void ModScene::UpdateFailureMenuInputMod() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const float dt = system_->GetDeltaTime();
+  if (failureMenuInputCooldown_ > 0.0f) {
+    failureMenuInputCooldown_ -= dt;
+    if (failureMenuInputCooldown_ < 0.0f) {
+      failureMenuInputCooldown_ = 0.0f;
+    }
+  }
+
+  const Vector2 mouse = system_->GetMousePosVector2();
+
+  struct MenuRect {
+    Vector2 center;
+    Vector2 size;
+  };
+
+  const MenuRect promptRect{{640.0f, 330.0f}, {420.0f, 64.0f}};
+  const MenuRect retryRect{{640.0f, 410.0f}, {420.0f, 64.0f}};
+
+  auto IsInside = [](const Vector2 &p, const MenuRect &r) -> bool {
+    const float left = r.center.x - r.size.x * 0.5f;
+    const float right = r.center.x + r.size.x * 0.5f;
+    const float top = r.center.y - r.size.y * 0.5f;
+    const float bottom = r.center.y + r.size.y * 0.5f;
+    return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
+  };
+
+  if (IsInside(mouse, promptRect)) {
+    selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+  } else if (IsInside(mouse, retryRect)) {
+    selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  }
+
+  if (failureMenuInputCooldown_ <= 0.0f) {
+    if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
+      if (selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod) {
+        selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
+      if (selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt) {
+        selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+      }
+      failureMenuInputCooldown_ = 0.12f;
+    }
+
+    const bool mouseClicked = IsMouseLeftTriggeredNow();
+    const bool keyConfirm =
+        system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
+
+    if (mouseClicked || keyConfirm) {
+      DecideFailureMenuMod();
+    }
+  }
+}
+
+void ModScene::DrawFailureMenuMod() {
+  if (!isFailureMenuOpen_) {
+    return;
+  }
+
+  const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
+
+  bitmapFont_.RenderText("しっぱい", {640.0f, 220.0f}, 72.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         {1.0f, 0.35f, 0.35f, 1.0f});
+
+  const bool promptSelected =
+      selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt;
+  const bool retrySelected =
+      selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod;
+
+  bitmapFont_.RenderText("おだいにもどる", {640.0f, 330.0f},
+                         promptSelected ? 44.0f : 36.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         promptSelected ? selectedColor : normalColor);
+
+  bitmapFont_.RenderText("かいぞうからやりなおす", {640.0f, 410.0f},
+                         retrySelected ? 44.0f : 36.0f,
+                         BitmapFont::Align::Center, 5.0f,
+                         retrySelected ? selectedColor : normalColor);
+}
+
+void ModScene::CheckModFailureState() {
+  if (isModFailed_) {
+    return;
+  }
+
+  if (npcGoalCountInMod_ >= modFailureGoalCount_) {
+    OpenFailureMenuMod();
+  }
+}
+
 void ModScene::SetupUiSprite(UiIconButton &button, const Vector2 &center,
                              const Vector2 &size, int textureHandle) {
   button.center = center;
@@ -5713,10 +5903,12 @@ bool ModScene::IsPointInUiButton(const Vector2 &point,
 
 void ModScene::InitializeScreenUi() {
   // フレーム画像
-  uiFrameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
+  uiFrameTextureHandle_ =
+      system_->LoadTexture("GAME/resources/texture/frame.png");
 
   // ゴミ箱画像
-  trashTextureHandle_ = system_->LoadTexture("GAME/resources/texture/trash.png");
+  trashTextureHandle_ =
+      system_->LoadTexture("GAME/resources/texture/trash.png");
 
   const float left = 110.0f;
   const float top = 40.0f;
@@ -5912,7 +6104,8 @@ void ModScene::DrawScreenUi() {
 
   if (trashButton_.visible) {
     const float left = trashButton_.center.x - trashButton_.size.x * 0.5f;
-    const float top = trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
+    const float top =
+        trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
 
     bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
                            BitmapFont::Align::Left, 5.0f,
