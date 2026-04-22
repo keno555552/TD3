@@ -38,6 +38,13 @@ PromptScene::PromptScene(kEngine* system) {
     stopInputLockCounter_ = 0;
     selectedPromptShowCounter_ = 0;
 
+    themeButton_ = std::make_unique<DetailButton>(system);
+    themeButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+    font_.Initialize(system_);
+
+    Logger::Log("[PromptScene] font address=%p", &font_);
+
     // フェード
     fade_.Initialize(system_);
     fade_.StartFadeIn();
@@ -48,6 +55,7 @@ PromptScene::~PromptScene() {
     system_->DestroyCamera(debugCamera_);
     system_->RemoveLight(light1_);
 
+    font_.Cleanup();
     delete light1_;
 
     delete themeManager_;
@@ -58,6 +66,8 @@ PromptScene::~PromptScene() {
 }
 
 void PromptScene::Update() {
+	themeButton_->Update();
+
     CameraPart();
 
     if (!fade_.IsBusy()) {
@@ -83,7 +93,7 @@ void PromptScene::UpdatePromptRoll() {
 
         // 入力ロック解除後にスペースキーでお題決定
         if (stopInputLockCounter_ >= stopInputLockFrame_) {
-            if (system_->GetTriggerOn(DIK_SPACE)) {
+            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsPress()) {
                 DecidePrompt();
             }
         }
@@ -92,7 +102,7 @@ void PromptScene::UpdatePromptRoll() {
     case PromptRollState::Stopped:
         if (promptBoard_ != nullptr && promptBoard_->IsStopAnimationFinished()) {
             // スペースキーで次のシーンへ
-            if (system_->GetTriggerOn(DIK_SPACE)) {
+            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsPress()) {
                 fade_.StartFadeOut();
                 isStartTransition_ = true;
                 rollState_ = PromptRollState::FadeOut;
@@ -144,6 +154,20 @@ void PromptScene::Draw() {
         promptBoard_->Draw();
     }
 
+	themeButton_->Render();
+
+    if (promptBoard_ != nullptr && promptBoard_->IsStopAnimationFinished()) {
+        font_.RenderText(
+            "改造スタート",
+            { 640.0f, 620.0f }, 48.0f,
+            BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
+    } else {
+        font_.RenderText(
+            "お題をきめろ",
+            { 640.0f, 620.0f }, 48.0f,
+			BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
+    }
+   
 #ifdef USE_IMGUI
     ImGui::Begin("Scene");
     ImGui::Text("PromptScene");

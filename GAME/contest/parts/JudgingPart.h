@@ -2,6 +2,7 @@
 #include "IContestPart.h"
 #include "GAME/score/ScoreResult.h"
 #include "GAME/judges/comment/JudgeCommentData.h"
+#include"GAME/Object/DetailButton/DetailButton.h"
 #include <vector>
 
 /// <summary>
@@ -20,6 +21,8 @@ public:
 	bool IsFinished() const override;
 
 private:
+
+	std::unique_ptr<DetailButton>nextButton_;
 	const ScoreResult& scoreResult_;
 	const std::vector<JudgeCommentResult>& judgeCommentResults_;
 

@@ -4,6 +4,8 @@
 #include "GAME/theme/ThemeManager.h"
 #include "GAME/theme/ThemeData.h"
 #include "GAME/judges/JudgeManager.h"
+#include"GAME/Object/DetailButton/DetailButton.h"
+#include "GAME/font/BitmapFont.h"
 #include <memory>
 
 class PromptBoard;
@@ -40,6 +42,9 @@ private:
 
 	// 審査員管理
 	JudgeManager* judgeManager_ = nullptr;
+
+	BitmapFont font_;
+	std::unique_ptr<DetailButton>themeButton_;
 
 	// お題演出
 	std::unique_ptr<PromptBoard> promptBoard_ = nullptr;

@@ -31,6 +31,9 @@ public:
 	void Initialize(kEngine* system,
 		const std::string& fontMapPath = "GAME/resources/font/font_map.json");
 
+	// publicに追加
+	int GetGlyphMapSize() const { return (int)glyphMap_.size(); }
+
 	/// <summary>
 	/// テキスト描画
 	/// </summary>

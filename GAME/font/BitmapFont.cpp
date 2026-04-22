@@ -4,6 +4,7 @@
 #include "GAME/json/JsonManager.h"
 
 BitmapFont::~BitmapFont() {
+	//Logger::Log("[BitmapFont::~BitmapFont] this=%p size=%d", this, (int)glyphMap_.size());
 	Cleanup();
 }
 
@@ -58,6 +59,7 @@ void BitmapFont::Initialize(kEngine* system, const std::string& fontMapPath) {
 			rows.push_back(row.get<std::string>());
 		}
 		BuildGlyphMap(rows, 0, false);
+		//Logger::Log("[BitmapFont] after kana: glyphMap size=%d", (int)glyphMap_.size());
 	}
 
 	if (root.contains("ascii_rows")) {
@@ -66,6 +68,7 @@ void BitmapFont::Initialize(kEngine* system, const std::string& fontMapPath) {
 			rows.push_back(row.get<std::string>());
 		}
 		BuildGlyphMap(rows, 1, true);
+		//Logger::Log("[BitmapFont] after ascii: glyphMap size=%d", (int)glyphMap_.size());
 	}
 
 	if (root.contains("kanji_rows")) {
@@ -74,6 +77,7 @@ void BitmapFont::Initialize(kEngine* system, const std::string& fontMapPath) {
 			rows.push_back(row.get<std::string>());
 		}
 		BuildGlyphMap(rows, 2, false);
+		//Logger::Log("[BitmapFont] after kanji: glyphMap size=%d", (int)glyphMap_.size());
 	}
 
 	// フォールバック文字の設定
@@ -122,15 +126,13 @@ void BitmapFont::RenderText(const std::string& text,
 	float cursorX = startX;
 
 	for (const auto& ch : chars) {
-		// グリフ検索
 		const GlyphInfo* glyph = nullptr;
 		auto it = glyphMap_.find(ch);
 		if (it != glyphMap_.end()) {
 			glyph = &it->second;
-		} else if (hasFallback_) {
-			glyph = &fallbackGlyph_;
+		
 		} else {
-			// フォールバックもない場合はスキップ
+			
 			cursorX += heightPx;
 			continue;
 		}
@@ -197,6 +199,7 @@ void BitmapFont::RenderText(const std::string& text,
 }
 
 void BitmapFont::Cleanup() {
+	
 	for (auto* sprite : spritePool_) {
 		delete sprite;
 	}
@@ -209,7 +212,6 @@ void BitmapFont::BuildGlyphMap(const std::vector<std::string>& rows,
 	int textureIndex, bool isHalfWidth) {
 
 	for (int row = 0; row < static_cast<int>(rows.size()); ++row) {
-		// 行の文字列をUTF-8で1文字ずつ分解
 		std::vector<std::string> chars = SplitUTF8(rows[row]);
 
 		for (int col = 0; col < static_cast<int>(chars.size()); ++col) {

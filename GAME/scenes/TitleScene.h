@@ -2,6 +2,8 @@
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include <Object/Object.h>
+#include"GAME/Object/DetailButton/DetailButton.h"
+#include "GAME/font/BitmapFont.h"
 
 class TitleScene : public BaseScene {
 public:
@@ -12,6 +14,9 @@ public:
   void Draw() override;
 
 private:
+
+	BitmapFont font_;
+	std::unique_ptr<DetailButton>nextButton_;
 
 	Object* titleTextObject_ = nullptr;
 	int titleTextModelHandle_ = 0;

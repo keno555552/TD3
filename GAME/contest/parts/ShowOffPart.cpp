@@ -10,15 +10,24 @@ ShowOffPart::ShowOffPart(kEngine* system, BitmapFont* font,
 	cameraTransform_.rotation = { 0.15f, 0.0f, 0.0f };
 
 	GenerateRandomDisplays();
+
+	nextButton_ = std::make_unique<DetailButton>(system);
+	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
 }
 
 void ShowOffPart::Update() {
 	if (isFinished_) return;
 
+	nextButton_->Update();
+
 	switch (step_) {
 	case ShowOffStep::StageView:
 		// SPACEで審査員側へカメラ移動
 		if (system_->GetTriggerOn(DIK_SPACE)) {
+			step_ = ShowOffStep::TurnToJudges;
+		}
+
+		if(nextButton_->GetIsPress()){
 			step_ = ShowOffStep::TurnToJudges;
 		}
 		break;
@@ -50,6 +59,13 @@ void ShowOffPart::Draw() {
 				5,{1.0f,0.0f,0.0f,1.0f});
 		}
 	}
+
+	nextButton_->Render();
+
+	font_->RenderText(
+		"To Judge",
+		{ 640.0f, 620.0f }, 48.0f,
+		BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
 
 #ifdef USE_IMGUI
 	ImGui::Begin("Contest - ShowOff");
