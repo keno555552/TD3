@@ -2,6 +2,7 @@
 #include "kEngine.h"
 #include "Object/Sprite.h"
 #include "GAME/json/JsonManager.h"
+#include <cstdio>
 
 BitmapFont::~BitmapFont() {
 	//Logger::Log("[BitmapFont::~BitmapFont] this=%p size=%d", this, (int)glyphMap_.size());
@@ -153,25 +154,62 @@ void BitmapFont::RenderText(const std::string& text,
 		// スプライト取得
 		SimpleSprite* sprite = GetPooledSprite();
 
-		// 前回の設定をリセット
+		// 前回の設定をリセット（メッシュ／UV／マテリアルの残存を確実に消す）
 		sprite->mainPosition.transform = CreateDefaultTransform();
 
-		// 位置設定
-		sprite->mainPosition.transform.translate = {
-			cursorX, position.y, layer
-		};
+		if (!sprite->objectParts_.empty()) {
+			// transform をリセット
+			sprite->objectParts_[0].transform = CreateDefaultTransform();
 
-		// テクスチャとUV切り出し設定
-		sprite->objectParts_[0].materialConfig->textureHandle = tex.handle;
-		sprite->objectParts_[0].materialConfig->useModelTexture = false;
+			// アンカーは左上基準（必要なら変更可）
+			sprite->objectParts_[0].anchorPoint = { 0.0f, 0.0f };
+
+			// conerData は後で設定するが、一旦ゼロクリアしておく
+			sprite->objectParts_[0].conerData = CornerData();
+
+			// crop は後で設定するが、念のため初期化
+			sprite->objectParts_[0].cropLT = { 0.0f, 0.0f };
+			sprite->objectParts_[0].cropSize = { 0.0f, 0.0f };
+
+			// materialConfig の UV 関連を初期化しておく（前フレームの uvTransformMatrix 等の残存を防ぐ）
+			if (sprite->objectParts_[0].materialConfig) {
+				sprite->objectParts_[0].materialConfig->useModelTexture = false;
+				sprite->objectParts_[0].materialConfig->uvTranslate = { 0.0f, 0.0f, 0.0f };
+				sprite->objectParts_[0].materialConfig->uvScale = { 1.0f, 1.0f, 1.0f };
+				sprite->objectParts_[0].materialConfig->uvRotate = { 0.0f, 0.0f, 0.0f };
+				sprite->objectParts_[0].materialConfig->MakeUVMatrix();
+			}
+		}
+
+		//Logger::Log("Glyph texIdx=%d texHandle=%d crop=(%f,%f,%f,%f)", glyph->textureIndex, tex.handle, cropX, cropY, cropW, cropH);
+ 
+ 		// 位置設定
+ 		sprite->mainPosition.transform.translate = {
+ 			cursorX, position.y, layer
+ 		};
+ 
+ 		// テクスチャとUV切り出し設定
+		// 共有マテリアルを取得（テクスチャインデックスと色でキャッシュ）
+		auto sharedMat = GetFontMaterial(glyph->textureIndex, color);
+		sprite->objectParts_[0].materialConfig = sharedMat;
+
+		// crop は mesh 側で設定（既存の cropLT/cropSize のまま）
 		sprite->objectParts_[0].cropLT = { cropX, cropY };
 		sprite->objectParts_[0].cropSize = { cropW, cropH };
 
-		// 表示サイズをconerDataで直接指定
-		sprite->objectParts_[0].conerData.coner[0] = { 0.0f, 0.0f };         // LT
-		sprite->objectParts_[0].conerData.coner[1] = { 0.0f, heightPx };     // LB
-		sprite->objectParts_[0].conerData.coner[2] = { charWidth, heightPx }; // RB
-		sprite->objectParts_[0].conerData.coner[3] = { charWidth, 0.0f };     // RT
+		// 追加: material の UV 関連を確実に初期化して行列を作り直す
+		if (sprite->objectParts_[0].materialConfig) {
+			sprite->objectParts_[0].materialConfig->uvTranslate = { 0.0f, 0.0f, 0.0f };
+			sprite->objectParts_[0].materialConfig->uvScale = { 1.0f, 1.0f, 1.0f };
+			sprite->objectParts_[0].materialConfig->uvRotate = { 0.0f, 0.0f, 0.0f };
+			sprite->objectParts_[0].materialConfig->MakeUVMatrix();
+		}
+ 
+ 		// 表示サイズをconerDataで直接指定
+ 		sprite->objectParts_[0].conerData.coner[0] = { 0.0f, 0.0f };         // LT
+ 		sprite->objectParts_[0].conerData.coner[1] = { 0.0f, heightPx };     // LB
+ 		sprite->objectParts_[0].conerData.coner[2] = { charWidth, heightPx }; // RB
+ 		sprite->objectParts_[0].conerData.coner[3] = { charWidth, 0.0f };     // RT
 
 		// スケールは1.0固定
 		sprite->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
@@ -207,6 +245,35 @@ void BitmapFont::Cleanup() {
 	spritePool_.clear();
 	spritePoolUsed_ = 0;
 	glyphMap_.clear();
+}
+
+std::shared_ptr<MaterialConfig> BitmapFont::GetFontMaterial(int textureIndex, Vector4 color)
+{
+	// 色を 0-255 に量子化してキーを作る（微小な色差で別マテリアルが大量発生するのを防ぐ）
+	int r = static_cast<int>(std::roundf(std::clamp(color.x, 0.0f, 1.0f) * 255.0f));
+	int g = static_cast<int>(std::roundf(std::clamp(color.y, 0.0f, 1.0f) * 255.0f));
+	int b = static_cast<int>(std::roundf(std::clamp(color.z, 0.0f, 1.0f) * 255.0f));
+	int a = static_cast<int>(std::roundf(std::clamp(color.w, 0.0f, 1.0f) * 255.0f));
+
+	char keyBuf[64];
+	snprintf(keyBuf, sizeof(keyBuf), "%d:%d:%d:%d:%d", textureIndex, r, g, b, a);
+	std::string key(keyBuf);
+
+	auto it = fontMaterialCache_.find(key);
+	if (it != fontMaterialCache_.end()) return it->second;
+
+	// 新規作成（InitMaterialConfig を使って既定値を設定）
+	auto mat = std::make_shared<MaterialConfig>();
+	InitMaterialConfig(mat.get());
+	mat->useModelTexture = false;
+	mat->textureHandle = textures_[textureIndex].handle;
+	mat->lightModelType = LightModelType::Sprite2D;
+	mat->enableLighting = false;
+	mat->textureColor = color;
+	mat->MakeUVMatrix();
+
+	fontMaterialCache_.emplace(key, mat);
+	return mat;
 }
 
 void BitmapFont::BuildGlyphMap(const std::vector<std::string>& rows,

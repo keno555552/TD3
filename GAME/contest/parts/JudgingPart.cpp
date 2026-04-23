@@ -33,7 +33,7 @@ void JudgingPart::Update() {
 }
 
 void JudgingPart::Draw() {
-
+	
 	nextButton_->Render();
 
 	if (currentJudgeIndex_ < (int)judgeCommentResults_.size()) {

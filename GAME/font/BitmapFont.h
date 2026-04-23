@@ -2,7 +2,10 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "Data/Render/CPUData/MaterialConfig.h"
+#include <unordered_map>
 #include "Vector4.h"
+#include <memory>
 
 class kEngine;
 class SimpleSprite;
@@ -55,6 +58,13 @@ public:
 	void Cleanup();
 
 private:
+
+	// フォント用に作る shared MaterialConfig キャッシュ
+	// key は "texIdx:colorx:colory:colorz:colorw"
+	std::unordered_map<std::string, std::shared_ptr<MaterialConfig>> fontMaterialCache_;
+
+	// キャッシュ取得ヘルパー
+	std::shared_ptr<MaterialConfig> GetFontMaterial(int textureIndex, Vector4 color);
 	kEngine* system_ = nullptr;
 
 	/// 1文字分のフォント情報
