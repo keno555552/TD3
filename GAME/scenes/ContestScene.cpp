@@ -269,6 +269,8 @@ void ContestScene::Update() {
 
 void ContestScene::Draw() {
 
+    bitmapFont_.BeginFrame();
+
 #ifdef USE_IMGUI
 
   // ステージオブジェクト配置調整
