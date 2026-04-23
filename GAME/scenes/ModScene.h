@@ -197,6 +197,11 @@ private:
   // マウスが次シーンボタンの上にあるかどうか
   bool isHoverNextScene_ = false;
 
+  // UIのリセットボタン
+  UiIconButton resetButton_{};
+  // マウスがリセットボタンの上にあるかどうか
+  bool isHoverReset_ = false;
+
   // UIの部位追加ボタンと削除ボタンのテクスチャハンドル
   int addLeftArmTextureHandle_ = 0;
   int addRightArmTextureHandle_ = 0;
@@ -271,6 +276,10 @@ private:
   /// </summary>
   void RebuildLegacyCustomizeDataFromInstances();
 
+  //===============================
+  // リセット系
+  //===============================
+
   /// <summary>
   /// 全部位の改造パラメータを初期状態へ戻す
   /// scale、length、enabled などを各部位でリセットする
@@ -288,6 +297,11 @@ private:
   /// AssemblyGraph、Object、改造パラメータ、共有データをまとめて初期化する
   /// </summary>
   void ResetToDefaultHumanoid();
+
+  /// <summary>
+  /// 全部位の操作点を初期状態へ戻す
+  /// </summary>
+  void RestoreDefaultControlPointsFromSnapshots();
 
   /// <summary>
   /// 改造部位Objectを更新する

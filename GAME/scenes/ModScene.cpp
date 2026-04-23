@@ -1883,12 +1883,8 @@ void ModScene::ResetSelectedPartParams() {
 }
 
 void ModScene::ResetToDefaultHumanoid() {
-
   // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
-
-  // 胴体共有操作点も初期化する
-  ResetTorsoControlPoints();
 
   // Object 一覧を構造に合わせて再同期する
   SyncObjectsWithAssembly();
@@ -1897,9 +1893,130 @@ void ModScene::ResetToDefaultHumanoid() {
   SetupInitialLayout();
   ResetModBodies();
 
+  // デフォルト保存済みの操作点へ戻す
+  RestoreDefaultControlPointsFromSnapshots();
+
+  // 入力中状態をクリア
+  ClearControlPointSelection();
+  isDraggingControlPoint_ = false;
+  assemblyDrag_ = ModAssemblyDragState{};
+  reattachParentId_ = -1;
+  reattachConnectorId_ = -1;
+  hoveredPartId_ = -1;
+
   // 選択状態と共有データも初期状態へ寄せる
   EnsureValidSelection();
+  UpdateModObjects();
   SyncCustomizeDataFromScene();
+}
+
+void ModScene::RestoreDefaultControlPointsFromSnapshots() {
+  if (customizeData_ == nullptr) {
+    return;
+  }
+
+  if (customizeData_->defaultControlPointSnapshots.empty()) {
+    return;
+  }
+
+  // まず torso を空にして復元する
+  torsoControlPoints_.clear();
+
+  const int chestBodyId = assembly_.GetBodyId();
+
+  for (size_t i = 0; i < customizeData_->defaultControlPointSnapshots.size();
+       ++i) {
+    const ModControlPointSnapshot &snap =
+        customizeData_->defaultControlPointSnapshots[i];
+
+    // torso 共有操作点
+    if (snap.ownerPartType == ModBodyPart::ChestBody && chestBodyId >= 0 &&
+        snap.ownerPartId == chestBodyId &&
+        (snap.role == ModControlPointRole::Chest ||
+         snap.role == ModControlPointRole::Belly ||
+         snap.role == ModControlPointRole::Waist)) {
+      TorsoControlPoint point{};
+      point.role = snap.role;
+      point.localPosition = snap.localPosition;
+      point.radius = snap.radius;
+      point.movable = snap.movable;
+      point.isConnectionPoint = snap.isConnectionPoint;
+      point.acceptsParent = snap.acceptsParent;
+      point.acceptsChild = snap.acceptsChild;
+      torsoControlPoints_.push_back(point);
+    }
+  }
+
+  // torso 長さキャッシュも復元
+  {
+    const int chestIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Chest);
+    const int bellyIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Belly);
+    const int waistIndex =
+        FindTorsoControlPointIndex(ModControlPointRole::Waist);
+
+    if (chestIndex >= 0 && bellyIndex >= 0) {
+      torsoChestToBellyLength_ = Length(Subtract(
+          torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition,
+          torsoControlPoints_[static_cast<size_t>(bellyIndex)].localPosition));
+    }
+
+    if (bellyIndex >= 0 && waistIndex >= 0) {
+      torsoBellyToWaistLength_ = Length(Subtract(
+          torsoControlPoints_[static_cast<size_t>(bellyIndex)].localPosition,
+          torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition));
+    }
+  }
+
+  // 非 torso 部位の操作点を ownerPartId ごとに復元
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    if (node->part == ModBodyPart::ChestBody ||
+        node->part == ModBodyPart::StomachBody) {
+      continue;
+    }
+
+    if (modBodies_.count(id) == 0) {
+      continue;
+    }
+
+    std::vector<ModControlPoint> restoredPoints;
+
+    for (size_t si = 0;
+         si < customizeData_->defaultControlPointSnapshots.size(); ++si) {
+      const ModControlPointSnapshot &snap =
+          customizeData_->defaultControlPointSnapshots[si];
+
+      if (snap.ownerPartId != id) {
+        continue;
+      }
+
+      ModControlPoint point{};
+      point.role = snap.role;
+      point.localPosition = snap.localPosition;
+      point.radius = snap.radius;
+      point.movable = snap.movable;
+      point.isConnectionPoint = snap.isConnectionPoint;
+      point.acceptsParent = snap.acceptsParent;
+      point.acceptsChild = snap.acceptsChild;
+
+      restoredPoints.push_back(point);
+    }
+
+    if (!restoredPoints.empty()) {
+      modBodies_[id].SetControlPoints(restoredPoints);
+    } else {
+      // 念のため。default snapshot が無い部位は通常の初期化へ戻す
+      modBodies_[id].ResetControlPoints();
+    }
+  }
 }
 
 void ModScene::SelectPart(int partId) {
@@ -4047,27 +4164,22 @@ ModScene::FindBestAttachCandidate(int childRootPartId,
 Vector3 ModScene::ComputeAssemblyPreviewLocalTranslate(
     int childRootPartId, const ModAttachFaceCandidate &candidate) const {
   const PartNode *childNode = assembly_.FindNode(childRootPartId);
-  const PartNode *parentNode = assembly_.FindNode(candidate.parentPartId);
-  if (childNode == nullptr || parentNode == nullptr) {
+  if (childNode == nullptr) {
     return {0.0f, 0.0f, 0.0f};
   }
 
-  const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
-      parentNode->part, childNode->part, childNode->side);
-
-  const Vector3 baseAttach = ResolveDynamicAttachBase(*parentNode, *childNode);
+  // 今画面上で見えている root のワールド位置
   const Vector3 currentRootWorld =
       GetAssemblyRootWorldPosition(childRootPartId);
+
+  // スナップしたい候補面のワールド位置
   const Vector3 desiredRootWorld = candidate.worldPosition;
 
-  Vector3 worldDelta = Subtract(desiredRootWorld, currentRootWorld);
+  // 見えている位置から目標位置までの差分だけ使う
+  const Vector3 worldDelta = Subtract(desiredRootWorld, currentRootWorld);
 
-  // 現状エンジンは親回転を接続計算へ強く入れていないので、
-  // ここでは world delta をそのまま local delta として扱う
-  const Vector3 currentLocal = childNode->localTransform.translate;
-  const Vector3 offsetFromDefault = Subtract(currentLocal, defaultAttach);
-
-  return Add(Add(baseAttach, offsetFromDefault), worldDelta);
+  // localTransform.translate は「現在値に差分加算」で更新する
+  return Add(childNode->localTransform.translate, worldDelta);
 }
 
 void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
@@ -6059,6 +6171,10 @@ void ModScene::InitializeScreenUi() {
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
+  SetupUiSprite(resetButton_, {1040.0f, 640.0f}, {140.0f, 52.0f},
+                uiFrameTextureHandle_);
+  resetButton_.label = "リセット";
+
   SetupUiSprite(nextSceneButton_, {1200.0f, 640.0f}, {100.0f, 100.0f},
                 uiFrameTextureHandle_);
   nextSceneButton_.label = "つぎへ";
@@ -6119,6 +6235,13 @@ bool ModScene::TryHandleAddButtonClick() {
     return true;
   }
 
+  if (IsPointInUiButton(mouse, resetButton_)) {
+    ResetToDefaultHumanoid();
+    UpdateModObjects();
+    SyncCustomizeDataFromScene();
+    return true;
+  }
+
   if (IsPointInUiButton(mouse, nextSceneButton_)) {
     if (!fade_.IsBusy()) {
       fade_.StartFadeOut();
@@ -6143,6 +6266,10 @@ bool ModScene::IsMouseOverAnyScreenUi() const {
     return true;
   }
 
+  if (IsPointInUiButton(mouse, resetButton_)) {
+    return true;
+  }
+
   if (IsPointInUiButton(mouse, nextSceneButton_)) {
     return true;
   }
@@ -6161,9 +6288,12 @@ void ModScene::UpdateScreenUi() {
   }
 
   UpdateUiSpriteTransform(trashButton_);
+  UpdateUiSpriteTransform(resetButton_);
   UpdateUiSpriteTransform(nextSceneButton_);
 
   isHoverTrash_ = assemblyDrag_.isDragging && IsMouseOverTrashArea();
+  isHoverReset_ =
+      IsPointInUiButton(system_->GetMousePosVector2(), resetButton_);
   isHoverNextScene_ =
       IsPointInUiButton(system_->GetMousePosVector2(), nextSceneButton_);
 
@@ -6190,6 +6320,14 @@ void ModScene::UpdateScreenUi() {
                           : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
   }
 
+  if (resetButton_.sprite != nullptr &&
+      !resetButton_.sprite->objectParts_.empty()) {
+    Vector4 &color =
+        resetButton_.sprite->objectParts_[0].materialConfig->textureColor;
+    color = isHoverReset_ ? MakeColor(1.0f, 0.8f, 0.45f, 1.0f)
+                          : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+  }
+
   if (nextSceneButton_.sprite != nullptr &&
       !nextSceneButton_.sprite->objectParts_.empty()) {
     Vector4 &color =
@@ -6212,6 +6350,10 @@ void ModScene::DrawScreenUi() {
 
   if (trashButton_.visible && trashButton_.sprite != nullptr) {
     trashButton_.sprite->Draw();
+  }
+
+  if (resetButton_.visible && resetButton_.sprite != nullptr) {
+    resetButton_.sprite->Draw();
   }
 
   if (nextSceneButton_.visible && nextSceneButton_.sprite != nullptr) {
@@ -6249,6 +6391,15 @@ void ModScene::DrawScreenUi() {
     bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
                            BitmapFont::Align::Left, 5.0f,
                            {1.0f, 1.0f, 1.0f, 1.0f});
+  }
+
+  if (resetButton_.visible) {
+    Vector4 textColor = isHoverReset_ ? Vector4{1.0f, 0.8f, 0.45f, 1.0f}
+                                      : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+
+    bitmapFont_.RenderText(
+        "リセット", {resetButton_.center.x, resetButton_.center.y - 10.0f},
+        24.0f, BitmapFont::Align::Center, 5.0f, textColor);
   }
 
   if (nextSceneButton_.visible) {
