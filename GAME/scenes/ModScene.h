@@ -405,6 +405,9 @@ private:
   /// </summary>
   void DrawControlPointGizmos();
 
+  /// 接続判定ボックス（PickBox）をラインで可視化する
+  void DrawPickBoxesDebug();
+
   /* 胴体共有点関連
   --------------------------------------*/
 
@@ -877,7 +880,7 @@ private:
 
   float failureMenuInputCooldown_ = 0.0f;
 
-  float modNpcGoalLeadTime_ = 8.0f;
+  float modNpcGoalLeadTime_ = 60.0f;
 
   void InitializeNpcModProgress();
   void UpdateNpcProgress();

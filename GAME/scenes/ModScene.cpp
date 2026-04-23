@@ -788,6 +788,69 @@ void MakeEditRangeFromBase(float baseValue, float *outMinValue,
   *outMaxValue = safeBase * GetEditMaxRatio();
 }
 
+#ifdef USE_IMGUI
+bool ProjectWorldToScreen(Camera *camera, const Vector3 &worldPos,
+                          ImVec2 *outScreenPos) {
+  if (camera == nullptr || outScreenPos == nullptr) {
+    return false;
+  }
+
+  const Vector2 screen = camera->GetObjectScreenPos(worldPos);
+  if (screen.x <= -9000.0f || screen.y <= -9000.0f) {
+    return false;
+  }
+
+  outScreenPos->x = screen.x;
+  outScreenPos->y = screen.y;
+  return true;
+}
+
+void BuildSegmentBoxCorners(const ModSceneSegmentBox &box,
+                            Vector3 outCorners[8]) {
+  const Vector3 ex = Multiply(box.halfWidth, box.axisX);
+  const Vector3 ey = Multiply(box.halfLength, box.axisY);
+  const Vector3 ez = Multiply(box.halfDepth, box.axisZ);
+
+  outCorners[0] = Subtract(Subtract(Subtract(box.center, ex), ey), ez);
+  outCorners[1] = Add(Subtract(Subtract(box.center, ey), ez), ex);
+  outCorners[2] = Add(Add(Subtract(box.center, ez), ex), ey);
+  outCorners[3] = Add(Subtract(Add(box.center, ey), ez), Multiply(-1.0f, ex));
+
+  outCorners[4] = Add(Subtract(Subtract(box.center, ey), ex), ez);
+  outCorners[5] = Add(Add(Subtract(box.center, ey), ez), ex);
+  outCorners[6] = Add(Add(Add(box.center, ex), ey), ez);
+  outCorners[7] = Add(Add(Subtract(box.center, ex), ey), ez);
+}
+
+void DrawSegmentBoxWire(ImDrawList *drawList, Camera *camera,
+                        const ModSceneSegmentBox &box, ImU32 color,
+                        float thickness = 1.5f) {
+  if (drawList == nullptr || camera == nullptr) {
+    return;
+  }
+
+  Vector3 corners[8]{};
+  BuildSegmentBoxCorners(box, corners);
+
+  static const int edges[12][2] = {
+      {0, 1}, {1, 2}, {2, 3}, {3, 0}, {4, 5}, {5, 6},
+      {6, 7}, {7, 4}, {0, 4}, {1, 5}, {2, 6}, {3, 7},
+  };
+
+  for (int i = 0; i < 12; ++i) {
+    ImVec2 a{};
+    ImVec2 b{};
+    if (!ProjectWorldToScreen(camera, corners[edges[i][0]], &a)) {
+      continue;
+    }
+    if (!ProjectWorldToScreen(camera, corners[edges[i][1]], &b)) {
+      continue;
+    }
+    drawList->AddLine(a, b, color, thickness);
+  }
+}
+#endif
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -1026,6 +1089,9 @@ void ModScene::Draw() {
   DrawControlPointGizmos();
 
 #ifdef USE_IMGUI
+  // 接続判定ボックスを可視化する
+  DrawPickBoxesDebug();
+
   // シーン共通の簡易操作説明を表示する
   ImGui::Begin("Scene");
   ImGui::Text("ModScene");
@@ -6452,4 +6518,39 @@ void ModScene::SyncAfterAssemblyChanged() {
   LoadCustomizeData();
   EnsureValidSelection();
   ClearControlPointSelection();
+}
+
+void ModScene::DrawPickBoxesDebug() {
+#ifdef USE_IMGUI
+  if (usingCamera_ == nullptr) {
+    return;
+  }
+
+  ImDrawList *drawList = ImGui::GetForegroundDrawList();
+  if (drawList == nullptr) {
+    return;
+  }
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int partId = orderedPartIds_[i];
+
+    ModSceneSegmentBoxSet boxSet{};
+    if (!BuildPartPickBoxes(partId, boxSet)) {
+      continue;
+    }
+
+    ImU32 color = IM_COL32(80, 180, 255, 220); // 通常
+    if (partId == selectedPartId_) {
+      color = IM_COL32(255, 220, 80, 255); // 選択中
+    }
+    if (partId == hoveredPartId_) {
+      color = IM_COL32(255, 120, 80, 255); // Hover
+    }
+
+    for (int bi = 0; bi < boxSet.count; ++bi) {
+      DrawSegmentBoxWire(drawList, usingCamera_, boxSet.segments[bi], color,
+                         2.0f);
+    }
+  }
+#endif
 }
