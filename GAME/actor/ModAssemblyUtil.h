@@ -184,15 +184,20 @@ inline bool CanAssemblyParentChild(ModAssemblyType parent,
 }
 
 /// <summary>
-/// part 単位から見た親子有効判定
-/// 内部固定接続を先に許可し、それ以外は assembly root 同士の外部接続で判定する
+/// 親子関係が組めるか
 /// </summary>
+/// <param name="parent">親部位</param>
+/// <param name="child">子部位</param>
+/// <returns>親子関係が組める場合は true、それ以外は false</returns>
 inline bool CanPartParentChild(ModBodyPart parent, ModBodyPart child) {
   if (IsInternalAssemblyParentChild(parent, child)) {
     return true;
   }
 
-  if (!IsAssemblyRootPart(parent) || !IsAssemblyRootPart(child)) {
+  const bool parentCanReceive =
+      IsAssemblyRootPart(parent) || parent == ModBodyPart::Head;
+
+  if (!parentCanReceive || !IsAssemblyRootPart(child)) {
     return false;
   }
 

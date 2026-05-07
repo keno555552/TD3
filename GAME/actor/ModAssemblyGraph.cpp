@@ -138,7 +138,7 @@ int ModAssemblyGraph::ScoreConnectorMatch(const ConnectorNode &connector,
                                           ConnectorRole desiredRole,
                                           PartSide childSide) const {
   // 左右属性が合わない接続点は候補から除外する
-  if (!IsSideCompatible(connector.side, childSide)) {
+  if (!ModAssemblyUtil::IsSideCompatible(connector.side, childSide)) {
     return -1000000;
   }
 
@@ -361,11 +361,6 @@ ModAssemblyGraph::MakeDefaultConnectors(ModBodyPart part, PartSide side) {
   }
 
   return result;
-}
-
-bool ModAssemblyGraph::CanParentChild(ModBodyPart parent,
-                                      ModBodyPart child) const {
-  return ModAssemblyUtil::CanPartParentChild(parent, child);
 }
 
 bool ModAssemblyGraph::IsSideCompatible(PartSide parentSide,
@@ -762,10 +757,10 @@ void ModAssemblyGraph::AttachPartToParent(int childId, int parentId) {
   PartNode &child = nodes_[childId];
   const PartNode &parent = nodes_.at(parentId);
 
-  if (!CanParentChild(parent.part, child.part)) {
+  if (!ModAssemblyUtil::CanPartParentChild(parent.part, child.part)) {
     return;
   }
-  if (!IsSideCompatible(parent.side, child.side)) {
+  if (!ModAssemblyUtil::IsSideCompatible(parent.side, child.side)) {
     return;
   }
 
@@ -1265,12 +1260,12 @@ int ModAssemblyGraph::FindBestParentForChild(int childId) const {
     }
 
     // 親子関係として不正なら除外する
-    if (!CanParentChild(candidate.part, child.part)) {
+    if (!ModAssemblyUtil::CanPartParentChild(candidate.part, child.part)) {
       continue;
     }
 
     // 左右属性が合わない候補は除外する
-    if (!IsSideCompatible(candidate.side, child.side)) {
+    if (!ModAssemblyUtil::IsSideCompatible(candidate.side, child.side)) {
       continue;
     }
 
@@ -1295,10 +1290,10 @@ bool ModAssemblyGraph::MovePart(int partId, int newParentId,
   PartNode &node = nodes_[partId];
   const PartNode &parent = nodes_.at(newParentId);
 
-  if (!CanParentChild(parent.part, node.part)) {
+  if (!ModAssemblyUtil::CanPartParentChild(parent.part, node.part)) {
     return false;
   }
-  if (!IsSideCompatible(parent.side, node.side)) {
+  if (!ModAssemblyUtil::IsSideCompatible(parent.side, node.side)) {
     return false;
   }
 

@@ -851,6 +851,90 @@ void DrawSegmentBoxWire(ImDrawList *drawList, Camera *camera,
 }
 #endif
 
+struct ModelLocalBounds {
+  Vector3 center{0.0f, 0.0f, 0.0f};
+  Vector3 halfSize{0.1f, 0.1f, 0.1f};
+};
+
+Matrix4x4 MulMatrix4x4(const Matrix4x4 &a, const Matrix4x4 &b) {
+  Matrix4x4 result{};
+  for (int row = 0; row < 4; ++row) {
+    for (int col = 0; col < 4; ++col) {
+      result.m[row][col] = a.m[row][0] * b.m[0][col] + a.m[row][1] * b.m[1][col] +
+                           a.m[row][2] * b.m[2][col] + a.m[row][3] * b.m[3][col];
+    }
+  }
+  return result;
+}
+
+ModelLocalBounds GetModelLocalBounds(ModBodyPart part) {
+  static std::unordered_map<int, ModelLocalBounds> cache;
+
+  const int key = static_cast<int>(part);
+  auto it = cache.find(key);
+  if (it != cache.end()) {
+    return it->second;
+  }
+
+  ModelLocalBounds result{};
+
+  const std::string path = ModelPath(part);
+  const std::vector<ModelData> models = LoadFileTop(path);
+
+  float minX = FLT_MAX;
+  float minY = FLT_MAX;
+  float minZ = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float maxY = -FLT_MAX;
+  float maxZ = -FLT_MAX;
+
+  bool hasVertex = false;
+
+  for (const ModelData &model : models) {
+    for (const VertexData &vertex : model.vertices) {
+      const Vector4 &pos4 = vertex.position;
+      const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
+
+      const Vector3 transformed =
+          TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+
+      minX = (std::min)(minX, transformed.x);
+      minY = (std::min)(minY, transformed.y);
+      minZ = (std::min)(minZ, transformed.z);
+
+      maxX = (std::max)(maxX, transformed.x);
+      maxY = (std::max)(maxY, transformed.y);
+      maxZ = (std::max)(maxZ, transformed.z);
+
+      hasVertex = true;
+    }
+  }
+
+  if (!hasVertex) {
+    cache[key] = result;
+    return result;
+  }
+
+  result.center = {
+      (minX + maxX) * 0.5f,
+      (minY + maxY) * 0.5f,
+      (minZ + maxZ) * 0.5f,
+  };
+
+  result.halfSize = {
+      (std::max)((maxX - minX) * 0.5f, 0.01f),
+      (std::max)((maxY - minY) * 0.5f, 0.01f),
+      (std::max)((maxZ - minZ) * 0.5f, 0.01f),
+  };
+
+  cache[key] = result;
+  return result;
+}
+
+float AxisScaleLength(const Vector3 &axis) {
+  return (std::max)(Length(axis), 0.0001f);
+}
+
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
@@ -3965,7 +4049,11 @@ bool ModScene::CanAttachAssemblyRootToParentPart(int childRootPartId,
     return false;
   }
 
-  if (!ModAssemblyUtil::IsAssemblyRootPart(parentNode->part)) {
+  const bool parentCanReceive =
+      ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) ||
+      parentNode->part == ModBodyPart::Head;
+
+  if (!parentCanReceive) {
     return false;
   }
 
@@ -5691,49 +5779,57 @@ bool ModScene::BuildHeadPickBox(int partId,
   }
 
   const Object *headObject = objectIt->second.get();
-  if (headObject == nullptr) {
+  if (headObject == nullptr || headObject->objectParts_.empty()) {
     return false;
   }
 
-  ModSceneSegmentBox &box = outBoxes.segments[0];
+  const ObjectPart &headMesh = headObject->objectParts_[0];
 
-  const Matrix4x4 world =
+  const Matrix4x4 mainWorld =
       ModObjectUtil::ComputeMainPositionWorldMatrix(headObject);
 
-  Vector3 axisX = {
-      world.m[0][0],
-      world.m[0][1],
-      world.m[0][2],
+  const Matrix4x4 meshLocal =
+      MakeAffineMatrix(headMesh.transform.scale, headMesh.transform.rotate,
+                       headMesh.transform.translate);
+
+  const Matrix4x4 meshWorld = MulMatrix4x4(meshLocal, mainWorld);
+
+  Vector3 rawAxisX = {
+      meshWorld.m[0][0],
+      meshWorld.m[0][1],
+      meshWorld.m[0][2],
   };
-  Vector3 axisY = {
-      world.m[1][0],
-      world.m[1][1],
-      world.m[1][2],
+  Vector3 rawAxisY = {
+      meshWorld.m[1][0],
+      meshWorld.m[1][1],
+      meshWorld.m[1][2],
   };
-  Vector3 axisZ = {
-      world.m[2][0],
-      world.m[2][1],
-      world.m[2][2],
+  Vector3 rawAxisZ = {
+      meshWorld.m[2][0],
+      meshWorld.m[2][1],
+      meshWorld.m[2][2],
   };
 
-  axisX = NormalizeSafeV(axisX, {1.0f, 0.0f, 0.0f});
-  axisY = NormalizeSafeV(axisY, {0.0f, 1.0f, 0.0f});
-  axisZ = NormalizeSafeV(axisZ, {0.0f, 0.0f, 1.0f});
+  const float scaleX = AxisScaleLength(rawAxisX);
+  const float scaleY = AxisScaleLength(rawAxisY);
+  const float scaleZ = AxisScaleLength(rawAxisZ);
 
-  box.center = ModObjectUtil::ComputeObjectRootWorldTranslate(headObject);
+  Vector3 axisX = NormalizeSafeV(rawAxisX, {1.0f, 0.0f, 0.0f});
+  Vector3 axisY = NormalizeSafeV(rawAxisY, {0.0f, 1.0f, 0.0f});
+  Vector3 axisZ = NormalizeSafeV(rawAxisZ, {0.0f, 0.0f, 1.0f});
+
+  const ModelLocalBounds bounds = GetModelLocalBounds(ModBodyPart::Head);
+
+  ModSceneSegmentBox &box = outBoxes.segments[0];
+
+  box.center = TransformPointByMatrixLocal(meshWorld, bounds.center);
   box.axisX = axisX;
   box.axisY = axisY;
   box.axisZ = axisZ;
 
-  const float halfWidth = GetModelLocalVisualRadius(ModBodyPart::Head);
-  const float halfHeight = GetModelLocalVisualHalfHeight(ModBodyPart::Head);
-  const Vector3 scale = modBodies_.count(partId) > 0
-                            ? modBodies_.at(partId).GetVisualScaleRatio()
-                            : Vector3{1.0f, 1.0f, 1.0f};
-
-  box.halfWidth = (std::max)(halfWidth * scale.x, 0.01f);
-  box.halfLength = (std::max)(halfHeight * scale.y, 0.01f);
-  box.halfDepth = (std::max)(halfWidth * scale.z, 0.01f);
+  box.halfWidth = (std::max)(bounds.halfSize.x * scaleX, 0.01f);
+  box.halfLength = (std::max)(bounds.halfSize.y * scaleY, 0.01f);
+  box.halfDepth = (std::max)(bounds.halfSize.z * scaleZ, 0.01f);
 
   outBoxes.count = 1;
   return true;
