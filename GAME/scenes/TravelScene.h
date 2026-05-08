@@ -1,10 +1,12 @@
-#pragma once
+﻿#pragma once
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/ModBody.h"
 #include "GAME/effect/Perfect_Particle.h"
 #include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
+#include "GAME/actor/TravelPlayer.h"
+#include "GAME/manager/TravelNpcManager.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -42,14 +44,6 @@ private:
   /// <param name="leftNowInput"></param>
   /// <param name="rightNowInput"></param>
   /// <param name="deltaTime"></param>
-  void UpdateHoldState(bool leftNowInput, bool rightNowInput, float deltaTime);
-
-  /// <summary>
-  /// 脚の曲げ状態と速度の更新
-  /// </summary>
-  /// <param name="leftNowInput"></param>
-  /// <param name="rightNowInput"></param>
-  void UpdateLegBendState(bool leftNowInput, bool rightNowInput);
 
   /// <summary>
   /// 入力や姿勢から移動を更新
@@ -312,6 +306,8 @@ private:
 
   int perfectStreak_ = 0;
 
+  std::unique_ptr<TravelPlayer> player_;
+
 private:
   /// <summary>
   /// 使用するカメラを設定・更新する
@@ -425,79 +421,7 @@ private:
   float visualLiftY_ = 0.0f;
 
   // NPC
-  struct NpcRunner {
-    float moveX = -18.0f;
-    float moveY = 0.0f;
-    float velocityX = 0.0f;
-    float velocityY = 0.0f;
-
-    float leftLegBend = 0.0f;
-    float rightLegBend = 0.0f;
-    float leftLegBendSpeed = 0.0f;
-    float rightLegBendSpeed = 0.0f;
-
-    float bodyTilt = 0.0f;
-    float bodyTiltVelocity = 0.0f;
-
-    float landTimer = 999.0f;
-
-    bool leftInput = false;
-    bool rightInput = false;
-    bool isGrounded = false;
-    bool finished = false;
-
-    float phaseTimer = 0.0f;
-    int phase = 0; // 0:左押し 1:左離し 2:右押し 3:右離し
-
-    float laneX = 0.0f;
-
-    float startDelay = 0.0f;
-    bool started = false;
-    float headStartSpeed = 2.0f;
-
-    float inputHoldTimer = 0.0f;
-    bool inputLeftActive = false;
-    float baseKickInterval = 0.25f;
-    bool isKickHolding = false;
-    bool kickHoldLeft = false;
-
-    float timingSkill = 1.0f;
-    float targetKickTime = 0.05f;
-    bool hasKickPlan = false;
-    bool prevGrounded = false;
-
-    int lastTimingResult = 0;
-
-    int finishRank = -1;
-
-    std::unique_ptr<Object> debugObject;
-
-    bool useCustomizedVisual = false;
-
-    std::unique_ptr<ModBodyCustomizeData> customizeData;
-
-    std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects{};
-    std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies{};
-
-    std::vector<Object *> extraObjects;
-
-    bool visualInitialized = false;
-
-    Vector3 leftFootWorld = {};
-    Vector3 rightFootWorld = {};
-    float leftFootRadius = 1.0f;
-    float rightFootRadius = 1.0f;
-
-    bool kickThisFrame = false;
-    int kickSideThisFrame = 0; // -1:左, 1:右, 0:なし
-
-    bool kickedThisAirborne = false;
-
-    float legGroundOffset = 5.0f;
-  };
-
-  std::vector<NpcRunner> npcRunners_;
-  int npcModelHandle_ = 0;
+  std::unique_ptr<TravelNpcManager> npcManager_;
 
   void InitializeNpcRunners();
   void UpdateNpcRunners(float deltaTime);
