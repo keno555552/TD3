@@ -76,16 +76,44 @@ struct NpcRunner {
   float legGroundOffset = 5.0f;
 };
 
+class TravelScene;
+class Camera;
+struct ModBodyCustomizeData;
+class TravelPlayer;
+
 class TravelNpcManager {
 public:
   TravelNpcManager(kEngine *system);
   ~TravelNpcManager();
 
-  // Variables transferred from TravelScene
+  void InitializeNpcRunners(const ModBodyCustomizeData* customizeData, const TravelPlayer* player, float goalX);
+  void UpdateNpcRunners(float deltaTime, float goalX, Camera* camera);
+  void UpdateNpcInput(NpcRunner &npc, float deltaTime, int npcIndex);
+  void UpdateNpcMovement(NpcRunner &npc, float deltaTime, int npcIndex);
+
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetDefault();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetHeadBig();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetLongLeg();
+  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetBigTorso();
+
+  void SetupNpcPartObject(
+      std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> &objects,
+      std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> &bodies,
+      ModBodyPart part, const std::string &path);
+
+  void SetupNpcCustomizedVisual(NpcRunner &npc);
+  void BuildNpcCustomizedVisual(NpcRunner &npc);
+  void UpdateNpcCustomizedVisual(NpcRunner &npc, Camera* camera);
+  void DrawNpcCustomizedVisual(NpcRunner &npc);
+  void ClearNpcCustomizedVisual(NpcRunner &npc);
+  void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex, float goalX);
+
   std::vector<NpcRunner> npcRunners_;
   int npcModelHandle_ = 0;
+  std::array<Object *, 16> npcDebugCpObjects_{};
 
-  // We will migrate NPC functions here progressively
 private:
   kEngine *system_ = nullptr;
+  const ModBodyCustomizeData* customizeData_ = nullptr;
+  const TravelPlayer* player_ = nullptr;
 };

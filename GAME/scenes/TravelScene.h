@@ -304,7 +304,6 @@ private:
 
   float torsoSizeScale_ = 1.0f;
 
-  int perfectStreak_ = 0;
 
   std::unique_ptr<TravelPlayer> player_;
 
@@ -423,14 +422,6 @@ private:
   // NPC
   std::unique_ptr<TravelNpcManager> npcManager_;
 
-  void InitializeNpcRunners();
-  void UpdateNpcRunners(float deltaTime);
-  // void UpdateNpcInput(NpcRunner &npc, float deltaTime);
-  // void UpdateNpcMovement(NpcRunner &npc, float deltaTime);
-  void UpdateNpcInput(NpcRunner &npc, float deltaTime, int npcIndex);
-  void UpdateNpcMovement(NpcRunner &npc, float deltaTime, int npcIndex);
-
-  // 順位
   struct RaceEntry {
     bool isPlayer = false;
     int npcIndex = -1;
@@ -457,24 +448,6 @@ private:
   RaceResultState raceResultState_ = RaceResultState::None;
 
   void UpdateRaceFinishState();
-
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetDefault();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetHeadBig();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetLongLeg();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetBigTorso();
-
-  void SetupNpcPartObject(
-      std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> &objects,
-      std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> &bodies,
-      ModBodyPart part, const std::string &path);
-
-  void SetupNpcCustomizedVisual(NpcRunner &npc);
-  void BuildNpcCustomizedVisual(NpcRunner &npc);
-  void UpdateNpcCustomizedVisual(NpcRunner &npc);
-  void DrawNpcCustomizedVisual(NpcRunner &npc);
-  void ClearNpcCustomizedVisual(NpcRunner &npc);
-  // void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime);
-  void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex);
 
   // Particle
   std::unique_ptr<Perfect_Particle> perfectParticle_;
