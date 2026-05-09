@@ -318,30 +318,7 @@ void TravelScene::Update() {
   }
   npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_);
 
-  if (kickFeedbackTimer_ > 0.0f) {
-    kickFeedbackTimer_ -= deltaTime;
-    if (kickFeedbackTimer_ <= 0.0f) {
-      kickFeedbackTimer_ = 0.0f;
-      kickFeedbackType_ = KickFeedbackType::None;
-    }
-  }
 
-  //-------------------------------
-  // キーUI点灯タイマー更新
-  //-------------------------------
-  if (aKeyFlashTimer_ > 0.0f) {
-    aKeyFlashTimer_ -= deltaTime;
-    if (aKeyFlashTimer_ < 0.0f) {
-      aKeyFlashTimer_ = 0.0f;
-    }
-  }
-
-  if (dKeyFlashTimer_ > 0.0f) {
-    dKeyFlashTimer_ -= deltaTime;
-    if (dKeyFlashTimer_ < 0.0f) {
-      dKeyFlashTimer_ = 0.0f;
-    }
-  }
 
   player_->ApplyVisualState();
 
