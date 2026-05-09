@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "GAME/actor/ModBody.h"
 #include "Object/Object.h"
 #include <array>
@@ -107,6 +107,8 @@ public:
   void DrawNpcCustomizedVisual(NpcRunner &npc);
   void ClearNpcCustomizedVisual(NpcRunner &npc);
   void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex, float goalX);
+
+  void DrawNpcs(float goalX, bool showNpcModel);
 
   std::vector<NpcRunner> npcRunners_;
   int npcModelHandle_ = 0;

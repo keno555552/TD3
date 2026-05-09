@@ -1,4 +1,4 @@
-﻿#include "TravelNpcManager.h"
+#include "TravelNpcManager.h"
 #include "kEngine.h"
 #include "GAME/actor/TravelPlayer.h"
 #include <cmath>
@@ -1268,4 +1268,26 @@ void TravelNpcManager::SetupNpcPartObject(
   objects[index]->mainPosition.transform = t;
 
   bodies[index].Initialize(objects[index], part);
+}
+
+void TravelNpcManager::DrawNpcs(float goalX, bool showNpcModel) {
+  for (auto &npc : npcRunners_) {
+    if (!npc.started) {
+      continue;
+    }
+
+    if (!showNpcModel) {
+      continue;
+    }
+
+    if (npc.finished && npc.moveX > goalX + 20.0f) {
+      continue;
+    }
+
+    if (npc.useCustomizedVisual) {
+      DrawNpcCustomizedVisual(npc);
+    } else if (npc.debugObject != nullptr) {
+      npc.debugObject->Draw();
+    }
+  }
 }

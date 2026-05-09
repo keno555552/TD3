@@ -212,11 +212,58 @@ public:
     customizeData_ = data;
   }
   std::vector<Object *> extraObjects_;
+  std::vector<int> extraParentIds_;
+  std::vector<ModBodyPart> extraPartTypes_;
+  std::vector<int> extraPartIds_;
+  std::vector<ModControlPointSnapshot> controlPointSnapshots_;
+
   float visualLiftY_ = 0.0f;
   std::vector<ModControlPoint> torsoSharedPointsBuffer_;
   std::unique_ptr<Object> shadow_;
   int shadowModelHandle_ = 0;
   std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
+
+  void ClearExtraVisualParts();
+  void BuildExtraVisualParts();
+  void UpdateExtraVisualParts(Camera* camera);
+  void DrawExtraVisualParts(Camera* camera);
+
+  void CollectSnapshotsByOwnerId(
+      int ownerPartId,
+      std::vector<const ModControlPointSnapshot *> &outSnapshots) const;
+
+  Vector3 BuildAnimatedChildRootFromParent(const Vector3 &root, float angleZ,
+                                           float angleX, float length) const;
+
+  bool GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
+                                     Vector3 &outBend, Vector3 &outEnd) const;
+
+  bool GetExtraInstanceLocalTranslate(int partId, Vector3 &outLocal) const;
+
+  bool GetFirstPartTypePartId(ModBodyPart partType, int &outPartId) const;
+  float GetSnapshotSegmentLength(ModBodyPart partType, int ownerPartId) const;
+  bool GetPartInstanceParentId(int partId, int &outParentId) const;
+
+  bool GetExtraPartParentObject(
+      ModBodyPart partType, int parentId,
+      const std::unordered_map<int, Object *> &extraPartObjectMap,
+      Object *&outParent) const;
+
+  bool GetPartInstanceLocalTranslate(int partId, Vector3 &outLocal) const;
+  bool GetPartInstanceLocalRotate(int partId, Vector3 &outRotate) const;
+  bool GetFirstPartTypeLocalTranslate(ModBodyPart partType,
+                                      Vector3 &outLocal) const;
+
+  int GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
+                              int parentId) const;
+
+  bool ComputeExtraBaseAngles(ModBodyPart partType, int snapshotOwnerId,
+                              float &outBaseAngleX, float &outBaseAngleZ) const;
+
+  float ComputeExtraAnimAngleX(ModBodyPart partType) const;
+
+
+
   struct CharacterFeatures {
     int headCount = 0;
     int armCount = 0;
@@ -250,11 +297,7 @@ public:
   bool BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
                                 SegmentVisual &out);
 
-  void CollectSnapshotsByOwnerId(
-      int ownerPartId,
-      std::vector<const ModControlPointSnapshot *> &outSnapshots) const;
 
-  std::vector<ModControlPointSnapshot> controlPointSnapshots_;
   bool useModBodyApplyTorso_ = true;
 
 private:
