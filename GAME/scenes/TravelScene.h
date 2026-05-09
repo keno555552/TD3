@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/ModBody.h"
@@ -30,32 +30,7 @@ private:
   /// <summary>
   /// 前フレーム保存
   /// </summary>
-  void SavePreviousFrameState();
 
-  /// <summary>
-  /// 制限時間
-  /// </summary>
-  /// <param name="deltaTime"></param>
-  void UpdateTimeLimit(float deltaTime);
-
-  /// <summary>
-  /// キーのホールドを取得
-  /// </summary>
-  /// <param name="leftNowInput"></param>
-  /// <param name="rightNowInput"></param>
-  /// <param name="deltaTime"></param>
-
-  /// <summary>
-  /// 入力や姿勢から移動を更新
-  /// </summary>
-  /// <param name="leftNowInput"></param>
-  /// <param name="rightNowInput"></param>
-  void UpdateMovementState(bool leftNowInput, bool rightNowInput);
-
-  /// <summary>
-  /// 見た目反映(アニメーション)
-  /// </summary>
-  void ApplyVisualState();
 
   /// <summary>
   /// シーン遷移
@@ -101,17 +76,7 @@ private:
 
   std::unique_ptr<ModBodyCustomizeData> customizeData_ = nullptr;
 
-  void SetupModObjects();
-  void SetupPartObject(ModBodyPart part, const std::string &path);
-  void SetupHierarchy();
-  void SetupInitialLayout();
-  void UpdateModObjects();
-  void DrawModObjects();
-  void SetupBodyJointOffsets();
-  void LoadCustomizeData();
-  void UpdateChildRootsFromBody();
-  void ApplyCustomizeToMovementParam();
-  float ComputeLegHeightOffset() const;
+
 
   /* プレイヤー移動用変数
   ------------------------------*/
@@ -317,16 +282,11 @@ private:
   /// <summary>
   /// 構造を特徴量に変換
   /// </summary>
-  void BuildFeaturesFromCustomizeData();
 
-  /// <summary>
-  ///
-  /// </summary>
+  void ClearExtraVisualParts();
   void BuildExtraVisualParts();
-
   void UpdateExtraVisualParts();
   void DrawExtraVisualParts();
-  void ClearExtraVisualParts();
 
   void CollectSnapshotsByOwnerId(
       int ownerPartId,
@@ -398,26 +358,17 @@ private:
   bool useModBodyApplyTorso_ = true;
 
   void PrepareTorsoApplySource();
-  std::vector<ModControlPoint> torsoSharedPointsBuffer_;
+void UpdateTimeLimit(float deltaTime);
+  
 
 private:
   // 地面との当たり判定用
-  enum class LowestBodyPart {
-    None,
-    LeftForeArm,
-    RightForeArm,
-    LeftShin,
-    RightShin,
-    Head,
-    Chest,
-    Stomach,
-  };
 
-  float GetLowestVisualBodyY(LowestBodyPart *outPart) const;
-  const char *GetLowestBodyPartName(LowestBodyPart part) const;
+
+
   void ResolveVisualGroundPenetration();
 
-  float visualLiftY_ = 0.0f;
+  
 
   // NPC
   std::unique_ptr<TravelNpcManager> npcManager_;
@@ -449,14 +400,8 @@ private:
 
   void UpdateRaceFinishState();
 
-  // Particle
-  std::unique_ptr<Perfect_Particle> perfectParticle_;
-
   std::array<Object *, 16> npcDebugCpObjects_{};
   bool showNpcModel_ = true;
-
-  // 影
-  std::unique_ptr<Object> shadow_;
   int shadowModelHandle_ = 0;
 
   // ゴールオブジェクト
