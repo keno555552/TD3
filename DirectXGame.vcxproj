@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -252,6 +252,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GAME\manager\TravelNpcManager.cpp" />
+    <ClCompile Include="GAME\actor\TravelPlayer.cpp" />
     <ClCompile Include="GAME\actor\ControlPointChain.cpp" />
     <ClCompile Include="GAME\actor\ModAssemblyGraph.cpp" />
     <ClCompile Include="GAME\actor\ModBody.cpp" />
@@ -425,6 +427,8 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Geometry\CrashData\Sphere.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GAME\manager\TravelNpcManager.h" />
+    <ClInclude Include="GAME\actor\TravelPlayer.h" />
     <ClInclude Include="GAME\actor\ControlPointChain.h" />
     <ClInclude Include="GAME\actor\ModAssemblyGraph.h" />
     <ClInclude Include="GAME\actor\ModBody.h" />

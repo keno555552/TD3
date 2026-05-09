@@ -372,3 +372,4 @@ imgui.ini
 !externals/assimp/lib/Debug/*.lib
 !externals/assimp/lib/Debug/*.pdb
 !externals/assimp/lib/Release/*.lib
+/scratch
