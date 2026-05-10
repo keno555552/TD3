@@ -129,7 +129,7 @@ void TravelPlayer::SetupModObjects() {
                   "GAME/resources/modBody/rightShin/rightShin.obj");
 
   SetupHierarchy();
-  // SetupInitialLayout();
+  SetupInitialLayout();
   SetupBodyJointOffsets();
 
   fixedPartIdToPart_.clear();
@@ -200,85 +200,42 @@ void TravelPlayer::SetupHierarchy() {
   ObjectPart *stomachRoot = &stomachBody->mainPosition;
 
   //============================
-  // 胴体
+  // 完全なツリー構造（深い階層）の構築
+  // エンジンのバグが修正されたため、親の親を辿る正しいグラフ構造が構築可能です。
   //============================
+
   stomachBody->followObject_ = chestRoot;
   stomachBody->mainPosition.parentPart = chestRoot;
 
-  // 首
   modObjects_[ToIndex(ModBodyPart::Neck)]->followObject_ = chestRoot;
   modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition.parentPart = chestRoot;
 
-  // 頭
-  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = chestRoot;
-  modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart = chestRoot;
+  modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart = &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
 
-  // modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ = bodyRoot;
-  // modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart =
-  // bodyRoot;
-
-  // modObjects_[ToIndex(ModBodyPart::Head)]->followObject_ =
-  //     &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
-  // modObjects_[ToIndex(ModBodyPart::Head)]->mainPosition.parentPart =
-  //     &modObjects_[ToIndex(ModBodyPart::Neck)]->mainPosition;
-
-  // 腕
   modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->followObject_ = chestRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition.parentPart =
-      chestRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition.parentPart = chestRoot;
 
   modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->followObject_ = chestRoot;
-  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition.parentPart =
-      chestRoot;
+  modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition.parentPart = chestRoot;
 
-  // 脚
   modObjects_[ToIndex(ModBodyPart::LeftThigh)]->followObject_ = stomachRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition.parentPart =
-      stomachRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition.parentPart = stomachRoot;
 
   modObjects_[ToIndex(ModBodyPart::RightThigh)]->followObject_ = stomachRoot;
-  modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition.parentPart =
-      stomachRoot;
+  modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition.parentPart = stomachRoot;
 
-  //============================
-  // 二段目
-  //============================
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart = &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
 
-  // 左前腕
-  // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ =
-  //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
-  // modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
-  //    &modObjects_[ToIndex(ModBodyPart::LeftUpperArm)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->followObject_ = chestRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftForeArm)]->mainPosition.parentPart =
-      chestRoot;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart = &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
 
-  // 右前腕
-  //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ =
-  //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
-  //  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
-  //      &modObjects_[ToIndex(ModBodyPart::RightUpperArm)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->followObject_ = chestRoot;
-  modObjects_[ToIndex(ModBodyPart::RightForeArm)]->mainPosition.parentPart =
-      chestRoot;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart = &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
 
-  // 左脛
-  // modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ =
-  //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
-  // modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
-  //    &modObjects_[ToIndex(ModBodyPart::LeftThigh)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::LeftShin)]->followObject_ = stomachRoot;
-  modObjects_[ToIndex(ModBodyPart::LeftShin)]->mainPosition.parentPart =
-      stomachRoot;
-
-  // 右脛
-  // modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ =
-  //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
-  // modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
-  //    &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
-  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = stomachRoot;
-  modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart =
-      stomachRoot;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->followObject_ = &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
+  modObjects_[ToIndex(ModBodyPart::RightShin)]->mainPosition.parentPart = &modObjects_[ToIndex(ModBodyPart::RightThigh)]->mainPosition;
 }
 
 void TravelPlayer::SetupInitialLayout() {
@@ -330,6 +287,31 @@ void TravelPlayer::SetupInitialLayout() {
 
   rightShin->mainPosition.transform.translate = {0.0f, -1.0f, 0.0f};
   rightShin->mainPosition.transform.rotate = baseRotate;
+
+  // もし partInstances が有効なローカル座標を持っているなら上書きする
+  if (customizeData_ != nullptr) {
+    for (const auto &instance : customizeData_->partInstances) {
+      if (instance.partId < 0) continue;
+      
+      // (0,0,0) の場合は未設定（旧方式）とみなして無視する
+      if (instance.localTransform.translate.x == 0.0f &&
+          instance.localTransform.translate.y == 0.0f &&
+          instance.localTransform.translate.z == 0.0f) {
+        continue;
+      }
+
+      for (int i = 0; i < static_cast<int>(ModBodyPart::Count); ++i) {
+        int baseId = -1;
+        if (GetFirstPartTypePartId(static_cast<ModBodyPart>(i), baseId)) {
+          if (baseId == instance.partId && modObjects_[i] != nullptr) {
+            modObjects_[i]->mainPosition.transform.translate = instance.localTransform.translate;
+            modObjects_[i]->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+            break;
+          }
+        }
+      }
+    }
+  }
 }
 void TravelPlayer::UpdateModObjects() {
   if (useModBodyApplyTorso_) {
@@ -1837,7 +1819,6 @@ void TravelPlayer::ApplyVisualState() {
   // 回転を入れたあと、親子接続位置を再計算
   //================================
   UpdatePartRootsFromControlPoints();
-  UpdateModObjects();
   const ModControlPointData *cp = GetControlPoints();
   Vector3 saved = {0.0f, 0.0f, 0.0f};
 
@@ -1846,23 +1827,23 @@ void TravelPlayer::ApplyVisualState() {
   }
 
   if (!neck->objectParts_.empty()) {
-    neck->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // neck->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!head->objectParts_.empty()) {
-    head->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // head->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!leftUpperArm->objectParts_.empty()) {
-    leftUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // leftUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!leftForeArm->objectParts_.empty()) {
-    leftForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // leftForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
 
   if (!rightUpperArm->objectParts_.empty()) {
-    rightUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // rightUpperArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!rightForeArm->objectParts_.empty()) {
-    rightForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
+    // rightForeArm->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
   }
   if (!leftThigh->objectParts_.empty()) {
     // leftThigh->objectParts_[0].transform.rotate = {0.0f, 0.0f, 0.0f};
@@ -1928,6 +1909,7 @@ void TravelPlayer::ResolveVisualGroundPenetration() {
 }
 
 void TravelPlayer::UpdatePartRootsFromControlPoints() {
+  return;
 
   // 見た目補正用
   const float modelVisualScaleFix = 0.8f;
@@ -3084,9 +3066,13 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
   // anchor = NeckBase
   // shape  = Neck Root -> Neck Bend
   //==============================
+  float neckLength = 0.0001f;
+  float neckAngleZ = 0.0f;
+  float neckAngleX = 0.0f;
+
   if (neck != nullptr && hasNeckRoot && hasNeckBend) {
     Vector3 neckShapeVec = Sub(neckBendLocal, neckRootLocal);
-    float neckLength = Length(neckShapeVec);
+    neckLength = Length(neckShapeVec);
 
     if (neckLength < 0.0001f) {
       neckLength = 0.0001f;
@@ -3094,16 +3080,16 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
     }
 
     Vector3 neckDir = Normalize(neckShapeVec);
-    float neckAngleZ = atan2f(-neckDir.x, neckDir.y);
-    float neckAngleX = asinf(std::clamp(neckDir.z, -1.0f, 1.0f));
+    neckAngleZ = atan2f(-neckDir.x, neckDir.y);
+    neckAngleX = asinf(std::clamp(neckDir.z, -1.0f, 1.0f));
 
     const float neckRootR = GetSnapshotRadius(ModBodyPart::Neck, 1);
     const float neckBendR = GetSnapshotRadius(ModBodyPart::Neck, 2);
     const float neckThicknessScale = (std::max)(neckRootR, neckBendR) / 0.1f;
 
-    // neck->mainPosition.transform.translate = neckBaseAnchorLocal;
-    neck->mainPosition.transform.translate =
-        Add(neckBaseAnchorLocal, neckRootLocal);
+    neck->mainPosition.transform.translate = neckBaseAnchorLocal;
+    // neck->mainPosition.transform.translate =
+    //     Add(neckBaseAnchorLocal, neckRootLocal);
     neck->mainPosition.transform.rotate = {neckAngleX, 0.0f, neckAngleZ};
 
     if (!neck->objectParts_.empty()) {
@@ -3145,11 +3131,7 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
     float headAngleZ = atan2f(-headDir.x, headDir.y);
     float headAngleX = asinf(std::clamp(headDir.z, -1.0f, 1.0f));
 
-    const float headThicknessScale =
-        (std::max)(GetSnapshotRadius(ModBodyPart::Neck, 2),
-                   GetSnapshotRadius(ModBodyPart::Neck, 3)) /
-        0.1f;
-
+    // 平坦階層に戻したため、絶対座標にする
     head->mainPosition.transform.translate = headAnchorLocal;
     head->mainPosition.transform.rotate = {headAngleX, 0.0f, headAngleZ};
 
@@ -3233,11 +3215,9 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
     // 上腕追従
     float leftForeArmFollowX = leftUpperArmSwing * 0.35f;
 
-    // 肘は「常に曲がる方向」だけに足す
+    // 平坦階層に戻したため、絶対角度を計算
     float leftForeArmBendX = -leftElbowFold * 1.2f;
-
-    float leftForeArmAnimX =
-        (leftForeArmFollowX + leftForeArmBendX) * poseAnimScale;
+    float leftForeArmAnimX = (leftForeArmFollowX + leftForeArmBendX) * poseAnimScale;
 
     float leftForeArmAngleX = leftForeArmBaseX + leftForeArmAnimX;
 
@@ -3246,8 +3226,7 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
         leftUpperArmRoot, leftUpperArmAngleZ, leftUpperArmAngleX, upperLength);
 
     leftForeArm->mainPosition.transform.translate = leftForeArmRoot;
-    leftForeArm->mainPosition.transform.rotate = {leftForeArmAngleX, 0.0f,
-                                                  leftForeArmAngleZ};
+    leftForeArm->mainPosition.transform.rotate = {leftForeArmAngleX, 0.0f, leftForeArmAngleZ};
 
     if (!leftForeArm->objectParts_.empty()) {
       leftForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
@@ -3331,24 +3310,18 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
                                       0.0f, 1.0f);
 
     float rightForeArmFollowX = rightUpperArmSwing * 0.35f;
+    // 平坦階層に戻したため、絶対角度を計算
     float rightForeArmBendX = -rightElbowFold * 1.2f;
-
-    float rightForeArmAnimX =
-        (rightForeArmFollowX + rightForeArmBendX) * poseAnimScale;
+    float rightForeArmAnimX = (rightForeArmFollowX + rightForeArmBendX) * poseAnimScale;
 
     float rightForeArmAngleX = rightForeArmBaseX + rightForeArmAnimX;
 
-    // Vector3 rightElbowOffset = Sub(rightArmBendLocal, rightArmRootLocal);
-    // Vector3 rightUpperArmRoot = Add(chestTopWorld, rightShoulderFromChest);
-    // Vector3 rightForeArmRoot = Add(rightUpperArmRoot, rightElbowOffset);
     Vector3 rightUpperArmRoot = rightShoulderAnchorLocal;
-    Vector3 rightForeArmRoot =
-        BuildAnimatedChildRoot(rightUpperArmRoot, rightUpperArmAngleZ,
-                               rightUpperArmAngleX, upperLength);
+    Vector3 rightForeArmRoot = BuildAnimatedChildRoot(
+        rightUpperArmRoot, rightUpperArmAngleZ, rightUpperArmAngleX, upperLength);
 
     rightForeArm->mainPosition.transform.translate = rightForeArmRoot;
-    rightForeArm->mainPosition.transform.rotate = {rightForeArmAngleX, 0.0f,
-                                                   rightForeArmAngleZ};
+    rightForeArm->mainPosition.transform.rotate = {rightForeArmAngleX, 0.0f, rightForeArmAngleZ};
 
     if (!rightForeArm->objectParts_.empty()) {
       rightForeArm->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
@@ -3426,28 +3399,16 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
     float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
-
-    float leftShinAnimX =
-        (leftThighSwing * 0.35f + leftKneeFold * 0.6f) * poseAnimScale;
-
+    // 平坦階層に戻したため、絶対角度を計算
+    float leftShinAnimX = (leftThighSwing * 0.35f + leftKneeFold * 0.6f) * poseAnimScale;
     float leftShinAngleX = leftShinBaseX + leftShinAnimX;
 
-    // Vector3 leftKneeOffset = Sub(leftLegBendLocal, leftLegRootLocal);
-    // Vector3 leftShinRoot = Add(leftHipFromBelly, leftKneeOffset);
-    Vector3 leftThighRoot = leftHipFromBelly;
+    Vector3 leftThighRoot = leftHipAnchorLocal;
     Vector3 leftShinRoot = BuildAnimatedChildRoot(
         leftThighRoot, leftThighAngleZ, leftThighAngleX, thighLength);
 
-    Vector3 leftFootPos = BuildAnimatedChildRoot(leftShinRoot, leftShinAngleZ,
-                                                 leftShinAngleX, shinLength);
-
-    Vector3 leftShinCenter = {(leftShinRoot.x + leftFootPos.x) * 0.5f,
-                              (leftShinRoot.y + leftFootPos.y) * 0.5f,
-                              (leftShinRoot.z + leftFootPos.z) * 0.5f};
-
     leftShin->mainPosition.transform.translate = leftShinRoot;
-    leftShin->mainPosition.transform.rotate = {leftShinAngleX, 0.0f,
-                                               leftShinAngleZ};
+    leftShin->mainPosition.transform.rotate = {leftShinAngleX, 0.0f, leftShinAngleZ};
 
     if (!leftShin->objectParts_.empty()) {
       leftShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
@@ -3518,20 +3479,16 @@ void TravelPlayer::UpdatePartRootsFromControlPoints() {
                                          (legRecoverAngle_ - legKickAngle_),
                                      0.0f, 1.0f);
 
-    float rightShinAnimX =
-        (rightThighSwing * 0.35f + rightKneeFold * 0.6f) * poseAnimScale;
-
+    // 平坦階層に戻したため、絶対角度を計算
+    float rightShinAnimX = (rightThighSwing * 0.35f + rightKneeFold * 0.6f) * poseAnimScale;
     float rightShinAngleX = rightShinBaseX + rightShinAnimX;
 
-    // Vector3 rightKneeOffset = Sub(rightLegBendLocal, rightLegRootLocal);
-    // Vector3 rightShinRoot = Add(rightHipFromBelly, rightKneeOffset);
-    Vector3 rightThighRoot = rightHipFromBelly;
+    Vector3 rightThighRoot = rightHipAnchorLocal;
     Vector3 rightShinRoot = BuildAnimatedChildRoot(
         rightThighRoot, rightThighAngleZ, rightThighAngleX, thighLength);
 
     rightShin->mainPosition.transform.translate = rightShinRoot;
-    rightShin->mainPosition.transform.rotate = {rightShinAngleX, 0.0f,
-                                                rightShinAngleZ};
+    rightShin->mainPosition.transform.rotate = {rightShinAngleX, 0.0f, rightShinAngleZ};
 
     if (!rightShin->objectParts_.empty()) {
       rightShin->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
@@ -4244,7 +4201,7 @@ void TravelPlayer::PrepareTorsoApplySource() {
     ModControlPoint point{};
     point.role = snap->role;
     point.localPosition = snap->localPosition;
-    point.radius = snap->radius;
+    point.radius = (snap->radius > 0.01f) ? snap->radius : 0.1f; // Fallback to 0.1f for legacy
     point.movable = snap->movable;
     point.isConnectionPoint = snap->isConnectionPoint;
     point.acceptsParent = snap->acceptsParent;
@@ -5133,9 +5090,147 @@ void TravelPlayer::BuildExtraVisualParts() {
     extraPartIds_.push_back(instance.partId);
     extraParentIds_.push_back(instance.parentId);
   }
+
+  //================================================
+  // 全パーツの動的マッピングとツリー構造（グラフ）の構築
+  //================================================
+  allPartObjects_.clear();
+
+  // 1. 基本パーツ（modObjects_）をマッピング
+  for (size_t i = 0; i < modObjects_.size(); ++i) {
+    int partId = -1;
+    if (GetFirstPartTypePartId(static_cast<ModBodyPart>(i), partId)) {
+      if (modObjects_[i]) {
+        allPartObjects_[partId] = modObjects_[i];
+      }
+    }
+  }
+
+  // 2. 追加パーツ（extraObjects_）をマッピング
+  for (size_t i = 0; i < extraObjects_.size(); ++i) {
+    if (extraObjects_[i]) {
+      allPartObjects_[extraPartIds_[i]] = extraObjects_[i];
+    }
+  }
+
+  // 3. 親子関係とローカル座標の完全な再構築
+  for (const auto &instance : customizeData_->partInstances) {
+    auto it = allPartObjects_.find(instance.partId);
+    if (it == allPartObjects_.end() || it->second == nullptr) continue;
+    Object *obj = it->second;
+
+    // (0,0,0) の初期化忘れ対策（旧方式データの場合はスキップ）
+    // 標準パーツ(partId < 12)のみを対象とし、拡張パーツが(0,0,0)に配置された場合はスキップしない
+    if (instance.localTransform.translate.x == 0.0f &&
+        instance.localTransform.translate.y == 0.0f &&
+        instance.localTransform.translate.z == 0.0f &&
+        instance.partId < 12) {
+      // 古い固定配置のままにするため何もしない
+      continue;
+    }
+
+    // ローカル座標をそのまま適用
+    obj->mainPosition.transform.translate = instance.localTransform.translate;
+    
+    // スケールも適用
+    if (!obj->objectParts_.empty()) {
+      obj->objectParts_[0].transform.scale.x *= instance.param.scale.x;
+      obj->objectParts_[0].transform.scale.y *= instance.param.scale.y * instance.param.length;
+      obj->objectParts_[0].transform.scale.z *= instance.param.scale.z;
+    }
+
+    // 親を検索して数珠繋ぎ
+    auto parentIt = allPartObjects_.find(instance.parentId);
+    if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
+      obj->followObject_ = &parentIt->second->mainPosition;
+      obj->mainPosition.parentPart = &parentIt->second->mainPosition;
+    } else {
+      // 親がない（ルートなど）
+      obj->followObject_ = nullptr;
+      obj->mainPosition.parentPart = nullptr;
+    }
+  }
+
+  ApplyLegacySnapshotsToHierarchy();
 }
 
 void TravelPlayer::UpdateExtraVisualParts(Camera* camera) {
+  if (customizeData_ == nullptr) return;
+
+  for (const auto &instance : customizeData_->partInstances) {
+    auto it = allPartObjects_.find(instance.partId);
+    if (it == allPartObjects_.end() || it->second == nullptr) continue;
+    Object *obj = it->second;
+
+    if (obj->objectParts_.empty()) continue;
+
+    // ChestBody is the root, its transform is driven by physics in ApplyVisualState
+    if (instance.partType == ModBodyPart::ChestBody) {
+        continue;
+    }
+
+    float baseAngleX = instance.localTransform.rotate.x;
+    float baseAngleY = instance.localTransform.rotate.y;
+    float baseAngleZ = instance.localTransform.rotate.z;
+
+    bool isGroupA = true;
+    int index = 0;
+    for (const auto& inst : customizeData_->partInstances) {
+        if (inst.partType == instance.partType) {
+            if (inst.partId == instance.partId) break;
+            index++;
+        }
+    }
+
+    if (instance.partType == ModBodyPart::LeftThigh || instance.partType == ModBodyPart::LeftUpperArm ||
+        instance.partType == ModBodyPart::LeftShin || instance.partType == ModBodyPart::LeftForeArm) {
+        isGroupA = (index % 2 == 0); 
+    } else if (instance.partType == ModBodyPart::RightThigh || instance.partType == ModBodyPart::RightUpperArm ||
+               instance.partType == ModBodyPart::RightShin || instance.partType == ModBodyPart::RightForeArm) {
+        isGroupA = (index % 2 != 0);
+    }
+
+    float driveAngle = isGroupA ? leftLegBend_ : rightLegBend_;    
+    float oppositeAngle = isGroupA ? rightLegBend_ : leftLegBend_;
+
+    const float armSwingScale = 0.60f;
+    const float thighSwingScale = 0.70f;
+    float animAngleX = 0.0f;
+
+    switch (instance.partType) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+      animAngleX = -oppositeAngle * armSwingScale;
+      break;
+
+    case ModBodyPart::LeftForeArm:
+    case ModBodyPart::RightForeArm: {
+      float upperArmSwing = -oppositeAngle * armSwingScale;
+      float elbowFold = std::clamp((oppositeAngle - legKickAngle_) / (legRecoverAngle_ - legKickAngle_), 0.0f, 1.0f);
+      animAngleX = -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+      break;
+    }
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+      animAngleX = -driveAngle * thighSwingScale;
+      break;
+
+    case ModBodyPart::LeftShin:
+    case ModBodyPart::RightShin: {
+      float thighSwing = -driveAngle * thighSwingScale;
+      float kneeFold = std::clamp((driveAngle - legKickAngle_) / (legRecoverAngle_ - legKickAngle_), 0.0f, 1.0f);
+      animAngleX = thighSwing * 0.35f + kneeFold * 0.6f;
+      break;
+    }
+    default:
+      break;
+    }
+
+    obj->mainPosition.transform.rotate = {baseAngleX + animAngleX, baseAngleY, baseAngleZ};
+    obj->Update(camera);
+  }
+#if 0
   Object *fixedHead = modObjects_[ToIndex(ModBodyPart::Head)];
   Object *fixedNeck = modObjects_[ToIndex(ModBodyPart::Neck)];
   Object *fixedLeftUpperArm = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
@@ -5523,6 +5618,7 @@ void TravelPlayer::UpdateExtraVisualParts(Camera* camera) {
 
     obj->Update(camera);
   }
+#endif
 }
 
 void TravelPlayer::DrawExtraVisualParts(Camera* camera) {
@@ -5542,5 +5638,276 @@ void TravelPlayer::ClearExtraVisualParts() {
   extraParentIds_.clear();
   extraPartTypes_.clear();
   extraPartIds_.clear();
+}
+
+void TravelPlayer::ApplyLegacySnapshotsToHierarchy() {
+  if (customizeData_ == nullptr) return;
+
+  auto GetSnap = [&](int ownerPartId, ModControlPointRole role, Vector3& out) -> bool {
+      for (const auto& snap : customizeData_->controlPointSnapshots) {
+          if (snap.ownerPartId == ownerPartId && snap.role == role) {
+              out = snap.localPosition;
+              return true;
+          }
+      }
+      return false;
+  };
+
+  auto SubV = [](const Vector3& a, const Vector3& b) -> Vector3 {
+      return {a.x - b.x, a.y - b.y, a.z - b.z};
+  };
+  auto LengthV = [](const Vector3& v) -> float {
+      return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+  };
+
+  int chestId = -1, neckId = -1;
+  int leftArmId = -1, leftForeId = -1;
+  int rightArmId = -1, rightForeId = -1;
+  int leftLegId = -1, leftShinId = -1;
+  int rightLegId = -1, rightShinId = -1;
+
+  for (const auto& inst : customizeData_->partInstances) {
+      if (inst.partType == ModBodyPart::ChestBody) chestId = inst.partId;
+      if (inst.partType == ModBodyPart::LeftUpperArm) leftArmId = inst.partId;
+      if (inst.partType == ModBodyPart::LeftForeArm) leftForeId = inst.partId;
+      if (inst.partType == ModBodyPart::RightUpperArm) rightArmId = inst.partId;
+      if (inst.partType == ModBodyPart::RightForeArm) rightForeId = inst.partId;
+      if (inst.partType == ModBodyPart::LeftThigh) leftLegId = inst.partId;
+      if (inst.partType == ModBodyPart::LeftShin) leftShinId = inst.partId;
+      if (inst.partType == ModBodyPart::RightThigh) rightLegId = inst.partId;
+      if (inst.partType == ModBodyPart::RightShin) rightShinId = inst.partId;
+      if (inst.partType == ModBodyPart::Neck) neckId = inst.partId;
+  }
+
+  Vector3 chestTop = {0,0,0}, belly = {0,-1,0}, waist = {0,-2,0};
+  GetSnap(chestId, ModControlPointRole::Chest, chestTop);
+  GetSnap(chestId, ModControlPointRole::Belly, belly);
+  GetSnap(chestId, ModControlPointRole::Waist, waist);
+
+  Vector3 leftShoulder = {-1.25f, 1.0f, 0}, rightShoulder = {1.25f, 1.0f, 0};
+  GetSnap(chestId, ModControlPointRole::LeftShoulder, leftShoulder);
+  GetSnap(chestId, ModControlPointRole::RightShoulder, rightShoulder);
+
+  Vector3 leftHip = {-0.5f, -1.25f, 0}, rightHip = {0.5f, -1.25f, 0};
+  GetSnap(chestId, ModControlPointRole::LeftHip, leftHip);
+  GetSnap(chestId, ModControlPointRole::RightHip, rightHip);
+
+  Vector3 neckBase = chestTop;
+  GetSnap(chestId, ModControlPointRole::NeckBase, neckBase);
+
+  Object* chestObj = modObjects_[ToIndex(ModBodyPart::ChestBody)];
+  Object* stomachObj = modObjects_[ToIndex(ModBodyPart::StomachBody)];
+  if (stomachObj) {
+      stomachObj->mainPosition.transform.translate = {0.0f, 0.0f, 0.0f}; // Stomach is at O
+      if (!stomachObj->objectParts_.empty()) {
+          stomachObj->objectParts_[0].transform.scale.y = 1.0f;
+          stomachObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+      }
+  }
+  if (chestObj) {
+      chestObj->mainPosition.transform.translate = {0.0f, 0.0f, 0.0f}; // Chest is at O
+      if (!chestObj->objectParts_.empty()) {
+          chestObj->objectParts_[0].transform.scale.y = 1.0f;
+          chestObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+      }
+  }
+
+  // Left Arm
+  Object* leftArmObj = modObjects_[ToIndex(ModBodyPart::LeftUpperArm)];
+  Object* leftForeObj = modObjects_[ToIndex(ModBodyPart::LeftForeArm)];
+  if (leftArmObj && leftForeObj) {
+      leftArmObj->mainPosition.transform.translate = leftShoulder; // Child of ChestBody (at O)
+      Vector3 root = {0,0,0}, bend = {0,-1,0};
+      GetSnap(leftArmId, ModControlPointRole::Root, root);
+      GetSnap(leftArmId, ModControlPointRole::Bend, bend);
+      Vector3 foreBend = {0,0,0}, foreEnd = {0,-2,0};
+      GetSnap(leftArmId, ModControlPointRole::Bend, foreBend);
+      GetSnap(leftArmId, ModControlPointRole::End, foreEnd);
+      
+      Vector3 upVec = SubV(bend, root);
+      Vector3 lowVec = SubV(foreEnd, foreBend);
+      float upLen = LengthV(upVec);
+      float foreLen = LengthV(lowVec);
+      if (upLen < 0.0001f) upLen = 0.0001f;
+      if (foreLen < 0.0001f) foreLen = 0.0001f;
+      
+      float upAngleZ = atan2(upVec.x / upLen, -upVec.y / upLen);
+      float lowAngleZ = atan2(lowVec.x / foreLen, -lowVec.y / foreLen);
+      float upAngleX = -std::asin(std::clamp(upVec.z / upLen, -1.0f, 1.0f));
+      float lowAngleX = -std::asin(std::clamp(lowVec.z / foreLen, -1.0f, 1.0f));
+      
+      if (!leftArmObj->objectParts_.empty()) {
+          leftArmObj->objectParts_[0].transform.scale.y = upLen / 1.0814f;
+          leftArmObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          leftArmObj->objectParts_[0].transform.rotate.z = upAngleZ;
+          leftArmObj->objectParts_[0].transform.rotate.x = upAngleX;
+      }
+      leftForeObj->mainPosition.transform.translate = upVec; // Child of LeftUpperArm
+      if (!leftForeObj->objectParts_.empty()) {
+          leftForeObj->objectParts_[0].transform.scale.y = foreLen / 2.1377f;
+          leftForeObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          leftForeObj->objectParts_[0].transform.rotate.z = lowAngleZ;
+          leftForeObj->objectParts_[0].transform.rotate.x = lowAngleX;
+      }
+  }
+
+  // Right Arm
+  Object* rightArmObj = modObjects_[ToIndex(ModBodyPart::RightUpperArm)];
+  Object* rightForeObj = modObjects_[ToIndex(ModBodyPart::RightForeArm)];
+  if (rightArmObj && rightForeObj) {
+      rightArmObj->mainPosition.transform.translate = rightShoulder; // Child of ChestBody (at O)
+      Vector3 root = {0,0,0}, bend = {0,-1,0};
+      GetSnap(rightArmId, ModControlPointRole::Root, root);
+      GetSnap(rightArmId, ModControlPointRole::Bend, bend);
+      Vector3 foreBend = {0,0,0}, foreEnd = {0,-2,0};
+      GetSnap(rightArmId, ModControlPointRole::Bend, foreBend);
+      GetSnap(rightArmId, ModControlPointRole::End, foreEnd);
+      
+      Vector3 upVec = SubV(bend, root);
+      Vector3 lowVec = SubV(foreEnd, foreBend);
+      float upLen = LengthV(upVec);
+      float foreLen = LengthV(lowVec);
+      if (upLen < 0.0001f) upLen = 0.0001f;
+      if (foreLen < 0.0001f) foreLen = 0.0001f;
+      
+      float upAngleZ = atan2(upVec.x / upLen, -upVec.y / upLen);
+      float lowAngleZ = atan2(lowVec.x / foreLen, -lowVec.y / foreLen);
+      float upAngleX = -std::asin(std::clamp(upVec.z / upLen, -1.0f, 1.0f));
+      float lowAngleX = -std::asin(std::clamp(lowVec.z / foreLen, -1.0f, 1.0f));
+      
+      if (!rightArmObj->objectParts_.empty()) {
+          rightArmObj->objectParts_[0].transform.scale.y = upLen / 1.0814f;
+          rightArmObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          rightArmObj->objectParts_[0].transform.rotate.z = upAngleZ;
+          rightArmObj->objectParts_[0].transform.rotate.x = upAngleX;
+      }
+      rightForeObj->mainPosition.transform.translate = upVec; // Child of RightUpperArm
+      if (!rightForeObj->objectParts_.empty()) {
+          rightForeObj->objectParts_[0].transform.scale.y = foreLen / 2.1377f;
+          rightForeObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          rightForeObj->objectParts_[0].transform.rotate.z = lowAngleZ;
+          rightForeObj->objectParts_[0].transform.rotate.x = lowAngleX;
+      }
+  }
+
+  // Left Leg
+  Object* leftLegObj = modObjects_[ToIndex(ModBodyPart::LeftThigh)];
+  Object* leftShinObj = modObjects_[ToIndex(ModBodyPart::LeftShin)];
+  if (leftLegObj && leftShinObj) {
+      leftLegObj->mainPosition.transform.translate = leftHip; // Child of StomachBody (at O)
+      Vector3 root = {0,0,0}, bend = {0,-1,0};
+      GetSnap(leftLegId, ModControlPointRole::Root, root);
+      GetSnap(leftLegId, ModControlPointRole::Bend, bend);
+      Vector3 shinBend = {0,0,0}, shinEnd = {0,-2,0};
+      GetSnap(leftLegId, ModControlPointRole::Bend, shinBend);
+      GetSnap(leftLegId, ModControlPointRole::End, shinEnd);
+      
+      Vector3 upVec = SubV(bend, root);
+      Vector3 lowVec = SubV(shinEnd, shinBend);
+      float upLen = LengthV(upVec);
+      float lowLen = LengthV(lowVec);
+      if (upLen < 0.0001f) upLen = 0.0001f;
+      if (lowLen < 0.0001f) lowLen = 0.0001f;
+      
+      float upAngleZ = atan2(upVec.x / upLen, -upVec.y / upLen);
+      float lowAngleZ = atan2(lowVec.x / lowLen, -lowVec.y / lowLen);
+      float upAngleX = -std::asin(std::clamp(upVec.z / upLen, -1.0f, 1.0f));
+      float lowAngleX = -std::asin(std::clamp(lowVec.z / lowLen, -1.0f, 1.0f));
+      
+      if (!leftLegObj->objectParts_.empty()) {
+          leftLegObj->objectParts_[0].transform.scale.y = upLen / 1.5704f;
+          leftLegObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          leftLegObj->objectParts_[0].transform.rotate.z = upAngleZ;
+          leftLegObj->objectParts_[0].transform.rotate.x = upAngleX;
+      }
+      leftShinObj->mainPosition.transform.translate = upVec; // Child of LeftThigh
+      if (!leftShinObj->objectParts_.empty()) {
+          leftShinObj->objectParts_[0].transform.scale.y = lowLen / 2.6181f;
+          leftShinObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          leftShinObj->objectParts_[0].transform.rotate.z = lowAngleZ;
+          leftShinObj->objectParts_[0].transform.rotate.x = lowAngleX;
+      }
+  }
+
+  // Right Leg
+  Object* rightLegObj = modObjects_[ToIndex(ModBodyPart::RightThigh)];
+  Object* rightShinObj = modObjects_[ToIndex(ModBodyPart::RightShin)];
+  if (rightLegObj && rightShinObj) {
+      rightLegObj->mainPosition.transform.translate = rightHip; // Child of StomachBody (at O)
+      Vector3 root = {0,0,0}, bend = {0,-1,0};
+      GetSnap(rightLegId, ModControlPointRole::Root, root);
+      GetSnap(rightLegId, ModControlPointRole::Bend, bend);
+      Vector3 shinBend = {0,0,0}, shinEnd = {0,-2,0};
+      GetSnap(rightLegId, ModControlPointRole::Bend, shinBend);
+      GetSnap(rightLegId, ModControlPointRole::End, shinEnd);
+      
+      Vector3 upVec = SubV(bend, root);
+      Vector3 lowVec = SubV(shinEnd, shinBend);
+      float upLen = LengthV(upVec);
+      float lowLen = LengthV(lowVec);
+      if (upLen < 0.0001f) upLen = 0.0001f;
+      if (lowLen < 0.0001f) lowLen = 0.0001f;
+      
+      float upAngleZ = atan2(upVec.x / upLen, -upVec.y / upLen);
+      float lowAngleZ = atan2(lowVec.x / lowLen, -lowVec.y / lowLen);
+      float upAngleX = -std::asin(std::clamp(upVec.z / upLen, -1.0f, 1.0f));
+      float lowAngleX = -std::asin(std::clamp(lowVec.z / lowLen, -1.0f, 1.0f));
+      
+      if (!rightLegObj->objectParts_.empty()) {
+          rightLegObj->objectParts_[0].transform.scale.y = upLen / 1.5704f;
+          rightLegObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          rightLegObj->objectParts_[0].transform.rotate.z = upAngleZ;
+          rightLegObj->objectParts_[0].transform.rotate.x = upAngleX;
+      }
+      rightShinObj->mainPosition.transform.translate = upVec; // Child of RightThigh
+      if (!rightShinObj->objectParts_.empty()) {
+          rightShinObj->objectParts_[0].transform.scale.y = lowLen / 2.6181f;
+          rightShinObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          rightShinObj->objectParts_[0].transform.rotate.z = lowAngleZ;
+          rightShinObj->objectParts_[0].transform.rotate.x = lowAngleX;
+      }
+  }
+
+  // Head and Neck
+  Object* headObj = modObjects_[ToIndex(ModBodyPart::Head)];
+  Object* neckObj = modObjects_[ToIndex(ModBodyPart::Neck)];
+  if (neckObj && headObj) {
+      Vector3 root = {0,0,0}, bend = {0,1,0}, end = {0,2,0};
+      GetSnap(neckId, ModControlPointRole::Root, root);
+      GetSnap(neckId, ModControlPointRole::Bend, bend);
+      GetSnap(neckId, ModControlPointRole::End, end);
+      Vector3 neckVec = SubV(bend, root);
+      Vector3 headVec = SubV(end, bend);
+      
+      float neckLen = LengthV(neckVec);
+      float headLen = LengthV(headVec);
+      
+      if (neckLen < 0.0001f) neckLen = 0.0001f;
+      if (headLen < 0.0001f) headLen = 0.0001f;
+      
+      float neckAngleZ = atan2(-neckVec.x / neckLen, neckVec.y / neckLen);
+      float headAngleZ = atan2(-headVec.x / headLen, headVec.y / headLen);
+      
+      float neckAngleX = std::asin(std::clamp(neckVec.z / neckLen, -1.0f, 1.0f));
+      float headAngleX = std::asin(std::clamp(headVec.z / headLen, -1.0f, 1.0f));
+      
+      // Neck attaches to ChestBody (at O)
+      neckObj->mainPosition.transform.translate = neckBase; // Child of ChestBody
+      
+      if (!neckObj->objectParts_.empty()) {
+          neckObj->objectParts_[0].transform.scale.y = neckLen / 0.3462f;
+          neckObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          neckObj->objectParts_[0].transform.rotate.z = neckAngleZ;
+          neckObj->objectParts_[0].transform.rotate.x = neckAngleX;
+      }
+      
+      headObj->mainPosition.transform.translate = neckVec; // Child of Neck
+      if (!headObj->objectParts_.empty()) {
+          headObj->objectParts_[0].transform.scale.y = headLen / 1.6790f;
+          headObj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          headObj->objectParts_[0].transform.rotate.z = headAngleZ;
+          headObj->objectParts_[0].transform.rotate.x = headAngleX;
+      }
+  }
 }
 

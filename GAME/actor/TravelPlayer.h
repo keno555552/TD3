@@ -26,6 +26,7 @@ public:
   void SetupPartObject(ModBodyPart part, const std::string &path);
   void SetupHierarchy();
   void SetupInitialLayout();
+  void ApplyLegacySnapshotsToHierarchy();
   void UpdateModObjects();
   void DrawModObjects(Camera* camera);
   void UpdateParticle(Camera* camera);
@@ -216,6 +217,8 @@ public:
   std::vector<ModBodyPart> extraPartTypes_;
   std::vector<int> extraPartIds_;
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;
+  
+  std::unordered_map<int, Object*> allPartObjects_;
 
   float visualLiftY_ = 0.0f;
   std::vector<ModControlPoint> torsoSharedPointsBuffer_;
