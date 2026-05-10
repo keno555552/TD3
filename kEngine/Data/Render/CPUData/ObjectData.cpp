@@ -14,7 +14,9 @@ Matrix4x4 ObjectPart::UpdateWorldMatrix() {
 			parent->transform.rotate,
 			parent->transform.translate
 		);
-		parentMatrix = local * parentMatrix;
+		// バグ修正：行列の掛け算順序が逆だったため、深い階層で破綻していた。
+        // kojimaが修正
+		parentMatrix = parentMatrix * local;
 		parent = parent->parentPart;
 	}
 

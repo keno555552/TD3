@@ -150,7 +150,9 @@ Matrix4x4 DrawDataCollector::MakeFollowObjectMatrix2D(SpriteData* sprite) {
 			parent->mainPosition.transform.translate
 		);
 
-		parentMatrix = local * parentMatrix;
+		// バグ修正：行列の掛け算順序が逆だったため、深い階層で破綻していた。
+		//kojimaが修正
+		parentMatrix = parentMatrix * local;
 		parent = parent->followObject_;
 	}
 
@@ -287,7 +289,10 @@ Matrix4x4 DrawDataCollector::MakeFollowObjectMatrix3D(ObjectData* object) {
 			parent->transform.translate
 		);
 
-		parentMatrix = local * parentMatrix;
+		// バグ修正：行列の掛け算順序が逆だったため、深い階層で破綻していた。
+		// 正しくは 子 -> 親 -> 祖父 の順（ParentLocal * GrandparentLocal）
+        // kojimaが修正
+		parentMatrix = parentMatrix * local;
 		parent = parent->parentPart;
 	}
 
