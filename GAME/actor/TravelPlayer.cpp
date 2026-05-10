@@ -3,6 +3,7 @@
 #include "kEngine.h"
 #include <algorithm>
 #include <cmath>
+#include "ModObjectUtil.h"
 
 namespace {
 size_t ToIndex(ModBodyPart part) { return static_cast<size_t>(part); }
@@ -4290,204 +4291,47 @@ float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
   float lowestY = 999999.0f;
   LowestBodyPart lowestPart = LowestBodyPart::None;
 
-  auto PartBottomY = [&](Object *obj, float radius) -> float {
-    if (obj == nullptr) {
+  auto GetTipWorldY = [&](Object *obj, float defaultMeshLength, float radius) -> float {
+    if (obj == nullptr || obj->objectParts_.empty()) {
       return 999999.0f;
     }
+    Matrix4x4 localMat = MakeAffineMatrix(
+        obj->objectParts_[0].transform.scale,
+        obj->objectParts_[0].transform.rotate,
+        obj->objectParts_[0].transform.translate);
 
-    const Vector3 &p = obj->mainPosition.transform.translate;
-    return p.y - radius;
+    Vector3 tipPoint = {0.0f, -defaultMeshLength, 0.0f};
+    Vector3 tipInMainPos = ModObjectUtil::TransformPoint(localMat, tipPoint);
+    Matrix4x4 mainPosWorld = ModObjectUtil::ComputeMainPositionWorldMatrix(obj);
+    Vector3 tipWorld = ModObjectUtil::TransformPoint(mainPosWorld, tipInMainPos);
+
+    return tipWorld.y - radius;
   };
 
-  auto Add = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
-    return Vector3{a.x + b.x, a.y + b.y, a.z + b.z};
+  auto GetPartBottomWorldY = [&](Object *obj, float radius) -> float {
+    if (obj == nullptr || obj->objectParts_.empty()) {
+      return 999999.0f;
+    }
+    Matrix4x4 mainPosWorld = ModObjectUtil::ComputeMainPositionWorldMatrix(obj);
+    Vector3 centerWorld = {mainPosWorld.m[3][0], mainPosWorld.m[3][1], mainPosWorld.m[3][2]};
+    return centerWorld.y - radius;
   };
 
-  auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
-    return Vector3{a.x - b.x, a.y - b.y, a.z - b.z};
-  };
-
-  if (customizeData_ != nullptr) {
-    //================================
-    // anchor と snapshot を集める
-    //================================
-    int torsoAnchorOwnerId = -1;
-    int leftUpperArmOwnerId = -1;
-    int rightUpperArmOwnerId = -1;
-    int leftThighOwnerId = -1;
-    int rightThighOwnerId = -1;
-
-    Vector3 leftShoulderAnchorLocal = {-1.25f, 1.0f, 0.0f};
-    Vector3 rightShoulderAnchorLocal = {1.25f, 1.0f, 0.0f};
-    Vector3 leftHipAnchorLocal = {-0.5f, -1.25f, 0.0f};
-    Vector3 rightHipAnchorLocal = {0.5f, -1.25f, 0.0f};
-
-    Vector3 leftArmRootLocal = {0.0f, 0.0f, 0.0f};
-    Vector3 leftArmEndLocal = {0.0f, -1.10f, 0.0f};
-
-    Vector3 rightArmRootLocal = {0.0f, 0.0f, 0.0f};
-    Vector3 rightArmEndLocal = {0.0f, -1.10f, 0.0f};
-
-    Vector3 leftLegRootLocal = {0.0f, 0.0f, 0.0f};
-    Vector3 leftLegEndLocal = {0.0f, -1.40f, 0.0f};
-
-    Vector3 rightLegRootLocal = {0.0f, 0.0f, 0.0f};
-    Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
-
-    bool hasLeftArmRoot = false;
-    bool hasLeftArmEnd = false;
-    bool hasRightArmRoot = false;
-    bool hasRightArmEnd = false;
-    bool hasLeftLegRoot = false;
-    bool hasLeftLegEnd = false;
-    bool hasRightLegRoot = false;
-    bool hasRightLegEnd = false;
-
-    for (const auto &instance : customizeData_->partInstances) {
-      if (torsoAnchorOwnerId < 0 &&
-          instance.partType == ModBodyPart::ChestBody) {
-        torsoAnchorOwnerId = instance.partId;
-      } else if (leftUpperArmOwnerId < 0 &&
-                 instance.partType == ModBodyPart::LeftUpperArm) {
-        leftUpperArmOwnerId = instance.partId;
-      } else if (rightUpperArmOwnerId < 0 &&
-                 instance.partType == ModBodyPart::RightUpperArm) {
-        rightUpperArmOwnerId = instance.partId;
-      } else if (leftThighOwnerId < 0 &&
-                 instance.partType == ModBodyPart::LeftThigh) {
-        leftThighOwnerId = instance.partId;
-      } else if (rightThighOwnerId < 0 &&
-                 instance.partType == ModBodyPart::RightThigh) {
-        rightThighOwnerId = instance.partId;
-      }
-    }
-
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId == torsoAnchorOwnerId) {
-        if (snap.role == ModControlPointRole::LeftShoulder) {
-          leftShoulderAnchorLocal = snap.localPosition;
-        } else if (snap.role == ModControlPointRole::RightShoulder) {
-          rightShoulderAnchorLocal = snap.localPosition;
-        } else if (snap.role == ModControlPointRole::LeftHip) {
-          leftHipAnchorLocal = snap.localPosition;
-        } else if (snap.role == ModControlPointRole::RightHip) {
-          rightHipAnchorLocal = snap.localPosition;
-        }
-      }
-
-      if (snap.ownerPartId == leftUpperArmOwnerId) {
-        if (snap.role == ModControlPointRole::Root) {
-          leftArmRootLocal = snap.localPosition;
-          hasLeftArmRoot = true;
-        } else if (snap.role == ModControlPointRole::End) {
-          leftArmEndLocal = snap.localPosition;
-          hasLeftArmEnd = true;
-        }
-      }
-
-      if (snap.ownerPartId == rightUpperArmOwnerId) {
-        if (snap.role == ModControlPointRole::Root) {
-          rightArmRootLocal = snap.localPosition;
-          hasRightArmRoot = true;
-        } else if (snap.role == ModControlPointRole::End) {
-          rightArmEndLocal = snap.localPosition;
-          hasRightArmEnd = true;
-        }
-      }
-
-      if (snap.ownerPartId == leftThighOwnerId) {
-        if (snap.role == ModControlPointRole::Root) {
-          leftLegRootLocal = snap.localPosition;
-          hasLeftLegRoot = true;
-        } else if (snap.role == ModControlPointRole::End) {
-          leftLegEndLocal = snap.localPosition;
-          hasLeftLegEnd = true;
-        }
-      }
-
-      if (snap.ownerPartId == rightThighOwnerId) {
-        if (snap.role == ModControlPointRole::Root) {
-          rightLegRootLocal = snap.localPosition;
-          hasRightLegRoot = true;
-        } else if (snap.role == ModControlPointRole::End) {
-          rightLegEndLocal = snap.localPosition;
-          hasRightLegEnd = true;
-        }
-      }
-    }
-
-    //================================
-    // 前腕：anchor + (end - root) - radius
-    // grounded 側と同じ考え方
-    //================================
-    if (hasLeftArmRoot && hasLeftArmEnd) {
-      const float r = GetSnapshotRadius(ModBodyPart::LeftUpperArm, 3);
-      float y = leftShoulderAnchorLocal.y +
-                (leftArmEndLocal.y - leftArmRootLocal.y) - r;
-      UpdateLowest(y, LowestBodyPart::LeftForeArm, lowestY, lowestPart);
-    }
-
-    if (hasRightArmRoot && hasRightArmEnd) {
-      const float r = GetSnapshotRadius(ModBodyPart::RightUpperArm, 3);
-      float y = rightShoulderAnchorLocal.y +
-                (rightArmEndLocal.y - rightArmRootLocal.y) - r;
-      UpdateLowest(y, LowestBodyPart::RightForeArm, lowestY, lowestPart);
-    }
-
-    //================================
-    // 脚：anchor + (end - root) - radius
-    // これは grounded 側と完全に揃える
-    //================================
-    if (hasLeftLegRoot && hasLeftLegEnd) {
+  if (Object *leftShin = modObjects_[ToIndex(ModBodyPart::LeftShin)]) {
       const float r = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
-      float y =
-          leftHipAnchorLocal.y + (leftLegEndLocal.y - leftLegRootLocal.y) - r;
-      UpdateLowest(y, LowestBodyPart::LeftShin, lowestY, lowestPart);
-    }
-
-    if (hasRightLegRoot && hasRightLegEnd) {
+      UpdateLowest(GetTipWorldY(leftShin, 2.6181f, r), LowestBodyPart::LeftShin, lowestY, lowestPart);
+  }
+  if (Object *rightShin = modObjects_[ToIndex(ModBodyPart::RightShin)]) {
       const float r = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
-      float y = rightHipAnchorLocal.y +
-                (rightLegEndLocal.y - rightLegRootLocal.y) - r;
-      UpdateLowest(y, LowestBodyPart::RightShin, lowestY, lowestPart);
-    }
-  }
-
-  //================================
-  // 頭・胴体は今はいったん簡易でOK
-  //================================
-  {
-    Object *head = modObjects_[ToIndex(ModBodyPart::Head)];
-    const float upperR = GetSnapshotRadius(ModBodyPart::Neck, 2);
-    const float endR = GetSnapshotRadius(ModBodyPart::Neck, 3);
-    const float r = (std::max)(upperR, endR);
-    float y = PartBottomY(head, r);
-    UpdateLowest(y, LowestBodyPart::Head, lowestY, lowestPart);
-  }
-
-  {
-    Object *chest = modObjects_[ToIndex(ModBodyPart::ChestBody)];
-    const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
-    const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
-    const float r = (std::max)(chestR, bellyR);
-    float y = PartBottomY(chest, r);
-    UpdateLowest(y, LowestBodyPart::Chest, lowestY, lowestPart);
-  }
-
-  {
-    Object *stomach = modObjects_[ToIndex(ModBodyPart::StomachBody)];
-    const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
-    const float waistR = GetControlPointRadius(ModControlPointRole::Waist);
-    const float r = (std::max)(bellyR, waistR);
-    float y = PartBottomY(stomach, r);
-    UpdateLowest(y, LowestBodyPart::Stomach, lowestY, lowestPart);
+      UpdateLowest(GetTipWorldY(rightShin, 2.6181f, r), LowestBodyPart::RightShin, lowestY, lowestPart);
   }
 
   if (outPart != nullptr) {
     *outPart = lowestPart;
   }
 
-  return lowestY;
+  // Convert the calculated absolute world Y back to a relative local Y offset from the player's root coordinate
+  return lowestY - (moveY_ + visualLiftY_);
 }
 const char *TravelPlayer::GetLowestBodyPartName(LowestBodyPart part) const {
   switch (part) {
