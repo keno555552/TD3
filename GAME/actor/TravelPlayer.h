@@ -26,7 +26,6 @@ public:
   void SetupPartObject(ModBodyPart part, const std::string &path);
   void SetupHierarchy();
   void SetupInitialLayout();
-  void ApplyLegacySnapshotsToHierarchy();
   void UpdateModObjects();
   void DrawModObjects(Camera* camera);
   void UpdateParticle(Camera* camera);
@@ -228,8 +227,6 @@ public:
 
   void ClearExtraVisualParts();
   void BuildExtraVisualParts();
-  void UpdateExtraVisualParts(Camera* camera);
-  void DrawExtraVisualParts(Camera* camera);
 
   void CollectSnapshotsByOwnerId(
       int ownerPartId,
@@ -301,7 +298,7 @@ public:
                                 SegmentVisual &out);
 
 
-  bool useModBodyApplyTorso_ = true;
+  bool useModBodyApplyTorso_ = false;
 
 private:
   kEngine* system_ = nullptr;

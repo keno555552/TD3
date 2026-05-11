@@ -1745,6 +1745,7 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.parentConnectorId = node->parentConnectorId;
     instance.selfConnectorId = node->selfConnectorId;
     instance.localTransform = node->localTransform;
+    instance.resolvedLocalTranslate = ResolveAttachedLocalTranslate(*node);
     instance.param = modBodies_[id].GetParam();
 
     // 新方式ではインスタンス単位で count は常に 1
