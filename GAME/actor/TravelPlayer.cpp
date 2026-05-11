@@ -658,7 +658,7 @@ void TravelPlayer::ApplyCustomizeToMovementParam() {
 
   const float baseHeadSizeScale = 1.684f;
   const float baseTorsoScaleAvg = 1.899f;
-  const float baseAsymmetry = 2.200f;
+  const float baseAsymmetry = 0.0f;
   const float baseCenterOfMassY = 0.150f;
 
   //==============================
@@ -895,6 +895,7 @@ void TravelPlayer::ApplyCustomizeToMovementParam() {
   //==============================
   float extraHeadCount = (std::max)(0.0f, features_.headCount - 1.0f);
   float extraArmCount = (std::max)(0.0f, features_.armCount - 2.0f);
+  float extraLegCount = (std::max)(0.0f, features_.legCount - 2.0f);
 
   tuning_.stability -= extraHeadCount * 0.8f;
   tuning_.turnResponse += extraHeadCount * 0.8f;
@@ -902,6 +903,11 @@ void TravelPlayer::ApplyCustomizeToMovementParam() {
 
   tuning_.stability -= extraArmCount * 0.15f;
   tuning_.runPower += extraArmCount * 0.1f;
+
+  tuning_.stability += extraLegCount * 1.5f;
+  tuning_.runPower += extraLegCount * 0.6f;
+  tuning_.maxSpeed -= extraLegCount * 0.2f;
+  tuning_.turnResponse -= extraLegCount * 0.5f;
 
   //==============================
   // クランプ
@@ -4247,11 +4253,17 @@ void TravelPlayer::BuildFeaturesFromCustomizeData() {
       features_.armCount++;
     }
 
+    if (instance.partType == ModBodyPart::LeftThigh ||
+        instance.partType == ModBodyPart::RightThigh) {
+      features_.legCount++;
+    }
+
     features_.centerOfMassY += instance.localTransform.translate.y;
-    features_.asymmetry += std::abs(instance.localTransform.translate.x);
+    features_.asymmetry += instance.localTransform.translate.x;
     features_.lowestPoint =
         std::min(features_.lowestPoint, instance.localTransform.translate.y);
   }
+  features_.asymmetry = std::abs(features_.asymmetry);
 }
 
 
@@ -4978,8 +4990,12 @@ void TravelPlayer::BuildExtraVisualParts() {
     
     // スケールも適用
     if (!obj->objectParts_.empty()) {
+      int snapshotOwnerId = GetExtraSnapshotOwnerId(instance.partType, instance.partId, instance.parentId);
+      float segLength = GetSnapshotSegmentLength(instance.partType, snapshotOwnerId);
+      if (segLength < 0.0001f) segLength = 1.0f;
+
       obj->objectParts_[0].transform.scale.x *= instance.param.scale.x;
-      obj->objectParts_[0].transform.scale.y *= instance.param.scale.y * instance.param.length;
+      obj->objectParts_[0].transform.scale.y *= segLength * instance.param.scale.y * instance.param.length;
       obj->objectParts_[0].transform.scale.z *= instance.param.scale.z;
     }
 
@@ -5013,9 +5029,33 @@ void TravelPlayer::UpdateExtraVisualParts(Camera* camera) {
         continue;
     }
 
+    int snapshotOwnerId = GetExtraSnapshotOwnerId(instance.partType, instance.partId, instance.parentId);
+
+    Vector3 snapRoot = {0.0f, 0.0f, 0.0f};
+    Vector3 snapBend = {0.0f, 0.0f, 0.0f};
+    Vector3 snapEnd = {0.0f, 0.0f, 0.0f};
+    bool hasSnapPositions = GetExtraPartSnapshotPositions(snapshotOwnerId, snapRoot, snapBend, snapEnd);
+
+    // Head, Neck, Chest, Stomach are handled perfectly by ApplyVisualState.
+    // For limbs (Arms/Legs), we want UpdateExtraVisualParts to handle them
+    // because it applies procedural swing animation combined with snapshot base angles.
+    int firstPartId = -1;
+    if (GetFirstPartTypePartId(instance.partType, firstPartId)) {
+        if (instance.partId == firstPartId) {
+            if (instance.partType == ModBodyPart::Head || 
+                instance.partType == ModBodyPart::Neck ||
+                instance.partType == ModBodyPart::ChestBody || 
+                instance.partType == ModBodyPart::StomachBody) {
+                continue;
+            }
+        }
+    }
+
     float baseAngleX = instance.localTransform.rotate.x;
     float baseAngleY = instance.localTransform.rotate.y;
     float baseAngleZ = instance.localTransform.rotate.z;
+
+    ComputeExtraBaseAngles(instance.partType, snapshotOwnerId, baseAngleX, baseAngleZ);
 
     bool isGroupA = true;
     int index = 0;
