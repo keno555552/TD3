@@ -74,6 +74,7 @@ struct ModPartInstanceData {
   int selfConnectorId = -1;
 
   Transform localTransform = CreateDefaultTransform();
+  Vector3 resolvedLocalTranslate = {0.0f, 0.0f, 0.0f};
   ModBodyPartParam param{};
 };
 

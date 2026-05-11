@@ -249,7 +249,6 @@ TravelScene::~TravelScene() {
 
   player_->ClearParticle();
 
-  player_->ClearExtraVisualParts();
 
   system_->RemoveLight(light1_);
 
@@ -347,7 +346,6 @@ void TravelScene::Draw() {
 
   player_->DrawModObjects(usingCamera_);
 
-  player_->DrawExtraVisualParts(usingCamera_);
 
   npcManager_->DrawNpcs(goalX_, showNpcModel_);
 

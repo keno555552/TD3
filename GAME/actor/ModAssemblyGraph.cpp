@@ -780,13 +780,13 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
   case ModBodyPart::ChestBody: {
     switch (childPart) {
     case ModBodyPart::Neck:
-      return {0.0f, 0.45f, 0.0f};
+      return {0.0f, 1.2796f, 0.0f};
 
     case ModBodyPart::LeftUpperArm:
-      return {-0.75f, 0.30f, 0.0f};
+      return {-0.75f, 1.15f, 0.0f};
 
     case ModBodyPart::RightUpperArm:
-      return {0.75f, 0.30f, 0.0f};
+      return {0.75f, 1.15f, 0.0f};
 
     case ModBodyPart::LeftThigh:
       return {-0.35f, -0.70f, 0.0f};
@@ -816,7 +816,7 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
 
   case ModBodyPart::Neck: {
     if (childPart == ModBodyPart::Head) {
-      return {0.0f, 0.0f, 0.0f};
+      return {0.0f, 0.3462f, 0.0f};
     }
     break;
   }
@@ -825,7 +825,7 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
   case ModBodyPart::RightUpperArm: {
     if (childPart == ModBodyPart::LeftForeArm ||
         childPart == ModBodyPart::RightForeArm) {
-      return {0.0f, 0.0f, 0.0f};
+      return {0.0f, -1.08f, 0.0f};
     }
     break;
   }
@@ -834,7 +834,7 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
   case ModBodyPart::RightThigh: {
     if (childPart == ModBodyPart::LeftShin ||
         childPart == ModBodyPart::RightShin) {
-      return {0.0f, 0.0f, 0.0f};
+      return {0.0f, -1.57f, 0.0f};
     }
     break;
   }
