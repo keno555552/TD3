@@ -745,8 +745,15 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
     const float rightFootBottomLocalY = rightFootPos.y - rightAnkleRadius;
 
-    lowestLegBottomLocalY =
+    float predictedFirstLegsY =
         (std::min)(leftFootBottomLocalY, rightFootBottomLocalY);
+
+    float visualLowestY = GetLowestVisualBodyY(nullptr);
+    if (visualLowestY < 900000.0f) {
+        lowestLegBottomLocalY = (std::min)(predictedFirstLegsY, visualLowestY);
+    } else {
+        lowestLegBottomLocalY = predictedFirstLegsY;
+    }
 
     const float groundEpsilon = 0.01f;
 
@@ -1424,8 +1431,23 @@ void TravelPlayer::ApplyVisualState() {
 
     switch (instance.partType) {
     case ModBodyPart::ChestBody:
-      animAngleX = -bodyTilt_;
+    case ModBodyPart::StomachBody: {
+      bool parentIsTorso = false;
+      if (instance.parentId >= 0) {
+        for (const auto &pInst : customizeData_->partInstances) {
+          if (pInst.partId == instance.parentId &&
+              (pInst.partType == ModBodyPart::ChestBody ||
+               pInst.partType == ModBodyPart::StomachBody)) {
+            parentIsTorso = true;
+            break;
+          }
+        }
+      }
+      if (!parentIsTorso) {
+        animAngleX = -bodyTilt_;
+      }
       break;
+    }
     case ModBodyPart::LeftUpperArm:
     case ModBodyPart::RightUpperArm:
       animAngleX = -oppositeAngle * armSwingScale;
@@ -1441,7 +1463,7 @@ void TravelPlayer::ApplyVisualState() {
     }
     case ModBodyPart::LeftThigh:
     case ModBodyPart::RightThigh:
-      animAngleX = -driveAngle * thighSwingScale;
+      animAngleX = -driveAngle * thighSwingScale + bodyTilt_;
       break;
     case ModBodyPart::LeftShin:
     case ModBodyPart::RightShin: {
@@ -1601,40 +1623,24 @@ void TravelPlayer::ResolveVisualGroundPenetration() {
   float lowestBodyWorldY = moveY_ + visualLiftY_ + lowestBodyLocalY;
   float penetration = groundY_ - lowestBodyWorldY;
 
-  const bool lowestIsLeg = (lowestPart == LowestBodyPart::LeftShin ||
-                            lowestPart == LowestBodyPart::RightShin);
-
-  static int visualGroundCheckFrame = 0;
-  visualGroundCheckFrame++;
-
-  if (lowestIsLeg) {
-    visualLiftY_ *= 0.60f;
-
-    if (std::abs(visualLiftY_) < 0.0001f) {
-      visualLiftY_ = 0.0f;
-    }
-    return;
-  }
-
-  if (penetration <= 0.0f) {
-    visualLiftY_ *= 0.80f;
-    if (std::abs(visualLiftY_) < 0.0001f) {
-      visualLiftY_ = 0.0f;
-    }
-    return;
-  }
+  float requiredLift = visualLiftY_ + penetration;
+  const float maxVisualLift = 6.0f;
+  float targetLift = std::clamp(requiredLift, 0.0f, maxVisualLift);
 
   float follow = 0.40f;
-  if (penetration > 0.30f) {
-    follow = 0.55f;
-  }
   if (penetration > 0.80f) {
     follow = 0.75f;
+  } else if (penetration > 0.30f) {
+    follow = 0.55f;
+  } else if (penetration <= 0.0f) {
+    follow = 0.15f; // Slower decay when airborne to prevent sudden drops
   }
 
-  const float maxVisualLift = 6.0f;
-  float targetLift = std::min(penetration, maxVisualLift);
   visualLiftY_ += (targetLift - visualLiftY_) * follow;
+
+  if (std::abs(visualLiftY_) < 0.001f) {
+    visualLiftY_ = 0.0f;
+  }
 }
 
 void TravelPlayer::BuildFeaturesFromCustomizeData() {
@@ -1726,15 +1732,36 @@ float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
     return centerWorld.y - radius;
   };
 
-  if (Object *leftShin = GetStandardPart(ModBodyPart::LeftShin)) {
-    const float r = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
-    UpdateLowest(GetTipWorldY(leftShin, 2.6181f, r), LowestBodyPart::LeftShin,
-                 lowestY, lowestPart);
-  }
-  if (Object *rightShin = GetStandardPart(ModBodyPart::RightShin)) {
-    const float r = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
-    UpdateLowest(GetTipWorldY(rightShin, 2.6181f, r), LowestBodyPart::RightShin,
-                 lowestY, lowestPart);
+  if (customizeData_ != nullptr) {
+    const float leftRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+    const float rightRadius = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+    
+    for (const auto &inst : customizeData_->partInstances) {
+      if (inst.partType == ModBodyPart::LeftShin) {
+        auto it = allPartObjects_.find(inst.partId);
+        if (it != allPartObjects_.end() && it->second != nullptr) {
+          UpdateLowest(GetTipWorldY(it->second, 2.6181f, leftRadius),
+                       LowestBodyPart::LeftShin, lowestY, lowestPart);
+        }
+      } else if (inst.partType == ModBodyPart::RightShin) {
+        auto it = allPartObjects_.find(inst.partId);
+        if (it != allPartObjects_.end() && it->second != nullptr) {
+          UpdateLowest(GetTipWorldY(it->second, 2.6181f, rightRadius),
+                       LowestBodyPart::RightShin, lowestY, lowestPart);
+        }
+      }
+    }
+  } else {
+    if (Object *leftShin = GetStandardPart(ModBodyPart::LeftShin)) {
+      const float r = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
+      UpdateLowest(GetTipWorldY(leftShin, 2.6181f, r), LowestBodyPart::LeftShin,
+                   lowestY, lowestPart);
+    }
+    if (Object *rightShin = GetStandardPart(ModBodyPart::RightShin)) {
+      const float r = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+      UpdateLowest(GetTipWorldY(rightShin, 2.6181f, r), LowestBodyPart::RightShin,
+                   lowestY, lowestPart);
+    }
   }
 
   if (outPart != nullptr) {
