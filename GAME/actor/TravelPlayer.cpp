@@ -108,11 +108,19 @@ void TravelPlayer::UpdateModObjects() {
     shadow_->mainPosition.transform.translate.y = groundY_ + 0.01f;
     shadow_->mainPosition.transform.translate.z = moveX_;
     shadow_->mainPosition.transform.rotate = {1.5f, -1.57f, 0.0f};
-    float height = moveY_ - groundY_;
-    float baseHeight = 6.068f;
-    float heightOffset = height - baseHeight;
-    float scale = 1.2f - heightOffset * 0.35f;
+
+    LowestBodyPart lowestPart = LowestBodyPart::None;
+    float lowestBodyLocalY = GetLowestVisualBodyY(&lowestPart);
+    float lowestBodyWorldY = moveY_ + visualLiftY_ + lowestBodyLocalY;
+    
+    float jumpHeight = lowestBodyWorldY - groundY_;
+    if (jumpHeight < 0.0f) {
+      jumpHeight = 0.0f;
+    }
+
+    float scale = 1.2f - jumpHeight * 0.35f;
     scale = std::clamp(scale, 0.1f, 30.0f);
+    
     shadow_->mainPosition.transform.scale = {scale, scale, 1.0f};
     shadow_->Update(nullptr);
   }
@@ -642,6 +650,22 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       leftThighVec = {0.0f, -1.0f, 0.0f};
       leftThighLength = 0.0001f;
     }
+    
+    float leftThighScaleY = 1.0f;
+    float leftShinScaleY = 1.0f;
+    float rightThighScaleY = 1.0f;
+    float rightShinScaleY = 1.0f;
+    if (customizeData_) {
+      for (const auto &inst : customizeData_->partInstances) {
+        if (inst.partType == ModBodyPart::LeftThigh) leftThighScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::LeftShin) leftShinScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::RightThigh) rightThighScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::RightShin) rightShinScaleY = inst.param.scale.y * inst.param.length;
+      }
+    }
+    
+    leftThighLength *= leftThighScaleY;
+    
     Vector3 leftThighDir = NormalizeSafe(leftThighVec);
 
     float leftThighAngleZ = std::atan2(leftThighDir.x, -leftThighDir.y);
@@ -655,6 +679,7 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       leftShinVec = {0.0f, -1.0f, 0.0f};
       leftShinLength = 0.0001f;
     }
+    leftShinLength *= leftShinScaleY;
     Vector3 leftShinDir = NormalizeSafe(leftShinVec);
 
     float leftShinAngleZ = std::atan2(leftShinDir.x, -leftShinDir.y);
@@ -684,6 +709,7 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       rightThighVec = {0.0f, -1.0f, 0.0f};
       rightThighLength = 0.0001f;
     }
+    rightThighLength *= rightThighScaleY;
     Vector3 rightThighDir = NormalizeSafe(rightThighVec);
 
     float rightThighAngleZ = std::atan2(rightThighDir.x, -rightThighDir.y);
@@ -698,6 +724,7 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       rightShinVec = {0.0f, -1.0f, 0.0f};
       rightShinLength = 0.0001f;
     }
+    rightShinLength *= rightShinScaleY;
     Vector3 rightShinDir = NormalizeSafe(rightShinVec);
 
     float rightShinAngleZ = std::atan2(rightShinDir.x, -rightShinDir.y);
@@ -1264,6 +1291,47 @@ void TravelPlayer::ApplyVisualState() {
     if (instance.parentId < 0) {
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
+    }
+
+    ModBodyPart parentType = ModBodyPart::Count;
+    if (instance.parentId >= 0) {
+      for (const auto &pInst : customizeData_->partInstances) {
+        if (pInst.partId == instance.parentId) {
+          parentType = pInst.partType;
+          break;
+        }
+      }
+
+      bool isStandardJoint = false;
+      if ((instance.partType == ModBodyPart::LeftForeArm && parentType == ModBodyPart::LeftUpperArm) ||
+          (instance.partType == ModBodyPart::RightForeArm && parentType == ModBodyPart::RightUpperArm) ||
+          (instance.partType == ModBodyPart::LeftShin && parentType == ModBodyPart::LeftThigh) ||
+          (instance.partType == ModBodyPart::RightShin && parentType == ModBodyPart::RightThigh)) {
+        isStandardJoint = true;
+      }
+
+      if (isStandardJoint) {
+        auto parentIt = allPartObjects_.find(instance.parentId);
+        if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
+          if (!parentIt->second->objectParts_.empty()) {
+            float parentScaleY = parentIt->second->objectParts_[0].transform.scale.y;
+            float parentDefaultLength = 1.0f;
+            switch (parentType) {
+            case ModBodyPart::LeftUpperArm:
+            case ModBodyPart::RightUpperArm:
+              parentDefaultLength = 1.08f;
+              break;
+            case ModBodyPart::LeftThigh:
+            case ModBodyPart::RightThigh:
+              parentDefaultLength = 1.57f;
+              break;
+            default:
+              break;
+            }
+            obj->mainPosition.transform.translate = {0.0f, -(parentScaleY * parentDefaultLength), 0.0f};
+          }
+        }
+      }
     }
 
     // Base Rotation

@@ -20,7 +20,7 @@ inline Matrix4x4 ComputeMainPositionWorldMatrix(const Object *target) {
     Matrix4x4 local =
         MakeAffineMatrix(parent->transform.scale, parent->transform.rotate,
                          parent->transform.translate);
-    parentMatrix = local * parentMatrix;
+    parentMatrix = parentMatrix * local;
     parent = parent->parentPart;
   }
 
