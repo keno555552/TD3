@@ -62,18 +62,6 @@ private:
   // フェードアウト完了後の遷移先
   SceneOutcome nextOutcome_ = SceneOutcome::NONE;
 
-  /* モデル描画用
-  ------------------------------*/
-  // モデルハンドル
-  std::array<int, static_cast<size_t>(ModBodyPart::Count)> modModelHandles_{};
-  // 各部位オブジェクト
-  std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects_{};
-
-  std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies_{};
-
-  std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)>
-      bodyJointOffsets_{};
-
   std::unique_ptr<ModBodyCustomizeData> customizeData_ = nullptr;
 
 
@@ -144,6 +132,8 @@ private:
   void UpdateRaceFinishState();
 
   std::array<Object *, 16> npcDebugCpObjects_{};
+  bool showBaseModel_ = true;
+  bool showExtraModel_ = true;
   bool showNpcModel_ = true;
   int shadowModelHandle_ = 0;
 

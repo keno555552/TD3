@@ -22,30 +22,21 @@ public:
   void UpdateMovementState(bool leftNowInput, bool rightNowInput);
   void ApplyVisualState();
 
-    void SetupModObjects();
-  void SetupPartObject(ModBodyPart part, const std::string &path);
-  void SetupHierarchy();
-  void SetupInitialLayout();
+  void BuildAllVisualParts();
   void UpdateModObjects();
   void DrawModObjects(Camera* camera);
   void UpdateParticle(Camera* camera);
   void DrawParticle();
   void ClearParticle();
-  void SetupBodyJointOffsets();
   void LoadCustomizeData();
   void UpdateChildRootsFromBody();
   void ApplyCustomizeToMovementParam();
   float ComputeLegHeightOffset() const;
   void SavePreviousFrameState();
   void ResolveVisualGroundPenetration();
-  void UpdatePartRootsFromControlPoints();
-  void PrepareTorsoApplySource();
   void BuildFeaturesFromCustomizeData();
   
-  void CollectSnapshotsByOwnerId(const ModBodyCustomizeData* data, const std::string& ownerId, std::vector<const ModControlPointSnapshot*>& outSnapshots);
-  
-  
-  
+
   enum class LowestBodyPart {
     None,
     LeftForeArm,
@@ -116,6 +107,11 @@ public:
   float rightLegBend_ = 0.0f;
   float leftLegBendSpeed_ = 0.0f;
   float rightLegBendSpeed_ = 0.0f;
+
+  static const int kMaxAnimHistory = 32;
+  float leftLegBendHistory_[kMaxAnimHistory] = {0};
+  float rightLegBendHistory_[kMaxAnimHistory] = {0};
+  int animHistoryIndex_ = 0;
 
   float bodyStretch_ = 0.0f;
   float bodyStretchSpeed_ = 0.0f;
@@ -203,30 +199,17 @@ public:
 
   int perfectStreak_ = 0;
 
-  std::array<int, static_cast<size_t>(ModBodyPart::Count)> modModelHandles_{};
-  std::array<Object *, static_cast<size_t>(ModBodyPart::Count)> modObjects_{};
-  std::array<ModBody, static_cast<size_t>(ModBodyPart::Count)> modBodies_{};
-  std::array<Vector3, static_cast<size_t>(ModBodyPart::Count)> bodyJointOffsets_{};
   const ModBodyCustomizeData *customizeData_ = nullptr;
   void SetCustomizeData(const ModBodyCustomizeData *data) {
     customizeData_ = data;
   }
-  std::vector<Object *> extraObjects_;
-  std::vector<int> extraParentIds_;
-  std::vector<ModBodyPart> extraPartTypes_;
-  std::vector<int> extraPartIds_;
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;
   
   std::unordered_map<int, Object*> allPartObjects_;
 
-  float visualLiftY_ = 0.0f;
-  std::vector<ModControlPoint> torsoSharedPointsBuffer_;
   std::unique_ptr<Object> shadow_;
+  float visualLiftY_ = 0.0f;
   int shadowModelHandle_ = 0;
-  std::unordered_map<int, ObjectPart *> fixedPartIdToPart_;
-
-  void ClearExtraVisualParts();
-  void BuildExtraVisualParts();
 
   void CollectSnapshotsByOwnerId(
       int ownerPartId,
@@ -253,6 +236,7 @@ public:
   bool GetPartInstanceLocalRotate(int partId, Vector3 &outRotate) const;
   bool GetFirstPartTypeLocalTranslate(ModBodyPart partType,
                                       Vector3 &outLocal) const;
+  Object* GetStandardPart(ModBodyPart partType) const;
 
   int GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
                               int parentId) const;
@@ -298,7 +282,6 @@ public:
                                 SegmentVisual &out);
 
 
-  bool useModBodyApplyTorso_ = false;
 
 private:
   kEngine* system_ = nullptr;

@@ -75,12 +75,7 @@ TravelScene::TravelScene(kEngine *system) {
   // 3Dオブジェクト
   //===============================
 
-  // 各部位のハンドルとオブジェクト配列を初期化
-  modModelHandles_.fill(0);
-  modObjects_.fill(nullptr);
-
   // 改造用の各部位オブジェクトをセットアップ
-  player_->SetupModObjects();
 
   customizeData_ = ModBody::CopySharedCustomizeData();
   if (customizeData_ == nullptr) {
@@ -91,7 +86,7 @@ TravelScene::TravelScene(kEngine *system) {
   player_->LoadCustomizeData();
 
   player_->BuildFeaturesFromCustomizeData();
-  player_->BuildExtraVisualParts();
+  player_->BuildAllVisualParts();
 
   player_->ApplyCustomizeToMovementParam();
 
@@ -221,7 +216,7 @@ TravelScene::TravelScene(kEngine *system) {
   for (auto &obj : npcDebugCpObjects_) {
     obj = new Object;
     obj->IntObject(system_);
-    obj->CreateModelData(modModelHandles_[ToIndex(ModBodyPart::Head)]);
+    obj->CreateModelData(system_->SetModelObj("GAME/resources/modBody/head/head.obj"));
     obj->mainPosition.transform = CreateDefaultTransform();
     obj->mainPosition.transform.scale = {0.08f, 0.08f, 0.08f};
   }
@@ -237,11 +232,7 @@ TravelScene::~TravelScene() {
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
 
-  // 各部位オブジェクトを解放
-  for (auto &object : modObjects_) {
-    delete object;
-    object = nullptr;
-  }
+
 
   for (auto &npc : npcManager_->npcRunners_) {
     npcManager_->ClearNpcCustomizedVisual(npc);
@@ -343,9 +334,9 @@ void TravelScene::Update() {
 }
 
 void TravelScene::Draw() {
-
-  player_->DrawModObjects(usingCamera_);
-
+  if (showBaseModel_) {
+    player_->DrawModObjects(usingCamera_);
+  }
 
   npcManager_->DrawNpcs(goalX_, showNpcModel_);
 
@@ -376,6 +367,10 @@ void TravelScene::Draw() {
 
 #ifdef USE_IMGUI
   ImGui::Begin("TravelDebug");
+
+  ImGui::Checkbox("Show Base Model", &showBaseModel_);
+  ImGui::Checkbox("Show Extra Model", &showExtraModel_);
+  ImGui::Separator();
 
   //==============================
   // 位置・速度
