@@ -1080,7 +1080,7 @@ void ModScene::Update() {
   }
 
   // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
-  if (TryHandleAddButtonClick()) {
+  if (TryHandleAddButtonInteraction()) {
     UpdateModObjects();
     SyncCustomizeDataFromScene();
 
@@ -4599,6 +4599,14 @@ void ModScene::CancelAssemblyDragPlacement() {
     return;
   }
 
+  if (assemblyDrag_.isNewPartAdding) {
+    // 新規追加中のキャンセルなら、追加したパーツを削除する
+    assembly_.RemovePart(assemblyDrag_.assemblyRootPartId);
+    SyncAfterAssemblyChanged();
+    assemblyDrag_.Clear();
+    return;
+  }
+
   const int rootPartId = assemblyDrag_.assemblyRootPartId;
   const PartNode *rootNode = assembly_.FindNode(rootPartId);
   if (rootNode == nullptr) {
@@ -4725,11 +4733,16 @@ void ModScene::ApplyAssemblyDragVisualFeedback() {
       Vector4 &color =
           object->objectParts_[partIndex].materialConfig->textureColor;
 
+      // ドラッグ中は半透明にする
+      color.w = 0.5f;
+
       if (valid) {
+        // 有効な配置場所なら緑っぽく
         color.x = 0.25f;
         color.y = 1.0f;
         color.z = 0.35f;
       } else {
+        // 無効な場所なら赤っぽく
         color.x = 1.0f;
         color.y = 0.25f;
         color.z = 0.25f;
@@ -6480,11 +6493,6 @@ void ModScene::InitializeScreenUi() {
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)].label =
       "ひだりあし";
 
-  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)],
-                {left, top + spacingY * 5.0f}, {width, height},
-                uiFrameTextureHandle_);
-  addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "縺九ｉ縺";
-
   SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
@@ -6498,46 +6506,46 @@ void ModScene::InitializeScreenUi() {
   nextSceneButton_.label = "つぎへ";
 }
 
-bool ModScene::ExecuteAddButton(UiAddButtonType type) {
-  bool changed = false;
+int ModScene::ExecuteAddButton(UiAddButtonType type) {
+  int newPartId = -1;
 
   switch (type) {
   case UiAddButtonType::AddLeftArm:
-    changed = assembly_.AddArmAssembly(PartSide::Left);
+    newPartId = assembly_.AddArmAssembly(PartSide::Left);
     break;
 
   case UiAddButtonType::AddRightArm:
-    changed = assembly_.AddArmAssembly(PartSide::Right);
+    newPartId = assembly_.AddArmAssembly(PartSide::Right);
     break;
 
   case UiAddButtonType::AddLeftLeg:
-    changed = assembly_.AddLegAssembly(PartSide::Left);
+    newPartId = assembly_.AddLegAssembly(PartSide::Left);
     break;
 
   case UiAddButtonType::AddRightLeg:
-    changed = assembly_.AddLegAssembly(PartSide::Right);
+    newPartId = assembly_.AddLegAssembly(PartSide::Right);
     break;
 
   case UiAddButtonType::AddHeadSet:
-    changed = assembly_.AddNeckPart();
+    newPartId = assembly_.AddNeckPart();
     break;
 
   case UiAddButtonType::AddBody:
-    changed = assembly_.AddBodyPart();
+    newPartId = assembly_.AddBodyPart();
     break;
 
   default:
     break;
   }
 
-  if (changed) {
+  if (newPartId >= 0) {
     SyncAfterAssemblyChanged();
   }
 
-  return changed;
+  return newPartId;
 }
 
-bool ModScene::TryHandleAddButtonClick() {
+bool ModScene::TryHandleAddButtonInteraction() {
   if (!IsMouseLeftTriggeredNow()) {
     return false;
   }
@@ -6549,8 +6557,53 @@ bool ModScene::TryHandleAddButtonClick() {
       continue;
     }
 
-    ExecuteAddButton(static_cast<UiAddButtonType>(i));
-    return true;
+    // ドラッグによる新規追加を開始
+    const int newId = ExecuteAddButton(static_cast<UiAddButtonType>(i));
+    if (newId >= 0) {
+      // 即座にドラッグ状態へ移行
+      BeginAssemblyDragFromPart(newId);
+      assemblyDrag_.isNewPartAdding = true;
+
+      // オフセットを完全にゼロにしてカーソル直下に吸着させる
+      assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
+
+      // 胴体（親）の座標を取得して、マウス位置を正確なローカル座標に変換する
+      int bodyId = assembly_.GetBodyId();
+      if (bodyId >= 0 && modObjects_.count(bodyId) > 0) {
+        const Object *bodyObject = modObjects_.at(bodyId).get();
+        const Vector3 bodyWorldPos =
+            ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
+
+        // ドラッグ平面を胴体の深度に設定
+        assemblyDrag_.dragPlanePoint = bodyWorldPos;
+        if (usingCamera_) {
+          const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+          assemblyDrag_.dragPlaneNormal =
+              NormalizeSafeV(Subtract(cameraPos, bodyWorldPos), {0, 0, 1});
+        }
+
+        const Ray mouseRay =
+            usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+        Vector3 hitPoint{};
+        if (RayPlaneIntersection(mouseRay, assemblyDrag_.dragPlanePoint,
+                                 assemblyDrag_.dragPlaneNormal, &hitPoint)) {
+          // ワールド座標の hitPoint を親のローカル座標へ変換
+          const Vector3 localPos =
+              ModObjectUtil::TransformWorldPointToLocal(bodyObject, hitPoint);
+
+          // ドラッグ開始時の状態を現在のマウス位置に合わせて上書き
+          assemblyDrag_.beforeLocalTranslate = localPos;
+          assemblyDrag_.previewLocalTranslate = localPos;
+          assemblyDrag_.dragPlanePoint = hitPoint; // 今のマウス位置を移動の起点にする
+
+          // 即座にパーツ位置を更新
+          assembly_.SetPartLocalTranslate(newId, localPos);
+          UpdateModObjects();
+        }
+      }
+
+      return true;
+    }
   }
 
   if (IsPointInUiButton(mouse, resetButton_)) {

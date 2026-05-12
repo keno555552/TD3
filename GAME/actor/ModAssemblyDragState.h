@@ -34,6 +34,7 @@ struct ModAssemblyDragState {
 
   bool hasSnappedCandidate = false;
   bool isPlacementValid = false;
+  bool isNewPartAdding = false;
 
   Vector3 dragPlanePoint{0.0f, 0.0f, 0.0f};
   Vector3 dragPlaneNormal{0.0f, 0.0f, 1.0f};
@@ -60,6 +61,7 @@ struct ModAssemblyDragState {
     snappedWorldNormal = {0.0f, 1.0f, 0.0f};
     hasSnappedCandidate = false;
     isPlacementValid = false;
+    isNewPartAdding = false;
     dragPlanePoint = {0.0f, 0.0f, 0.0f};
     dragPlaneNormal = {0.0f, 0.0f, 1.0f};
     dragRootOffset = {0.0f, 0.0f, 0.0f};

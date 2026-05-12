@@ -952,14 +952,14 @@ private:
   /// 現在のマウス位置に基づいて、部位追加ボタンや削除ボタンのどれかがクリックされたかを判定する
   /// </summary>
   /// <returns></returns>
-  bool TryHandleAddButtonClick();
+  bool TryHandleAddButtonInteraction();
 
   /// <summary>
   /// 指定した部位追加ボタンの種類に応じて、対応する部位を追加する
   /// </summary>
   /// <param name="type"></param>
   /// <returns></returns>
-  bool ExecuteAddButton(UiAddButtonType type);
+  int ExecuteAddButton(UiAddButtonType type);
 
   /// <summary>
   /// 現在のマウス位置が、部位追加ボタンや削除ボタンのどれかと重なっているかを判定する
