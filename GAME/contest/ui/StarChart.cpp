@@ -38,30 +38,38 @@ void StarChart::SetStars(int theme, int impact, int commitment,
 	int stars[5] = { theme, impact, commitment, efficiency, judgeEval };
 
 	// 5つの外側頂点（apex）と5つの内側谷点（dip）を計算
-	// apex は ★値で半径が変動、dip は固定半径で五芒星の凹みを作る
 	Vector2 apex[5];
 	Vector2 dip[5];
 
+	// Step 1: 各apexの半径と位置を確定
+	// ★0 は腕を出さない（半径0で凧形が縮退）
+	// ★1〜5 は kMinStarRatio〜1.0 を線形補間
+	float apexR[5];
 	for (int i = 0; i < 5; ++i) {
-		// 頂点 i の方向：真上（-90°）を起点に 72° × i ずつ時計回り
-		float apexAngle = (kTwoPi / 5.0f) * i - kHalfPi;
-
-		// 外側頂点：★値に応じた半径
-		// ★0 は腕を出さない（半径0で凧形が縮退）
-		// ★1〜5 は kMinStarRatio〜1.0 を線形補間（内側谷点より外側に出るよう底上げ）
-		float apexR = 0.0f;
 		if (stars[i] > 0) {
 			float t = (stars[i] - 1) / 4.0f;   // ★1→0, ★5→1
-			apexR = kMaxRadius * (kMinStarRatio + t * (1.0f - kMinStarRatio));
+			apexR[i] = kMaxRadius * (kMinStarRatio + t * (1.0f - kMinStarRatio));
+		} else {
+			apexR[i] = 0.0f;
 		}
-		apex[i] = {
-			centerX_ + apexR * cosf(apexAngle),
-			centerY_ + apexR * sinf(apexAngle)
-		};
 
-		// 内側谷点：apex[i] と apex[i+1] の中間角度（+36°）、固定半径
-		float dipAngle = apexAngle + kTwoPi / 10.0f;
-		float dipR     = kMaxRadius * kInnerRatio;
+		float apexAngle = (kTwoPi / 5.0f) * i - kHalfPi;
+		apex[i] = {
+			centerX_ + apexR[i] * cosf(apexAngle),
+			centerY_ + apexR[i] * sinf(apexAngle)
+		};
+	}
+
+	// Step 2: 各dipの半径と位置を確定
+	// 隣接2つのapex半径の平均 × kDipRatio で「少し内側」に。
+	// kDipFloorRatio * kMaxRadius を下限にして、apexが小さくても谷が潰れないようにする
+	const float dipFloor = kMaxRadius * kDipFloorRatio;
+	for (int i = 0; i < 5; ++i) {
+		float avgApexR = (apexR[i] + apexR[(i + 1) % 5]) * 0.5f;
+		float dipR = avgApexR * kDipRatio;
+		if (dipR < dipFloor) dipR = dipFloor;
+
+		float dipAngle = (kTwoPi / 5.0f) * i - kHalfPi + kTwoPi / 10.0f;  // apexAngle + 36°
 		dip[i] = {
 			centerX_ + dipR * cosf(dipAngle),
 			centerY_ + dipR * sinf(dipAngle)

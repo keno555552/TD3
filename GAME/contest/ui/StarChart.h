@@ -55,14 +55,18 @@ private:
 	float centerY_ = 0.0f;
 
 	/// ★5 時の外側頂点の最大半径（ピクセル）
-	static constexpr float kMaxRadius  = 200.0f;
+	static constexpr float kMaxRadius  = 250.0f;
 
-	/// 内側谷点の半径比（外側半径に対する比率）
-	/// 黄金比由来 ≈ 0.382 で正多角形の星形になる。下げるほど痩せた星になる
-	static constexpr float kInnerRatio = 0.382f;
+	/// 谷点の最小半径比（kMaxRadius に対する比率）
+	/// 隣接apexが両方とも小さくても、谷がこの値より内側に潜らない
+	static constexpr float kDipFloorRatio = 0.25f;
+
+	/// 谷点の半径 = 隣接2つのapex半径の平均 × この比率
+	/// 1.0 に近いほど谷が浅く（五角形寄り）、小さいほど深い星形になる
+	static constexpr float kDipRatio = 0.4f;
 
 	/// ★1 のときの外側頂点半径比（★5=1.0 までを線形補間）
 	/// 内側谷点(kInnerRatio≈0.382)より大きい必要がある。
-	/// 0.6 → ★1=120px, ★3=160px, ★5=200px
-	static constexpr float kMinStarRatio = 0.6f;
+	/// 0.5 → ★1=125px, ★3=175px, ★5=250px
+	static constexpr float kMinStarRatio = 0.5f;
 };
