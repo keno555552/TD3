@@ -3,10 +3,11 @@
 class kEngine;
 class SimpleSprite;
 struct Vector2;
+struct Vector4;
 
 /// <summary>
 /// 五芒星型のレーダーチャート
-/// 5枚の三角形スプライトを回転配置し、★値でスケールを変える
+/// 5頂点を三角扇（center + v[i] + v[i+1]）で描画する
 /// </summary>
 class StarChart {
 public:
@@ -31,6 +32,11 @@ public:
 		int efficiency, int judgeEval);
 
 	/// <summary>
+	/// 5枚すべての色（textureColor）を設定する。RGBA、半透明可。
+	/// </summary>
+	void SetColor(const Vector4& color);
+
+	/// <summary>
 	/// 描画
 	/// </summary>
 	void Draw();
@@ -48,16 +54,15 @@ private:
 	float centerX_ = 0.0f;
 	float centerY_ = 0.0f;
 
-	/// 頂点の回転角度（ラジアン）
-	/// 上から時計回り: テーマ(0°), インパクト(72°), こだわり(144°), 効率(216°), 審査員(288°)
-	static constexpr float kRotations[5] = {
-		0.0f,       /// テーマ一致度   0°
-		1.25664f,   /// インパクト    72°
-		2.51327f,   /// こだわり     144°
-		3.76991f,   /// 効率        216°
-		5.02655f,   /// 審査員評価   288°
-	};
+	/// ★5 時の外側頂点の最大半径（ピクセル）
+	static constexpr float kMaxRadius  = 200.0f;
 
-	/// ★値(1〜5)からスケール(0.2〜1.0)に変換。0なら非表示(0.0)
-	static float StarToScale(int star);
+	/// 内側谷点の半径比（外側半径に対する比率）
+	/// 黄金比由来 ≈ 0.382 で正多角形の星形になる。下げるほど痩せた星になる
+	static constexpr float kInnerRatio = 0.382f;
+
+	/// ★1 のときの外側頂点半径比（★5=1.0 までを線形補間）
+	/// 内側谷点(kInnerRatio≈0.382)より大きい必要がある。
+	/// 0.6 → ★1=120px, ★3=160px, ★5=200px
+	static constexpr float kMinStarRatio = 0.6f;
 };

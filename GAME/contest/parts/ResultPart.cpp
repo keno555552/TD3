@@ -9,17 +9,30 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 	, scoreResult_(scoreResult)
 	, earnedNickname_(earnedNickname) {
 
-	// 五芒星レーダーチャート初期化（画面右側に配置）
+	// 五芒星レーダーチャート初期化（画面右側、3層構造）
 	// HD: 1280x720 → 右側中心あたり (900, 360)
-	starChart_.Initialize(system_, 900.0f, 360.0f);
+	const float kCx = 900.0f;
+	const float kCy = 360.0f;
 
-	// 最初から全5項目をセット
+	// 背景：全★5の最大星形（薄いグレーで透過）
+	bgStar_.Initialize(system_, kCx, kCy);
+	bgStar_.SetStars(5, 5, 5, 5, 5);
+	bgStar_.SetColor({ 0.2f, 0.2f, 0.2f, 0.5f });
+
+	// 中段：実値の星形（オレンジ色）
+	starChart_.Initialize(system_, kCx, kCy);
 	starChart_.SetStars(
 		scoreResult_.starThemeMatch,
 		scoreResult_.starImpact,
 		scoreResult_.starCommitment,
 		scoreResult_.starEfficiency,
 		scoreResult_.starJudgeBonus);
+	starChart_.SetColor({ 0.906f, 0.58f, 0.0f, 1.0f });
+
+	// 前景：全★1の最小星形（黄色）
+	fgStar_.Initialize(system_, kCx, kCy);
+	fgStar_.SetStars(1, 1, 1, 1, 1);
+	fgStar_.SetColor({ 1.0f, 0.808f, 0.0f, 1.0f });
 
 	cameraTransform_ = { { 0.6f, 0.7f, -3.0f }, { 0.0f, 0.0f, 0.0f } };
 
@@ -28,7 +41,9 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 }
 
 ResultPart::~ResultPart() {
+	bgStar_.Cleanup();
 	starChart_.Cleanup();
+	fgStar_.Cleanup();
 }
 
 void ResultPart::Update() {
@@ -50,8 +65,10 @@ void ResultPart::Update() {
 }
 
 void ResultPart::Draw() {
-	// 五芒星レーダーチャート描画
-	starChart_.Draw();
+	// 五芒星レーダーチャート描画（後に描画したものほど手前に来る）
+	bgStar_.Draw();      // 背景：全★5
+	starChart_.Draw();   // 中段：実値
+	fgStar_.Draw();      // 前景：全★1
 
 	if (step_ >= ResultStep::StarsAndChart) {
 

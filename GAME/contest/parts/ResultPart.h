@@ -42,8 +42,10 @@ private:
 
 	PartCameraTransform GetCameraTransform() const override;
 
-	/// 五芒星レーダーチャート
-	StarChart starChart_;
+	/// 五芒星レーダーチャート（3層構造）
+	StarChart bgStar_;     /// 背景：全★5の最大星形（薄く表示）
+	StarChart starChart_;  /// 中段：実値の星形
+	StarChart fgStar_;     /// 前景：全★1の最小星形
 
 	/// StarChartの表示を現在のステップに合わせて更新する
 	void UpdateStarChart();
