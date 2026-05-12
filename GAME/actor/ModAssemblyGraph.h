@@ -234,6 +234,7 @@ private:
   /// 現在存在している脚根元（腿）の数を数える
   /// </summary>
   int CountLegRoots() const;
+  int CountLegsBySide(PartSide side) const;
 
   /// <summary>
   /// 現在存在しているHeadの数を数える

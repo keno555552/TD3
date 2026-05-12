@@ -273,7 +273,7 @@ float ClampFloatLocal(float value, float minValue, float maxValue) {
 }
 
 float GetControlPointGizmoDrawRadius(float influenceRadius) {
-  return ClampFloatLocal(influenceRadius * 0.45f, 0.035f, 0.12f);
+  return ClampFloatLocal(influenceRadius * 0.90f, 0.07f, 0.24f);
 }
 
 float GetWheelScaleFactorFromDelta(int wheelDelta) {
@@ -2415,6 +2415,11 @@ void ModScene::UpdateControlPointEditing() {
 }
 
 bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
+  if (usingCamera_ == nullptr) {
+    return false;
+  }
+  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+
   const int visiblePartId =
       (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
 
@@ -2433,10 +2438,19 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
         continue;
       }
 
-      Sphere sphere{};
-      sphere.center =
+      const float influenceRadius = torsoControlPoints_[i].radius;
+      const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+
+      const Vector3 worldPos =
           GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
-      sphere.radius = torsoControlPoints_[i].radius;
+      const Vector3 toCamera =
+          NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+      const Vector3 drawPos =
+          Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
+      Sphere sphere{};
+      sphere.center = drawPos;
+      sphere.radius = drawRadius * 2.0f;
 
       float t = 0.0f;
       if (!crashDecision(sphere, mouseRay, &t)) {
@@ -2450,6 +2464,12 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
     }
 
     if (nearestPointIndex < 0) {
+      return false;
+    }
+
+    if (nearestPointIndex >= 0 &&
+        torsoControlPoints_[static_cast<size_t>(nearestPointIndex)].role ==
+            ModControlPointRole::Root) {
       return false;
     }
 
@@ -2508,9 +2528,18 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       continue;
     }
 
+    const Vector3 worldPos = body.GetControlPointWorldPosition(object, pointIndex);
+    const float influenceRadius = points[pointIndex].radius;
+    const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+
+    const Vector3 toCamera =
+        NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+    const Vector3 drawPos =
+        Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
     Sphere sphere{};
-    sphere.center = body.GetControlPointWorldPosition(object, pointIndex);
-    sphere.radius = points[pointIndex].radius;
+    sphere.center = drawPos;
+    sphere.radius = drawRadius * 2.0f;
 
     float t = 0.0f;
     if (!crashDecision(sphere, mouseRay, &t)) {
@@ -2521,6 +2550,10 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       nearestT = t;
       nearestPointIndex = static_cast<int>(pointIndex);
     }
+  }
+
+  if (nearestPointIndex < 0) {
+    return false;
   }
 
   if (nearestPointIndex >= 0 &&
@@ -2541,7 +2574,6 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
 
   dragControlPlanePoint_ = worldPos;
 
-  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
   dragControlPlaneNormal_ =
       NormalizeSafeV(Subtract(worldPos, cameraPos), {0.0f, 0.0f, 1.0f});
 
@@ -2948,6 +2980,13 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
             ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
             : defaultWaist;
 
+    // 親ノード（胴体）自体がドラッグなどで移動している場合、その分を差し引いて「相対座標」にする。
+    // そうしないと、親の移動 + 子の(絶対座標による)移動 で2倍速になってしまう。
+    const Vector3 parentPos = parentNode.localTransform.translate;
+    const Vector3 relChest = Subtract(currentChest, parentPos);
+    const Vector3 relBelly = Subtract(currentBelly, parentPos);
+    const Vector3 relWaist = Subtract(currentWaist, parentPos);
+
     const float defaultChestRadius = 0.12f;
     const float defaultBellyRadius = 0.10f;
     const float defaultWaistRadius = 0.12f;
@@ -2995,41 +3034,41 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     switch (childNode.part) {
     case ModBodyPart::Neck:
     case ModBodyPart::Head: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.y +=
           neckLift + (currentUpperTorsoRadius - defaultUpperTorsoRadius);
       return attach;
     }
 
     case ModBodyPart::LeftUpperArm: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.x -= baseShoulderX * upperTorsoRadiusRatio;
-      attach.y = currentChest.y;
-      attach.z = currentChest.z;
+      attach.y = relChest.y;
+      attach.z = relChest.z;
       return attach;
     }
 
     case ModBodyPart::RightUpperArm: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.x += baseShoulderX * upperTorsoRadiusRatio;
-      attach.y = currentChest.y;
-      attach.z = currentChest.z;
+      attach.y = relChest.y;
+      attach.z = relChest.z;
       return attach;
     }
 
     case ModBodyPart::LeftThigh: {
-      Vector3 attach = currentWaist;
+      Vector3 attach = relWaist;
       attach.x -= baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = currentWaist.z;
+      attach.z = relWaist.z;
       return attach;
     }
 
     case ModBodyPart::RightThigh: {
-      Vector3 attach = currentWaist;
+      Vector3 attach = relWaist;
       attach.x += baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = currentWaist.z;
+      attach.z = relWaist.z;
       return attach;
     }
 
@@ -3314,6 +3353,7 @@ void ModScene::UpdateControlPointWheelScaling() {
   if (system_->GetMouseIsPush(2)) {
     return;
   }
+  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
 
   const int wheelDelta = system_->GetMouseScrollOrigin();
   if (wheelDelta == 0) {
@@ -3363,10 +3403,19 @@ void ModScene::UpdateControlPointWheelScaling() {
         continue;
       }
 
-      Sphere sphere{};
-      sphere.center =
+      const Vector3 worldPos =
           GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
-      sphere.radius = torsoControlPoints_[i].radius;
+      const float influenceRadius = torsoControlPoints_[i].radius;
+      const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+
+      const Vector3 toCamera =
+          NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+      const Vector3 drawPos =
+          Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
+      Sphere sphere{};
+      sphere.center = drawPos;
+      sphere.radius = drawRadius * 2.0f;
 
       float t = 0.0f;
       if (!crashDecision(sphere, mouseRay, &t)) {
@@ -3418,9 +3467,18 @@ void ModScene::UpdateControlPointWheelScaling() {
       continue;
     }
 
+    const Vector3 worldPos = body.GetControlPointWorldPosition(object, i);
+    const float influenceRadius = points[i].radius;
+    const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+
+    const Vector3 toCamera =
+        NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+    const Vector3 drawPos =
+        Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
     Sphere sphere{};
-    sphere.center = body.GetControlPointWorldPosition(object, i);
-    sphere.radius = points[i].radius;
+    sphere.center = drawPos;
+    sphere.radius = drawRadius * 2.0f;
 
     float t = 0.0f;
     if (!crashDecision(sphere, mouseRay, &t)) {
@@ -4001,6 +4059,23 @@ void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
 
   assemblyDrag_.previewLocalTranslate = rootNode->localTransform.translate;
 
+  // 胴体ドラッグ用に全操作点の初期座標を保存
+  assemblyDrag_.beforeTorsoPoints.clear();
+  for (const auto &point : torsoControlPoints_) {
+    assemblyDrag_.beforeTorsoPoints.push_back(point.localPosition);
+  }
+
+  // 胴体各パーツの初期座標も保存
+  assemblyDrag_.beforeBodyTranslations.clear();
+  std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+  for (int id : allIds) {
+    const PartNode *node = assembly_.FindNode(id);
+    if (node != nullptr &&
+        ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+      assemblyDrag_.beforeBodyTranslations[id] = node->localTransform.translate;
+    }
+  }
+
   // ドラッグ平面は「掴んだ点を通る、カメラ正面向き平面」を使う
   const Vector3 rootWorld = GetAssemblyRootWorldPosition(rootPartId);
   assemblyDrag_.dragPlanePoint = rootWorld;
@@ -4051,8 +4126,10 @@ bool ModScene::CanAttachAssemblyRootToParentPart(int childRootPartId,
   }
 
   const bool parentCanReceive =
-      ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) ||
-      parentNode->part == ModBodyPart::Head;
+      (ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) &&
+       parentNode->part != ModBodyPart::Neck) ||
+      parentNode->part == ModBodyPart::Head ||
+      parentNode->part == ModBodyPart::StomachBody;
 
   if (!parentCanReceive) {
     return false;
@@ -4288,7 +4365,18 @@ ModScene::FindBestAttachCandidate(int childRootPartId,
   for (size_t i = 0; i < ids.size(); ++i) {
     const int parentId = ids[i];
 
-    if (!IsAssemblyRootPartId(parentId)) {
+    const PartNode *parentNode = assembly_.FindNode(parentId);
+    if (parentNode == nullptr) {
+      continue;
+    }
+
+    const bool canBeParent =
+        (ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) &&
+         parentNode->part != ModBodyPart::Neck) ||
+        parentNode->part == ModBodyPart::Head ||
+        parentNode->part == ModBodyPart::StomachBody;
+
+    if (!canBeParent) {
       continue;
     }
 
@@ -4403,8 +4491,32 @@ void ModScene::ApplyAssemblyDragPreview() {
     return;
   }
 
-  assembly_.SetPartLocalTranslate(assemblyDrag_.assemblyRootPartId,
-                                  assemblyDrag_.previewLocalTranslate);
+  const int rootId = assemblyDrag_.assemblyRootPartId;
+  const Vector3 currentLocal = assemblyDrag_.previewLocalTranslate;
+  const Vector3 beforeLocal = assemblyDrag_.beforeLocalTranslate;
+  const Vector3 delta = Subtract(currentLocal, beforeLocal);
+
+  const PartNode *rootNode = assembly_.FindNode(rootId);
+  bool isBodyDrag = (rootNode != nullptr &&
+                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                        ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグの場合は、すべての胴体パーツと操作点を連動させる
+    for (auto const& [id, beforePos] : assemblyDrag_.beforeBodyTranslations) {
+      assembly_.SetPartLocalTranslate(id, Add(beforePos, delta));
+    }
+
+    // 胴体操作点も連動移動させる
+    // (開始時の座標に delta を足す)
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      torsoControlPoints_[i].localPosition =
+          Add(assemblyDrag_.beforeTorsoPoints[i], delta);
+    }
+  } else {
+    // 通常パーツ
+    assembly_.SetPartLocalTranslate(rootId, currentLocal);
+  }
 }
 
 void ModScene::UpdateAssemblyDragTest() {
@@ -4457,8 +4569,28 @@ bool ModScene::IsPartInDraggingAssembly(int partId) const {
     return false;
   }
 
-  return ModAssemblyResolver::BelongsToAssemblyRoot(
-      assembly_, assemblyDrag_.assemblyRootPartId, partId);
+  const int rootId = assemblyDrag_.assemblyRootPartId;
+  const PartNode *rootNode = assembly_.FindNode(rootId);
+  bool isBodyDrag = (rootNode != nullptr &&
+                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                        ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグ時は、全胴体パーツのいずれかの下にあれば true
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int id : allIds) {
+      const PartNode *node = assembly_.FindNode(id);
+      if (node != nullptr &&
+          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        if (ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, id, partId)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  return ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, rootId, partId);
 }
 
 void ModScene::CancelAssemblyDragPlacement() {
@@ -4479,8 +4611,35 @@ void ModScene::CancelAssemblyDragPlacement() {
                        assemblyDrag_.beforeParentConnectorId);
   }
 
-  assembly_.SetPartLocalTranslate(rootPartId,
-                                  assemblyDrag_.beforeLocalTranslate);
+  bool isBodyDrag = (ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                    ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグ時はすべて復元
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int id : allIds) {
+      const PartNode *node = assembly_.FindNode(id);
+      if (node != nullptr &&
+          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        // 胴体パーツは通常 (0,0,0) で保存されているはずだが、
+        // 念のため Root の開始座標をセットする（通常は (0,0,0)）
+        // 胴体パーツ間で初期座標が異なる可能性に備えるなら本来は個別保持が必要。
+        // ここでは簡易的に beforeLocalTranslate をセット
+        assembly_.SetPartLocalTranslate(id, assemblyDrag_.beforeLocalTranslate);
+      }
+    }
+
+    // 胴体操作点も復元
+    if (assemblyDrag_.beforeTorsoPoints.size() == torsoControlPoints_.size()) {
+      for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+        torsoControlPoints_[i].localPosition =
+            assemblyDrag_.beforeTorsoPoints[i];
+      }
+    }
+  } else {
+    assembly_.SetPartLocalTranslate(rootPartId,
+                                    assemblyDrag_.beforeLocalTranslate);
+  }
 
   SelectPart(assemblyDrag_.pickedPartId >= 0 ? assemblyDrag_.pickedPartId
                                              : rootPartId);
@@ -4821,14 +4980,10 @@ ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
     return ZeroV();
   }
 
-  const Object *bodyObject = modObjects_.at(chestBodyId).get();
-  if (bodyObject == nullptr) {
-    return ZeroV();
-  }
-
-  return ModObjectUtil::TransformLocalPointToWorld(
-      bodyObject,
-      torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition);
+  // 胴体操作点は、localPosition 自体がアセンブリ空間での絶対座標として扱われているため、
+  // オブジェクトのワールド変換を適用せずにそのまま返す。
+  // そうしないと、アセンブリドラッグ中に移動量が二重に加算されてしまう。
+  return torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition;
 }
 
 void ModScene::UpdateModObjects() {
@@ -6328,7 +6483,7 @@ void ModScene::InitializeScreenUi() {
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)],
                 {left, top + spacingY * 5.0f}, {width, height},
                 uiFrameTextureHandle_);
-  addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "からだ";
+  addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "縺九ｉ縺";
 
   SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);

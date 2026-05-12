@@ -600,15 +600,10 @@ void ModBody::Apply(Object *target) {
 
   // 外部点列参照部位の描画:
   // - 前腕/脛/首などは「start基準（開始点を原点化）」でも良い
-  // - 体（Chest/Stomach）は3点を同列に扱いたいので原点化しない
+  // - 体（Chest/Stomach）もオブジェクトの移動に追従させるため、原点（target->mainPosition.transform.translate）を差し引く
   if (useExternal) {
-    const bool isTorso =
-        (part_ == ModBodyPart::ChestBody || part_ == ModBodyPart::StomachBody);
-
-    if (!isTorso) {
-      startPos = ConvertExternalPointToThisObjectLocal(target, startPos);
-      endPos = ConvertExternalPointToThisObjectLocal(target, endPos);
-    }
+    startPos = ConvertExternalPointToThisObjectLocal(target, startPos);
+    endPos = ConvertExternalPointToThisObjectLocal(target, endPos);
   }
 
     ApplySegmentToObjectPart(target, 0, startPos, endPos, startRadius, endRadius);
