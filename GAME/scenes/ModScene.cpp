@@ -938,21 +938,21 @@ float AxisScaleLength(const Vector3 &axis) {
 } // namespace
 
 ModScene::ModScene(kEngine *system) {
-  // 繧ｨ繝ｳ繧ｸ繝ｳ譛ｬ菴薙ｒ菫晄戟縺吶ｋ
+  // エンジン本体を保持する
   system_ = system;
 
-  // 繧ｷ繝ｼ繝ｳ逕ｨ繝ｩ繧､繝医ｒ菴懈・縺励※逋ｻ骭ｲ縺吶ｋ
+  // シーン用ライトを作成して登録する
   light1_ = new Light;
   light1_->direction = {-0.5f, -1.0f, -0.3f};
   light1_->color = {1.0f, 1.0f, 1.0f};
   light1_->intensity = 1.0f;
   system_->AddLight(light1_);
 
-  // 騾壼ｸｸ繧ｫ繝｡繝ｩ縺ｨ繝・ヰ繝・げ繧ｫ繝｡繝ｩ繧剃ｽ懈・縺吶ｋ
+  // 通常カメラとデバッグカメラを作成する
   debugCamera_ = system_->CreateDebugCamera();
   camera_ = system_->CreateCamera();
 
-  // 縺ｩ縺｡繧峨・繧ｫ繝｡繝ｩ繧ょ・譛滉ｽ咲ｽｮ繧偵◎繧阪∴縺ｦ縺翫￥
+  // どちらのカメラも初期位置をそろえておく
   /*debugCamera_->SetTranslate({0.0f, 0.0f, -8.0f});
   debugCamera_->SetRotation({0.0f, 0.0f, 0.0f});
   debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
@@ -960,20 +960,20 @@ ModScene::ModScene(kEngine *system) {
   camera_->SetTranslate({0.0f, 0.0f, -8.0f});
   camera_->SetDefaultTransform(camera_->GetTransform());*/
 
-  // 蛻晄悄迥ｶ諷九〒縺ｯ繝・ヰ繝・げ繧ｫ繝｡繝ｩ繧剃ｽｿ逕ｨ縺吶ｋ
+  // 初期状態ではデバッグカメラを使用する
   usingCamera_ = debugCamera_;
   system_->SetCamera(usingCamera_);
 
-  // PromptScene 縺ｧ豎ｺ縺ｾ縺｣縺溘♀鬘梧枚繧貞叙蠕励☆繧・
+  // PromptScene で決まったお題文を取得する
   selectedPrompt_ = PromptData::GetSelectedPrompt();
 
-  // 蜑阪す繝ｼ繝ｳ縺九ｉ蜈ｱ譛峨＆繧後※縺・ｋ謾ｹ騾繝・・繧ｿ繧貞叙蠕励☆繧・
+  // 前シーンから共有されている改造データを取得する
   customizeData_ = ModBody::CopySharedCustomizeData();
   if (customizeData_ == nullptr) {
     customizeData_ = ModBody::CreateDefaultCustomizeData();
   }
 
-  // 蛻晄悄驛ｨ菴肴ｧ区・繧剃ｽ懈・縺励∽ｿ晏ｭ倥ョ繝ｼ繧ｿ縺後≠繧後・隕九◆逶ｮ縺ｸ隱ｭ縺ｿ霎ｼ繧
+  // 初期部位構成を作成し、保存データがあれば見た目へ読み込む
   SetupModObjects();
 
   if (ModBody::ConsumeResetOnNextModSceneEntry()) {
@@ -984,13 +984,13 @@ ModScene::ModScene(kEngine *system) {
 
   EnsureValidSelection();
 
-  // Orbit繧ｫ繝｡繝ｩ縺ｮ蛻晄悄蛟､繧偵後Δ繝・Ν蜑埼擇縲榊渕貅悶〒豎ｺ繧√ｋ
+  // Orbitカメラの初期値を「モデル前面」基準で決める
   orbitTarget_ = ComputeOrbitTarget();
   orbitYaw_ = 3.14159265f;
   orbitPitch_ = 0.0f;
   orbitDistance_ = 25.0f;
 
-  // orbit蛟､縺九ｉ蛻晄悄繧ｫ繝｡繝ｩ菴咲ｽｮ繧定ｨ育ｮ励☆繧・
+  // orbit値から初期カメラ位置を計算する
   {
     const float cosPitch = cosf(orbitPitch_);
     const float sinPitch = sinf(orbitPitch_);
@@ -1021,50 +1021,50 @@ ModScene::ModScene(kEngine *system) {
     camera_->SetDefaultTransform(camera_->GetTransform());
   }
 
-  // 繝輔ぉ繝ｼ繝峨う繝ｳ繧帝幕蟋九☆繧・
+  // フェードインを開始する
   fade_.Initialize(system_);
   fade_.StartFadeIn();
 
-  // 謫堺ｽ懃せ陦ｨ遉ｺ逕ｨ縺ｮ逋ｽ繝・け繧ｹ繝√Ε繧定ｪｭ縺ｿ霎ｼ繧
+  // 操作点表示用の白テクスチャを読み込む
   controlPointGizmoTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/white100x100.png");
 
   InitializeNpcModProgress();
 
-  // 繝・く繧ｹ繝域緒逕ｻ逕ｨ縺ｮ繝薙ャ繝医・繝・・繝輔か繝ｳ繝医ｒ蛻晄悄蛹悶☆繧・
+  // テキスト描画用のビットマップフォントを初期化する
   bitmapFont_.Initialize(system);
 
-  // 逕ｻ髱｢UI繧貞・譛溷喧縺吶ｋ
+  // 画面UIを初期化する
   InitializeScreenUi();
 
   pendingFailureOutcome_ = SceneOutcome::NONE;
 }
 
 ModScene::~ModScene() {
-  // 菴懈・縺励◆繧ｫ繝｡繝ｩ繧堤ｴ譽・☆繧・
+  // 作成したカメラを破棄する
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
 
-  // 逋ｻ骭ｲ縺励◆繝ｩ繧､繝医ｒ隗｣髯､縺励※隗｣謾ｾ縺吶ｋ
+  // 登録したライトを解除して解放する
   system_->RemoveLight(light1_);
   delete light1_;
 
-  // 菴ｿ逕ｨ縺励※縺・↑縺・・繝・Μ繧｢繝ｫ繧偵け繝ｪ繝ｼ繝ｳ繧｢繝・・縺吶ｋ
+  // 使用していないマテリアルをクリーンアップする
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
-  // 繝薙ャ繝医・繝・・繝輔か繝ｳ繝医ｒ繧ｯ繝ｪ繝ｼ繝ｳ繧｢繝・・縺吶ｋ
+  // ビットマップフォントをクリーンアップする
   bitmapFont_.Cleanup();
 }
 
 void ModScene::Update() {
 
-  // 菴ｿ逕ｨ荳ｭ繧ｫ繝｡繝ｩ繧呈峩譁ｰ縺吶ｋ
+  // 使用中カメラを更新する
   CameraPart();
 
-  // 逕ｻ髱｢UI縺ｮ迥ｶ諷九ｒ譖ｴ譁ｰ縺吶ｋ
+  // 画面UIの状態を更新する
   UpdateScreenUi();
 
-  // 螟ｱ謨励Γ繝九Η繝ｼ縺碁幕縺・※縺・ｋ蝣ｴ蜷医・縲・D謫堺ｽ懊・陦後ｏ縺壹↓繝｡繝九Η繝ｼ縺ｮ譖ｴ譁ｰ縺ｨ驕ｷ遘ｻ蜃ｦ逅・□縺題｡後≧
+  // 失敗メニューが開いている場合は、3D操作は行わずにメニューの更新と遷移処理だけ行う
   if (isFailureMenuOpen_) {
     UpdateNotifications();
     UpdateFailureMenuInputMod();
@@ -1079,7 +1079,7 @@ void ModScene::Update() {
     return;
   }
 
-  // 逕ｻ髱｢荳翫・霑ｽ蜉繝懊ち繝ｳ縺梧款縺輔ｌ縺溘ｉ縲√◎縺ｮ繝輔Ξ繝ｼ繝縺ｯ3D謫堺ｽ懊∈豬√＆縺ｪ縺・
+  // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
   if (TryHandleAddButtonClick()) {
     UpdateModObjects();
     SyncCustomizeDataFromScene();
@@ -1104,10 +1104,10 @@ void ModScene::Update() {
     return;
   }
 
-  // 縺薙・繝輔Ξ繝ｼ繝縺ｧ讒矩螟画峩縺檎匱逕溘＠縺溘°繧定ｨ倬鹸縺吶ｋ
+  // このフレームで構造変更が発生したかを記録する
   bool assemblyChanged = false;
 
-  // 讒矩螟画峩縺後≠縺｣縺溷ｴ蜷医・ Object 荳隕ｧ縺ｨ驕ｸ謚樒憾諷九ｒ蜷梧悄縺礼峩縺・
+  // 構造変更があった場合は Object 一覧と選択状態を同期し直す
   if (assemblyChanged) {
     SyncObjectsWithAssembly();
     LoadCustomizeData();
@@ -1115,17 +1115,17 @@ void ModScene::Update() {
     ClearControlPointSelection();
   }
 
-  // 謫堺ｽ懃せ縺ｮ驕ｸ謚槭→繝峨Λ繝・げ遘ｻ蜍輔ｒ蜃ｦ逅・☆繧・
+  // 操作点の選択とドラッグ移動を処理する
   UpdateControlPointEditing();
 
-  // 迴ｾ蝨ｨ縺ｮ讒矩縺ｨ繝代Λ繝｡繝ｼ繧ｿ繧定ｦ九◆逶ｮ縺ｸ蜿肴丐縺吶ｋ
+  // 現在の構造とパラメータを見た目へ反映する
   UpdateModObjects();
 
-  // NPC縺ｮ陬乗隼騾騾ｲ陦後ｒ譖ｴ譁ｰ縺吶ｋ
+  // NPCの裏改造進行を更新する
   UpdateNpcProgress();
 
   if (isStartTransition_) {
-    // 閭ｴ菴・id=1)縺ｨ鬆ｭ(id=4)縺ｮ謫堺ｽ懃せ繧堤｢ｺ隱阪☆繧・
+    // 胴体(id=1)と頭(id=4)の操作点を確認する
     for (const auto &pair : modBodies_) {
       const auto &points = pair.second.GetControlPoints();
       if (!points.empty()) {
@@ -1135,24 +1135,24 @@ void ModScene::Update() {
     }
   }
 
-  // 迴ｾ蝨ｨ縺ｮ繧ｷ繝ｼ繝ｳ迥ｶ諷九ｒ蜈ｱ譛峨ョ繝ｼ繧ｿ縺ｸ譖ｸ縺肴綾縺・
+  // 現在のシーン状態を共有データへ書き戻す
   SyncCustomizeDataFromScene();
 
-  // 繧ｫ繝｡繝ｩ蛻・ｊ譖ｿ縺医ｒ陦後≧
+  // カメラ切り替えを行う
   if (system_->GetTriggerOn(DIK_0)) {
     useDebugCamera_ = !useDebugCamera_;
   }
 
-  // Space 蜈･蜉帙〒谺｡繧ｷ繝ｼ繝ｳ縺ｸ縺ｮ繝輔ぉ繝ｼ繝峨い繧ｦ繝医ｒ髢句ｧ九☆繧・
+  // Space 入力で次シーンへのフェードアウトを開始する
   if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
   }
 
-  // 繝輔ぉ繝ｼ繝画ｼ泌・繧呈峩譁ｰ縺吶ｋ
+  // フェード演出を更新する
   fade_.Update(usingCamera_);
 
-  // 繝輔ぉ繝ｼ繝峨い繧ｦ繝亥ｮ御ｺ・ｾ後↓蜈ｱ譛峨ョ繝ｼ繧ｿ繧剃ｿ晏ｭ倥＠縺ｦ谺｡繧ｷ繝ｼ繝ｳ縺ｸ騾ｲ繧
+  // フェードアウト完了後に共有データを保存して次シーンへ進む
   if (isStartTransition_ && fade_.IsFinished()) {
     if (customizeData_ != nullptr) {
       for (size_t i = 0; i < customizeData_->controlPointSnapshots.size();
@@ -1166,27 +1166,27 @@ void ModScene::Update() {
 }
 
 void ModScene::Draw() {
-  // 謾ｹ騾驛ｨ菴・Object 繧呈緒逕ｻ縺吶ｋ
+  // 改造部位 Object を描画する
   DrawModObjects();
 
-  // 謫堺ｽ懃せ陦ｨ遉ｺ逅・ｒ謠冗判縺吶ｋ
+  // 操作点表示球を描画する
   DrawControlPointGizmos();
 
 #ifdef USE_IMGUI
-  // 謗･邯壼愛螳壹・繝・け繧ｹ繧貞庄隕門喧縺吶ｋ
+  // 接続判定ボックスを可視化する
   DrawPickBoxesDebug();
 
-  // 繧ｷ繝ｼ繝ｳ蜈ｱ騾壹・邁｡譏捺桃菴懆ｪｬ譏弱ｒ陦ｨ遉ｺ縺吶ｋ
+  // シーン共通の簡易操作説明を表示する
   ImGui::Begin("Scene");
   ImGui::Text("ModScene");
   ImGui::Text("Selected Prompt:");
   ImGui::Text("%s", selectedPrompt_.c_str());
   ImGui::End();
 
-  // 謾ｹ騾逕ｨUI譛ｬ菴薙ｒ陦ｨ遉ｺ縺吶ｋ
+  // 改造用UI本体を表示する
   DrawModGui();
 
-  // NPC騾ｲ陦檎｢ｺ隱咲畑
+  // NPC進行確認用
   ImGui::Begin("NpcModProgress");
 
   ImGui::Text("NPC Count : %zu", npcProgress_.size());
@@ -1221,18 +1221,18 @@ void ModScene::Draw() {
 #endif
 
   bitmapFont_.BeginFrame();
-  // 逕ｻ髱｢蝗ｺ螳壹・霑ｽ蜉繝懊ち繝ｳ繝ｻ繧ｴ繝溽ｮｱUI繧呈緒逕ｻ縺吶ｋ
+  // 画面固定の追加ボタン・ゴミ箱UIを描画する
   if (!isFailureMenuOpen_) {
     DrawScreenUi();
   }
 
-  // 螟ｱ謨励Γ繝九Η繝ｼ縺碁幕縺・※縺・↑縺・ｴ蜷医・縲¨PC騾ｲ陦碁夂衍繧呈緒逕ｻ縺吶ｋ
+  // 失敗メニューが開いていない場合は、NPC進行通知を描画する
   DrawStartNotifications();
 
-  // 螟ｱ謨励Γ繝九Η繝ｼ縺碁幕縺・※縺・ｋ蝣ｴ蜷医・縲√Γ繝九Η繝ｼ繧呈緒逕ｻ縺吶ｋ
+  // 失敗メニューが開いている場合は、メニューを描画する
   DrawFailureMenuMod();
 
-  // 繝輔ぉ繝ｼ繝峨ｒ謠冗判縺吶ｋ
+  // フェードを描画する
   fade_.Draw();
 }
 
@@ -1249,31 +1249,31 @@ void ModScene::CameraPart() {
 }
 
 void ModScene::ResetForRetryFromFailure() {
-  // 讒矩繧貞・譛滉ｺｺ蝙九∈謌ｻ縺・
+  // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
-  // 閭ｴ菴捺桃菴懃せ繧貞・譛溷喧
+  // 胴体操作点を初期化
   ResetTorsoControlPoints();
 
-  // Object 繧貞・蜷梧悄
+  // Object を再同期
   SyncObjectsWithAssembly();
 
-  // 蛻晄悄繝ｬ繧､繧｢繧ｦ繝・
+  // 初期レイアウト
   SetupInitialLayout();
 
-  // 隕九◆逶ｮ繝代Λ繝｡繝ｼ繧ｿ蛻晄悄蛹・
+  // 見た目パラメータ初期化
   ResetModBodies();
 
-  // 驕ｸ謚樒憾諷九・繝峨Λ繝・げ迥ｶ諷九け繝ｪ繧｢
+  // 選択状態・ドラッグ状態クリア
   EnsureValidSelection();
   ClearControlPointSelection();
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
 
-  // shared 縺ｫ遨阪・逕ｨ縺ｮ customizeData 繧ょｮ悟・縺ｫ蜀肴ｧ狗ｯ・
+  // shared に積む用の customizeData も完全に再構築
   SyncCustomizeDataFromScene();
 
-  // 蠢ｵ縺ｮ縺溘ａ謨ｴ蜷域ｧ
+  // 念のため整合性
   if (customizeData_ != nullptr) {
     ModBody::NormalizeCustomizeData(*customizeData_);
     ModBody::SetSharedCustomizeData(*customizeData_);
@@ -1281,13 +1281,13 @@ void ModScene::ResetForRetryFromFailure() {
 }
 
 Vector3 ModScene::ComputeOrbitTarget() const {
-  // 閻ｰ繧呈怙蜆ｪ蜈医〒豕ｨ隕悶☆繧・
+  // 腰を最優先で注視する
   const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
   if (waistIndex >= 0) {
     return GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
   }
 
-  // 閻ｰ縺悟叙繧後↑縺・→縺阪・閭ｴ菴謎ｸｭ蠢・
+  // 腰が取れないときは胴体中心
   const int chestIndex = FindTorsoControlPointIndex(ModControlPointRole::Chest);
   const int bellyIndex = FindTorsoControlPointIndex(ModControlPointRole::Belly);
 
@@ -1306,7 +1306,7 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     return center;
   }
 
-  // 閭ｴ菴薙′蜿悶ｌ縺ｪ縺・→縺阪・驕ｸ謚樣Κ菴阪ｒ隕九ｋ
+  // 胴体が取れないときは選択部位を見る
   if (selectedPartId_ >= 0 && modObjects_.count(selectedPartId_) > 0) {
     Object *object = modObjects_.at(selectedPartId_).get();
     if (object != nullptr) {
@@ -1314,7 +1314,7 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     }
   }
 
-  // 菴輔ｂ辟｡縺代ｌ縺ｰ蜴溽せ蟆代＠荳・
+  // 何も無ければ原点少し上
   return {0.0f, 0.5f, 0.0f};
 }
 
@@ -1340,13 +1340,13 @@ void ModScene::UpdateOrbitCamera() {
 
   const bool rightPressed = IsMouseRightPressed();
 
-  // 豕ｨ隕悶ち繝ｼ繧ｲ繝・ヨ縺縺代・豈弱ヵ繝ｬ繝ｼ繝譖ｴ譁ｰ
+  // 注視ターゲットだけは毎フレーム更新
   orbitTarget_ = ComputeOrbitTarget();
 
   // --------------------------------
-  // 蜿ｳ繧ｯ繝ｪ繝・け髢句ｧ区凾・・
-  // 縲御ｻ翫・繧ｫ繝｡繝ｩ菴咲ｽｮ縲阪°繧・orbit 繝代Λ繝｡繝ｼ繧ｿ繧帝・ｮ励☆繧・
-  // 縺薙ｌ縺ｧ蛻晄悄菴咲ｽｮ縺ｯ螟峨∴縺ｪ縺・
+  // 右クリック開始時：
+  // 「今のカメラ位置」から orbit パラメータを逆算する
+  // これで初期位置は変えない
   // --------------------------------
   if (!blockCameraInput && rightPressed && !wasRightPressed) {
     Vector3 currentPos = debugCamera_->GetTransform().translate;
@@ -1367,7 +1367,7 @@ void ModScene::UpdateOrbitCamera() {
   }
 
   // --------------------------------
-  // 蜿ｳ繝峨Λ繝・げ荳ｭ縺縺・orbit 蝗櫁ｻ｢
+  // 右ドラッグ中だけ orbit 回転
   // --------------------------------
   if (!blockCameraInput && rightPressed) {
     if (wasRightPressed) {
@@ -1412,8 +1412,8 @@ void ModScene::UpdateOrbitCamera() {
   }
 
   // --------------------------------
-  // 繝帙う繝ｼ繝ｫ zoom 繧ょ承謚ｼ縺嶺ｸｭ縺縺大渚譏
-  // 蛻晄悄菴咲ｽｮ繧貞享謇九↓螟峨∴縺ｪ縺・◆繧・
+  // ホイール zoom も右押し中だけ反映
+  // 初期位置を勝手に変えないため
   // --------------------------------
   if (!blockCameraInput) {
     const int wheelDelta = system_->GetMouseScrollOrigin();
@@ -1442,26 +1442,26 @@ void ModScene::UpdateOrbitCamera() {
 }
 
 void ModScene::SetupModObjects() {
-  // 蛻晄悄莠ｺ蝙区ｧ矩繧剃ｽ懈・縺吶ｋ
+  // 初期人型構造を作成する
   assembly_.InitializeDefaultHumanoid();
 
-  // 閭ｴ菴灘・譛画桃菴懃せ繧貞・譛溷喧縺吶ｋ
+  // 胴体共有操作点を初期化する
   ResetTorsoControlPoints();
 
-  // Graph 縺ｫ蜷医ｏ縺帙※ Object 荳隕ｧ繧堤函謌舌☆繧・
+  // Graph に合わせて Object 一覧を生成する
   SyncObjectsWithAssembly();
 
-  // 蛻晄悄繝ｬ繧､繧｢繧ｦ繝医ｒ謨ｴ縺医ｋ
+  // 初期レイアウトを整える
   SetupInitialLayout();
 
-  // 謾ｹ騾繝代Λ繝｡繝ｼ繧ｿ繧貞・譛溷喧縺吶ｋ
+  // 改造パラメータを初期化する
   ResetModBodies();
 
-  // SetupModObjects() 縺ｮ譛ｫ蟆ｾ縺ｮ defaultControlPointSnapshots 菫晏ｭ倬Κ蛻・ｒ蟾ｮ縺玲崛縺・
+  // SetupModObjects() の末尾の defaultControlPointSnapshots 保存部分を差し替え
   if (customizeData_ != nullptr) {
     customizeData_->defaultControlPointSnapshots.clear();
 
-    // 縺ｾ縺・torsoControlPoints_ 縺九ｉ閭ｴ菴薙・繝・ヵ繧ｩ繝ｫ繝域桃菴懃せ繧剃ｿ晏ｭ倥☆繧・
+    // まず torsoControlPoints_ から胴体のデフォルト操作点を保存する
     {
       int chestPartId = -1;
       for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -1490,7 +1490,7 @@ void ModScene::SetupModObjects() {
       }
     }
 
-    // 谿九ｊ縺ｮ驛ｨ菴阪・ modBodies_ 縺九ｉ・郁Χ菴薙・繧ｹ繧ｭ繝・・・・
+    // 残りの部位は modBodies_ から（胴体はスキップ）
     for (const auto &id : orderedPartIds_) {
       if (modBodies_.count(id) == 0)
         continue;
@@ -1498,7 +1498,7 @@ void ModScene::SetupModObjects() {
       if (node == nullptr)
         continue;
 
-      // ChestBody 縺ｨ StomachBody 縺ｯ torsoControlPoints_ 縺ｧ蜃ｦ逅・ｸ医∩
+      // ChestBody と StomachBody は torsoControlPoints_ で処理済み
       if (node->part == ModBodyPart::ChestBody ||
           node->part == ModBodyPart::StomachBody) {
         continue;
@@ -1523,26 +1523,26 @@ void ModScene::SetupModObjects() {
 }
 
 void ModScene::SetupInitialLayout() {
-  // 迴ｾ蝨ｨ縺ｮ驛ｨ菴巧D荳隕ｧ繧貞叙蠕励☆繧・
+  // 現在の部位ID一覧を取得する
   orderedPartIds_ = assembly_.GetNodeIdsSorted();
 
-  // 縺吶∋縺ｦ縺ｮ驛ｨ菴阪せ繧ｱ繝ｼ繝ｫ繧堤ｭ牙阪〒蛻晄悄蛹悶☆繧・
+  // すべての部位スケールを等倍で初期化する
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     assembly_.SetPartScale(orderedPartIds_[i], {1.0f, 1.0f, 1.0f});
   }
 }
 
 void ModScene::SyncObjectsWithAssembly() {
-  // 迴ｾ蝨ｨ縺ｮ讒矩縺九ｉ驛ｨ菴巧D荳隕ｧ繧呈峩譁ｰ縺吶ｋ
+  // 現在の構造から部位ID一覧を更新する
   orderedPartIds_ = assembly_.GetNodeIdsSorted();
 
-  // 迴ｾ蝨ｨ逕溷ｭ倥＠縺ｦ縺・ｋ驛ｨ菴巧D髮・粋繧剃ｽ懊ｋ
+  // 現在生存している部位ID集合を作る
   std::unordered_set<int> alive;
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     alive.insert(orderedPartIds_[i]);
   }
 
-  // 譌｢縺ｫ蜑企勁縺輔ｌ縺滄Κ菴阪↓蟇ｾ蠢懊☆繧・Object 繧・ョ繝ｼ繧ｿ繧呈ｶ医☆
+  // 既に削除された部位に対応する Object やデータを消す
   for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =
            modObjects_.begin();
        it != modObjects_.end();) {
@@ -1555,7 +1555,7 @@ void ModScene::SyncObjectsWithAssembly() {
     }
   }
 
-  // 譁ｰ縺励￥霑ｽ蜉縺輔ｌ縺滄Κ菴阪・ Object 繧堤函謌舌☆繧・
+  // 新しく追加された部位の Object を生成する
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     if (modObjects_.count(id) > 0) {
@@ -1569,24 +1569,24 @@ void ModScene::SyncObjectsWithAssembly() {
     CreateObjectForNode(id, *node);
   }
 
-  // 驕ｸ謚樒憾諷九ｒ譛牙柑縺ｪ繧ゅ・縺ｸ陬懈ｭ｣縺吶ｋ
+  // 選択状態を有効なものへ補正する
   EnsureValidSelection();
 }
 
 void ModScene::CreateObjectForNode(int partId, const PartNode &node) {
-  // 驛ｨ菴咲ｨｮ鬘槭↓蟇ｾ蠢懊☆繧九Δ繝・Ν繝代せ繧貞叙蠕励☆繧・
+  // 部位種類に対応するモデルパスを取得する
   const std::string path = ModelPath(node.part);
 
-  // 繝｢繝・Ν繧定ｪｭ縺ｿ霎ｼ縺ｿ縲√ワ繝ｳ繝峨Ν繧剃ｿ晄戟縺吶ｋ
+  // モデルを読み込み、ハンドルを保持する
   modModelHandles_[partId] = system_->SetModelObj(path);
 
-  // Object 繧堤函謌舌＠縺ｦ繝｢繝・Ν繝・・繧ｿ繧定ｨｭ螳壹☆繧・
+  // Object を生成してモデルデータを設定する
   std::unique_ptr<Object> object = std::make_unique<Object>();
   object->IntObject(system_);
   object->CreateModelData(modModelHandles_[partId]);
   object->mainPosition.transform = CreateDefaultTransform();
 
-  // 邂｡逅・さ繝ｳ繝・リ縺ｸ逋ｻ骭ｲ縺励∝ｯｾ蠢懊☆繧・ModBody 繧ょ・譛溷喧縺吶ｋ
+  // 管理コンテナへ登録し、対応する ModBody も初期化する
   modObjects_[partId] = std::move(object);
   modBodies_[partId].Initialize(modObjects_[partId].get(), node.part);
 
@@ -1634,7 +1634,7 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
         object->mainPosition.parentPart = &parentObject->mainPosition;
       }
 
-      // 縺吶∋縺ｦ縺ｮ隕ｪ蟄先磁邯壹ｒ縺薙％縺ｧ邨ｱ荳逧・↓隗｣豎ｺ縺吶ｋ
+      // すべての親子接続をここで統一的に解決する
       localTranslate = ResolveAttachedLocalTranslate(*node);
     }
 
@@ -1674,9 +1674,9 @@ void ModScene::LoadCustomizeData() {
         break;
       }
 
-      // partId 荳閾ｴ縺檎┌縺・Κ菴阪・縲梧眠隕剰ｿｽ蜉驛ｨ菴阪阪→縺ｿ縺ｪ縺励※縲・
-      // 譌ｧ譁ｹ蠑・partParams 縺ｸ縺ｯ繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ縺励↑縺・・
-      // ModBody::Initialize / Reset 縺ｧ蜈･縺｣縺ｦ縺・ｋ蛻晄悄蛟､繧偵◎縺ｮ縺ｾ縺ｾ菴ｿ縺・・
+      // partId 一致が無い部位は「新規追加部位」とみなして、
+      // 旧方式 partParams へはフォールバックしない。
+      // ModBody::Initialize / Reset で入っている初期値をそのまま使う。
       if (!found) {
         ModBodyPartParam param = modBodies_[id].GetParam();
         param.count = 1;
@@ -1688,7 +1688,7 @@ void ModScene::LoadCustomizeData() {
     return;
   }
 
-  // 譁ｰ譁ｹ蠑上ョ繝ｼ繧ｿ縺檎┌縺・ｴ蜷医□縺第立譁ｹ蠑上↓繝輔か繝ｼ繝ｫ繝舌ャ繧ｯ縺吶ｋ
+  // 新方式データが無い場合だけ旧方式にフォールバックする
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     const PartNode *node = assembly_.FindNode(id);
@@ -1708,7 +1708,7 @@ void ModScene::LoadCustomizeData() {
     ModBodyPartParam param = customizeData_->partParams[index];
     param.count = 1;
 
-    // 譌ｧ譁ｹ蠑上＠縺九↑縺・→縺阪・縲∵怙菴朱剞隕九∴繧九ｈ縺・↓縺吶ｋ
+    // 旧方式しかないときは、最低限見えるようにする
     if (param.count <= 0) {
       param.scale = {1.0f, 1.0f, 1.0f};
       param.length = 1.0f;
@@ -1721,12 +1721,12 @@ void ModScene::LoadCustomizeData() {
 }
 
 void ModScene::SyncCustomizeDataFromScene() {
-  // 蜈ｱ譛峨ョ繝ｼ繧ｿ縺檎┌縺・ｴ蜷医・菴輔ｂ縺励↑縺・
+  // 共有データが無い場合は何もしない
   if (customizeData_ == nullptr) {
     return;
   }
 
-  // 迴ｾ蝨ｨ縺ｮ繧ｷ繝ｼ繝ｳ迥ｶ諷九°繧画眠譁ｹ蠑上・ partInstances 繧剃ｽ懊ｊ逶ｴ縺・
+  // 現在のシーン状態から新方式の partInstances を作り直す
   customizeData_->partInstances.clear();
   customizeData_->partInstances.reserve(orderedPartIds_.size());
 
@@ -1737,7 +1737,7 @@ void ModScene::SyncCustomizeDataFromScene() {
       continue;
     }
 
-    // 驛ｨ菴阪＃縺ｨ縺ｮ讒矩諠・ｱ縺ｨ謾ｹ騾繝代Λ繝｡繝ｼ繧ｿ繧剃ｿ晏ｭ倡畑繝・・繧ｿ縺ｸ隧ｰ繧√ｋ
+    // 部位ごとの構造情報と改造パラメータを保存用データへ詰める
     ModPartInstanceData instance;
     instance.partId = id;
     instance.partType = node->part;
@@ -1748,25 +1748,25 @@ void ModScene::SyncCustomizeDataFromScene() {
     instance.resolvedLocalTranslate = ResolveAttachedLocalTranslate(*node);
     instance.param = modBodies_[id].GetParam();
 
-    // 譁ｰ譁ｹ蠑上〒縺ｯ繧､繝ｳ繧ｹ繧ｿ繝ｳ繧ｹ蜊倅ｽ阪〒 count 縺ｯ蟶ｸ縺ｫ 1
+    // 新方式ではインスタンス単位で count は常に 1
     instance.param.count = 1;
 
     customizeData_->partInstances.push_back(instance);
   }
 
-  // 譁ｰ譁ｹ蠑上・蜿ｯ螟蛾聞謫堺ｽ懃せ驟榊・繧貞・讒狗ｯ峨☆繧・
+  // 新方式の可変長操作点配列を再構築する
   RebuildControlPointSnapshotsFromScene();
 
-  // 譌ｧ蝗ｺ螳壽桃菴懃せ驟榊・繧ゆｺ呈鋤逕ｨ縺ｫ菫晏ｭ倥☆繧・
+  // 旧固定操作点配列も互換用に保存する
   SaveControlPointsToCustomizeData();
 
-  // 譌ｧ譁ｹ蠑城・蛻励ｂ莠呈鋤逕ｨ縺ｫ蜀肴ｧ狗ｯ峨☆繧・
+  // 旧方式配列も互換用に再構築する
   RebuildLegacyCustomizeDataFromInstances();
 
-  // NPC縺ｮ騾ｲ陦檎憾諷九ｂ蜈ｱ譛峨ョ繝ｼ繧ｿ縺ｸ菫晏ｭ倥☆繧・
+  // NPCの進行状態も共有データへ保存する
   SyncNpcProgressToCustomizeData();
 
-  // shared 縺ｫ遨阪・蜑阪↓謨ｴ蜷域ｧ繧呈純縺医※縺翫￥
+  // shared に積む前に整合性を揃えておく
   ModBody::NormalizeCustomizeData(*customizeData_);
 }
 
@@ -1777,9 +1777,9 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 
   customizeData_->controlPointSnapshots.clear();
 
-  // 縺ｾ縺・torsoControlPoints_ 縺九ｉ閭ｴ菴薙・謫堺ｽ懃せ繧剃ｿ晏ｭ倥☆繧・
+  // まず torsoControlPoints_ から胴体の操作点を保存する
   {
-    // ChestBody 縺ｮ partId 繧呈爾縺・
+    // ChestBody の partId を探す
     int chestPartId = -1;
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const PartNode *node = assembly_.FindNode(orderedPartIds_[i]);
@@ -1865,8 +1865,8 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 
       PushTorsoAnchorSnapshot(ModControlPointRole::NeckBase, chestLocal, 0.08f);
 
-      // 閧ｩ繝ｻ閧｡髢｢遽繧｢繝ｳ繧ｫ繝ｼ縺ｯ蜀崎ｨ育ｮ励○縺壹…ontrol point
-      // 縺ｮ迴ｾ蝨ｨ菴咲ｽｮ繧偵◎縺ｮ縺ｾ縺ｾ菫晏ｭ倥☆繧・
+      // 肩・股関節アンカーは再計算せず、control point
+      // の現在位置をそのまま保存する
       PushTorsoAnchorSnapshot(
           ModControlPointRole::LeftShoulder,
           GetControlPointLocalPosition(ModControlPointRole::LeftShoulder),
@@ -1887,7 +1887,7 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
     }
   }
 
-  // 谿九ｊ縺ｮ驛ｨ菴阪・ modBodies_ 縺九ｉ隱ｭ縺ｿ蜿悶ｋ・郁Χ菴薙・繧ｹ繧ｭ繝・・・・
+  // 残りの部位は modBodies_ から読み取る（胴体はスキップ）
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
 
@@ -1896,7 +1896,7 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
       continue;
     }
 
-    // ChestBody 縺ｨ StomachBody 縺ｯ torsoControlPoints_ 縺ｧ蜃ｦ逅・ｸ医∩縺ｪ縺ｮ縺ｧ繧ｹ繧ｭ繝・・
+    // ChestBody と StomachBody は torsoControlPoints_ で処理済みなのでスキップ
     if (node->part == ModBodyPart::ChestBody ||
         node->part == ModBodyPart::StomachBody) {
       continue;
@@ -1945,12 +1945,12 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
 }
 
 void ModScene::RebuildLegacyCustomizeDataFromInstances() {
-  // 蜈ｱ譛峨ョ繝ｼ繧ｿ縺檎┌縺・ｴ蜷医・菴輔ｂ縺励↑縺・
+  // 共有データが無い場合は何もしない
   if (customizeData_ == nullptr) {
     return;
   }
 
-  // 譌ｧ譁ｹ蠑城・蛻励ｒ荳譌ｦ蛻晄悄蛹悶☆繧・
+  // 旧方式配列を一旦初期化する
   for (size_t i = 0; i < static_cast<size_t>(ModBodyPart::Count); ++i) {
     customizeData_->partParams[i].scale = {1.0f, 1.0f, 1.0f};
     customizeData_->partParams[i].length = 1.0f;
@@ -1958,13 +1958,13 @@ void ModScene::RebuildLegacyCustomizeDataFromInstances() {
     customizeData_->partParams[i].enabled = false;
   }
 
-  // 蜷・Κ菴咲ｨｮ蛻･縺ｫ縺､縺・※莉｣陦ｨ蛟､繧・縺､菫晏ｭ倥☆繧九◆繧√・繝輔Λ繧ｰ繧堤畑諢上☆繧・
+  // 各部位種別について代表値を1つ保存するためのフラグを用意する
   std::array<bool, static_cast<size_t>(ModBodyPart::Count)> hasRepresentative{};
   for (size_t i = 0; i < hasRepresentative.size(); ++i) {
     hasRepresentative[i] = false;
   }
 
-  // partInstances 縺九ｉ莉｣陦ｨ蛟､繧呈鏡縺・↑縺後ｉ縲∝酔譎ゅ↓驛ｨ菴肴焚繧貞｢励ｄ縺・
+  // partInstances から代表値を拾いながら、同時に部位数を増やす
   for (size_t i = 0; i < customizeData_->partInstances.size(); ++i) {
     const ModPartInstanceData &instance = customizeData_->partInstances[i];
     const size_t index = ToIndex(instance.partType);
@@ -1981,7 +1981,7 @@ void ModScene::RebuildLegacyCustomizeDataFromInstances() {
     }
   }
 
-  // 蜈・さ繝ｼ繝峨・豬√ｌ繧剃ｿ昴▽縺溘ａ縲・Κ菴咲ｨｮ蛻･縺斐→縺ｮ count 繧貞・險育ｮ励☆繧・
+  // 元コードの流れを保つため、部位種別ごとの count を再計算する
   for (size_t i = 0; i < customizeData_->partInstances.size(); ++i) {
     const ModPartInstanceData &instance = customizeData_->partInstances[i];
     const size_t index = ToIndex(instance.partType);
@@ -1992,7 +1992,7 @@ void ModScene::RebuildLegacyCustomizeDataFromInstances() {
     customizeData_->partParams[index].count += 0;
   }
 
-  // 豁｣遒ｺ縺ｪ驛ｨ菴肴焚繧呈焚縺育峩縺・
+  // 正確な部位数を数え直す
   std::array<int, static_cast<size_t>(ModBodyPart::Count)> counts{};
   for (size_t i = 0; i < counts.size(); ++i) {
     counts[i] = 0;
@@ -2006,14 +2006,14 @@ void ModScene::RebuildLegacyCustomizeDataFromInstances() {
     counts[index] += 1;
   }
 
-  // 謨ｰ縺育峩縺励◆ count 繧呈怙邨ら噪縺ｪ蛟､縺ｨ縺励※蜈･繧後ｋ
+  // 数え直した count を最終的な値として入れる
   for (size_t i = 0; i < counts.size(); ++i) {
     customizeData_->partParams[i].count = counts[i];
   }
 }
 
 void ModScene::ResetModBodies() {
-  // 蜈ｨ驛ｨ菴阪・謾ｹ騾繝代Λ繝｡繝ｼ繧ｿ繧貞・譛溷喧縺吶ｋ
+  // 全部位の改造パラメータを初期化する
   for (std::unordered_map<int, ModBody>::iterator it = modBodies_.begin();
        it != modBodies_.end(); ++it) {
     it->second.Reset();
@@ -2021,7 +2021,7 @@ void ModScene::ResetModBodies() {
 }
 
 void ModScene::ResetSelectedPartParams() {
-  // 驕ｸ謚樔ｸｭ驛ｨ菴阪′辟｡縺・ｴ蜷医・菴輔ｂ縺励↑縺・
+  // 選択中部位が無い場合は何もしない
   if (selectedPartId_ < 0) {
     return;
   }
@@ -2029,25 +2029,25 @@ void ModScene::ResetSelectedPartParams() {
     return;
   }
 
-  // 驕ｸ謚樔ｸｭ驛ｨ菴阪□縺題ｦ九◆逶ｮ繝代Λ繝｡繝ｼ繧ｿ繧貞・譛溷喧縺吶ｋ
+  // 選択中部位だけ見た目パラメータを初期化する
   modBodies_[selectedPartId_].Reset();
 }
 
 void ModScene::ResetToDefaultHumanoid() {
-  // 讒矩繧貞・譛滉ｺｺ蝙九∈謌ｻ縺・
+  // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
-  // Object 荳隕ｧ繧呈ｧ矩縺ｫ蜷医ｏ縺帙※蜀榊酔譛溘☆繧・
+  // Object 一覧を構造に合わせて再同期する
   SyncObjectsWithAssembly();
 
-  // 蛻晄悄繝ｬ繧､繧｢繧ｦ繝医→謾ｹ騾繝代Λ繝｡繝ｼ繧ｿ繧剃ｽ懊ｊ逶ｴ縺・
+  // 初期レイアウトと改造パラメータを作り直す
   SetupInitialLayout();
   ResetModBodies();
 
-  // 繝・ヵ繧ｩ繝ｫ繝井ｿ晏ｭ俶ｸ医∩縺ｮ謫堺ｽ懃せ縺ｸ謌ｻ縺・
+  // デフォルト保存済みの操作点へ戻す
   RestoreDefaultControlPointsFromSnapshots();
 
-  // 蜈･蜉帑ｸｭ迥ｶ諷九ｒ繧ｯ繝ｪ繧｢
+  // 入力中状態をクリア
   ClearControlPointSelection();
   isDraggingControlPoint_ = false;
   assemblyDrag_ = ModAssemblyDragState{};
@@ -2055,7 +2055,7 @@ void ModScene::ResetToDefaultHumanoid() {
   reattachConnectorId_ = -1;
   hoveredPartId_ = -1;
 
-  // 驕ｸ謚樒憾諷九→蜈ｱ譛峨ョ繝ｼ繧ｿ繧ょ・譛溽憾諷九∈蟇・○繧・
+  // 選択状態と共有データも初期状態へ寄せる
   EnsureValidSelection();
   UpdateModObjects();
   SyncCustomizeDataFromScene();
@@ -2070,7 +2070,7 @@ void ModScene::RestoreDefaultControlPointsFromSnapshots() {
     return;
   }
 
-  // 縺ｾ縺・torso 繧堤ｩｺ縺ｫ縺励※蠕ｩ蜈・☆繧・
+  // まず torso を空にして復元する
   torsoControlPoints_.clear();
 
   const int chestBodyId = assembly_.GetBodyId();
@@ -2080,7 +2080,7 @@ void ModScene::RestoreDefaultControlPointsFromSnapshots() {
     const ModControlPointSnapshot &snap =
         customizeData_->defaultControlPointSnapshots[i];
 
-    // torso 蜈ｱ譛画桃菴懃せ
+    // torso 共有操作点
     if (snap.ownerPartType == ModBodyPart::ChestBody && chestBodyId >= 0 &&
         snap.ownerPartId == chestBodyId &&
         (snap.role == ModControlPointRole::Chest ||
@@ -2098,7 +2098,7 @@ void ModScene::RestoreDefaultControlPointsFromSnapshots() {
     }
   }
 
-  // torso 髟ｷ縺輔く繝｣繝・す繝･繧ょｾｩ蜈・
+  // torso 長さキャッシュも復元
   {
     const int chestIndex =
         FindTorsoControlPointIndex(ModControlPointRole::Chest);
@@ -2120,7 +2120,7 @@ void ModScene::RestoreDefaultControlPointsFromSnapshots() {
     }
   }
 
-  // 髱・torso 驛ｨ菴阪・謫堺ｽ懃せ繧・ownerPartId 縺斐→縺ｫ蠕ｩ蜈・
+  // 非 torso 部位の操作点を ownerPartId ごとに復元
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
 
@@ -2164,35 +2164,35 @@ void ModScene::RestoreDefaultControlPointsFromSnapshots() {
     if (!restoredPoints.empty()) {
       modBodies_[id].SetControlPoints(restoredPoints);
     } else {
-      // 蠢ｵ縺ｮ縺溘ａ縲Ｅefault snapshot 縺檎┌縺・Κ菴阪・騾壼ｸｸ縺ｮ蛻晄悄蛹悶∈謌ｻ縺・
+      // 念のため。default snapshot が無い部位は通常の初期化へ戻す
       modBodies_[id].ResetControlPoints();
     }
   }
 }
 
 void ModScene::SelectPart(int partId) {
-  // 驕ｸ謚樣Κ菴阪ｒ譖ｴ譁ｰ縺吶ｋ
+  // 選択部位を更新する
   selectedPartId_ = partId;
 
-  // 莉倥￠譖ｿ縺亥呵｣懊・驕ｸ謚槭＠逶ｴ縺励↓縺ｪ繧九・縺ｧ繝ｪ繧ｻ繝・ヨ縺吶ｋ
+  // 付け替え候補は選択し直しになるのでリセットする
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
 
-  // 驛ｨ菴阪ｒ驕ｸ縺ｳ逶ｴ縺励◆繧画桃菴懃せ驕ｸ謚槭ｂ縺・▲縺溘ｓ隗｣髯､縺吶ｋ
+  // 部位を選び直したら操作点選択もいったん解除する
   ClearControlPointSelection();
 }
 
 void ModScene::EnsureValidSelection() {
-  // 迴ｾ蝨ｨ縺ｮ驕ｸ謚槭′縺ｾ縺譛牙柑縺ｪ繧峨◎縺ｮ縺ｾ縺ｾ邯ｭ謖√☆繧・
+  // 現在の選択がまだ有効ならそのまま維持する
   if (selectedPartId_ >= 0 && assembly_.FindNode(selectedPartId_) != nullptr &&
       modObjects_.count(selectedPartId_) > 0) {
     return;
   }
 
-  // 辟｡蜉ｹ縺ｪ繧峨＞縺｣縺溘ｓ譛ｪ驕ｸ謚槭↓謌ｻ縺・
+  // 無効ならいったん未選択に戻す
   selectedPartId_ = -1;
 
-  // 驕ｸ謚槫庄閭ｽ縺ｪ蜈磯ｭ驛ｨ菴阪ｒ譁ｰ縺溘↑驕ｸ謚槫ｯｾ雎｡縺ｫ縺吶ｋ
+  // 選択可能な先頭部位を新たな選択対象にする
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     const PartNode *node = assembly_.FindNode(id);
@@ -2207,32 +2207,32 @@ void ModScene::EnsureValidSelection() {
     break;
   }
 
-  // 莉倥￠譖ｿ縺亥呵｣懊・繝ｪ繧ｻ繝・ヨ縺吶ｋ
+  // 付け替え候補はリセットする
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
 
-  // 驛ｨ菴埼∈謚槭′辟｡蜉ｹ蛹悶＆繧後◆蝣ｴ蜷医・謫堺ｽ懃せ驕ｸ謚槭ｂ隗｣髯､縺吶ｋ
+  // 部位選択が無効化された場合は操作点選択も解除する
   ClearControlPointSelection();
 }
 
 void ModScene::DeleteSelectedPart() {
-  // 驕ｸ謚樔ｸｭ驛ｨ菴阪′辟｡縺・ｴ蜷医・菴輔ｂ縺励↑縺・
+  // 選択中部位が無い場合は何もしない
   if (selectedPartId_ < 0) {
     return;
   }
 
-  // 繧ｻ繝・ヨ蜊倅ｽ榊炎髯､縺悟ｿ・ｦ√↑蝣ｴ蜷医ｒ閠・・縺励※蟇ｾ雎｡驛ｨ菴巧D繧定｣懈ｭ｣縺吶ｋ
+  // セット単位削除が必要な場合を考慮して対象部位IDを補正する
   const int targetId = ResolveAssemblyOperationPartId(selectedPartId_);
   if (targetId < 0) {
     return;
   }
 
-  // Graph 縺九ｉ蜑企勁縺ｧ縺阪↑縺代ｌ縺ｰ邨ゆｺ・☆繧・
+  // Graph から削除できなければ終了する
   if (!assembly_.RemovePart(targetId)) {
     return;
   }
 
-  // 蜑企勁蠕後・ Object 荳隕ｧ縺ｨ驕ｸ謚樒憾諷九ｒ蜀榊酔譛溘☆繧・
+  // 削除後の Object 一覧と選択状態を再同期する
   selectedPartId_ = targetId;
   SyncObjectsWithAssembly();
   EnsureValidSelection();
@@ -2258,18 +2258,18 @@ void ModScene::ReattachSelectedPart() {
 }
 
 void ModScene::NudgeSelectedPart(const Vector3 &delta) {
-  // 驕ｸ謚樣Κ菴阪′辟｡縺・ｴ蜷医・菴輔ｂ縺励↑縺・
+  // 選択部位が無い場合は何もしない
   if (selectedPartId_ < 0) {
     return;
   }
 
-  // 迴ｾ蝨ｨ縺ｮ繝ｭ繝ｼ繧ｫ繝ｫ菴咲ｽｮ繧貞叙蠕励☆繧・
+  // 現在のローカル位置を取得する
   const PartNode *node = assembly_.FindNode(selectedPartId_);
   if (node == nullptr) {
     return;
   }
 
-  // delta 繧貞刈邂励＠縺ｦ繝ｭ繝ｼ繧ｫ繝ｫ菴咲ｽｮ繧呈峩譁ｰ縺吶ｋ
+  // delta を加算してローカル位置を更新する
   assembly_.SetPartLocalTranslate(selectedPartId_,
                                   Add(node->localTransform.translate, delta));
 }
@@ -2350,13 +2350,13 @@ void ModScene::UpdateControlPointEditing() {
 
   Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
 
-  // 逕ｻ髱｢UI荳翫〒縺ｯ3D蛛ｴ縺ｮ驕ｸ謚槭・繝峨Λ繝・げ髢句ｧ九ｒ縺輔○縺ｪ縺・
+  // 画面UI上では3D側の選択・ドラッグ開始をさせない
   if (!assemblyDrag_.isDragging && IsMouseOverAnyScreenUi()) {
     hoveredPartId_ = -1;
     return;
   }
 
-  // Assembly 繝峨Λ繝・げ荳ｭ縺ｯ縺昴■繧峨ｒ譛蜆ｪ蜈・
+  // Assembly ドラッグ中はそちらを最優先
   if (assemblyDrag_.isDragging) {
     UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
     ApplyAssemblyDragPreview();
@@ -2377,7 +2377,7 @@ void ModScene::UpdateControlPointEditing() {
     return;
   }
 
-  // 騾壼ｸｸ譎ゅ・ hover 譖ｴ譁ｰ
+  // 通常時の hover 更新
   UpdateHoveredPartFromMouseRay(mouseRay);
 
   if (selectedControlPointIndex_ >= 0 && !isDraggingControlPoint_) {
@@ -2389,26 +2389,26 @@ void ModScene::UpdateControlPointEditing() {
 
   UpdateControlPointWheelScaling();
 
-  // 蟾ｦ繧ｯ繝ｪ繝・け髢句ｧ区凾
+  // 左クリック開始時
   if (IsMouseLeftTriggeredNow()) {
-    // 縺ｾ縺壽桃菴懃せ繧貞━蜈医ゅ◆縺縺・Root 縺ｯ PickControlPointFromMouseRay() 蛛ｴ縺ｧ蠑ｾ縺・
+    // まず操作点を優先。ただし Root は PickControlPointFromMouseRay() 側で弾く
     if (PickControlPointFromMouseRay(mouseRay)) {
       isDraggingControlPoint_ = true;
       return;
     }
 
-    // 謫堺ｽ懃せ縺ｧ縺ｪ縺代ｌ縺ｰ驛ｨ菴阪ラ繝ｩ繝・げ髢句ｧ・
+    // 操作点でなければ部位ドラッグ開始
     if (TryBeginAssemblyDragFromMouseRay(mouseRay)) {
       return;
     }
   }
 
-  // 謫堺ｽ懃せ繝峨Λ繝・げ荳ｭ
+  // 操作点ドラッグ中
   if (isDraggingControlPoint_ && IsMouseLeftPressedNow()) {
     MoveSelectedControlPointFromMouseRay(mouseRay);
   }
 
-  // 蟾ｦ繝懊ち繝ｳ繧帝屬縺励◆繧画桃菴懃せ繝峨Λ繝・げ邨ゆｺ・
+  // 左ボタンを離したら操作点ドラッグ終了
   if (IsMouseLeftReleasedNow()) {
     isDraggingControlPoint_ = false;
   }
@@ -2427,7 +2427,7 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
     return false;
   }
 
-  // 閭ｴ菴灘・譛臥せ繧貞━蜈医＠縺ｦ蛻､螳壹☆繧・
+  // 胴体共有点を優先して判定する
   if (IsTorsoVisiblePartId(visiblePartId)) {
     float nearestT = FLT_MAX;
     int nearestPointIndex = -1;
@@ -2467,6 +2467,12 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       return false;
     }
 
+    if (nearestPointIndex >= 0 &&
+        torsoControlPoints_[static_cast<size_t>(nearestPointIndex)].role ==
+            ModControlPointRole::Root) {
+      return false;
+    }
+
     selectedControlPartId_ = -2;
     selectedControlPointIndex_ = nearestPointIndex;
     selectedPartId_ = visiblePartId;
@@ -2478,7 +2484,8 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
 
     dragControlPlanePoint_ = worldPos;
 
-    // 繧ｫ繝｡繝ｩ縺九ｉ繧ｿ繝ｼ繧ｲ繝・ヨ縺ｸ蜷代￥譁ｹ蜷・= 逕ｻ髱｢縺ｮ豕慕ｷ・
+    // カメラからターゲットへ向く方向 = 画面の法線
+    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
     dragControlPlaneNormal_ =
         NormalizeSafeV(Subtract(worldPos, cameraPos), {0.0f, 0.0f, 1.0f});
 
@@ -2543,6 +2550,10 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       nearestT = t;
       nearestPointIndex = static_cast<int>(pointIndex);
     }
+  }
+
+  if (nearestPointIndex < 0) {
+    return false;
   }
 
   if (nearestPointIndex >= 0 &&
@@ -2691,7 +2702,7 @@ void ModScene::EnsureControlPointGizmoCount(size_t requiredCount) {
     gizmo->CreateDefaultData();
     gizmo->modelHandle_ = config::default_Sphere_MeshBufferHandle_;
 
-    // 繧ｫ繝｡繝ｩ豁｣髱｢蜷代″縺ｧ隕九ｄ縺吶￥縺吶ｋ
+    // カメラ正面向きで見やすくする
     gizmo->isBillboard_ = true;
 
     if (!gizmo->objectParts_.empty()) {
@@ -2730,7 +2741,7 @@ void ModScene::UpdateControlPointGizmos() {
     return;
   }
 
-  // torso 蜈ｱ譛臥せ陦ｨ遉ｺ
+  // torso 共有点表示
   if (IsTorsoVisiblePartId(visiblePartId)) {
     size_t visibleCount = 0;
     for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
@@ -2889,7 +2900,7 @@ void ModScene::DrawControlPointGizmos() {
 void ModScene::ResetTorsoControlPoints() {
   torsoControlPoints_.clear();
 
-  // 譁ｰ繝｢繝・Ν蟇ｸ豕輔↓蜷医ｏ縺帙ｋ
+  // 新モデル寸法に合わせる
   torsoChestToBellyLength_ = 1.2796f;
   torsoBellyToWaistLength_ = 1.6880f;
 
@@ -2939,7 +2950,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
       parentNode.part, childNode.part, childNode.side);
 
   // ------------------------------------------------------------
-  // torso 隕ｪ
+  // torso 親
   // ------------------------------------------------------------
   if (parentNode.part == ModBodyPart::ChestBody ||
       parentNode.part == ModBodyPart::StomachBody) {
@@ -2968,6 +2979,13 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
         (waistIndex >= 0)
             ? torsoControlPoints_[static_cast<size_t>(waistIndex)].localPosition
             : defaultWaist;
+
+    // 親ノード（胴体）自体がドラッグなどで移動している場合、その分を差し引いて「相対座標」にする。
+    // そうしないと、親の移動 + 子の(絶対座標による)移動 で2倍速になってしまう。
+    const Vector3 parentPos = parentNode.localTransform.translate;
+    const Vector3 relChest = Subtract(currentChest, parentPos);
+    const Vector3 relBelly = Subtract(currentBelly, parentPos);
+    const Vector3 relWaist = Subtract(currentWaist, parentPos);
 
     const float defaultChestRadius = 0.12f;
     const float defaultBellyRadius = 0.10f;
@@ -3004,10 +3022,10 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     const float waistRadiusRatio =
         currentWaistRadius / (std::max)(defaultWaistRadius, 0.0001f);
 
-    // 譁ｰ繝｢繝・Ν蝓ｺ貅悶・謗･邯夐・鄂ｮ
-    // 閻・ : Chest 縺ｨ蜷後§鬮倥＆縲∝ｰ代＠螟・
-    // 閼・ : Waist 繧医ｊ蟆代＠荳・
-    // 鬥・ : Chest 繧医ｊ蟆代＠荳・
+    // 新モデル基準の接続配置
+    // 腕  : Chest と同じ高さ、少し外
+    // 脚  : Waist より少し下
+    // 首  : Chest より少し上
     const float baseShoulderX = 1.34f;
     const float baseHipX = 0.58f;
     const float neckLift = 0.08f;
@@ -3016,41 +3034,41 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
     switch (childNode.part) {
     case ModBodyPart::Neck:
     case ModBodyPart::Head: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.y +=
           neckLift + (currentUpperTorsoRadius - defaultUpperTorsoRadius);
       return attach;
     }
 
     case ModBodyPart::LeftUpperArm: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.x -= baseShoulderX * upperTorsoRadiusRatio;
-      attach.y = currentChest.y;
-      attach.z = currentChest.z;
+      attach.y = relChest.y;
+      attach.z = relChest.z;
       return attach;
     }
 
     case ModBodyPart::RightUpperArm: {
-      Vector3 attach = currentChest;
+      Vector3 attach = relChest;
       attach.x += baseShoulderX * upperTorsoRadiusRatio;
-      attach.y = currentChest.y;
-      attach.z = currentChest.z;
+      attach.y = relChest.y;
+      attach.z = relChest.z;
       return attach;
     }
 
     case ModBodyPart::LeftThigh: {
-      Vector3 attach = currentWaist;
+      Vector3 attach = relWaist;
       attach.x -= baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = currentWaist.z;
+      attach.z = relWaist.z;
       return attach;
     }
 
     case ModBodyPart::RightThigh: {
-      Vector3 attach = currentWaist;
+      Vector3 attach = relWaist;
       attach.x += baseHipX * lowerTorsoRadiusRatio;
       attach.y -= legDrop * waistRadiusRatio;
-      attach.z = currentWaist.z;
+      attach.z = relWaist.z;
       return attach;
     }
 
@@ -3060,8 +3078,8 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
   }
 
   // ------------------------------------------------------------
-  // UpperArm 隕ｪ -> ForeArm 蟄・
-  // Bend 轤ｹ繧貞渕貅悶↓縺吶ｋ
+  // UpperArm 親 -> ForeArm 子
+  // Bend 点を基準にする
   // ------------------------------------------------------------
   if (parentNode.part == ModBodyPart::LeftUpperArm ||
       parentNode.part == ModBodyPart::RightUpperArm) {
@@ -3103,8 +3121,8 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
   }
 
   // ------------------------------------------------------------
-  // Thigh 隕ｪ -> Shin 蟄・
-  // Bend 轤ｹ繧貞渕貅悶↓縺吶ｋ
+  // Thigh 親 -> Shin 子
+  // Bend 点を基準にする
   // ------------------------------------------------------------
   if (parentNode.part == ModBodyPart::LeftThigh ||
       parentNode.part == ModBodyPart::RightThigh) {
@@ -3146,8 +3164,8 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
   }
 
   // ------------------------------------------------------------
-  // Neck 隕ｪ -> Head 蟄・
-  // Head 縺ｮ LowerNeck 繧貞渕貅悶↓縺励▽縺､縲ゞpperNeck 蛛ｴ縺ｮ螟牙喧繧りｿｽ蠕薙＆縺帙ｋ
+  // Neck 親 -> Head 子
+  // Head の LowerNeck を基準にしつつ、UpperNeck 側の変化も追従させる
   // ------------------------------------------------------------
   if (parentNode.part == ModBodyPart::Neck &&
       childNode.part == ModBodyPart::Head) {
@@ -3187,7 +3205,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
   }
 
   // ------------------------------------------------------------
-  // Head 隕ｪ
+  // Head 親
   // ------------------------------------------------------------
   if (parentNode.part == ModBodyPart::Head) {
     const float defaultHeadRadius = 0.11f;
@@ -3202,7 +3220,7 @@ Vector3 ModScene::ResolveDynamicAttachBase(const PartNode &parentNode,
   }
 
   // ------------------------------------------------------------
-  // 縺昴・莉・
+  // その他
   // ------------------------------------------------------------
   if (modBodies_.count(parentNode.id) > 0) {
     const Vector3 parentScale =
@@ -3285,9 +3303,9 @@ float ModScene::GetTorsoVisualSegmentRadius(ModControlPointRole startRole,
   const float thicknessScale =
       segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
 
-  // torso 縺ｯ蛟句挨 ModBody 縺ｮ param.scale
-  // 縺ｧ縺ｯ縺ｪ縺丞・譛臥せ蜊雁ｾ・〒荳ｻ縺ｫ螟ｪ縺輔′豎ｺ縺ｾ縺｣縺ｦ縺・ｋ縺ｮ縺ｧ縲・縺ｾ縺壹・隕九◆逶ｮ蛛ｴ縺ｨ蜷後§
-  // segmentRadius 繝吶・繧ｹ縺ｧ蜷医ｏ縺帙ｋ
+  // torso は個別 ModBody の param.scale
+  // ではなく共有点半径で主に太さが決まっているので、 まずは見た目側と同じ
+  // segmentRadius ベースで合わせる
   return defaultSegmentRadius * thicknessScale;
 }
 
@@ -3316,11 +3334,11 @@ ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
 
   const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, childNode);
 
-  // 菫晏ｭ倥＠縺ｦ縺ゅｋ localTransform.translate 縺ｯ繝・ヵ繧ｩ繝ｫ繝域磁邯壼渕貅悶°繧峨・邱ｨ髮・ｷｮ蛻・
+  // 保存してある localTransform.translate はデフォルト接続基準からの編集差分
   const Vector3 offsetFromDefault =
       Subtract(childNode.localTransform.translate, defaultAttach);
 
-  // 蟄占・霄ｫ縺ｮ螟ｪ縺輔・髟ｷ縺募｢怜刈縺ｶ繧薙□縺代∬ｦｪ縺九ｉ螟悶∈謚ｼ縺怜・縺・
+  // 子自身の太さ・長さ増加ぶんだけ、親から外へ押し出す
   const Vector3 childSelfOffset = ResolveChildSelfAttachOffset(childNode);
 
   return Add(Add(dynamicBase, offsetFromDefault), childSelfOffset);
@@ -3331,7 +3349,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     return;
   }
 
-  // 荳ｭ繝懊ち繝ｳ謚ｼ縺嶺ｸｭ縺ｯ繝・ヰ繝・げ繧ｫ繝｡繝ｩ謫堺ｽ懊ｒ蜆ｪ蜈医☆繧・
+  // 中ボタン押し中はデバッグカメラ操作を優先する
   if (system_->GetMouseIsPush(2)) {
     return;
   }
@@ -3347,7 +3365,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     return;
   }
 
-  // 縺吶〒縺ｫ驕ｸ謚樔ｸｭ縺ｮ謫堺ｽ懃せ縺後≠繧九↑繧画怙蜆ｪ蜈医〒縺昴ｌ繧呈僑邵ｮ縺吶ｋ
+  // すでに選択中の操作点があるなら最優先でそれを拡縮する
   if (selectedControlPointIndex_ >= 0) {
     if (selectedControlPartId_ == -2) {
       ScaleTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
@@ -3363,8 +3381,8 @@ void ModScene::UpdateControlPointWheelScaling() {
     }
   }
 
-  // 譛ｪ驕ｸ謚槭↑繧峨”over荳ｭ縺ｾ縺溘・驕ｸ謚樔ｸｭ縺ｮ驛ｨ菴阪ｒ蝓ｺ貅悶↓
-  // 繝槭え繧ｹ Ray 縺ｫ譛繧りｿ代＞謫堺ｽ懃せ繧定ｦ九▽縺代※縺昴・蝣ｴ縺ｧ諡｡邵ｮ縺吶ｋ
+  // 未選択なら、hover中または選択中の部位を基準に
+  // マウス Ray に最も近い操作点を見つけてその場で拡縮する
   const int visiblePartId =
       (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
 
@@ -3374,7 +3392,7 @@ void ModScene::UpdateControlPointWheelScaling() {
 
   Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
 
-  // 閭ｴ菴灘・譛臥せ
+  // 胴体共有点
   if (IsTorsoVisiblePartId(visiblePartId)) {
     float nearestT = FLT_MAX;
     int nearestPointIndex = -1;
@@ -3818,7 +3836,7 @@ int ModScene::ResolveFadeGroupId(int partId) const {
     return -1;
   }
 
-  // 閭ｴ菴薙・ Chest / Stomach 繧貞酔縺倥げ繝ｫ繝ｼ繝励→縺励※謇ｱ縺・
+  // 胴体は Chest / Stomach を同じグループとして扱う
   if (node->part == ModBodyPart::ChestBody ||
       node->part == ModBodyPart::StomachBody) {
     const int chestId = assembly_.GetBodyId();
@@ -4041,7 +4059,24 @@ void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
 
   assemblyDrag_.previewLocalTranslate = rootNode->localTransform.translate;
 
-  // 繝峨Λ繝・げ蟷ｳ髱｢縺ｯ縲梧雫繧薙□轤ｹ繧帝壹ｋ縲√き繝｡繝ｩ豁｣髱｢蜷代″蟷ｳ髱｢縲阪ｒ菴ｿ縺・
+  // 胴体ドラッグ用に全操作点の初期座標を保存
+  assemblyDrag_.beforeTorsoPoints.clear();
+  for (const auto &point : torsoControlPoints_) {
+    assemblyDrag_.beforeTorsoPoints.push_back(point.localPosition);
+  }
+
+  // 胴体各パーツの初期座標も保存
+  assemblyDrag_.beforeBodyTranslations.clear();
+  std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+  for (int id : allIds) {
+    const PartNode *node = assembly_.FindNode(id);
+    if (node != nullptr &&
+        ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+      assemblyDrag_.beforeBodyTranslations[id] = node->localTransform.translate;
+    }
+  }
+
+  // ドラッグ平面は「掴んだ点を通る、カメラ正面向き平面」を使う
   const Vector3 rootWorld = GetAssemblyRootWorldPosition(rootPartId);
   assemblyDrag_.dragPlanePoint = rootWorld;
 
@@ -4091,8 +4126,10 @@ bool ModScene::CanAttachAssemblyRootToParentPart(int childRootPartId,
   }
 
   const bool parentCanReceive =
-      ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) ||
-      parentNode->part == ModBodyPart::Head;
+      (ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) &&
+       parentNode->part != ModBodyPart::Neck) ||
+      parentNode->part == ModBodyPart::Head ||
+      parentNode->part == ModBodyPart::StomachBody;
 
   if (!parentCanReceive) {
     return false;
@@ -4198,13 +4235,13 @@ bool ModScene::BuildAttachCapsuleCandidate(
     const float clampedZ =
         ClampFloatLocal(localZ, -box.halfDepth, box.halfDepth);
 
-    // 邂ｱ蜀・Κ/霑大ｍ縺ｮ蝓ｺ貅也せ
+    // 箱内部/近傍の基準点
     const Vector3 closestPointInBox =
         Add(Add(Add(box.center, Multiply(clampedX, box.axisX)),
                 Multiply(clampedY, box.axisY)),
             Multiply(clampedZ, box.axisZ));
 
-    // 蜷・擇縺ｾ縺ｧ縺ｮ霍晞屬繧呈ｯ碑ｼ・＠縺ｦ譛繧りｿ代＞髱｢繧帝∈縺ｶ
+    // 各面までの距離を比較して最も近い面を選ぶ
     const float distToPosX = fabsf(localX - box.halfWidth);
     const float distToNegX = fabsf(localX + box.halfWidth);
     const float distToPosY = fabsf(localY - box.halfLength);
@@ -4328,7 +4365,18 @@ ModScene::FindBestAttachCandidate(int childRootPartId,
   for (size_t i = 0; i < ids.size(); ++i) {
     const int parentId = ids[i];
 
-    if (!IsAssemblyRootPartId(parentId)) {
+    const PartNode *parentNode = assembly_.FindNode(parentId);
+    if (parentNode == nullptr) {
+      continue;
+    }
+
+    const bool canBeParent =
+        (ModAssemblyUtil::IsAssemblyRootPart(parentNode->part) &&
+         parentNode->part != ModBodyPart::Neck) ||
+        parentNode->part == ModBodyPart::Head ||
+        parentNode->part == ModBodyPart::StomachBody;
+
+    if (!canBeParent) {
       continue;
     }
 
@@ -4363,17 +4411,17 @@ Vector3 ModScene::ComputeAssemblyPreviewLocalTranslate(
     return {0.0f, 0.0f, 0.0f};
   }
 
-  // 莉顔判髱｢荳翫〒隕九∴縺ｦ縺・ｋ root 縺ｮ繝ｯ繝ｼ繝ｫ繝我ｽ咲ｽｮ
+  // 今画面上で見えている root のワールド位置
   const Vector3 currentRootWorld =
       GetAssemblyRootWorldPosition(childRootPartId);
 
-  // 繧ｹ繝翫ャ繝励＠縺溘＞蛟呵｣憺擇縺ｮ繝ｯ繝ｼ繝ｫ繝我ｽ咲ｽｮ
+  // スナップしたい候補面のワールド位置
   const Vector3 desiredRootWorld = candidate.worldPosition;
 
-  // 隕九∴縺ｦ縺・ｋ菴咲ｽｮ縺九ｉ逶ｮ讓吩ｽ咲ｽｮ縺ｾ縺ｧ縺ｮ蟾ｮ蛻・□縺台ｽｿ縺・
+  // 見えている位置から目標位置までの差分だけ使う
   const Vector3 worldDelta = Subtract(desiredRootWorld, currentRootWorld);
 
-  // localTransform.translate 縺ｯ縲檎樟蝨ｨ蛟､縺ｫ蟾ｮ蛻・刈邂励阪〒譖ｴ譁ｰ縺吶ｋ
+  // localTransform.translate は「現在値に差分加算」で更新する
   return Add(childNode->localTransform.translate, worldDelta);
 }
 
@@ -4443,8 +4491,32 @@ void ModScene::ApplyAssemblyDragPreview() {
     return;
   }
 
-  assembly_.SetPartLocalTranslate(assemblyDrag_.assemblyRootPartId,
-                                  assemblyDrag_.previewLocalTranslate);
+  const int rootId = assemblyDrag_.assemblyRootPartId;
+  const Vector3 currentLocal = assemblyDrag_.previewLocalTranslate;
+  const Vector3 beforeLocal = assemblyDrag_.beforeLocalTranslate;
+  const Vector3 delta = Subtract(currentLocal, beforeLocal);
+
+  const PartNode *rootNode = assembly_.FindNode(rootId);
+  bool isBodyDrag = (rootNode != nullptr &&
+                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                        ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグの場合は、すべての胴体パーツと操作点を連動させる
+    for (auto const& [id, beforePos] : assemblyDrag_.beforeBodyTranslations) {
+      assembly_.SetPartLocalTranslate(id, Add(beforePos, delta));
+    }
+
+    // 胴体操作点も連動移動させる
+    // (開始時の座標に delta を足す)
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      torsoControlPoints_[i].localPosition =
+          Add(assemblyDrag_.beforeTorsoPoints[i], delta);
+    }
+  } else {
+    // 通常パーツ
+    assembly_.SetPartLocalTranslate(rootId, currentLocal);
+  }
 }
 
 void ModScene::UpdateAssemblyDragTest() {
@@ -4475,7 +4547,7 @@ void ModScene::UpdateAssemblyDragTest() {
   UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
   ApplyAssemblyDragPreview();
 
-  // 蟾ｦ繧ｯ繝ｪ繝・け繧帝屬縺励◆繧蛾・鄂ｮ遒ｺ螳壼愛螳・
+  // 左クリックを離したら配置確定判定
   if (IsMouseLeftReleasedNow()) {
     if (assemblyDrag_.isPlacementValid) {
       ConfirmAssemblyDragPlacement();
@@ -4485,7 +4557,7 @@ void ModScene::UpdateAssemblyDragTest() {
     return;
   }
 
-  // Esc 縺ｯ蟶ｸ縺ｫ繧ｭ繝｣繝ｳ繧ｻ繝ｫ
+  // Esc は常にキャンセル
   if (system_->GetTriggerOn(DIK_ESCAPE)) {
     CancelAssemblyDragPlacement();
     return;
@@ -4497,8 +4569,28 @@ bool ModScene::IsPartInDraggingAssembly(int partId) const {
     return false;
   }
 
-  return ModAssemblyResolver::BelongsToAssemblyRoot(
-      assembly_, assemblyDrag_.assemblyRootPartId, partId);
+  const int rootId = assemblyDrag_.assemblyRootPartId;
+  const PartNode *rootNode = assembly_.FindNode(rootId);
+  bool isBodyDrag = (rootNode != nullptr &&
+                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                        ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグ時は、全胴体パーツのいずれかの下にあれば true
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int id : allIds) {
+      const PartNode *node = assembly_.FindNode(id);
+      if (node != nullptr &&
+          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        if (ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, id, partId)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  return ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, rootId, partId);
 }
 
 void ModScene::CancelAssemblyDragPlacement() {
@@ -4519,8 +4611,35 @@ void ModScene::CancelAssemblyDragPlacement() {
                        assemblyDrag_.beforeParentConnectorId);
   }
 
-  assembly_.SetPartLocalTranslate(rootPartId,
-                                  assemblyDrag_.beforeLocalTranslate);
+  bool isBodyDrag = (ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                    ModAssemblyType::Body);
+
+  if (isBodyDrag) {
+    // 胴体ドラッグ時はすべて復元
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int id : allIds) {
+      const PartNode *node = assembly_.FindNode(id);
+      if (node != nullptr &&
+          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        // 胴体パーツは通常 (0,0,0) で保存されているはずだが、
+        // 念のため Root の開始座標をセットする（通常は (0,0,0)）
+        // 胴体パーツ間で初期座標が異なる可能性に備えるなら本来は個別保持が必要。
+        // ここでは簡易的に beforeLocalTranslate をセット
+        assembly_.SetPartLocalTranslate(id, assemblyDrag_.beforeLocalTranslate);
+      }
+    }
+
+    // 胴体操作点も復元
+    if (assemblyDrag_.beforeTorsoPoints.size() == torsoControlPoints_.size()) {
+      for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+        torsoControlPoints_[i].localPosition =
+            assemblyDrag_.beforeTorsoPoints[i];
+      }
+    }
+  } else {
+    assembly_.SetPartLocalTranslate(rootPartId,
+                                    assemblyDrag_.beforeLocalTranslate);
+  }
 
   SelectPart(assemblyDrag_.pickedPartId >= 0 ? assemblyDrag_.pickedPartId
                                              : rootPartId);
@@ -4650,7 +4769,7 @@ bool ModScene::IsAssemblyDragPriorityControlPoint(int ownerPartId,
 
   const ModControlPointRole role = points[static_cast<size_t>(pointIndex)].role;
 
-  // 譬ｹ蜈・磁邯夂せ縺ｯ驛ｨ菴阪ラ繝ｩ繝・げ髢句ｧ九ｒ蜆ｪ蜈医☆繧・
+  // 根元接続点は部位ドラッグ開始を優先する
   return role == ModControlPointRole::Root;
 }
 
@@ -4861,14 +4980,10 @@ ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
     return ZeroV();
   }
 
-  const Object *bodyObject = modObjects_.at(chestBodyId).get();
-  if (bodyObject == nullptr) {
-    return ZeroV();
-  }
-
-  return ModObjectUtil::TransformLocalPointToWorld(
-      bodyObject,
-      torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition);
+  // 胴体操作点は、localPosition 自体がアセンブリ空間での絶対座標として扱われているため、
+  // オブジェクトのワールド変換を適用せずにそのまま返す。
+  // そうしないと、アセンブリドラッグ中に移動量が二重に加算されてしまう。
+  return torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition;
 }
 
 void ModScene::UpdateModObjects() {
@@ -5004,7 +5119,7 @@ void ModScene::UpdateModObjects() {
         Vector4 &color =
             object->objectParts_[partIndex].materialConfig->textureColor;
 
-        // 縺ｾ縺夐壼ｸｸ濶ｲ縺ｸ謌ｻ縺・
+        // まず通常色へ戻す
         color.x = 1.0f;
         color.y = 1.0f;
         color.z = 1.0f;
@@ -5017,7 +5132,7 @@ void ModScene::UpdateModObjects() {
 
   ApplyAssemblyDragVisualFeedback();
 
-  // 濶ｲ螟画峩蠕後↓繧ゅ≧荳蠎ｦ譖ｴ譁ｰ縺励※蜿肴丐
+  // 色変更後にもう一度更新して反映
   if (assemblyDrag_.isDragging) {
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const int id = orderedPartIds_[i];
@@ -5034,7 +5149,7 @@ void ModScene::UpdateModObjects() {
 }
 
 void ModScene::DrawModObjects() {
-  // orderedPartIds_ 縺ｮ鬆・↓蜷・Κ菴・Object 繧呈緒逕ｻ縺吶ｋ
+  // orderedPartIds_ の順に各部位 Object を描画する
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
     if (modObjects_.count(id) == 0) {
@@ -5050,7 +5165,7 @@ void ModScene::DrawModObjects() {
 
 #ifdef USE_IMGUI
 void ModScene::DrawAssemblyGui() {
-  // 驛ｨ菴堺ｸ隕ｧ繝・Μ繝ｼ繧帝幕縺・※縺・ｋ縺ｨ縺阪□縺台ｸ隕ｧ繧呈緒逕ｻ縺吶ｋ
+  // 部位一覧ツリーを開いているときだけ一覧を描画する
   if (ImGui::TreeNode("Assembly Parts")) {
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const int id = orderedPartIds_[i];
@@ -5059,7 +5174,7 @@ void ModScene::DrawAssemblyGui() {
         continue;
       }
 
-      // 蜷・Κ菴阪ｒ驕ｸ謚槫庄閭ｽ縺ｪ繝ｪ繧ｹ繝医→縺励※陦ｨ遉ｺ縺吶ｋ
+      // 各部位を選択可能なリストとして表示する
       ImGui::PushID(id);
 
       const bool selected = (id == selectedPartId_);
@@ -5078,13 +5193,13 @@ void ModScene::DrawAssemblyGui() {
 }
 
 void ModScene::DrawSelectedPartGui() {
-  // 驕ｸ謚樣Κ菴阪′辟｡縺・ｴ蜷医・譯亥・縺縺題｡ｨ遉ｺ縺吶ｋ
+  // 選択部位が無い場合は案内だけ表示する
   if (selectedPartId_ < 0) {
     ImGui::Text("No part selected.");
     return;
   }
 
-  // 驕ｸ謚樣Κ菴阪′荳肴ｭ｣縺ｪ繧臥ｷｨ髮・ｒ荳ｭ譁ｭ縺吶ｋ
+  // 選択部位が不正なら編集を中断する
   const PartNode *node = assembly_.FindNode(selectedPartId_);
   if (node == nullptr || modBodies_.count(selectedPartId_) == 0 ||
       modObjects_.count(selectedPartId_) == 0) {
@@ -5092,29 +5207,29 @@ void ModScene::DrawSelectedPartGui() {
     return;
   }
 
-  // 邱ｨ髮・ｯｾ雎｡縺ｮ Object 縺ｨ繝代Λ繝｡繝ｼ繧ｿ繧貞叙蠕励☆繧・
+  // 編集対象の Object とパラメータを取得する
   Object *object = modObjects_[selectedPartId_].get();
   ModBodyPartParam &param = modBodies_[selectedPartId_].GetParam();
 
-  // 驕ｸ謚樔ｸｭ驛ｨ菴阪・蝓ｺ譛ｬ諠・ｱ繧定｡ｨ遉ｺ縺吶ｋ
+  // 選択中部位の基本情報を表示する
   ImGui::Separator();
   ImGui::Text("Selected Part");
   ImGui::Text("PartId: %d", selectedPartId_);
   ImGui::Text("Type: %s", PartName(node->part));
   ImGui::Text("ParentId: %d", node->parentId);
 
-  // 繝ｭ繝ｼ繧ｫ繝ｫ菴咲ｽｮ繧堤峩謗･邱ｨ髮・〒縺阪ｋ繧医≧縺ｫ縺吶ｋ
+  // ローカル位置を直接編集できるようにする
   Vector3 local = node->localTransform.translate;
   if (ImGui::SliderFloat3("Local Translate", &local.x, -5.0f, 5.0f)) {
     assembly_.SetPartLocalTranslate(selectedPartId_, local);
   }
 
-  // 隕九◆逶ｮ縺ｮ譛牙柑迥ｶ諷九√せ繧ｱ繝ｼ繝ｫ縲・聞縺輔ｒ邱ｨ髮・〒縺阪ｋ繧医≧縺ｫ縺吶ｋ
+  // 見た目の有効状態、スケール、長さを編集できるようにする
   ImGui::Checkbox("Enabled", &param.enabled);
   ImGui::SliderFloat3("Mesh Scale", &param.scale.x, 0.2f, 5.0f);
   ImGui::SliderFloat("Length", &param.length, 0.2f, 5.0f, "%.2f");
 
-  // 迴ｾ蝨ｨ縺ｮ mesh transform 繧堤｢ｺ隱咲畑縺ｫ陦ｨ遉ｺ縺吶ｋ
+  // 現在の mesh transform を確認用に表示する
   if (!object->objectParts_.empty()) {
     const Transform &mesh = object->objectParts_[0].transform;
     ImGui::Text("Mesh Translate : %.2f %.2f %.2f", mesh.translate.x,
@@ -5123,7 +5238,7 @@ void ModScene::DrawSelectedPartGui() {
                 mesh.scale.z);
   }
 
-  // 莉倥￠譖ｿ縺亥・縺ｮ隕ｪ驛ｨ菴阪→繧ｳ繝阪け繧ｿ繧帝∈謚槭☆繧偽I繧定｡ｨ遉ｺ縺吶ｋ
+  // 付け替え先の親部位とコネクタを選択するUIを表示する
   ImGui::Separator();
   ImGui::Text("Reattach");
   if (ImGui::BeginCombo("Parent Part",
@@ -5155,7 +5270,7 @@ void ModScene::DrawSelectedPartGui() {
     ImGui::EndCombo();
   }
 
-  // 隕ｪ驛ｨ菴阪′豎ｺ縺ｾ縺｣縺ｦ縺・ｋ蝣ｴ蜷医・縲∬ｦｪ蛛ｴ繧ｳ繝阪け繧ｿ繧る∈縺ｹ繧九ｈ縺・↓縺吶ｋ
+  // 親部位が決まっている場合は、親側コネクタも選べるようにする
   if (reattachParentId_ >= 0) {
     const PartNode *parentNode = assembly_.FindNode(reattachParentId_);
     if (parentNode != nullptr) {
@@ -5186,7 +5301,7 @@ void ModScene::DrawSelectedPartGui() {
     }
   }
 
-  // 驕ｸ謚樣Κ菴阪・莉倥￠譖ｿ縺医→蜑企勁繧貞ｮ溯｡後〒縺阪ｋ繧医≧縺ｫ縺吶ｋ
+  // 選択部位の付け替えと削除を実行できるようにする
   if (ImGui::Button("Apply Reattach")) {
     ReattachSelectedPart();
   }
@@ -5196,7 +5311,7 @@ void ModScene::DrawSelectedPartGui() {
     DeleteSelectedPart();
   }
 
-  // 驕ｸ謚樣Κ菴阪□縺代ヱ繝ｩ繝｡繝ｼ繧ｿ繧貞・譛溷喧縺吶ｋ繝懊ち繝ｳ繧定｡ｨ遉ｺ縺吶ｋ
+  // 選択部位だけパラメータを初期化するボタンを表示する
   ImGui::Separator();
   ImGui::Text("Reset");
 
@@ -5305,7 +5420,7 @@ void ModScene::DrawModGui() {
 }
 
 const char *ModScene::ConnectorRoleName(ConnectorRole role) const {
-  // 謗･邯夂せ蠖ｹ蜑ｲ繧定｡ｨ遉ｺ蜷阪∈螟画鋤縺吶ｋ
+  // 接続点役割を表示名へ変換する
   switch (role) {
   case ConnectorRole::Generic:
     return "Generic";
@@ -5325,7 +5440,7 @@ const char *ModScene::ConnectorRoleName(ConnectorRole role) const {
 }
 
 const char *ModScene::SideName(PartSide side) const {
-  // 蟾ｦ蜿ｳ螻樊ｧ繧定｡ｨ遉ｺ蜷阪∈螟画鋤縺吶ｋ
+  // 左右属性を表示名へ変換する
   switch (side) {
   case PartSide::Center:
     return "Center";
@@ -5650,22 +5765,22 @@ Vector3 ModScene::GetControlPointLocalPosition(ModControlPointRole role) const {
 }
 
 bool ModScene::ShouldBlockDebugCameraMouseControl() const {
-  // 驛ｨ菴堺ｻ倥￠譖ｿ縺医ラ繝ｩ繝・げ荳ｭ
+  // 部位付け替えドラッグ中
   if (assemblyDrag_.isDragging) {
     return true;
   }
 
-  // 謫堺ｽ懃せ繝峨Λ繝・げ荳ｭ
+  // 操作点ドラッグ中
   if (isDraggingControlPoint_) {
     return true;
   }
 
-  // 謫堺ｽ懃せ繧帝∈謚樔ｸｭ
+  // 操作点を選択中
   if (selectedControlPointIndex_ >= 0) {
     return true;
   }
 
-  // 繝槭え繧ｹ縺碁Κ菴阪Γ繝・す繝･荳翫↓縺ゅｋ
+  // マウスが部位メッシュ上にある
   if (hoveredPartId_ >= 0) {
     return true;
   }
@@ -6107,9 +6222,9 @@ float ModScene::GetNpcRunTimingSkillByIndex(int index) const {
 }
 
 bool ModScene::IsNpcReachedGoalInModScene(const NpcModProgress &npc) const {
-  // 證ｫ螳壼ｮ溯｣・
-  // ModScene 縺ｫ縺ｯ襍ｰ陦瑚ｷ晞屬縺昴・繧ゅ・縺檎┌縺・・縺ｧ縲・
-  // 蜈郁｡檎ｧｻ蜍墓凾髢薙′荳螳壻ｻ･荳翫↑繧峨後ｂ縺・ざ繝ｼ繝ｫ貂医∩縲阪→縺ｿ縺ｪ縺・
+  // 暫定実装
+  // ModScene には走行距離そのものが無いので、
+  // 先行移動時間が一定以上なら「もうゴール済み」とみなす
   return npc.hasStartedMoving && npc.moveElapsedTime >= modNpcGoalLeadTime_;
 }
 
@@ -6119,7 +6234,7 @@ void ModScene::OpenFailureMenuMod() {
   failureMenuInputCooldown_ = 0.15f;
   selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
 
-  // 螟ｱ謨鈴夂衍繧呈ｶ医☆
+  // 失敗通知を消す
   notifications_.clear();
 }
 
@@ -6321,11 +6436,11 @@ bool ModScene::IsPointInUiButton(const Vector2 &point,
 }
 
 void ModScene::InitializeScreenUi() {
-  // 繝輔Ξ繝ｼ繝逕ｻ蜒・
+  // フレーム画像
   uiFrameTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/frame.png");
 
-  // 繧ｴ繝溽ｮｱ逕ｻ蜒・
+  // ゴミ箱画像
   trashTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/trash.png");
 
@@ -6637,8 +6752,8 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
     return false;
   }
 
-  // 蜑企勁螟ｱ謨玲凾縺ｫ蜈・・隕ｪ繝ｻ蜈・・菴咲ｽｮ縺ｸ謌ｻ縺帙ｋ繧医≧縲・
-  // 蜈医↓ Clear 縺励↑縺・
+  // 削除失敗時に元の親・元の位置へ戻せるよう、
+  // 先に Clear しない
   if (!assembly_.RemovePart(deleteTargetId)) {
     CancelAssemblyDragPlacement();
     return false;
@@ -6676,9 +6791,9 @@ void ModScene::DrawPickBoxesDebug() {
       continue;
     }
 
-    ImU32 color = IM_COL32(80, 180, 255, 220); // 騾壼ｸｸ
+    ImU32 color = IM_COL32(80, 180, 255, 220); // 通常
     if (partId == selectedPartId_) {
-      color = IM_COL32(255, 220, 80, 255); // 驕ｸ謚樔ｸｭ
+      color = IM_COL32(255, 220, 80, 255); // 選択中
     }
     if (partId == hoveredPartId_) {
       color = IM_COL32(255, 120, 80, 255); // Hover

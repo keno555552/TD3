@@ -535,6 +535,16 @@ int ModAssemblyGraph::CountLegRoots() const {
   return count;
 }
 
+int ModAssemblyGraph::CountLegsBySide(PartSide side) const {
+  int count = 0;
+  for (auto it = nodes_.begin(); it != nodes_.end(); ++it) {
+    if (IsLegRoot(it->second.part) && it->second.side == side) {
+      ++count;
+    }
+  }
+  return count;
+}
+
 int ModAssemblyGraph::CountHeads() const {
   int count = 0;
   for (std::unordered_map<int, PartNode>::const_iterator it = nodes_.begin();
@@ -544,6 +554,29 @@ int ModAssemblyGraph::CountHeads() const {
     }
   }
   return count;
+}
+
+void ModAssemblyGraph::RefreshManagedPartIds() {
+  bodyId_ = -1;
+  headId_ = -1;
+  neckId_ = -1;
+
+  for (std::unordered_map<int, PartNode>::const_iterator it = nodes_.begin();
+       it != nodes_.end(); ++it) {
+    if (bodyId_ < 0 && it->second.part == ModBodyPart::ChestBody) {
+      bodyId_ = it->first;
+    }
+    if (headId_ < 0 && it->second.part == ModBodyPart::Head) {
+      headId_ = it->first;
+    }
+    if (neckId_ < 0 && it->second.part == ModBodyPart::Neck) {
+      neckId_ = it->first;
+    }
+
+    if (bodyId_ >= 0 && headId_ >= 0 && neckId_ >= 0) {
+      break;
+    }
+  }
 }
 
 bool ModAssemblyGraph::IsBodyChildPart(ModBodyPart part) const {
@@ -799,6 +832,22 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     }
     break;
   }
+  case ModBodyPart::Head: {
+    // 胴体がない場合に暫定的に頭に接続される際のオフセット
+    switch (childPart) {
+    case ModBodyPart::LeftUpperArm:
+      return {-0.5f, -0.5f, 0.0f};
+    case ModBodyPart::RightUpperArm:
+      return {0.5f, -0.5f, 0.0f};
+    case ModBodyPart::LeftThigh:
+      return {-0.35f, -1.5f, 0.0f};
+    case ModBodyPart::RightThigh:
+      return {0.35f, -1.5f, 0.0f};
+    default:
+      break;
+    }
+    break;
+  }
 
   case ModBodyPart::StomachBody: {
     switch (childPart) {
@@ -839,7 +888,6 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     break;
   }
 
-  case ModBodyPart::Head:
   case ModBodyPart::LeftForeArm:
   case ModBodyPart::RightForeArm:
   case ModBodyPart::LeftShin:
@@ -991,59 +1039,50 @@ void ModAssemblyGraph::NormalizeHeadLinks() {
   RefreshManagedPartIds();
 }
 
-bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
-  return part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
-         part == ModBodyPart::RightUpperArm || part == ModBodyPart::LeftThigh ||
-         part == ModBodyPart::RightThigh;
-}
-
-void ModAssemblyGraph::RefreshManagedPartIds() {
-  bodyId_ = -1;
-  headId_ = -1;
-  neckId_ = -1;
-
-  for (std::unordered_map<int, PartNode>::const_iterator it = nodes_.begin();
-       it != nodes_.end(); ++it) {
-    if (bodyId_ < 0 && it->second.part == ModBodyPart::ChestBody) {
-      bodyId_ = it->first;
-    }
-    if (headId_ < 0 && it->second.part == ModBodyPart::Head) {
-      headId_ = it->first;
-    }
-    if (neckId_ < 0 && it->second.part == ModBodyPart::Neck) {
-      neckId_ = it->first;
-    }
-
-    if (bodyId_ >= 0 && headId_ >= 0 && neckId_ >= 0) {
-      break;
-    }
-  }
-}
-
-bool ModAssemblyGraph::RemoveChildrenRecursive(int partId) {
-  // まず直接の子を取得する
-  const std::vector<int> children = GetChildren(partId);
+bool ModAssemblyGraph::RemoveChildrenRecursive(int parentId) {
+  const std::vector<int> children = GetChildren(parentId);
 
   for (size_t i = 0; i < children.size(); ++i) {
     const int childId = children[i];
 
-    // 子孫を先に削除する
-    if (!RemoveChildrenRecursive(childId)) {
-      return false;
+    auto it = nodes_.find(childId);
+    if (it == nodes_.end()) {
+      continue;
     }
 
-    // 子ノード自体を削除する
-    std::unordered_map<int, PartNode>::iterator childIt = nodes_.find(childId);
-    if (childIt != nodes_.end()) {
-      if (childIt->second.required) {
-        return false;
+    const PartNode &node = it->second;
+
+    // 生存判定を「子孫の処理の前」に行う
+    bool shouldSpare = false;
+    if (node.part == ModBodyPart::Head || node.part == ModBodyPart::Neck) {
+      if (CountHeads() <= 1) {
+        shouldSpare = true;
       }
-      nodes_.erase(childIt);
+    } else if (IsLegRoot(node.part)) {
+      if (CountLegsBySide(node.side) <= 1) {
+        shouldSpare = true;
+      }
+    }
+
+    if (shouldSpare) {
+      // 生存させる場合は、このパーツ以下のツリー全体を切り離して残す
+      DetachPartFromParent(childId);
+      // 子孫の削除は行わない
+    } else {
+      // 子孫を先に再帰削除
+      RemoveChildrenRecursive(childId);
+      // 自分を削除
+      nodes_.erase(childId);
     }
   }
 
-  RefreshManagedPartIds();
   return true;
+}
+
+bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
+  return part == ModBodyPart::Neck || part == ModBodyPart::LeftUpperArm ||
+         part == ModBodyPart::RightUpperArm || part == ModBodyPart::LeftThigh ||
+         part == ModBodyPart::RightThigh;
 }
 
 bool ModAssemblyGraph::RemovePart(int partId) {
@@ -1094,13 +1133,46 @@ bool ModAssemblyGraph::RemovePart(int partId) {
 
   if (target.part == ModBodyPart::ChestBody ||
       target.part == ModBodyPart::StomachBody) {
-    if (!RemoveBodyAttachedLimbsAndReattachOthers(partId)) {
-      return false;
+    // 胴体セット（胸・腹の両方）を削除対象とする
+    // 片方を消す際にもう片方も道連れにする
+    std::vector<int> targets;
+    targets.push_back(partId);
+
+    const ModBodyPart otherPart = (target.part == ModBodyPart::ChestBody)
+                                      ? ModBodyPart::StomachBody
+                                      : ModBodyPart::ChestBody;
+    const int otherId = FindFirstPartId(otherPart, partId);
+    if (otherId >= 0) {
+      targets.push_back(otherId);
     }
 
-    nodes_.erase(partId);
+    for (int tid : targets) {
+      if (nodes_.count(tid) == 0)
+        continue;
+      RemoveChildrenRecursive(tid);
+      nodes_.erase(tid);
+    }
+
     RefreshManagedPartIds();
     NormalizeHeadLinks();
+
+    // 胴体削除後、孤立した足を頭に再接続する
+    const int survivingHeadId = FindFirstPartId(ModBodyPart::Head);
+    if (survivingHeadId >= 0) {
+      std::vector<int> rootIds = GetNodeIdsSorted();
+      for (int rid : rootIds) {
+        if (rid == survivingHeadId) continue;
+        
+        auto it = nodes_.find(rid);
+        if (it != nodes_.end() && it->second.parentId < 0) {
+          // 親なしの脚根元があれば頭につなぐ
+          if (IsLegRoot(it->second.part)) {
+            AttachPartToParent(rid, survivingHeadId);
+          }
+        }
+      }
+    }
+
     return true;
   }
 

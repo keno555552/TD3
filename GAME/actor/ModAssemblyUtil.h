@@ -195,7 +195,8 @@ inline bool CanPartParentChild(ModBodyPart parent, ModBodyPart child) {
   }
 
   const bool parentCanReceive =
-      IsAssemblyRootPart(parent) || parent == ModBodyPart::Head;
+      (IsAssemblyRootPart(parent) && parent != ModBodyPart::Neck) ||
+      parent == ModBodyPart::Head || parent == ModBodyPart::StomachBody;
 
   if (!parentCanReceive || !IsAssemblyRootPart(child)) {
     return false;
