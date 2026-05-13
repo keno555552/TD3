@@ -90,7 +90,7 @@ void SceneManager::Update() {
 
 	SceneChanger();
 
-	// defaultMenu_->Update();
+	 defaultMenu_->Updata();
 
 	if (!defaultMenu_->GetIsPause()) {
 		if (sceneUsing_ != nullptr) {
@@ -106,7 +106,7 @@ void SceneManager::Render() {
 	} else {
 	}
 
-	// defaultMenu_->Draw();
+	 defaultMenu_->Draw();
 
 #ifdef USE_IMGUI
 	ImGuiPart();
