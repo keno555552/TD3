@@ -1445,24 +1445,38 @@ void TravelPlayer::ApplyVisualState() {
       break;
     }
     case ModBodyPart::LeftUpperArm:
-    case ModBodyPart::RightUpperArm:
-      animAngleX = -oppositeAngle * armSwingScale;
+    case ModBodyPart::RightUpperArm: {
+      float swing = -oppositeAngle;
+      if (swing > 0.0f) swing *= 1.6f;
+      animAngleX = swing * armSwingScale;
       break;
+    }
     case ModBodyPart::LeftForeArm:
     case ModBodyPart::RightForeArm: {
-      float upperArmSwing = -oppositeAngle * armSwingScale;
+      float swing = -oppositeAngle;
+      if (swing > 0.0f) swing *= 1.6f;
+      float upperArmSwing = swing * armSwingScale;
       float elbowFold = std::clamp((oppositeAngle - legKickAngle_) /
                                        (legRecoverAngle_ - legKickAngle_),
                                    0.0f, 1.0f);
-      animAngleX = -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+      animAngleX = -(upperArmSwing * 0.35f + elbowFold * 0.70f + 0.30f);
       break;
     }
     case ModBodyPart::LeftThigh:
-    case ModBodyPart::RightThigh:
+    case ModBodyPart::RightThigh: {
+      if (baseAngleX < 0.0f && driveAngle < 0.0f) {
+        float kickRatio = driveAngle / legKickAngle_;
+        baseAngleX = std::lerp(baseAngleX, 0.0f, kickRatio * 0.85f);
+      }
       animAngleX = -driveAngle * thighSwingScale + bodyTilt_;
       break;
+    }
     case ModBodyPart::LeftShin:
     case ModBodyPart::RightShin: {
+      if (baseAngleX > 0.0f && driveAngle < 0.0f) {
+        float kickRatio = driveAngle / legKickAngle_;
+        baseAngleX = std::lerp(baseAngleX, 0.0f, kickRatio * 0.85f);
+      }
       float thighSwing = -driveAngle * thighSwingScale;
       float kneeFold = std::clamp((driveAngle - legKickAngle_) /
                                       (legRecoverAngle_ - legKickAngle_),
@@ -2268,26 +2282,36 @@ float TravelPlayer::ComputeExtraAnimAngleX(ModBodyPart partType) const {
   const float thighSwingScale = 0.70f;
 
   switch (partType) {
-  case ModBodyPart::LeftUpperArm:
-    return -rightLegBend_ * armSwingScale;
+  case ModBodyPart::LeftUpperArm: {
+    float swing = -rightLegBend_;
+    if (swing > 0.0f) swing *= 1.6f;
+    return swing * armSwingScale;
+  }
 
-  case ModBodyPart::RightUpperArm:
-    return -leftLegBend_ * armSwingScale;
+  case ModBodyPart::RightUpperArm: {
+    float swing = -leftLegBend_;
+    if (swing > 0.0f) swing *= 1.6f;
+    return swing * armSwingScale;
+  }
 
   case ModBodyPart::LeftForeArm: {
-    float upperArmSwing = -rightLegBend_ * armSwingScale;
+    float swing = -rightLegBend_;
+    if (swing > 0.0f) swing *= 1.6f;
+    float upperArmSwing = swing * armSwingScale;
     float elbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
                                      (legRecoverAngle_ - legKickAngle_),
                                  0.0f, 1.0f);
-    return -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+    return -(upperArmSwing * 0.35f + elbowFold * 0.70f + 0.30f);
   }
 
   case ModBodyPart::RightForeArm: {
-    float upperArmSwing = -leftLegBend_ * armSwingScale;
+    float swing = -leftLegBend_;
+    if (swing > 0.0f) swing *= 1.6f;
+    float upperArmSwing = swing * armSwingScale;
     float elbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
                                      (legRecoverAngle_ - legKickAngle_),
                                  0.0f, 1.0f);
-    return -(upperArmSwing * 0.35f + elbowFold * 0.45f);
+    return -(upperArmSwing * 0.35f + elbowFold * 0.70f + 0.30f);
   }
 
   case ModBodyPart::LeftThigh:

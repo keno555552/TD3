@@ -247,6 +247,10 @@ TravelScene::~TravelScene() {
 
   bitmapFont.Cleanup();
 
+  player_.reset();
+  npcManager_.reset();
+  grounds_.clear();
+
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
   for (auto &obj : npcDebugCpObjects_) {
