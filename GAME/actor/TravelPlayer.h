@@ -98,7 +98,7 @@ public:
   float maxBackwardTilt_ = 0.20f;
   float legDiffTiltPower_ = 0.08f;
 
-  float legKickAngle_ = -0.55f;
+  float legKickAngle_ = -1.15f;
   float legRecoverAngle_ = 0.85f;
   float legFollowPower_ = 0.18f;
   float legMaxSpeed_ = 0.12f;
