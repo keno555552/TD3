@@ -1346,9 +1346,7 @@ void TravelPlayer::ApplyVisualState() {
     float baseAngleY = instance.localTransform.rotate.y;
     float baseAngleZ = instance.localTransform.rotate.z;
     if (instance.partType != ModBodyPart::ChestBody &&
-        instance.partType != ModBodyPart::StomachBody &&
-        instance.partType != ModBodyPart::Neck &&
-        instance.partType != ModBodyPart::Head) {
+        instance.partType != ModBodyPart::StomachBody) {
 
       int snapshotOwnerId = GetExtraSnapshotOwnerId(
           instance.partType, instance.partId, instance.parentId);
@@ -1367,9 +1365,7 @@ void TravelPlayer::ApplyVisualState() {
           }
         }
         if (parentType != ModBodyPart::ChestBody &&
-            parentType != ModBodyPart::StomachBody &&
-            parentType != ModBodyPart::Neck &&
-            parentType != ModBodyPart::Head) {
+            parentType != ModBodyPart::StomachBody) {
           int parentOwnerId =
               GetExtraSnapshotOwnerId(parentType, instance.parentId, -1);
           ComputeExtraBaseAngles(parentType, parentOwnerId, parentAbsX,
@@ -2233,6 +2229,7 @@ bool TravelPlayer::ComputeExtraBaseAngles(ModBodyPart partType,
   Vector3 to = snapBend;
 
   switch (partType) {
+  case ModBodyPart::Head:
   case ModBodyPart::LeftForeArm:
   case ModBodyPart::RightForeArm:
   case ModBodyPart::LeftShin:
@@ -2248,6 +2245,11 @@ bool TravelPlayer::ComputeExtraBaseAngles(ModBodyPart partType,
   }
 
   Vector3 vec = {to.x - from.x, to.y - from.y, to.z - from.z};
+  if (partType == ModBodyPart::Head || partType == ModBodyPart::Neck) {
+    vec.x = -vec.x;
+    vec.y = -vec.y;
+    vec.z = -vec.z;
+  }
   float length = Length(vec);
 
   if (length < 0.0001f) {
