@@ -54,6 +54,8 @@ public:
   /// </summary>
   ~ModScene();
 
+  static void ResetTutorialFlag();
+
   /// <summary>
   /// シーンの更新処理
   /// 入力処理、構造変更、見た目反映、共有データ同期、シーン遷移管理を行う
@@ -144,6 +146,10 @@ private:
   Fade fade_;                      // シーン開始・終了時のフェード演出
   bool isStartTransition_ = false; // フェードアウトによる遷移を開始したかどうか
   std::string selectedPrompt_;     // 現在のお題文
+
+  bool isTutorialMode_;
+  std::unique_ptr<SimpleSprite> tutorialBgSprite_;
+  int whiteTextureHandle_ = 0;
 
   int selectedPartId_ = -1;      // 現在選択中の部位ID
   int reattachParentId_ = -1;    // 付け替え先として選択中の親部位ID
