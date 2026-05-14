@@ -204,6 +204,7 @@ ContestScene::ContestScene(kEngine *system) {
 
   customizedBodyActor_.Initialize(system_);
 
+  //プレイヤーのモデルを再構築
   if (playerData != nullptr) {
     customizedBodyActor_.SetActorScale({0.03f, 0.03f, 0.03f});
     customizedBodyActor_.SetActorTranslate({0.0f, 0.0f, -0.2f});

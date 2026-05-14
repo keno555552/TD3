@@ -33,6 +33,8 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 	fgStar_.Initialize(system_, kCx, kCy);
 	fgStar_.SetStars(1, 1, 1, 1, 1);
 	fgStar_.SetColor({ 1.0f, 0.808f, 0.0f, 1.0f });
+	// 5軸×★1〜5の基準ドット（fgStar_ で有効化 → 最前面に表示）
+	fgStar_.EnableLevelDots({ 0.0f, 0.0f, 0.0f, 1.0f });
 
 	cameraTransform_ = { { 0.6f, 0.7f, -3.0f }, { 0.0f, 0.0f, 0.0f } };
 

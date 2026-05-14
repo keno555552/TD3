@@ -112,10 +112,54 @@ void StarChart::SetColor(const Vector4& color) {
 	}
 }
 
+void StarChart::EnableLevelDots(const Vector4& color) {
+	const float halfSize = kDotSize * 0.5f;
+	int dotIdx = 0;
+
+	for (int axis = 0; axis < 5; ++axis) {
+		float angle = (kTwoPi / 5.0f) * axis - kHalfPi;
+
+		for (int level = 1; level <= 5; ++level) {
+			// ★level の apex 半径と同じ式（kMinStarRatio〜1.0 の線形補間）
+			float t = (level - 1) / 4.0f;
+			float r = kMaxRadius * (kMinStarRatio + t * (1.0f - kMinStarRatio));
+
+			float x = centerX_ + r * cosf(angle);
+			float y = centerY_ + r * sinf(angle);
+
+			// 既存があれば差し替え
+			if (dots_[dotIdx]) {
+				delete dots_[dotIdx];
+			}
+			dots_[dotIdx] = new SimpleSprite;
+			dots_[dotIdx]->IntObject(system_);
+			dots_[dotIdx]->CreateDefaultData();
+			dots_[dotIdx]->objectParts_[0].materialConfig->textureHandle   = textureHandle_;
+			dots_[dotIdx]->objectParts_[0].materialConfig->useModelTexture = false;
+			dots_[dotIdx]->objectParts_[0].materialConfig->textureColor    = color;
+
+			// (x, y) を中心に kDotSize × kDotSize の四角形
+			auto& c = dots_[dotIdx]->objectParts_[0].conerData.coner;
+			c[(int)CornerName::TOP_LEFT]     = { x - halfSize, y - halfSize };
+			c[(int)CornerName::BOTTOM_LEFT]  = { x - halfSize, y + halfSize };
+			c[(int)CornerName::BOTTOM_RIGHT] = { x + halfSize, y + halfSize };
+			c[(int)CornerName::TOP_RIGHT]    = { x + halfSize, y - halfSize };
+
+			dotIdx++;
+		}
+	}
+}
+
 void StarChart::Draw() {
 	for (int i = 0; i < 5; ++i) {
 		if (triangles_[i]) {
 			triangles_[i]->Draw();
+		}
+	}
+	// ドットは星形より後に描画して手前に出す
+	for (int i = 0; i < 25; ++i) {
+		if (dots_[i]) {
+			dots_[i]->Draw();
 		}
 	}
 }
@@ -124,5 +168,9 @@ void StarChart::Cleanup() {
 	for (int i = 0; i < 5; ++i) {
 		delete triangles_[i];
 		triangles_[i] = nullptr;
+	}
+	for (int i = 0; i < 25; ++i) {
+		delete dots_[i];
+		dots_[i] = nullptr;
 	}
 }

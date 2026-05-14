@@ -37,6 +37,12 @@ public:
 	void SetColor(const Vector4& color);
 
 	/// <summary>
+	/// 5軸×★1〜5の25個の基準ドットを表示する。指定色で表示。
+	/// 一度有効化すると Cleanup までドットが描画される。
+	/// </summary>
+	void EnableLevelDots(const Vector4& color);
+
+	/// <summary>
 	/// 描画
 	/// </summary>
 	void Draw();
@@ -49,7 +55,11 @@ public:
 private:
 	kEngine* system_ = nullptr;
 	SimpleSprite* triangles_[5] = {};
+	SimpleSprite* dots_[25] = {};   /// 5軸×5レベル
 	int textureHandle_ = 0;
+
+	/// ドット1辺のサイズ（ピクセル）
+	static constexpr float kDotSize = 8.0f;
 
 	float centerX_ = 0.0f;
 	float centerY_ = 0.0f;
