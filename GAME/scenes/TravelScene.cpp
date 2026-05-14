@@ -31,12 +31,20 @@ std::string GetRankText(int rank) {
 
 } // namespace
 
+static bool s_hasSeenTravelTutorial = false;
+
+void TravelScene::ResetTutorialFlag() {
+  s_hasSeenTravelTutorial = false;
+}
+
 TravelScene::TravelScene(kEngine *system) {
   player_ = std::make_unique<TravelPlayer>(system);
   npcManager_ = std::make_unique<TravelNpcManager>(system);
   player_->Initialize(-18.0f);
   Logger::Log("TravelScene ctor");
   system_ = system;
+
+  isTutorialMode_ = !s_hasSeenTravelTutorial;
 
   //===============================
   // ライト
@@ -202,6 +210,19 @@ TravelScene::TravelScene(kEngine *system) {
   startUITextTimer_ = 4.0f; // 表示時間
 
   //===============================
+  // チュートリアルUI
+  //===============================
+  whiteTextureHandle_ = system_->LoadTexture("kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
+  tutorialBgSprite_ = std::make_unique<SimpleSprite>();
+  tutorialBgSprite_->IntObject(system_);
+  tutorialBgSprite_->CreateDefaultData();
+  tutorialBgSprite_->objectParts_[0].materialConfig->textureHandle = whiteTextureHandle_;
+  tutorialBgSprite_->mainPosition.transform.translate = {0.0f, 0.0f, 0.01f}; // Zは手前
+  tutorialBgSprite_->mainPosition.transform.scale = {2000.0f, 2000.0f, 1.0f};
+  tutorialBgSprite_->objectParts_[0].materialConfig->textureColor = {0.0f, 0.0f, 0.0f, 0.7f}; // 半透明の黒
+
+
+  //===============================
   // NPC
   //===============================
   npcManager_->npcModelHandle_ =
@@ -225,6 +246,17 @@ TravelScene::TravelScene(kEngine *system) {
   isFailureMenuOpen_ = false;
   failureMenuInputCooldown_ = 0.0f;
   selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+
+  //===============================
+  // 初回フレームの座標(0,0,0)バグ対策
+  //===============================
+  CameraPart();
+  for (int i = 0; i < 10; ++i) {
+    player_->ApplyVisualState();
+    player_->ResolveVisualGroundPenetration();
+  }
+  player_->ApplyVisualState();
+  npcManager_->UpdateNpcRunners(0.0f, goalX_, usingCamera_);
 }
 
 TravelScene::~TravelScene() {
@@ -270,6 +302,19 @@ void TravelScene::Update() {
   //===============================
   if (isStartTransition_) {
     UpdateSceneTransition();
+    return;
+  }
+
+  //===============================
+  // チュートリアル入力待ち
+  //===============================
+  if (isTutorialMode_) {
+    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN)) {
+      isTutorialMode_ = false;
+      s_hasSeenTravelTutorial = true;
+    }
+    fade_.Update(usingCamera_);
+    tutorialBgSprite_->Update(nullptr);
     return;
   }
 
@@ -532,6 +577,23 @@ void TravelScene::Draw() {
 
   spriteA_->Draw();
   spriteD_->Draw();
+
+  //===============================
+  // チュートリアル描画
+  //===============================
+  if (isTutorialMode_) {
+    tutorialBgSprite_->Draw();
+
+    bitmapFont.RenderText(
+        "AキーとDキーを こうごに おして はしれ！", {640.0f, 320.0f},
+        48.0f, BitmapFont::Align::Center, 5.0f,
+        {1.0f, 1.0f, 1.0f, 1.0f});
+
+    bitmapFont.RenderText(
+        "[SPACE]キー または [ENTER]キー で スタート", {640.0f, 480.0f},
+        32.0f, BitmapFont::Align::Center, 5.0f,
+        {1.0f, 1.0f, 0.5f, 1.0f});
+  }
 
   // フェード描画
   fade_.Draw();
