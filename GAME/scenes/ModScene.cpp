@@ -860,8 +860,9 @@ Matrix4x4 MulMatrix4x4(const Matrix4x4 &a, const Matrix4x4 &b) {
   Matrix4x4 result{};
   for (int row = 0; row < 4; ++row) {
     for (int col = 0; col < 4; ++col) {
-      result.m[row][col] = a.m[row][0] * b.m[0][col] + a.m[row][1] * b.m[1][col] +
-                           a.m[row][2] * b.m[2][col] + a.m[row][3] * b.m[3][col];
+      result.m[row][col] =
+          a.m[row][0] * b.m[0][col] + a.m[row][1] * b.m[1][col] +
+          a.m[row][2] * b.m[2][col] + a.m[row][3] * b.m[3][col];
     }
   }
   return result;
@@ -936,6 +937,10 @@ float AxisScaleLength(const Vector3 &axis) {
 }
 
 } // namespace
+
+static bool s_hasSeenModTutorial = false;
+
+void ModScene::ResetTutorialFlag() { s_hasSeenModTutorial = false; }
 
 ModScene::ModScene(kEngine *system) {
   // エンジン本体を保持する
@@ -1037,6 +1042,21 @@ ModScene::ModScene(kEngine *system) {
   // 画面UIを初期化する
   InitializeScreenUi();
 
+  // チュートリアル
+  isTutorialMode_ = !s_hasSeenModTutorial;
+  whiteTextureHandle_ = system_->LoadTexture(
+      "kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
+  tutorialBgSprite_ = std::make_unique<SimpleSprite>();
+  tutorialBgSprite_->IntObject(system_);
+  tutorialBgSprite_->CreateDefaultData();
+  tutorialBgSprite_->objectParts_[0].materialConfig->textureHandle =
+      whiteTextureHandle_;
+  tutorialBgSprite_->mainPosition.transform.translate = {0.0f, 0.0f,
+                                                         0.01f}; // Zは手前
+  tutorialBgSprite_->mainPosition.transform.scale = {2000.0f, 2000.0f, 1.0f};
+  tutorialBgSprite_->objectParts_[0].materialConfig->textureColor = {
+      0.0f, 0.0f, 0.0f, 0.7f}; // 半透明の黒
+
   pendingFailureOutcome_ = SceneOutcome::NONE;
 }
 
@@ -1063,6 +1083,20 @@ void ModScene::Update() {
 
   // 画面UIの状態を更新する
   UpdateScreenUi();
+
+  //===============================
+  // チュートリアル入力待ち
+  //===============================
+  if (isTutorialMode_) {
+    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN)) {
+      isTutorialMode_ = false;
+      s_hasSeenModTutorial = true;
+    }
+    UpdateModObjects();
+    fade_.Update(usingCamera_);
+    tutorialBgSprite_->Update(nullptr);
+    return;
+  }
 
   // 失敗メニューが開いている場合は、3D操作は行わずにメニューの更新と遷移処理だけ行う
   if (isFailureMenuOpen_) {
@@ -1231,6 +1265,19 @@ void ModScene::Draw() {
 
   // 失敗メニューが開いている場合は、メニューを描画する
   DrawFailureMenuMod();
+
+  //===============================
+  // チュートリアル描画
+  //===============================
+  if (isTutorialMode_) {
+    tutorialBgSprite_->Draw();
+    bitmapFont_.RenderText(
+        "パーツをドラッグしたりサイズを変えて 体を改造しろ！", {640.0f, 360.0f},
+        48.0f, BitmapFont::Align::Center, 4, {1.0f, 1.0f, 1.0f, 1.0f});
+    bitmapFont_.RenderText("[SPACE]キー または [ENTER]キー で スタート",
+                           {640.0f, 480.0f}, 36.0f, BitmapFont::Align::Center,
+                           4, {1.0f, 1.0f, 0.5f, 1.0f});
+  }
 
   // フェードを描画する
   fade_.Draw();
@@ -2547,7 +2594,8 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
       continue;
     }
 
-    const Vector3 worldPos = body.GetControlPointWorldPosition(object, pointIndex);
+    const Vector3 worldPos =
+        body.GetControlPointWorldPosition(object, pointIndex);
     const float influenceRadius = points[pointIndex].radius;
     const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
 
@@ -3809,12 +3857,14 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
     return false;
   }
 
-  // 1. まず現在選択中部位の操作点（ギズモ）のいずれかにマウスが乗っているかチェックする
+  // 1.
+  // まず現在選択中部位の操作点（ギズモ）のいずれかにマウスが乗っているかチェックする
   if (IsMouseRayOverSelectedGizmo(mouseRay)) {
     return true;
   }
 
-  // 2. ギズモに当たっていなければ、従来の部位当たり判定（SegmentBox）をチェックする
+  // 2.
+  // ギズモに当たっていなければ、従来の部位当たり判定（SegmentBox）をチェックする
   if (selectedControlPartId_ == -2) {
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const int partId = orderedPartIds_[i];
@@ -3902,10 +3952,11 @@ bool ModScene::IsMouseRayOverSelectedGizmo(const Ray &mouseRay) const {
           continue;
         }
 
-        const Vector3 worldPos = body.GetControlPointWorldPosition(
-            itObj->second.get(), i);
+        const Vector3 worldPos =
+            body.GetControlPointWorldPosition(itObj->second.get(), i);
         const float influenceRadius = points[i].radius;
-        const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+        const float drawRadius =
+            GetControlPointGizmoDrawRadius(influenceRadius);
         const Vector3 toCamera =
             NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
         const Vector3 drawPos =
@@ -4591,12 +4642,12 @@ void ModScene::ApplyAssemblyDragPreview() {
 
   const PartNode *rootNode = assembly_.FindNode(rootId);
   bool isBodyDrag = (rootNode != nullptr &&
-                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
-                        ModAssemblyType::Body);
+                     ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                         ModAssemblyType::Body);
 
   if (isBodyDrag) {
     // 胴体ドラッグの場合は、すべての胴体パーツと操作点を連動させる
-    for (auto const& [id, beforePos] : assemblyDrag_.beforeBodyTranslations) {
+    for (auto const &[id, beforePos] : assemblyDrag_.beforeBodyTranslations) {
       assembly_.SetPartLocalTranslate(id, Add(beforePos, delta));
     }
 
@@ -4665,16 +4716,16 @@ bool ModScene::IsPartInDraggingAssembly(int partId) const {
   const int rootId = assemblyDrag_.assemblyRootPartId;
   const PartNode *rootNode = assembly_.FindNode(rootId);
   bool isBodyDrag = (rootNode != nullptr &&
-                    ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
-                        ModAssemblyType::Body);
+                     ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
+                         ModAssemblyType::Body);
 
   if (isBodyDrag) {
     // 胴体ドラッグ時は、全胴体パーツのいずれかの下にあれば true
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
     for (int id : allIds) {
       const PartNode *node = assembly_.FindNode(id);
-      if (node != nullptr &&
-          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+      if (node != nullptr && ModAssemblyUtil::GetAssemblyType(node->part) ==
+                                 ModAssemblyType::Body) {
         if (ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, id, partId)) {
           return true;
         }
@@ -4713,15 +4764,15 @@ void ModScene::CancelAssemblyDragPlacement() {
   }
 
   bool isBodyDrag = (ModAssemblyUtil::GetAssemblyType(rootNode->part) ==
-                    ModAssemblyType::Body);
+                     ModAssemblyType::Body);
 
   if (isBodyDrag) {
     // 胴体ドラッグ時はすべて復元
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
     for (int id : allIds) {
       const PartNode *node = assembly_.FindNode(id);
-      if (node != nullptr &&
-          ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+      if (node != nullptr && ModAssemblyUtil::GetAssemblyType(node->part) ==
+                                 ModAssemblyType::Body) {
         // 胴体パーツは通常 (0,0,0) で保存されているはずだが、
         // 念のため Root の開始座標をセットする（通常は (0,0,0)）
         // 胴体パーツ間で初期座標が異なる可能性に備えるなら本来は個別保持が必要。
@@ -5105,7 +5156,8 @@ ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
     return ZeroV();
   }
 
-  // 胴体操作点は、localPosition 自体がアセンブリ空間での絶対座標として扱われているため、
+  // 胴体操作点は、localPosition
+  // 自体がアセンブリ空間での絶対座標として扱われているため、
   // オブジェクトのワールド変換を適用せずにそのまま返す。
   // そうしないと、アセンブリドラッグ中に移動量が二重に加算されてしまう。
   return torsoControlPoints_[static_cast<size_t>(pointIndex)].localPosition;
@@ -6706,7 +6758,8 @@ bool ModScene::TryHandleAddButtonInteraction() {
           // ドラッグ開始時の状態を現在のマウス位置に合わせて上書き
           assemblyDrag_.beforeLocalTranslate = localPos;
           assemblyDrag_.previewLocalTranslate = localPos;
-          assemblyDrag_.dragPlanePoint = hitPoint; // 今のマウス位置を移動の起点にする
+          assemblyDrag_.dragPlanePoint =
+              hitPoint; // 今のマウス位置を移動の起点にする
 
           // 即座にパーツ位置を更新
           assembly_.SetPartLocalTranslate(newId, localPos);

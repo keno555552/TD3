@@ -1,10 +1,12 @@
 #include "TitleScene.h"
 #include "TravelScene.h"
+#include "ModScene.h"
 
 TitleScene::TitleScene(kEngine* system) {
 	system_ = system;
 
 	TravelScene::ResetTutorialFlag();
+	ModScene::ResetTutorialFlag();
 
 	// 最低限のライト
 	light1_ = new Light;
