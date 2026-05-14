@@ -1085,25 +1085,45 @@ bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
          part == ModBodyPart::RightThigh;
 }
 
+bool ModAssemblyGraph::CanRemovePart(int partId) const {
+  std::unordered_map<int, PartNode>::const_iterator it = nodes_.find(partId);
+  if (it == nodes_.end()) {
+    return false;
+  }
+
+  const PartNode &target = it->second;
+
+  // 必須部位は削除不可
+  if (target.required) {
+    return false;
+  }
+
+  // 頭部セット（頭または首）の削除制約: 最後の1セットは削除禁止
+  if (target.part == ModBodyPart::Head || target.part == ModBodyPart::Neck) {
+    if (CountHeads() <= 1) {
+      return false;
+    }
+  }
+
+  // 脚部セットの削除制約: 左右1セット（計2セット）以上必要
+  if (IsLegRoot(target.part) && CountLegRoots() <= 2) {
+    return false;
+  }
+
+  return true;
+}
+
 bool ModAssemblyGraph::RemovePart(int partId) {
   std::unordered_map<int, PartNode>::iterator it = nodes_.find(partId);
   if (it == nodes_.end()) {
     return false;
   }
 
-  PartNode originalTarget = it->second;
-  PartNode target = originalTarget;
-
-  // 削除前に「元の要求」が Head セット削除かどうかを記録しておく
-  const bool isHeadSetDeleteRequest =
-      (originalTarget.part == ModBodyPart::Head ||
-       originalTarget.part == ModBodyPart::Neck);
-
   // Head 単体を指定された場合は Neck を削除対象に昇格する
-  if (target.part == ModBodyPart::Head) {
-    if (target.parentId >= 0 && nodes_.count(target.parentId) > 0) {
+  if (it->second.part == ModBodyPart::Head) {
+    if (it->second.parentId >= 0) {
       std::unordered_map<int, PartNode>::const_iterator parentIt =
-          nodes_.find(target.parentId);
+          nodes_.find(it->second.parentId);
       if (parentIt != nodes_.end() &&
           parentIt->second.part == ModBodyPart::Neck) {
         partId = parentIt->second.id;
@@ -1111,25 +1131,16 @@ bool ModAssemblyGraph::RemovePart(int partId) {
         if (it == nodes_.end()) {
           return false;
         }
-        target = it->second;
       }
     }
   }
 
-  if (target.required) {
+  // 削除可能かどうかを判定
+  if (!CanRemovePart(partId)) {
     return false;
   }
 
-  // Head セットは常に 1 セット以上必要
-  // Head を直接掴んだ場合も Neck を掴んだ場合も、最後の1セットは削除禁止
-  if (isHeadSetDeleteRequest && CountHeads() <= 1) {
-    return false;
-  }
-
-  // 足セットは左右1セットずつ、計2セット以上必要
-  if (IsLegRoot(target.part) && CountLegRoots() <= 2) {
-    return false;
-  }
+  PartNode target = it->second;
 
   if (target.part == ModBodyPart::ChestBody ||
       target.part == ModBodyPart::StomachBody) {

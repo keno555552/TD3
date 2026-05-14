@@ -160,6 +160,8 @@ private:
   size_t activeControlPointGizmoCount_ = 0; // 今フレーム描画する球の数
 
   bool isDraggingControlPoint_ = false; // 左ドラッグ中かどうか
+  Vector2 mouseTriggerPos_{};           // クリックした瞬間のマウス座標
+  bool isPendingAssemblyDrag_ = false;  // ドラッグの遊び判定中かどうか
   float dragControlPlaneZ_ = 0.0f;      // ドラッグ時に固定する Z 平面
   Vector3 dragControlPointOffset_{0.0f, 0.0f, 0.0f}; // 掴んだ位置との差分
 
@@ -533,6 +535,7 @@ private:
   /// <param name="mouseRay">マウス位置から作成した Ray</param>
   /// <returns>範囲内なら true</returns>
   bool IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const;
+  bool IsMouseRayOverSelectedGizmo(const Ray &mouseRay) const;
 
   /// <summary>
   /// 透過処理用のフェードグループIDを返す

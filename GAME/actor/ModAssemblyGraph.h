@@ -108,6 +108,11 @@ public:
   bool RemovePart(int partId);
 
   /// <summary>
+  /// 指定した部位が削除可能かどうかを判定する
+  /// </summary>
+  bool CanRemovePart(int partId) const;
+
+  /// <summary>
   /// 指定した部位の親を変更する（付け替え）
   /// </summary>
   /// <param name="newParentConnectorId">-1 の場合は自動選択</param>
