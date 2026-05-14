@@ -1,7 +1,10 @@
 #include "TitleScene.h"
+#include "TravelScene.h"
 
 TitleScene::TitleScene(kEngine* system) {
 	system_ = system;
+
+	TravelScene::ResetTutorialFlag();
 
 	// 最低限のライト
 	light1_ = new Light;

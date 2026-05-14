@@ -197,10 +197,10 @@ void TravelNpcManager::UpdateNpcRunners(float deltaTime, float goalX, Camera* ca
 
     if (!npc.started) {
       npc.startDelay -= deltaTime;
-      if (npc.startDelay <= 0.0f) {
-        npc.started = true;
+      if (npc.startDelay > 0.0f) {
+        continue;
       }
-      continue;
+      npc.started = true;
     }
 
     // if (npc.finished) {

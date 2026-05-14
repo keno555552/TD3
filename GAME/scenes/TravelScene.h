@@ -16,6 +16,8 @@ public:
   TravelScene(kEngine *system);
   ~TravelScene();
 
+  static void ResetTutorialFlag();
+
   void Update() override;
 
   void Draw() override;
@@ -152,6 +154,11 @@ private:
   float dKeyFlashTimer_ = 0.0f;
 
   float startUITextTimer_ = 0.0f;
+
+  // チュートリアル用
+  bool isTutorialMode_;
+  std::unique_ptr<SimpleSprite> tutorialBgSprite_;
+  int whiteTextureHandle_ = 0;
 
   /* 失敗時のリトライ選択
   ---------------------------*/
