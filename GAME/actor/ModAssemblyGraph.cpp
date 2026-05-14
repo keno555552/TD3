@@ -1085,25 +1085,45 @@ bool ModAssemblyGraph::ShouldCascadeDeleteChildren(ModBodyPart part) const {
          part == ModBodyPart::RightThigh;
 }
 
+bool ModAssemblyGraph::CanRemovePart(int partId) const {
+  std::unordered_map<int, PartNode>::const_iterator it = nodes_.find(partId);
+  if (it == nodes_.end()) {
+    return false;
+  }
+
+  const PartNode &target = it->second;
+
+  // 必須部位は削除不可
+  if (target.required) {
+    return false;
+  }
+
+  // 頭部セット（頭または首）の削除制約: 最後の1セットは削除禁止
+  if (target.part == ModBodyPart::Head || target.part == ModBodyPart::Neck) {
+    if (CountHeads() <= 1) {
+      return false;
+    }
+  }
+
+  // 脚部セットの削除制約: 左右1セット（計2セット）以上必要
+  if (IsLegRoot(target.part) && CountLegRoots() <= 2) {
+    return false;
+  }
+
+  return true;
+}
+
 bool ModAssemblyGraph::RemovePart(int partId) {
   std::unordered_map<int, PartNode>::iterator it = nodes_.find(partId);
   if (it == nodes_.end()) {
     return false;
   }
 
-  PartNode originalTarget = it->second;
-  PartNode target = originalTarget;
-
-  // 削除前に「元の要求」が Head セット削除かどうかを記録しておく
-  const bool isHeadSetDeleteRequest =
-      (originalTarget.part == ModBodyPart::Head ||
-       originalTarget.part == ModBodyPart::Neck);
-
   // Head 単体を指定された場合は Neck を削除対象に昇格する
-  if (target.part == ModBodyPart::Head) {
-    if (target.parentId >= 0 && nodes_.count(target.parentId) > 0) {
+  if (it->second.part == ModBodyPart::Head) {
+    if (it->second.parentId >= 0) {
       std::unordered_map<int, PartNode>::const_iterator parentIt =
-          nodes_.find(target.parentId);
+          nodes_.find(it->second.parentId);
       if (parentIt != nodes_.end() &&
           parentIt->second.part == ModBodyPart::Neck) {
         partId = parentIt->second.id;
@@ -1111,25 +1131,16 @@ bool ModAssemblyGraph::RemovePart(int partId) {
         if (it == nodes_.end()) {
           return false;
         }
-        target = it->second;
       }
     }
   }
 
-  if (target.required) {
+  // 削除可能かどうかを判定
+  if (!CanRemovePart(partId)) {
     return false;
   }
 
-  // Head セットは常に 1 セット以上必要
-  // Head を直接掴んだ場合も Neck を掴んだ場合も、最後の1セットは削除禁止
-  if (isHeadSetDeleteRequest && CountHeads() <= 1) {
-    return false;
-  }
-
-  // 足セットは左右1セットずつ、計2セット以上必要
-  if (IsLegRoot(target.part) && CountLegRoots() <= 2) {
-    return false;
-  }
+  PartNode target = it->second;
 
   if (target.part == ModBodyPart::ChestBody ||
       target.part == ModBodyPart::StomachBody) {
@@ -1453,9 +1464,9 @@ Vector3 ModAssemblyGraph::ComputeWorldPosition(int partId) const {
   return AddV(parentPos, Mul(parentScale, node.localTransform.translate));
 }
 
-bool ModAssemblyGraph::AddArmAssembly(PartSide side) {
+int ModAssemblyGraph::AddArmAssembly(PartSide side) {
   if (side != PartSide::Left && side != PartSide::Right) {
-    return false;
+    return -1;
   }
 
   int parentId = -1;
@@ -1465,7 +1476,7 @@ bool ModAssemblyGraph::AddArmAssembly(PartSide side) {
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
     parentId = headId_;
   } else {
-    return false;
+    return -1;
   }
 
   const ModBodyPart upper = (side == PartSide::Left)
@@ -1476,12 +1487,12 @@ bool ModAssemblyGraph::AddArmAssembly(PartSide side) {
 
   const int upperId = AddPart(upper, side, parentId, false);
   AddPart(fore, side, upperId, false);
-  return true;
+  return upperId;
 }
 
-bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
+int ModAssemblyGraph::AddLegAssembly(PartSide side) {
   if (side != PartSide::Left && side != PartSide::Right) {
-    return false;
+    return -1;
   }
 
   int parentId = -1;
@@ -1495,7 +1506,7 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
   } else if (headId_ >= 0 && nodes_.count(headId_) > 0) {
     parentId = headId_;
   } else {
-    return false;
+    return -1;
   }
 
   const ModBodyPart thigh = (side == PartSide::Left) ? ModBodyPart::LeftThigh
@@ -1505,10 +1516,10 @@ bool ModAssemblyGraph::AddLegAssembly(PartSide side) {
 
   const int thighId = AddPart(thigh, side, parentId, false);
   AddPart(shin, side, thighId, false);
-  return true;
+  return thighId;
 }
 
-bool ModAssemblyGraph::AddNeckPart() {
+int ModAssemblyGraph::AddNeckPart() {
   RefreshManagedPartIds();
 
   int parentId = -1;
@@ -1519,7 +1530,7 @@ bool ModAssemblyGraph::AddNeckPart() {
   const int newNeckId =
       AddPart(ModBodyPart::Neck, PartSide::Center, parentId, false);
   if (newNeckId < 0) {
-    return false;
+    return -1;
   }
 
   const int newHeadId =
@@ -1527,22 +1538,22 @@ bool ModAssemblyGraph::AddNeckPart() {
   if (newHeadId < 0) {
     nodes_.erase(newNeckId);
     RefreshManagedPartIds();
-    return false;
+    return -1;
   }
 
   RefreshManagedPartIds();
-  return true;
+  return newNeckId;
 }
 
-bool ModAssemblyGraph::AddHeadPart() {
+int ModAssemblyGraph::AddHeadPart() {
   // 互換用。頭単体ではなく頭首セット追加へ統一する
   return AddNeckPart();
 }
 
-bool ModAssemblyGraph::AddBodyPart() {
-  // Body が既に存在する場合は追加しない
+int ModAssemblyGraph::AddBodyPart() {
+  // Body (ChestBody) が既に存在する場合は、StomachBody を追加する
   if (bodyId_ >= 0 && nodes_.count(bodyId_) > 0) {
-    return false;
+    return AddPart(ModBodyPart::StomachBody, PartSide::Center, bodyId_, false);
   }
 
   // Body は最上位として追加する
@@ -1550,7 +1561,7 @@ bool ModAssemblyGraph::AddBodyPart() {
       AddPart(ModBodyPart::ChestBody, PartSide::Center, -1, false);
 
   if (newBodyId < 0) {
-    return false;
+    return -1;
   }
 
   bodyId_ = newBodyId;
@@ -1561,5 +1572,5 @@ bool ModAssemblyGraph::AddBodyPart() {
   // Head は Neck 優先、無ければ Body に戻す
   NormalizeHeadLinks();
 
-  return true;
+  return newBodyId;
 }

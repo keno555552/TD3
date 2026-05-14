@@ -108,6 +108,11 @@ public:
   bool RemovePart(int partId);
 
   /// <summary>
+  /// 指定した部位が削除可能かどうかを判定する
+  /// </summary>
+  bool CanRemovePart(int partId) const;
+
+  /// <summary>
   /// 指定した部位の親を変更する（付け替え）
   /// </summary>
   /// <param name="newParentConnectorId">-1 の場合は自動選択</param>
@@ -126,29 +131,29 @@ public:
   /// <summary>
   /// 腕セット（上腕+前腕）を追加する
   /// </summary>
-  bool AddArmAssembly(PartSide side);
+  int AddArmAssembly(PartSide side);
 
   /// <summary>
   /// 脚セット（腿+脛）を追加する
   /// </summary>
-  bool AddLegAssembly(PartSide side);
+  int AddLegAssembly(PartSide side);
 
   /// <summary>
   /// Neck + Head セットを追加する
   /// 既に首または頭が存在する場合は追加しない
   /// </summary>
-  bool AddNeckPart();
+  int AddNeckPart();
 
   /// <summary>
   /// 互換用
   /// 単体Head追加は行わず、内部では AddNeckPart() を呼ぶ
   /// </summary>
-  bool AddHeadPart();
+  int AddHeadPart();
 
   /// <summary>
   /// Body 部位を追加する（既存Bodyが無い場合のみ）
   /// </summary>
-  bool AddBodyPart();
+  int AddBodyPart();
 
   /// <summary>
   /// 指定部位の直接の子一覧を返す

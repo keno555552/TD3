@@ -160,6 +160,8 @@ private:
   size_t activeControlPointGizmoCount_ = 0; // 今フレーム描画する球の数
 
   bool isDraggingControlPoint_ = false; // 左ドラッグ中かどうか
+  Vector2 mouseTriggerPos_{};           // クリックした瞬間のマウス座標
+  bool isPendingAssemblyDrag_ = false;  // ドラッグの遊び判定中かどうか
   float dragControlPlaneZ_ = 0.0f;      // ドラッグ時に固定する Z 平面
   Vector3 dragControlPointOffset_{0.0f, 0.0f, 0.0f}; // 掴んだ位置との差分
 
@@ -533,6 +535,7 @@ private:
   /// <param name="mouseRay">マウス位置から作成した Ray</param>
   /// <returns>範囲内なら true</returns>
   bool IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const;
+  bool IsMouseRayOverSelectedGizmo(const Ray &mouseRay) const;
 
   /// <summary>
   /// 透過処理用のフェードグループIDを返す
@@ -952,14 +955,14 @@ private:
   /// 現在のマウス位置に基づいて、部位追加ボタンや削除ボタンのどれかがクリックされたかを判定する
   /// </summary>
   /// <returns></returns>
-  bool TryHandleAddButtonClick();
+  bool TryHandleAddButtonInteraction();
 
   /// <summary>
   /// 指定した部位追加ボタンの種類に応じて、対応する部位を追加する
   /// </summary>
   /// <param name="type"></param>
   /// <returns></returns>
-  bool ExecuteAddButton(UiAddButtonType type);
+  int ExecuteAddButton(UiAddButtonType type);
 
   /// <summary>
   /// 現在のマウス位置が、部位追加ボタンや削除ボタンのどれかと重なっているかを判定する

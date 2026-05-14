@@ -1080,7 +1080,7 @@ void ModScene::Update() {
   }
 
   // 画面上の追加ボタンが押されたら、そのフレームは3D操作へ流さない
-  if (TryHandleAddButtonClick()) {
+  if (TryHandleAddButtonInteraction()) {
     UpdateModObjects();
     SyncCustomizeDataFromScene();
 
@@ -2383,7 +2383,6 @@ void ModScene::UpdateControlPointEditing() {
   if (selectedControlPointIndex_ >= 0 && !isDraggingControlPoint_) {
     if (!IsMouseRayInsideSelectedControlMesh(mouseRay)) {
       ClearControlPointSelection();
-      return;
     }
   }
 
@@ -2391,15 +2390,35 @@ void ModScene::UpdateControlPointEditing() {
 
   // 左クリック開始時
   if (IsMouseLeftTriggeredNow()) {
-    // まず操作点を優先。ただし Root は PickControlPointFromMouseRay() 側で弾く
+    // まず操作点を優先
     if (PickControlPointFromMouseRay(mouseRay)) {
       isDraggingControlPoint_ = true;
       return;
     }
 
-    // 操作点でなければ部位ドラッグ開始
-    if (TryBeginAssemblyDragFromMouseRay(mouseRay)) {
-      return;
+    // 操作点でなければ部位のドラッグ待機開始
+    // マウスの下に部位がある場合のみ処理し、なければ選択解除
+    if (hoveredPartId_ >= 0) {
+      SelectPart(hoveredPartId_);
+      isPendingAssemblyDrag_ = true;
+      mouseTriggerPos_ = system_->GetMousePosVector2();
+    } else {
+      SelectPart(-1);
+    }
+  }
+
+  // 部位ドラッグの遊び判定
+  if (isPendingAssemblyDrag_ && IsMouseLeftPressedNow()) {
+    const Vector2 currentPos = system_->GetMousePosVector2();
+    const float dx = currentPos.x - mouseTriggerPos_.x;
+    const float dy = currentPos.y - mouseTriggerPos_.y;
+    const float distSq = dx * dx + dy * dy;
+    const float threshold = 8.0f;
+
+    if (distSq > threshold * threshold) {
+      if (TryBeginAssemblyDragFromMouseRay(mouseRay)) {
+        isPendingAssemblyDrag_ = false;
+      }
     }
   }
 
@@ -2408,9 +2427,10 @@ void ModScene::UpdateControlPointEditing() {
     MoveSelectedControlPointFromMouseRay(mouseRay);
   }
 
-  // 左ボタンを離したら操作点ドラッグ終了
+  // 左ボタンを離したら各種ドラッグ・待機を終了
   if (IsMouseLeftReleasedNow()) {
     isDraggingControlPoint_ = false;
+    isPendingAssemblyDrag_ = false;
   }
 }
 
@@ -2420,8 +2440,7 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
   }
   const Vector3 cameraPos = usingCamera_->GetTransform().translate;
 
-  const int visiblePartId =
-      (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
+  const int visiblePartId = selectedPartId_;
 
   if (visiblePartId < 0) {
     return false;
@@ -2668,6 +2687,15 @@ void ModScene::UpdateHoveredPartFromMouseRay(const Ray &mouseRay) {
     return;
   }
 
+  // 選択中の部位があれば、その操作点にマウスが乗っているか優先的にチェックする
+  // これにより、操作点へのホバーを他部位より優先し、空クリック判定も防ぐ
+  if (selectedPartId_ >= 0) {
+    if (IsMouseRayOverSelectedGizmo(mouseRay)) {
+      hoveredPartId_ = selectedPartId_;
+      return;
+    }
+  }
+
   float nearestT = FLT_MAX;
   int nearestPartId = -1;
 
@@ -2721,14 +2749,7 @@ void ModScene::EnsureControlPointGizmoCount(size_t requiredCount) {
 void ModScene::UpdateControlPointGizmos() {
   activeControlPointGizmoCount_ = 0;
 
-  int visiblePartId = -1;
-  if (isDraggingControlPoint_ && selectedPartId_ >= 0) {
-    visiblePartId = selectedPartId_;
-  } else if (hoveredPartId_ >= 0) {
-    visiblePartId = hoveredPartId_;
-  } else if (selectedPartId_ >= 0) {
-    visiblePartId = selectedPartId_;
-  }
+  int visiblePartId = selectedPartId_;
 
   if (IsTorsoVisiblePartId(visiblePartId)) {
     const int chestId = assembly_.GetBodyId();
@@ -3784,10 +3805,16 @@ bool ModScene::BuildPartPickBoxes(int partId,
 }
 
 bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
-  if (selectedControlPointIndex_ < 0) {
+  if (selectedControlPointIndex_ < 0 || usingCamera_ == nullptr) {
     return false;
   }
 
+  // 1. まず現在選択中部位の操作点（ギズモ）のいずれかにマウスが乗っているかチェックする
+  if (IsMouseRayOverSelectedGizmo(mouseRay)) {
+    return true;
+  }
+
+  // 2. ギズモに当たっていなければ、従来の部位当たり判定（SegmentBox）をチェックする
   if (selectedControlPartId_ == -2) {
     for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
       const int partId = orderedPartIds_[i];
@@ -3807,7 +3834,6 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
         }
       }
     }
-
     return false;
   }
 
@@ -3824,6 +3850,73 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
     float t = 0.0f;
     if (IntersectRaySegmentBox(mouseRay, boxSet.segments[bi], &t)) {
       return true;
+    }
+  }
+
+  return false;
+}
+
+bool ModScene::IsMouseRayOverSelectedGizmo(const Ray &mouseRay) const {
+  if (selectedPartId_ < 0 || usingCamera_ == nullptr) {
+    return false;
+  }
+
+  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+
+  // 胴体共有点のチェック
+  if (IsTorsoVisiblePartId(selectedPartId_)) {
+    for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+      const auto &cp = torsoControlPoints_[i];
+      if (!(cp.movable || cp.isConnectionPoint)) {
+        continue;
+      }
+
+      const Vector3 worldPos = GetTorsoControlPointWorldPosition(cp.role);
+      const float influenceRadius = cp.radius;
+      const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+      const Vector3 toCamera =
+          NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+      const Vector3 drawPos =
+          Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
+      Sphere sphere{drawPos, drawRadius * 2.0f};
+      float t = 0.0f;
+      if (crashDecision(sphere, mouseRay, &t)) {
+        return true;
+      }
+    }
+  }
+
+  // 通常部位の操作点のチェック
+  const int controlOwnerId =
+      ResolveControlOwnerPartId(assembly_, selectedPartId_);
+  if (controlOwnerId >= 0) {
+    auto itObj = modObjects_.find(controlOwnerId);
+    auto itBody = modBodies_.find(controlOwnerId);
+    if (itObj != modObjects_.end() && itObj->second != nullptr &&
+        itBody != modBodies_.end()) {
+      const ModBody &body = itBody->second;
+      const std::vector<ModControlPoint> &points = body.GetControlPoints();
+      for (size_t i = 0; i < points.size(); ++i) {
+        if (!(points[i].movable || points[i].isConnectionPoint)) {
+          continue;
+        }
+
+        const Vector3 worldPos = body.GetControlPointWorldPosition(
+            itObj->second.get(), i);
+        const float influenceRadius = points[i].radius;
+        const float drawRadius = GetControlPointGizmoDrawRadius(influenceRadius);
+        const Vector3 toCamera =
+            NormalizeSafeV(Subtract(cameraPos, worldPos), {0.0f, 0.0f, -1.0f});
+        const Vector3 drawPos =
+            Add(worldPos, Multiply(drawRadius * 0.75f, toCamera));
+
+        Sphere sphere{drawPos, drawRadius * 2.0f};
+        float t = 0.0f;
+        if (crashDecision(sphere, mouseRay, &t)) {
+          return true;
+        }
+      }
     }
   }
 
@@ -4599,6 +4692,14 @@ void ModScene::CancelAssemblyDragPlacement() {
     return;
   }
 
+  if (assemblyDrag_.isNewPartAdding) {
+    // 新規追加中のキャンセルなら、追加したパーツを削除する
+    assembly_.RemovePart(assemblyDrag_.assemblyRootPartId);
+    SyncAfterAssemblyChanged();
+    assemblyDrag_.Clear();
+    return;
+  }
+
   const int rootPartId = assemblyDrag_.assemblyRootPartId;
   const PartNode *rootNode = assembly_.FindNode(rootPartId);
   if (rootNode == nullptr) {
@@ -4698,6 +4799,19 @@ void ModScene::ApplyAssemblyDragVisualFeedback() {
     return;
   }
 
+  // ゴミ箱ホバー時は削除可能かどうかで色を決める
+  bool isOverTrash = isHoverTrash_;
+  bool canDelete = false;
+  if (isOverTrash) {
+    const int rootPartId = assemblyDrag_.assemblyRootPartId;
+    const int deleteTargetId = ResolveAssemblyOperationPartId(rootPartId);
+    if (deleteTargetId >= 0) {
+      if (assembly_.CanRemovePart(deleteTargetId)) {
+        canDelete = true;
+      }
+    }
+  }
+
   const bool valid = assemblyDrag_.isPlacementValid;
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -4725,11 +4839,23 @@ void ModScene::ApplyAssemblyDragVisualFeedback() {
       Vector4 &color =
           object->objectParts_[partIndex].materialConfig->textureColor;
 
-      if (valid) {
+      // ドラッグ中は半透明にする
+      color.w = 0.5f;
+
+      bool highlightGreen = false;
+      if (isOverTrash) {
+        highlightGreen = canDelete;
+      } else {
+        highlightGreen = valid;
+      }
+
+      if (highlightGreen) {
+        // 有効な配置場所、または削除可能なら緑っぽく
         color.x = 0.25f;
         color.y = 1.0f;
         color.z = 0.35f;
       } else {
+        // 無効な場所、または削除不可なら赤っぽく
         color.x = 1.0f;
         color.y = 0.25f;
         color.z = 0.25f;
@@ -4778,8 +4904,7 @@ bool ModScene::TryBeginAssemblyDragFromMouseRay(const Ray &mouseRay) {
     return false;
   }
 
-  const int visiblePartId =
-      (hoveredPartId_ >= 0) ? hoveredPartId_ : selectedPartId_;
+  const int visiblePartId = hoveredPartId_;
   if (visiblePartId < 0) {
     return false;
   }
@@ -5078,8 +5203,8 @@ void ModScene::UpdateModObjects() {
 
   int fadedGroupId = -1;
 
-  if (hoveredPartId_ >= 0) {
-    fadedGroupId = ResolveFadeGroupId(hoveredPartId_);
+  if (selectedPartId_ >= 0) {
+    fadedGroupId = ResolveFadeGroupId(selectedPartId_);
   }
 
   if (selectedControlPointIndex_ >= 0) {
@@ -6480,11 +6605,6 @@ void ModScene::InitializeScreenUi() {
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)].label =
       "ひだりあし";
 
-  SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)],
-                {left, top + spacingY * 5.0f}, {width, height},
-                uiFrameTextureHandle_);
-  addButtons_[static_cast<size_t>(UiAddButtonType::AddBody)].label = "縺九ｉ縺";
-
   SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
@@ -6498,46 +6618,46 @@ void ModScene::InitializeScreenUi() {
   nextSceneButton_.label = "つぎへ";
 }
 
-bool ModScene::ExecuteAddButton(UiAddButtonType type) {
-  bool changed = false;
+int ModScene::ExecuteAddButton(UiAddButtonType type) {
+  int newPartId = -1;
 
   switch (type) {
   case UiAddButtonType::AddLeftArm:
-    changed = assembly_.AddArmAssembly(PartSide::Left);
+    newPartId = assembly_.AddArmAssembly(PartSide::Left);
     break;
 
   case UiAddButtonType::AddRightArm:
-    changed = assembly_.AddArmAssembly(PartSide::Right);
+    newPartId = assembly_.AddArmAssembly(PartSide::Right);
     break;
 
   case UiAddButtonType::AddLeftLeg:
-    changed = assembly_.AddLegAssembly(PartSide::Left);
+    newPartId = assembly_.AddLegAssembly(PartSide::Left);
     break;
 
   case UiAddButtonType::AddRightLeg:
-    changed = assembly_.AddLegAssembly(PartSide::Right);
+    newPartId = assembly_.AddLegAssembly(PartSide::Right);
     break;
 
   case UiAddButtonType::AddHeadSet:
-    changed = assembly_.AddNeckPart();
+    newPartId = assembly_.AddNeckPart();
     break;
 
   case UiAddButtonType::AddBody:
-    changed = assembly_.AddBodyPart();
+    newPartId = assembly_.AddBodyPart();
     break;
 
   default:
     break;
   }
 
-  if (changed) {
+  if (newPartId >= 0) {
     SyncAfterAssemblyChanged();
   }
 
-  return changed;
+  return newPartId;
 }
 
-bool ModScene::TryHandleAddButtonClick() {
+bool ModScene::TryHandleAddButtonInteraction() {
   if (!IsMouseLeftTriggeredNow()) {
     return false;
   }
@@ -6549,8 +6669,53 @@ bool ModScene::TryHandleAddButtonClick() {
       continue;
     }
 
-    ExecuteAddButton(static_cast<UiAddButtonType>(i));
-    return true;
+    // ドラッグによる新規追加を開始
+    const int newId = ExecuteAddButton(static_cast<UiAddButtonType>(i));
+    if (newId >= 0) {
+      // 即座にドラッグ状態へ移行
+      BeginAssemblyDragFromPart(newId);
+      assemblyDrag_.isNewPartAdding = true;
+
+      // オフセットを完全にゼロにしてカーソル直下に吸着させる
+      assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
+
+      // 胴体（親）の座標を取得して、マウス位置を正確なローカル座標に変換する
+      int bodyId = assembly_.GetBodyId();
+      if (bodyId >= 0 && modObjects_.count(bodyId) > 0) {
+        const Object *bodyObject = modObjects_.at(bodyId).get();
+        const Vector3 bodyWorldPos =
+            ModObjectUtil::ComputeObjectRootWorldTranslate(bodyObject);
+
+        // ドラッグ平面を胴体の深度に設定
+        assemblyDrag_.dragPlanePoint = bodyWorldPos;
+        if (usingCamera_) {
+          const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+          assemblyDrag_.dragPlaneNormal =
+              NormalizeSafeV(Subtract(cameraPos, bodyWorldPos), {0, 0, 1});
+        }
+
+        const Ray mouseRay =
+            usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+        Vector3 hitPoint{};
+        if (RayPlaneIntersection(mouseRay, assemblyDrag_.dragPlanePoint,
+                                 assemblyDrag_.dragPlaneNormal, &hitPoint)) {
+          // ワールド座標の hitPoint を親のローカル座標へ変換
+          const Vector3 localPos =
+              ModObjectUtil::TransformWorldPointToLocal(bodyObject, hitPoint);
+
+          // ドラッグ開始時の状態を現在のマウス位置に合わせて上書き
+          assemblyDrag_.beforeLocalTranslate = localPos;
+          assemblyDrag_.previewLocalTranslate = localPos;
+          assemblyDrag_.dragPlanePoint = hitPoint; // 今のマウス位置を移動の起点にする
+
+          // 即座にパーツ位置を更新
+          assembly_.SetPartLocalTranslate(newId, localPos);
+          UpdateModObjects();
+        }
+      }
+
+      return true;
+    }
   }
 
   if (IsPointInUiButton(mouse, resetButton_)) {
