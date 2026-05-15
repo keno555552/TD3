@@ -1342,6 +1342,19 @@ void TravelRunner::ApplyVisualState() {
             float shiftSign = 0.0f;
             if (instance.partType == ModBodyPart::LeftThigh || instance.partType == ModBodyPart::RightThigh) {
                 shiftSign = -1.0f;
+                
+                // Because StomachBody's visual mesh is shifted down by ChestBody's expansion,
+                // we must also shift the legs down by that same amount so they stay attached.
+                float chestScaleY = 1.0f;
+                for (const auto &pInst : customizeData_->partInstances) {
+                    if (pInst.partType == ModBodyPart::ChestBody) {
+                        chestScaleY = pInst.param.scale.y * pInst.param.length;
+                        break;
+                    }
+                }
+                float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
+                if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
+                obj->mainPosition.transform.translate.y -= (chestScaleY - 1.0f) * chestSegLength;
             }
 
             obj->mainPosition.transform.translate.y += shiftSign * (parentScaleY - 1.0f) * parentSegLength;
@@ -1356,23 +1369,6 @@ void TravelRunner::ApplyVisualState() {
       obj->mainPosition.transform.translate.x += laneX_;
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
-
-      if (instance.partType == ModBodyPart::StomachBody) {
-          // StomachBody is attached to the tip of ChestBody.
-          // We must shift its mainPosition down by the expansion of ChestBody
-          // so that all its children (Legs) inherit this downward shift!
-          float chestScaleY = 1.0f;
-          for (const auto &pInst : customizeData_->partInstances) {
-              if (pInst.partType == ModBodyPart::ChestBody) {
-                  chestScaleY = pInst.param.scale.y * pInst.param.length;
-                  break;
-              }
-          }
-          float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
-          if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
-          
-          obj->mainPosition.transform.translate.y -= (chestScaleY - 1.0f) * chestSegLength;
-      }
     }
 
     ModBodyPart parentType = ModBodyPart::Count;
@@ -1705,6 +1701,18 @@ void TravelRunner::ApplyVisualState() {
               break;
             }
           }
+          // Shift StomachBody's local mesh down so it rotates around the same pivot as ChestBody!
+          float chestScaleY = 1.0f;
+          for (const auto &pInst : customizeData_->partInstances) {
+              if (pInst.partType == ModBodyPart::ChestBody) {
+                  chestScaleY = pInst.param.scale.y * pInst.param.length;
+                  break;
+              }
+          }
+          float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
+          if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
+          
+          startPos.y -= (chestScaleY - 1.0f) * chestSegLength;
         }
         obj->objectParts_[0].transform.translate = startPos;
       }
