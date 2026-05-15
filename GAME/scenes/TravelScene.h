@@ -5,7 +5,7 @@
 #include "GAME/effect/Perfect_Particle.h"
 #include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
-#include "GAME/actor/TravelPlayer.h"
+#include "GAME/actor/TravelRunner.h"
 #include "GAME/manager/TravelNpcManager.h"
 #include <array>
 #include <memory>
@@ -88,7 +88,7 @@ private:
 
 
 
-  std::unique_ptr<TravelPlayer> player_;
+  std::unique_ptr<TravelRunner> player_;
 
 private:
   /// <summary>

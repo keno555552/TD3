@@ -1,6 +1,6 @@
-#include "TravelPlayer.h"
 #include "GAME/effect/Perfect_Particle.h"
 #include "ModObjectUtil.h"
+#include "TravelRunner.h"
 #include "kEngine.h"
 #include <algorithm>
 #include <cmath>
@@ -12,20 +12,20 @@ Vector3 ScaleByRatio(const Vector3 &base, const Vector3 &ratio) {
 }
 } // namespace
 
-TravelPlayer::TravelPlayer(kEngine *system) : system_(system) {
+TravelRunner::TravelRunner(kEngine *system) : system_(system) {
   perfectParticle_ = std::make_unique<Perfect_Particle>(system_);
 }
 
-TravelPlayer::~TravelPlayer() {
+TravelRunner::~TravelRunner() {
   for (auto &pair : allPartObjects_) {
     if (pair.second)
       delete pair.second;
   }
 }
 
-void TravelPlayer::Initialize(float startX) { moveX_ = startX; }
+void TravelRunner::Initialize(float startX) { moveX_ = startX; }
 
-void TravelPlayer::UpdateHoldState(bool leftNowInput, bool rightNowInput,
+void TravelRunner::UpdateHoldState(bool leftNowInput, bool rightNowInput,
                                    float deltaTime) {
   if (leftNowInput && isGrounded_) {
     leftHoldTime_ += deltaTime;
@@ -47,7 +47,7 @@ void TravelPlayer::UpdateHoldState(bool leftNowInput, bool rightNowInput,
   }
 }
 
-void TravelPlayer::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
+void TravelRunner::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
   float leftTargetLegAngle = leftNowInput ? legKickAngle_ : legRecoverAngle_;
   float rightTargetLegAngle = rightNowInput ? legKickAngle_ : legRecoverAngle_;
 
@@ -98,13 +98,13 @@ void TravelPlayer::UpdateLegBendState(bool leftNowInput, bool rightNowInput) {
   bodyStretch_ = std::clamp(bodyStretch_, -0.5f, 1.0f);
 }
 
-void TravelPlayer::UpdateModObjects() {
+void TravelRunner::UpdateModObjects() {
   for (auto &pair : allPartObjects_) {
     if (pair.second)
       pair.second->Update(nullptr);
   }
   if (shadow_ != nullptr) {
-    shadow_->mainPosition.transform.translate.x = 0.0f;
+    shadow_->mainPosition.transform.translate.x = laneX_;
     shadow_->mainPosition.transform.translate.y = groundY_ + 0.01f;
     shadow_->mainPosition.transform.translate.z = moveX_;
     shadow_->mainPosition.transform.rotate = {1.5f, -1.57f, 0.0f};
@@ -112,7 +112,7 @@ void TravelPlayer::UpdateModObjects() {
     LowestBodyPart lowestPart = LowestBodyPart::None;
     float lowestBodyLocalY = GetLowestVisualBodyY(&lowestPart);
     float lowestBodyWorldY = moveY_ + visualLiftY_ + lowestBodyLocalY;
-    
+
     float jumpHeight = lowestBodyWorldY - groundY_;
     if (jumpHeight < 0.0f) {
       jumpHeight = 0.0f;
@@ -120,38 +120,38 @@ void TravelPlayer::UpdateModObjects() {
 
     float scale = 1.2f - jumpHeight * 0.35f;
     scale = std::clamp(scale, 0.1f, 30.0f);
-    
+
     shadow_->mainPosition.transform.scale = {scale, scale, 1.0f};
     shadow_->Update(nullptr);
   }
 }
 
-void TravelPlayer::DrawModObjects(Camera *camera) {
+void TravelRunner::DrawModObjects(Camera *camera) {
   for (auto &pair : allPartObjects_) {
     if (pair.second)
       pair.second->Draw();
   }
 }
 
-void TravelPlayer::UpdateParticle(Camera *camera) {
+void TravelRunner::UpdateParticle(Camera *camera) {
   if (perfectParticle_) {
     perfectParticle_->Update(camera);
   }
 }
 
-void TravelPlayer::DrawParticle() {
+void TravelRunner::DrawParticle() {
   if (perfectParticle_) {
     perfectParticle_->Draw();
   }
 }
 
-void TravelPlayer::ClearParticle() {
+void TravelRunner::ClearParticle() {
   if (perfectParticle_) {
     perfectParticle_->ClearAll();
   }
 }
 
-void TravelPlayer::LoadCustomizeData() {
+void TravelRunner::LoadCustomizeData() {
   if (customizeData_ == nullptr) {
     return;
   }
@@ -171,7 +171,7 @@ void TravelPlayer::LoadCustomizeData() {
   }
 }
 
-void TravelPlayer::ApplyCustomizeToMovementParam() {
+void TravelRunner::ApplyCustomizeToMovementParam() {
 
   if (customizeData_ == nullptr) {
     return;
@@ -465,7 +465,7 @@ void TravelPlayer::ApplyCustomizeToMovementParam() {
   recoveryAssist_ = std::clamp(0.7f + tuning_.stability * 0.25f, 0.6f, 1.4f);
 }
 
-float TravelPlayer::ComputeLegHeightOffset() const {
+float TravelRunner::ComputeLegHeightOffset() const {
   const ModControlPointData *cp = GetControlPoints();
   if (cp == nullptr) {
     return 0.0f;
@@ -494,7 +494,7 @@ float TravelPlayer::ComputeLegHeightOffset() const {
   return avgLegLength - baseLegLength;
 }
 
-void TravelPlayer::SavePreviousFrameState() {
+void TravelRunner::SavePreviousFrameState() {
   leftLegPrevBend_ = leftLegBend_;
   rightLegPrevBend_ = rightLegBend_;
 
@@ -502,7 +502,7 @@ void TravelPlayer::SavePreviousFrameState() {
   rightLegPrevBendSpeed_ = rightLegBendSpeed_;
 }
 
-void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
+void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
   bool bothInput = leftNowInput && rightNowInput;
 
@@ -650,22 +650,26 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       leftThighVec = {0.0f, -1.0f, 0.0f};
       leftThighLength = 0.0001f;
     }
-    
+
     float leftThighScaleY = 1.0f;
     float leftShinScaleY = 1.0f;
     float rightThighScaleY = 1.0f;
     float rightShinScaleY = 1.0f;
     if (customizeData_) {
       for (const auto &inst : customizeData_->partInstances) {
-        if (inst.partType == ModBodyPart::LeftThigh) leftThighScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::LeftShin) leftShinScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::RightThigh) rightThighScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::RightShin) rightShinScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::LeftThigh)
+          leftThighScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::LeftShin)
+          leftShinScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::RightThigh)
+          rightThighScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::RightShin)
+          rightShinScaleY = inst.param.scale.y * inst.param.length;
       }
     }
-    
+
     leftThighLength *= leftThighScaleY;
-    
+
     Vector3 leftThighDir = NormalizeSafe(leftThighVec);
 
     float leftThighAngleZ = std::atan2(leftThighDir.x, -leftThighDir.y);
@@ -750,9 +754,9 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
     float visualLowestY = GetLowestVisualBodyY(nullptr);
     if (visualLowestY < 900000.0f) {
-        lowestLegBottomLocalY = (std::min)(predictedFirstLegsY, visualLowestY);
+      lowestLegBottomLocalY = (std::min)(predictedFirstLegsY, visualLowestY);
     } else {
-        lowestLegBottomLocalY = predictedFirstLegsY;
+      lowestLegBottomLocalY = predictedFirstLegsY;
     }
 
     const float groundEpsilon = 0.01f;
@@ -1271,7 +1275,7 @@ void TravelPlayer::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
   rightPrevInput_ = rightNowInput;
 }
 
-void TravelPlayer::ApplyVisualState() {
+void TravelRunner::ApplyVisualState() {
   if (customizeData_ == nullptr) {
     return;
   }
@@ -1293,9 +1297,35 @@ void TravelPlayer::ApplyVisualState() {
     // dynamic offsets applied)
     obj->mainPosition.transform.translate = instance.resolvedLocalTranslate;
 
+    // Apply parent's scale to the local translation if parent is Torso
+    // This fixes the issue where big-bodied NPCs have normal shoulder widths
+    if (instance.parentId >= 0) {
+      auto parentIt = allPartObjects_.find(instance.parentId);
+      if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
+        if (!parentIt->second->objectParts_.empty()) {
+          ModBodyPart parentType = ModBodyPart::Count;
+          for (const auto &pInst : customizeData_->partInstances) {
+            if (pInst.partId == instance.parentId) {
+              parentType = pInst.partType;
+              break;
+            }
+          }
+          if (parentType == ModBodyPart::ChestBody || parentType == ModBodyPart::StomachBody) {
+            float parentScaleX = parentIt->second->objectParts_[0].transform.scale.x;
+            float parentScaleY = parentIt->second->objectParts_[0].transform.scale.y;
+            float parentScaleZ = parentIt->second->objectParts_[0].transform.scale.z;
+            obj->mainPosition.transform.translate.x *= parentScaleX;
+            obj->mainPosition.transform.translate.y *= parentScaleY;
+            obj->mainPosition.transform.translate.z *= parentScaleZ;
+          }
+        }
+      }
+    }
+
     // Root objects (like ChestBody or StomachBody with no parent) need world
     // offsets added
     if (instance.parentId < 0) {
+      obj->mainPosition.transform.translate.x += laneX_;
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
     }
@@ -1310,10 +1340,14 @@ void TravelPlayer::ApplyVisualState() {
       }
 
       bool isStandardJoint = false;
-      if ((instance.partType == ModBodyPart::LeftForeArm && parentType == ModBodyPart::LeftUpperArm) ||
-          (instance.partType == ModBodyPart::RightForeArm && parentType == ModBodyPart::RightUpperArm) ||
-          (instance.partType == ModBodyPart::LeftShin && parentType == ModBodyPart::LeftThigh) ||
-          (instance.partType == ModBodyPart::RightShin && parentType == ModBodyPart::RightThigh)) {
+      if ((instance.partType == ModBodyPart::LeftForeArm &&
+           parentType == ModBodyPart::LeftUpperArm) ||
+          (instance.partType == ModBodyPart::RightForeArm &&
+           parentType == ModBodyPart::RightUpperArm) ||
+          (instance.partType == ModBodyPart::LeftShin &&
+           parentType == ModBodyPart::LeftThigh) ||
+          (instance.partType == ModBodyPart::RightShin &&
+           parentType == ModBodyPart::RightThigh)) {
         isStandardJoint = true;
       }
 
@@ -1321,7 +1355,8 @@ void TravelPlayer::ApplyVisualState() {
         auto parentIt = allPartObjects_.find(instance.parentId);
         if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
           if (!parentIt->second->objectParts_.empty()) {
-            float parentScaleY = parentIt->second->objectParts_[0].transform.scale.y;
+            float parentScaleY =
+                parentIt->second->objectParts_[0].transform.scale.y;
             float parentDefaultLength = 1.0f;
             switch (parentType) {
             case ModBodyPart::LeftUpperArm:
@@ -1335,7 +1370,8 @@ void TravelPlayer::ApplyVisualState() {
             default:
               break;
             }
-            obj->mainPosition.transform.translate = {0.0f, -(parentScaleY * parentDefaultLength), 0.0f};
+            obj->mainPosition.transform.translate = {
+                0.0f, -(parentScaleY * parentDefaultLength), 0.0f};
           }
         }
       }
@@ -1447,14 +1483,16 @@ void TravelPlayer::ApplyVisualState() {
     case ModBodyPart::LeftUpperArm:
     case ModBodyPart::RightUpperArm: {
       float swing = -oppositeAngle;
-      if (swing > 0.0f) swing *= 1.6f;
+      if (swing > 0.0f)
+        swing *= 1.6f;
       animAngleX = swing * armSwingScale;
       break;
     }
     case ModBodyPart::LeftForeArm:
     case ModBodyPart::RightForeArm: {
       float swing = -oppositeAngle;
-      if (swing > 0.0f) swing *= 1.6f;
+      if (swing > 0.0f)
+        swing *= 1.6f;
       float upperArmSwing = swing * armSwingScale;
       float elbowFold = std::clamp((oppositeAngle - legKickAngle_) /
                                        (legRecoverAngle_ - legKickAngle_),
@@ -1626,7 +1664,7 @@ void TravelPlayer::ApplyVisualState() {
   UpdateModObjects();
   ResolveVisualGroundPenetration();
 }
-void TravelPlayer::ResolveVisualGroundPenetration() {
+void TravelRunner::ResolveVisualGroundPenetration() {
 
   LowestBodyPart lowestPart = LowestBodyPart::None;
   float lowestBodyLocalY = GetLowestVisualBodyY(&lowestPart);
@@ -1653,7 +1691,7 @@ void TravelPlayer::ResolveVisualGroundPenetration() {
   }
 }
 
-void TravelPlayer::BuildFeaturesFromCustomizeData() {
+void TravelRunner::BuildFeaturesFromCustomizeData() {
   features_ = {};
 
   if (customizeData_ == nullptr) {
@@ -1684,7 +1722,7 @@ void TravelPlayer::BuildFeaturesFromCustomizeData() {
   features_.asymmetry = std::abs(features_.asymmetry);
 }
 
-void TravelPlayer::CollectSnapshotsByOwnerId(
+void TravelRunner::CollectSnapshotsByOwnerId(
     int ownerPartId,
     std::vector<const ModControlPointSnapshot *> &outSnapshots) const {
 
@@ -1701,7 +1739,7 @@ void TravelPlayer::CollectSnapshotsByOwnerId(
   }
 }
 
-float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
+float TravelRunner::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
   auto UpdateLowest = [&](float candidateY, LowestBodyPart part, float &lowestY,
                           LowestBodyPart &lowestPart) {
     if (candidateY < lowestY) {
@@ -1745,7 +1783,7 @@ float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
   if (customizeData_ != nullptr) {
     const float leftRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
     const float rightRadius = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
-    
+
     for (const auto &inst : customizeData_->partInstances) {
       if (inst.partType == ModBodyPart::LeftShin) {
         auto it = allPartObjects_.find(inst.partId);
@@ -1769,8 +1807,8 @@ float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
     }
     if (Object *rightShin = GetStandardPart(ModBodyPart::RightShin)) {
       const float r = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
-      UpdateLowest(GetTipWorldY(rightShin, 2.6181f, r), LowestBodyPart::RightShin,
-                   lowestY, lowestPart);
+      UpdateLowest(GetTipWorldY(rightShin, 2.6181f, r),
+                   LowestBodyPart::RightShin, lowestY, lowestPart);
     }
   }
 
@@ -1782,7 +1820,7 @@ float TravelPlayer::GetLowestVisualBodyY(LowestBodyPart *outPart) const {
   // from the player's root coordinate
   return lowestY - (moveY_ + visualLiftY_);
 }
-const char *TravelPlayer::GetLowestBodyPartName(LowestBodyPart part) const {
+const char *TravelRunner::GetLowestBodyPartName(LowestBodyPart part) const {
   switch (part) {
   case LowestBodyPart::LeftForeArm:
     return "LeftForeArm";
@@ -1803,7 +1841,7 @@ const char *TravelPlayer::GetLowestBodyPartName(LowestBodyPart part) const {
   }
 }
 
-bool TravelPlayer::HasRequiredParts() const {
+bool TravelRunner::HasRequiredParts() const {
   Object *chestBody = GetStandardPart(ModBodyPart::ChestBody);
   Object *stomachBody = GetStandardPart(ModBodyPart::StomachBody);
   Object *neck = GetStandardPart(ModBodyPart::Neck);
@@ -1831,7 +1869,7 @@ bool TravelPlayer::HasRequiredParts() const {
   return true;
 }
 
-float TravelPlayer::GetSnapshotRadius(ModBodyPart ownerPart,
+float TravelRunner::GetSnapshotRadius(ModBodyPart ownerPart,
                                       int localRole) const {
   if (customizeData_ == nullptr) {
     return 0.1f;
@@ -1847,7 +1885,7 @@ float TravelPlayer::GetSnapshotRadius(ModBodyPart ownerPart,
   return 0.1f;
 }
 
-float TravelPlayer::GetControlPointRadius(ModControlPointRole role) const {
+float TravelRunner::GetControlPointRadius(ModControlPointRole role) const {
   if (customizeData_ == nullptr) {
     return 0.1f;
   }
@@ -1861,14 +1899,14 @@ float TravelPlayer::GetControlPointRadius(ModControlPointRole role) const {
   return 0.1f;
 }
 
-const ModControlPointData *TravelPlayer::GetControlPoints() const {
+const ModControlPointData *TravelRunner::GetControlPoints() const {
   if (customizeData_ == nullptr) {
     return nullptr;
   }
   return &customizeData_->controlPoints;
 }
 
-bool TravelPlayer::BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
+bool TravelRunner::BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
                                             SegmentVisual &out) {
   if (!customizeData_)
     return false;
@@ -1949,7 +1987,7 @@ bool TravelPlayer::BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
 
   return true;
 }
-Vector3 TravelPlayer::BuildAnimatedChildRootFromParent(const Vector3 &root,
+Vector3 TravelRunner::BuildAnimatedChildRootFromParent(const Vector3 &root,
                                                        float angleZ,
                                                        float angleX,
                                                        float length) const {
@@ -1960,7 +1998,7 @@ Vector3 TravelPlayer::BuildAnimatedChildRootFromParent(const Vector3 &root,
   return result;
 }
 
-bool TravelPlayer::GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
+bool TravelRunner::GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
                                                  Vector3 &outBend,
                                                  Vector3 &outEnd) const {
   if (customizeData_ == nullptr) {
@@ -1989,7 +2027,7 @@ bool TravelPlayer::GetExtraPartSnapshotPositions(int partId, Vector3 &outRoot,
   return foundAny;
 }
 
-bool TravelPlayer::GetExtraInstanceLocalTranslate(int partId,
+bool TravelRunner::GetExtraInstanceLocalTranslate(int partId,
                                                   Vector3 &outLocal) const {
   if (customizeData_ == nullptr) {
     return false;
@@ -2005,7 +2043,7 @@ bool TravelPlayer::GetExtraInstanceLocalTranslate(int partId,
   return false;
 }
 
-bool TravelPlayer::GetFirstPartTypePartId(ModBodyPart partType,
+bool TravelRunner::GetFirstPartTypePartId(ModBodyPart partType,
                                           int &outPartId) const {
   outPartId = -1;
 
@@ -2023,7 +2061,7 @@ bool TravelPlayer::GetFirstPartTypePartId(ModBodyPart partType,
   return false;
 }
 
-float TravelPlayer::GetSnapshotSegmentLength(ModBodyPart partType,
+float TravelRunner::GetSnapshotSegmentLength(ModBodyPart partType,
                                              int ownerPartId) const {
   auto GetTorsoSnap = [&](ModControlPointRole role, Vector3 &outPos) -> bool {
     if (customizeData_ == nullptr)
@@ -2080,7 +2118,7 @@ float TravelPlayer::GetSnapshotSegmentLength(ModBodyPart partType,
   return Length({to.x - from.x, to.y - from.y, to.z - from.z});
 }
 
-bool TravelPlayer::GetPartInstanceParentId(int partId, int &outParentId) const {
+bool TravelRunner::GetPartInstanceParentId(int partId, int &outParentId) const {
   outParentId = -1;
 
   if (customizeData_ == nullptr) {
@@ -2097,7 +2135,7 @@ bool TravelPlayer::GetPartInstanceParentId(int partId, int &outParentId) const {
   return false;
 }
 
-bool TravelPlayer::GetExtraPartParentObject(
+bool TravelRunner::GetExtraPartParentObject(
     ModBodyPart partType, int parentId,
     const std::unordered_map<int, Object *> &extraPartObjectMap,
     Object *&outParent) const {
@@ -2131,7 +2169,7 @@ bool TravelPlayer::GetExtraPartParentObject(
   }
 }
 
-bool TravelPlayer::GetPartInstanceLocalTranslate(int partId,
+bool TravelRunner::GetPartInstanceLocalTranslate(int partId,
                                                  Vector3 &outLocal) const {
   if (customizeData_ == nullptr) {
     return false;
@@ -2147,7 +2185,7 @@ bool TravelPlayer::GetPartInstanceLocalTranslate(int partId,
   return false;
 }
 
-bool TravelPlayer::GetPartInstanceLocalRotate(int partId,
+bool TravelRunner::GetPartInstanceLocalRotate(int partId,
                                               Vector3 &outRotate) const {
   if (customizeData_ == nullptr) {
     return false;
@@ -2165,7 +2203,7 @@ bool TravelPlayer::GetPartInstanceLocalRotate(int partId,
   return false;
 }
 
-bool TravelPlayer::GetFirstPartTypeLocalTranslate(ModBodyPart partType,
+bool TravelRunner::GetFirstPartTypeLocalTranslate(ModBodyPart partType,
                                                   Vector3 &outLocal) const {
   if (customizeData_ == nullptr) {
     return false;
@@ -2181,7 +2219,7 @@ bool TravelPlayer::GetFirstPartTypeLocalTranslate(ModBodyPart partType,
   return false;
 }
 
-int TravelPlayer::GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
+int TravelRunner::GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
                                           int parentId) const {
   ModBodyPart targetOwnerPart = ModBodyPart::Count;
   switch (partType) {
@@ -2226,7 +2264,7 @@ int TravelPlayer::GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
   return partId;
 }
 
-bool TravelPlayer::ComputeExtraBaseAngles(ModBodyPart partType,
+bool TravelRunner::ComputeExtraBaseAngles(ModBodyPart partType,
                                           int snapshotOwnerId,
                                           float &outBaseAngleX,
                                           float &outBaseAngleZ) const {
@@ -2277,26 +2315,29 @@ bool TravelPlayer::ComputeExtraBaseAngles(ModBodyPart partType,
   return true;
 }
 
-float TravelPlayer::ComputeExtraAnimAngleX(ModBodyPart partType) const {
+float TravelRunner::ComputeExtraAnimAngleX(ModBodyPart partType) const {
   const float armSwingScale = 0.60f;
   const float thighSwingScale = 0.70f;
 
   switch (partType) {
   case ModBodyPart::LeftUpperArm: {
     float swing = -rightLegBend_;
-    if (swing > 0.0f) swing *= 1.6f;
+    if (swing > 0.0f)
+      swing *= 1.6f;
     return swing * armSwingScale;
   }
 
   case ModBodyPart::RightUpperArm: {
     float swing = -leftLegBend_;
-    if (swing > 0.0f) swing *= 1.6f;
+    if (swing > 0.0f)
+      swing *= 1.6f;
     return swing * armSwingScale;
   }
 
   case ModBodyPart::LeftForeArm: {
     float swing = -rightLegBend_;
-    if (swing > 0.0f) swing *= 1.6f;
+    if (swing > 0.0f)
+      swing *= 1.6f;
     float upperArmSwing = swing * armSwingScale;
     float elbowFold = std::clamp((rightLegBend_ - legKickAngle_) /
                                      (legRecoverAngle_ - legKickAngle_),
@@ -2306,7 +2347,8 @@ float TravelPlayer::ComputeExtraAnimAngleX(ModBodyPart partType) const {
 
   case ModBodyPart::RightForeArm: {
     float swing = -leftLegBend_;
-    if (swing > 0.0f) swing *= 1.6f;
+    if (swing > 0.0f)
+      swing *= 1.6f;
     float upperArmSwing = swing * armSwingScale;
     float elbowFold = std::clamp((leftLegBend_ - legKickAngle_) /
                                      (legRecoverAngle_ - legKickAngle_),
@@ -2341,7 +2383,7 @@ float TravelPlayer::ComputeExtraAnimAngleX(ModBodyPart partType) const {
   }
 }
 
-void TravelPlayer::BuildAllVisualParts() {
+void TravelRunner::BuildAllVisualParts() {
   for (auto &pair : allPartObjects_) {
     if (pair.second)
       delete pair.second;
@@ -2718,7 +2760,7 @@ void TravelPlayer::BuildAllVisualParts() {
 
 */
 
-Object *TravelPlayer::GetStandardPart(ModBodyPart partType) const {
+Object *TravelRunner::GetStandardPart(ModBodyPart partType) const {
   int partId = -1;
   if (GetFirstPartTypePartId(partType, partId)) {
     auto it = allPartObjects_.find(partId);

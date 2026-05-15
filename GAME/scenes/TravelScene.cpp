@@ -1,4 +1,4 @@
-#include "GAME/actor/TravelPlayer.h"
+#include "GAME/actor/TravelRunner.h"
 #include "TravelScene.h"
 #include <cmath>
 
@@ -38,7 +38,7 @@ void TravelScene::ResetTutorialFlag() {
 }
 
 TravelScene::TravelScene(kEngine *system) {
-  player_ = std::make_unique<TravelPlayer>(system);
+  player_ = std::make_unique<TravelRunner>(system);
   npcManager_ = std::make_unique<TravelNpcManager>(system);
   player_->Initialize(-18.0f);
   Logger::Log("TravelScene ctor");
@@ -100,32 +100,32 @@ TravelScene::TravelScene(kEngine *system) {
 
   // UpdateChildRootsFromBody();
 
-  // player_->leftLegBend_ = player_->legRecoverAngle_;
-  // player_->rightLegBend_ = player_->legRecoverAngle_;
-  player_->leftLegBend_ = 0.0f;
-  player_->rightLegBend_ = 0.0f;
+  // player_->SetLeftLegBend(player_->GetLegRecoverAngle());
+  // player_->SetRightLegBend(player_->GetLegRecoverAngle());
+  player_->SetLeftLegBend(0.0f);
+  player_->SetRightLegBend(0.0f);
 
-  player_->leftLegPrevBend_ = player_->leftLegBend_;
-  player_->rightLegPrevBend_ = player_->rightLegBend_;
+  player_->SetLeftLegPrevBend(player_->GetLeftLegBend());
+  player_->SetRightLegPrevBend(player_->GetRightLegBend());
 
-  player_->leftLegBendSpeed_ = 0.0f;
-  player_->rightLegBendSpeed_ = 0.0f;
-  player_->leftLegPrevBendSpeed_ = 0.0f;
-  player_->rightLegPrevBendSpeed_ = 0.0f;
+  player_->SetLeftLegBendSpeed(0.0f);
+  player_->SetRightLegBendSpeed(0.0f);
+  player_->SetLeftLegPrevBendSpeed(0.0f);
+  player_->SetRightLegPrevBendSpeed(0.0f);
 
-  player_->bodyTilt_ = 0.0f;
-  player_->bodyTiltVelocity_ = 0.0f;
+  player_->SetBodyTilt(0.0f);
+  player_->SetBodyTiltVelocity(0.0f);
 
-  player_->leftDriveAccum_ = 0.0f;
-  player_->rightDriveAccum_ = 0.0f;
-  player_->leftHoldTime_ = 0.0f;
-  player_->rightHoldTime_ = 0.0f;
-  player_->lastKickSide_ = 0;
+  player_->SetLeftDriveAccum(0.0f);
+  player_->SetRightDriveAccum(0.0f);
+  player_->SetLeftHoldTime(0.0f);
+  player_->SetRightHoldTime(0.0f);
+  player_->SetLastKickSide(0);
 
-  player_->moveX_ = -18.0f;
+  player_->SetMoveX(-18.0f);
 
-  player_->gaitTiltTarget_ = 0.0f;
-  player_->landTimer_ = 999.0f;
+  player_->SetGaitTiltTarget(0.0f);
+  player_->SetLandTimer(999.0f);
 
   // bodyで代用中
   groundModelHandle_ =
@@ -157,16 +157,16 @@ TravelScene::TravelScene(kEngine *system) {
   shadowModelHandle_ =
       system_->SetModelObj("GAME/resources/object/Plane/plane.gltf");
 
-  player_->shadow_ = std::make_unique<Object>();
-  player_->shadow_->IntObject(system_);
-  player_->shadow_->CreateModelData(shadowModelHandle_);
-  player_->shadow_->mainPosition.transform = CreateDefaultTransform();
+  player_->GetShadowRef() = std::make_unique<Object>();
+  player_->GetShadowRef()->IntObject(system_);
+  player_->GetShadowRef()->CreateModelData(shadowModelHandle_);
+  player_->GetShadowRef()->mainPosition.transform = CreateDefaultTransform();
 
-  player_->shadow_->mainPosition.transform.translate = {0.0f, player_->groundY_ + 0.01f, player_->moveX_};
-  player_->shadow_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
-  player_->shadow_->mainPosition.transform.scale = {1.2f, 0.02f, 1.2f};
+  player_->GetShadowRef()->mainPosition.transform.translate = {0.0f, player_->GetGroundY() + 0.01f, player_->GetMoveX()};
+  player_->GetShadowRef()->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  player_->GetShadowRef()->mainPosition.transform.scale = {1.2f, 0.02f, 1.2f};
 
-  player_->shadow_->objectParts_[0].materialConfig->textureColor = {0.0f, 0.0f, 0.0f,
+  player_->GetShadowRef()->objectParts_[0].materialConfig->textureColor = {0.0f, 0.0f, 0.0f,
                                                            0.9f};
 
   // ゴール
@@ -266,9 +266,7 @@ TravelScene::~TravelScene() {
 
 
 
-  for (auto &npc : npcManager_->npcRunners_) {
-    npcManager_->ClearNpcCustomizedVisual(npc);
-  }
+
 
   player_->ClearParticle();
 
@@ -387,14 +385,14 @@ void TravelScene::Draw() {
     player_->DrawModObjects(usingCamera_);
   }
 
-  npcManager_->DrawNpcs(goalX_, showNpcModel_);
+  npcManager_->DrawNpcs(goalX_, showNpcModel_, camera_);
 
   for (auto &ground : grounds_) {
     ground->Draw();
   }
 
-  if (player_->shadow_ != nullptr) {
-    player_->shadow_->Draw();
+  if (player_->GetShadowRef() != nullptr) {
+    player_->GetShadowRef()->Draw();
   }
 
   if (goalObject_ != nullptr) {
@@ -424,61 +422,61 @@ void TravelScene::Draw() {
   //==============================
   // 位置・速度
   //==============================
-  ImGui::Text("MoveX : %.3f", player_->moveX_);
-  ImGui::Text("MoveY : %.3f", player_->moveY_);
-  ImGui::Text("VelocityX : %.3f", player_->velocityX_);
-  ImGui::Text("VelocityY : %.3f", player_->velocityY_);
+  ImGui::Text("MoveX : %.3f", player_->GetMoveX());
+  ImGui::Text("MoveY : %.3f", player_->GetMoveY());
+  ImGui::Text("VelocityX : %.3f", player_->GetVelocityX());
+  ImGui::Text("VelocityY : %.3f", player_->GetVelocityY());
 
   //==============================
   // 姿勢確認
   //==============================
-  float legDiffTilt = (player_->leftLegBend_ - player_->rightLegBend_) * player_->legDiffTiltPower_;
+  float legDiffTilt = (player_->GetLeftLegBend() - player_->GetRightLegBend()) * player_->GetLegDiffTiltPower();
 
-  float postureError = std::abs(player_->bodyTilt_ - player_->idealRunTilt_);
-  float badPosture = std::clamp(postureError / player_->postureTolerance_, 0.0f, 1.0f);
+  float postureError = std::abs(player_->GetBodyTilt() - player_->GetIdealRunTilt());
+  float badPosture = std::clamp(postureError / player_->GetPostureTolerance(), 0.0f, 1.0f);
   float forwardRate = 1.0f - badPosture;
   float upwardRate = 0.30f + badPosture * 0.70f;
 
   ImGui::Separator();
-  ImGui::Text("BodyTilt : %.4f", player_->bodyTilt_);
+  ImGui::Text("BodyTilt : %.4f", player_->GetBodyTilt());
   ImGui::Text("LegDiffTilt : %.4f", legDiffTilt);
 
-  ImGui::Text("LeftLegBend : %.4f", player_->leftLegBend_);
-  ImGui::Text("RightLegBend : %.4f", player_->rightLegBend_);
+  ImGui::Text("LeftLegBend : %.4f", player_->GetLeftLegBend());
+  ImGui::Text("RightLegBend : %.4f", player_->GetRightLegBend());
 
   ImGui::Text("ForwardRate : %.4f", forwardRate);
   ImGui::Text("UpwardRate : %.4f", upwardRate);
 
-  ImGui::Text("LeftDriveAccum : %.4f", player_->leftDriveAccum_);
-  ImGui::Text("RightDriveAccum : %.4f", player_->rightDriveAccum_);
+  ImGui::Text("LeftDriveAccum : %.4f", player_->GetLeftDriveAccum());
+  ImGui::Text("RightDriveAccum : %.4f", player_->GetRightDriveAccum());
 
-  ImGui::Text("LeftHoldTime : %.4f", player_->leftHoldTime_);
-  ImGui::Text("RightHoldTime : %.4f", player_->rightHoldTime_);
+  ImGui::Text("LeftHoldTime : %.4f", player_->GetLeftHoldTime());
+  ImGui::Text("RightHoldTime : %.4f", player_->GetRightHoldTime());
 
-  ImGui::Text("BodyTiltVelocity : %.4f", player_->bodyTiltVelocity_);
-  ImGui::Text("LeftLegBendSpeed : %.4f", player_->leftLegBendSpeed_);
-  ImGui::Text("RightLegBendSpeed : %.4f", player_->rightLegBendSpeed_);
+  ImGui::Text("BodyTiltVelocity : %.4f", player_->GetBodyTiltVelocity());
+  ImGui::Text("LeftLegBendSpeed : %.4f", player_->GetLeftLegBendSpeed());
+  ImGui::Text("RightLegBendSpeed : %.4f", player_->GetRightLegBendSpeed());
 
-  ImGui::Checkbox("Force Tilt", &player_->debugForceTilt_);
-  ImGui::SliderFloat("Tilt Value", &player_->debugTiltValue_, -0.4f, 0.4f);
+  ImGui::Checkbox("Force Tilt", player_->GetDebugForceTiltPtr());
+  ImGui::SliderFloat("Tilt Value", player_->GetDebugTiltValuePtr(), -0.4f, 0.4f);
 
-  ImGui::Checkbox("Use Customize Move", &player_->useCustomizeMove_);
-  ImGui::Text("runPower: %.2f", player_->tuning_.runPower);
-  ImGui::Text("lift: %.2f", player_->tuning_.lift);
-  ImGui::Text("maxSpeed: %.2f", player_->tuning_.maxSpeed);
-  ImGui::Text("stability: %.2f", player_->tuning_.stability);
-  ImGui::Text("bodyTilt: %.4f", player_->bodyTilt_);
-  ImGui::Text("turnResponse: %.2f", player_->tuning_.turnResponse);
+  ImGui::Checkbox("Use Customize Move", player_->GetUseCustomizeMovePtr());
+  ImGui::Text("runPower: %.2f", player_->GetTuningPtr()->runPower);
+  ImGui::Text("lift: %.2f", player_->GetTuningPtr()->lift);
+  ImGui::Text("maxSpeed: %.2f", player_->GetTuningPtr()->maxSpeed);
+  ImGui::Text("stability: %.2f", player_->GetTuningPtr()->stability);
+  ImGui::Text("bodyTilt: %.4f", player_->GetBodyTilt());
+  ImGui::Text("turnResponse: %.2f", player_->GetTuningPtr()->turnResponse);
 
   {
-    TravelPlayer::LowestBodyPart lowestPart = TravelPlayer::LowestBodyPart::None;
+    TravelRunner::LowestBodyPart lowestPart = TravelRunner::LowestBodyPart::None;
     float lowestBodyLocalY = player_->GetLowestVisualBodyY(&lowestPart);
-    float lowestBodyWorldY = player_->moveY_ + player_->visualLiftY_ + lowestBodyLocalY;
-    float penetration = player_->groundY_ - lowestBodyWorldY;
+    float lowestBodyWorldY = player_->GetMoveY() + player_->GetVisualLiftY() + lowestBodyLocalY;
+    float penetration = player_->GetGroundY() - lowestBodyWorldY;
 
     ImGui::Text("--- Ground Penetration ---");
-    ImGui::Text("Player Y: %.3f", player_->moveY_);
-    ImGui::Text("Lift Y: %.3f", player_->visualLiftY_);
+    ImGui::Text("Player Y: %.3f", player_->GetMoveY());
+    ImGui::Text("Lift Y: %.3f", player_->GetVisualLiftY());
     ImGui::Text("Lowest Part: %s (%.3f)", player_->GetLowestBodyPartName(lowestPart),
                 lowestBodyLocalY);
   }
@@ -498,18 +496,18 @@ void TravelScene::Draw() {
 
 #ifdef USE_IMGUI
   {
-    TravelPlayer::LowestBodyPart lowestPart = TravelPlayer::LowestBodyPart::None;
+    TravelRunner::LowestBodyPart lowestPart = TravelRunner::LowestBodyPart::None;
     float lowestBodyLocalY = player_->GetLowestVisualBodyY(&lowestPart);
-    float lowestBodyWorldY = player_->moveY_ + player_->visualLiftY_ + lowestBodyLocalY;
-    float penetration = player_->groundY_ - lowestBodyWorldY;
+    float lowestBodyWorldY = player_->GetMoveY() + player_->GetVisualLiftY() + lowestBodyLocalY;
+    float penetration = player_->GetGroundY() - lowestBodyWorldY;
 
     ImGui::Begin("LowestBodyCheck");
     ImGui::Text("LowestBodyLocalY : %.3f", lowestBodyLocalY);
     ImGui::Text("LowestBodyWorldY : %.3f", lowestBodyWorldY);
     ImGui::Text("LowestPart       : %s", player_->GetLowestBodyPartName(lowestPart));
-    ImGui::Text("GroundY          : %.3f", player_->groundY_);
+    ImGui::Text("GroundY          : %.3f", player_->GetGroundY());
     ImGui::Text("Penetration      : %.3f", penetration);
-    ImGui::Text("VisualLiftY      : %.3f", player_->visualLiftY_);
+    ImGui::Text("VisualLiftY      : %.3f", player_->GetVisualLiftY());
     ImGui::End();
   }
 #endif
@@ -614,8 +612,8 @@ void TravelScene::CameraPart() {
     camPos.x = 48.0f;
     camPos.y = 5.0f;
 
-    if (player_->moveX_ + 10.0f <= goalX_ - 10.0f) {
-      camPos.z = player_->moveX_ + 10.0f;
+    if (player_->GetMoveX() + 10.0f <= goalX_ - 10.0f) {
+      camPos.z = player_->GetMoveX() + 10.0f;
     } else {
       camPos.z = goalX_ - 10.0f;
     }
@@ -806,7 +804,7 @@ void TravelScene::UpdateRaceRanking() {
     RaceEntry entry;
     entry.isPlayer = true;
     entry.npcIndex = -1;
-    entry.progress = player_->moveX_;
+    entry.progress = player_->GetMoveX();
     entries.push_back(entry);
   }
 
@@ -815,7 +813,7 @@ void TravelScene::UpdateRaceRanking() {
     RaceEntry entry;
     entry.isPlayer = false;
     entry.npcIndex = static_cast<int>(i);
-    entry.progress = npcManager_->npcRunners_[i].moveX;
+    entry.progress = npcManager_->npcRunners_[i].runner ? npcManager_->npcRunners_[i].runner->GetMoveX() : 0.0f;
     entries.push_back(entry);
   }
 
@@ -836,12 +834,12 @@ void TravelScene::UpdateRaceRanking() {
 
   goalCount_ = 0;
 
-  if (player_->moveX_ >= goalX_) {
+  if (player_->GetMoveX() >= goalX_) {
     goalCount_++;
   }
 
   for (const auto &npc : npcManager_->npcRunners_) {
-    if (npc.moveX >= goalX_) {
+    if (npc.runner && npc.runner->GetMoveX() >= goalX_) {
       goalCount_++;
     }
   }
@@ -855,7 +853,7 @@ void TravelScene::UpdateRaceFinishState() {
   //==============================
   // プレイヤーのゴール判定
   //==============================
-  if (!isPlayerFinished_ && player_->moveX_ >= goalX_) {
+  if (!isPlayerFinished_ && player_->GetMoveX() >= goalX_) {
     isPlayerFinished_ = true;
     finishCount_++;
     playerFinishRank_ = finishCount_;
