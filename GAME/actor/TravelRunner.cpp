@@ -1304,30 +1304,75 @@ void TravelRunner::ApplyVisualState() {
       if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
         if (!parentIt->second->objectParts_.empty()) {
           ModBodyPart parentType = ModBodyPart::Count;
+          float parentParamScaleX = 1.0f;
+          float parentParamScaleY = 1.0f;
+          float parentParamScaleZ = 1.0f;
+          float parentParamLength = 1.0f;
+
           for (const auto &pInst : customizeData_->partInstances) {
             if (pInst.partId == instance.parentId) {
               parentType = pInst.partType;
+              parentParamScaleX = pInst.param.scale.x;
+              parentParamScaleY = pInst.param.scale.y;
+              parentParamScaleZ = pInst.param.scale.z;
+              parentParamLength = pInst.param.length;
               break;
             }
           }
           if (parentType == ModBodyPart::ChestBody || parentType == ModBodyPart::StomachBody) {
-            float parentScaleX = parentIt->second->objectParts_[0].transform.scale.x;
-            float parentScaleY = parentIt->second->objectParts_[0].transform.scale.y;
-            float parentScaleZ = parentIt->second->objectParts_[0].transform.scale.z;
+            float parentScaleX = parentParamScaleX;
+            float parentScaleY = parentParamScaleY * parentParamLength;
+            float parentScaleZ = parentParamScaleZ;
+
             obj->mainPosition.transform.translate.x *= parentScaleX;
-            obj->mainPosition.transform.translate.y *= parentScaleY;
+
+            // X scale moves the attach point outwards, but the torso's thickness also scales.
+            // We use parentParamScaleX which correctly matches the user's manual width scaling.
+            // Z scale works similarly.
+
+            float parentSegLength = GetSnapshotSegmentLength(parentType, -1);
+            if (parentSegLength <= 0.0001f) {
+                parentSegLength = (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
+            }
+
+            // The origin of the torso parts is at the TOP (bone root).
+            // Scaling in Y only moves the BOTTOM edge (bone tip).
+            // Therefore, parts attached to the top (Neck, Arms) DO NOT move in Y.
+            // Parts attached to the bottom (Legs) move down by the full expansion amount.
+            float shiftSign = 0.0f;
+            if (instance.partType == ModBodyPart::LeftThigh || instance.partType == ModBodyPart::RightThigh) {
+                shiftSign = -1.0f;
+            }
+
+            obj->mainPosition.transform.translate.y += shiftSign * (parentScaleY - 1.0f) * parentSegLength;
             obj->mainPosition.transform.translate.z *= parentScaleZ;
           }
         }
       }
     }
 
-    // Root objects (like ChestBody or StomachBody with no parent) need world
-    // offsets added
+    // Root objects (like ChestBody or StomachBody with no parent) need world offsets added
     if (instance.parentId < 0) {
       obj->mainPosition.transform.translate.x += laneX_;
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
+
+      if (instance.partType == ModBodyPart::StomachBody) {
+          // StomachBody is attached to the tip of ChestBody.
+          // We must shift its mainPosition down by the expansion of ChestBody
+          // so that all its children (Legs) inherit this downward shift!
+          float chestScaleY = 1.0f;
+          for (const auto &pInst : customizeData_->partInstances) {
+              if (pInst.partType == ModBodyPart::ChestBody) {
+                  chestScaleY = pInst.param.scale.y * pInst.param.length;
+                  break;
+              }
+          }
+          float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
+          if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
+          
+          obj->mainPosition.transform.translate.y -= (chestScaleY - 1.0f) * chestSegLength;
+      }
     }
 
     ModBodyPart parentType = ModBodyPart::Count;
@@ -1355,8 +1400,13 @@ void TravelRunner::ApplyVisualState() {
         auto parentIt = allPartObjects_.find(instance.parentId);
         if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
           if (!parentIt->second->objectParts_.empty()) {
-            float parentScaleY =
-                parentIt->second->objectParts_[0].transform.scale.y;
+            float parentScaleY = 1.0f;
+            for (const auto &pInst : customizeData_->partInstances) {
+              if (pInst.partId == instance.parentId) {
+                parentScaleY = pInst.param.scale.y * pInst.param.length;
+                break;
+              }
+            }
             float parentDefaultLength = 1.0f;
             switch (parentType) {
             case ModBodyPart::LeftUpperArm:
