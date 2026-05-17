@@ -84,6 +84,30 @@ public:
   static const ModBodyCustomizeData *GetSharedCustomizeData();
 
   /// <summary>
+  /// 指定されたプリセットのNPC用改造データを生成する
+  /// baseData（プレイヤーのデータ等）を元にして、指定したプリセットの変形を適用する
+  /// </summary>
+  static std::unique_ptr<ModBodyCustomizeData> CreateNpcPreset(NpcPresetType type, const ModBodyCustomizeData* baseData);
+
+  /// <summary>
+  /// コンテストシーン用：上位入賞したNPCの改造データを保存する
+  /// </summary>
+  static void SetSharedNpcCustomizeData(int rankIndex, const ModBodyCustomizeData &data);
+
+  /// <summary>
+  /// コンテストシーン用：上位入賞したNPCの改造データを取得する
+  /// rankIndex は 0, 1 など（0がNPCの1位）
+  /// データが存在しない場合は nullptr が返る
+  /// </summary>
+  static const ModBodyCustomizeData *GetSharedNpcCustomizeData(int rankIndex);
+
+  /// <summary>
+  /// 保存されているNPCの共有データをすべてクリアする
+  /// 新しいレースが始まる前などに呼ぶ
+  /// </summary>
+  static void ClearSharedNpcCustomizeData();
+
+  /// <summary>
   /// 改造データを正規化する
   ///
   /// 【目的】

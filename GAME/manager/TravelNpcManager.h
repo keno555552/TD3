@@ -59,13 +59,6 @@ public:
   void UpdateNpcInput(NpcRunner &npc, float deltaTime, int npcIndex);
   void UpdateNpcMovement(NpcRunner &npc, float deltaTime, int npcIndex);
 
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetDefault();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetHeadBig();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetLongLeg();
-  std::unique_ptr<ModBodyCustomizeData> CreateNpcPresetBigTorso();
-
-
-
   void SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex, float goalX);
 
   void DrawNpcs(float goalX, bool showNpcModel, Camera* camera);

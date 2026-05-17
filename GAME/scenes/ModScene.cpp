@@ -2,6 +2,7 @@
 #include "GAME/actor/ModAssemblyResolver.h"
 #include "GAME/actor/ModAssemblyUtil.h"
 #include "GAME/actor/ModObjectUtil.h"
+#include "GAME/actor/ModCustomizeDataStore.h"
 #include "GAME/actor/prompt/PromptData.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
@@ -6243,8 +6244,11 @@ void ModScene::InitializeNpcModProgress() {
   npcProgress_.reserve(4);
 
   std::vector<NpcPresetType> presetPool = {
-      NpcPresetType::Default, NpcPresetType::HeadBig, NpcPresetType::BigTorso,
-      NpcPresetType::LongLeg};
+      NpcPresetType::HeadBig, NpcPresetType::BigTorso,
+      NpcPresetType::LongLeg, NpcPresetType::Gorilla, NpcPresetType::Slender,
+      NpcPresetType::Chubby, NpcPresetType::Giant, NpcPresetType::Mini,
+      NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip,
+      NpcPresetType::LowHead};
 
   std::random_device rd;
   std::mt19937 rng(rd());
@@ -6337,31 +6341,45 @@ void ModScene::SyncNpcProgressToCustomizeData() {
 float ModScene::CalculateNpcModTime(NpcPresetType presetType,
                                     float skillMultiplier) const {
   const float baseTime = GetNpcBaseModTime();
-  const float presetBonus = GetNpcPresetTimeBonus(presetType);
+  float presetBonus = 0.0f;
+
+  if (customizeData_ != nullptr) {
+    auto presetData = ModCustomizeDataStore::CreateNpcPreset(presetType, customizeData_.get());
+    if (presetData) {
+      float diffSum = 0.0f;
+
+      // 1. スケール値の差分を計算
+      for (size_t i = 0; i < presetData->partInstances.size() && i < customizeData_->partInstances.size(); ++i) {
+        const auto& pInst = presetData->partInstances[i];
+        const auto& cInst = customizeData_->partInstances[i];
+        if (pInst.partId == cInst.partId) {
+          diffSum += std::abs(pInst.param.scale.x - cInst.param.scale.x);
+          diffSum += std::abs(pInst.param.scale.y - cInst.param.scale.y);
+          diffSum += std::abs(pInst.param.scale.z - cInst.param.scale.z);
+        }
+      }
+
+      // 2. CP（操作点）の位置の差分を計算
+      for (size_t i = 0; i < presetData->controlPointSnapshots.size() && i < customizeData_->controlPointSnapshots.size(); ++i) {
+        const auto& pSnap = presetData->controlPointSnapshots[i];
+        const auto& cSnap = customizeData_->controlPointSnapshots[i];
+        if (pSnap.ownerPartId == cSnap.ownerPartId && pSnap.role == cSnap.role) {
+          // CPの移動は骨格の変形なので、より時間がかかるとみなして重み付け(x2.0)
+          diffSum += std::abs(pSnap.localPosition.x - cSnap.localPosition.x) * 2.0f;
+          diffSum += std::abs(pSnap.localPosition.y - cSnap.localPosition.y) * 2.0f;
+          diffSum += std::abs(pSnap.localPosition.z - cSnap.localPosition.z) * 2.0f;
+        }
+      }
+
+      // 差分量1.0につき0.5秒のペナルティとして計算
+      presetBonus = diffSum * 0.5f;
+    }
+  }
 
   return (baseTime + presetBonus) / skillMultiplier;
 }
 
 float ModScene::GetNpcBaseModTime() const { return 25.0f; }
-
-float ModScene::GetNpcPresetTimeBonus(NpcPresetType presetType) const {
-  switch (presetType) {
-  case NpcPresetType::Default:
-    return 0.0f;
-
-  case NpcPresetType::HeadBig:
-    return 1.5f;
-
-  case NpcPresetType::LongLeg:
-    return 3.0f;
-
-  case NpcPresetType::BigTorso:
-    return 2.0f;
-
-  default:
-    return 0.0f;
-  }
-}
 
 float ModScene::GetNpcSkillMultiplierByIndex(int index) const {
   switch (index) {

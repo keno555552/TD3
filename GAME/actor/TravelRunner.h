@@ -113,6 +113,9 @@ public:
   bool* GetUseCustomizeMovePtr() { return &useCustomizeMove_; }
   std::unique_ptr<Object>& GetShadowRef() { return shadow_; }
 
+  bool GetIsPlayer() const { return isPlayer_; }
+  void SetIsPlayer(bool v) { isPlayer_ = v; }
+
   void SetCustomizeData(const ModBodyCustomizeData *data) {
     customizeData_ = data;
   }
@@ -249,6 +252,7 @@ private:
   float torsoSizeScale_ = 1.0f;
 
   int perfectStreak_ = 0;
+  bool isPlayer_ = false;
 
   const ModBodyCustomizeData *customizeData_ = nullptr;
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;

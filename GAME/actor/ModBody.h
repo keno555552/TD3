@@ -127,6 +127,15 @@ enum class NpcPresetType {
   HeadBig,
   LongLeg,
   BigTorso,
+  Gorilla,
+  Slender,
+  Chubby,
+  Giant,
+  Mini,
+  LongArm,
+  WideShoulder,
+  WideHip,
+  LowHead,
 };
 
 // NPCのスタートからゴールまでの進行状況を保存する構造体

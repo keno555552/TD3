@@ -101,29 +101,10 @@ void TravelNpcManager::InitializeNpcRunners(const ModBodyCustomizeData* customiz
       presetType = customizeData_->npcStartProgressList[i].presetType;
     }
 
-    switch (presetType) {
-    case NpcPresetType::Default:
-      preset = CreateNpcPresetDefault();
-      break;
-
-    case NpcPresetType::HeadBig:
-      preset = CreateNpcPresetDefault();
-      preset = CreateNpcPresetHeadBig();
-      break;
-
-    case NpcPresetType::LongLeg:
-      preset = CreateNpcPresetDefault();
-      preset = CreateNpcPresetLongLeg();
-      break;
-
-    case NpcPresetType::BigTorso:
-      preset = CreateNpcPresetDefault();
-      preset = CreateNpcPresetBigTorso();
-      break;
-
-    default:
-      preset = CreateNpcPresetDefault();
-      break;
+    if (presetType == NpcPresetType::Default) {
+      preset = ModCustomizeDataStore::CreateNpcPreset(NpcPresetType::Default, customizeData_);
+    } else {
+      preset = ModCustomizeDataStore::CreateNpcPreset(presetType, customizeData_);
     }
 
     npcRunners_[i].customizeData = std::move(preset);
@@ -307,90 +288,6 @@ void TravelNpcManager::UpdateNpcInput(NpcRunner &npc, float deltaTime,
   npc.prevGrounded = isGrounded;
 }
 
-std::unique_ptr<ModBodyCustomizeData> TravelNpcManager::CreateNpcPresetDefault() {
-  std::unique_ptr<ModBodyCustomizeData> data;
-
-  if (customizeData_ != nullptr) {
-    data = std::make_unique<ModBodyCustomizeData>(*customizeData_);
-  } else {
-    data = ModBody::CreateDefaultCustomizeData();
-  }
-
-  if (data == nullptr) {
-    return nullptr;
-  }
-
-  // Logger::Log("NPC PRESET DEFAULT partInstances=%d snapshots=%d",
-  //             (int)data->partInstances.size(),
-  //             (int)data->controlPointSnapshots.size());
-
-  // for (const auto &inst : data->partInstances) {
-  //   Logger::Log("NPC PRESET partType=%d partId=%d parentId=%d",
-  //               (int)inst.partType, inst.partId, inst.parentId);
-  // }
-
-  return data;
-}
-
-std::unique_ptr<ModBodyCustomizeData> TravelNpcManager::CreateNpcPresetHeadBig() {
-  std::unique_ptr<ModBodyCustomizeData> data = CreateNpcPresetDefault();
-
-  if (data == nullptr) {
-    return nullptr;
-  }
-
-  for (auto& inst : data->partInstances) {
-    if (inst.partType == ModBodyPart::Head) {
-      inst.param.scale.x *= 2.0f;
-      inst.param.scale.y *= 2.0f;
-      inst.param.scale.z *= 2.0f;
-    } else if (inst.partType == ModBodyPart::Neck) {
-      inst.param.scale.x *= 1.15f;
-      inst.param.scale.z *= 1.15f;
-    }
-  }
-
-  ModCustomizeDataStore::NormalizeCustomizeData(*data);
-  return data;
-}
-
-std::unique_ptr<ModBodyCustomizeData> TravelNpcManager::CreateNpcPresetLongLeg() {
-  std::unique_ptr<ModBodyCustomizeData> data = CreateNpcPresetDefault();
-
-  if (data == nullptr) {
-    return nullptr;
-  }
-
-  for (auto& inst : data->partInstances) {
-    if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh) {
-      inst.param.scale.y *= 2.0f;
-    } else if (inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
-      inst.param.scale.y *= 2.0f;
-    }
-  }
-
-  ModCustomizeDataStore::NormalizeCustomizeData(*data);
-  return data;
-}
-
-std::unique_ptr<ModBodyCustomizeData> TravelNpcManager::CreateNpcPresetBigTorso() {
-  std::unique_ptr<ModBodyCustomizeData> data = CreateNpcPresetDefault();
-
-  if (data == nullptr) {
-    return nullptr;
-  }
-
-  for (auto& inst : data->partInstances) {
-    if (inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
-      inst.param.scale.x *= 2.0f;
-      inst.param.scale.y *= 2.0f;
-      inst.param.scale.z *= 2.0f;
-    }
-  }
-
-  ModCustomizeDataStore::NormalizeCustomizeData(*data);
-  return data;
-}
 
 void TravelNpcManager::SimulateNpcHeadStart(NpcRunner &npc, float elapsedTime, int npcIndex, float goalX) {
   const float simDeltaTime = 1.0f / 60.0f;

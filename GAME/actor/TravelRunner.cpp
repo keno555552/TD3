@@ -378,7 +378,7 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   //==============================
   // 前進力
   //==============================
-  tuning_.runPower += (avgLegLength - baseLegLength) * 2.2f;
+  tuning_.runPower += (avgLegLength - baseLegLength) * 1.2f;
   tuning_.runPower -= (legThicknessScale - baseLegThicknessScale) * 1.2f;
   tuning_.runPower -= legDiff * 1.8f;
 
@@ -444,8 +444,8 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   //==============================
   // クランプ
   //==============================
-  tuning_.runPower = std::clamp(tuning_.runPower, 0.1f, 4.0f);
-  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.2f, 4.5f);
+  tuning_.runPower = std::clamp(tuning_.runPower, 0.4f, 4.0f);
+  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.5f, 4.5f);
   tuning_.stability = std::clamp(tuning_.stability, 0.1f, 3.5f);
   tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
   tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
@@ -614,6 +614,26 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         }
       }
     }
+
+    float chestScaleY = 1.0f;
+    float stomachScaleY = 1.0f;
+    if (customizeData_) {
+      for (const auto &inst : customizeData_->partInstances) {
+        if (inst.partType == ModBodyPart::ChestBody)
+          chestScaleY = inst.param.scale.y * inst.param.length;
+        if (inst.partType == ModBodyPart::StomachBody)
+          stomachScaleY = inst.param.scale.y * inst.param.length;
+      }
+    }
+    float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
+    if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
+    float stomachSegLength = GetSnapshotSegmentLength(ModBodyPart::StomachBody, -1);
+    if (stomachSegLength <= 0.0001f) stomachSegLength = 1.6880f;
+
+    // Apply the same downward shift to the invisible logic anchors that the visual mesh does
+    float hipShiftY = -(chestScaleY - 1.0f) * chestSegLength - (stomachScaleY - 1.0f) * stomachSegLength;
+    leftHipAnchorLocal.y += hipShiftY;
+    rightHipAnchorLocal.y += hipShiftY;
 
     const float leftAnkleRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
     const float rightAnkleRadius =
@@ -1079,6 +1099,11 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     //==============================
     if (kickFeedbackType_ == KickFeedbackType::Perfect) {
       int streakLevel = std::min(perfectStreak_ - 1, 4);
+
+      // NPCの場合はPerfect連続ボーナスの恩恵を受けない
+      if (!isPlayer_) {
+        streakLevel = 0;
+      }
 
       float streakForwardScale = 1.0f + streakLevel * 1.0f;
       float streakRiseScale = 1.0f - streakLevel * 1.0f;
