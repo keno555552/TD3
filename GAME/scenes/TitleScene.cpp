@@ -16,6 +16,13 @@ TitleScene::TitleScene(kEngine* system) {
 	// 最低限のカメラ
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
+	titleCamera_ = system_->CreateCamera(); // タイトルロゴ用（デフォルト位置）
+
+	// TravelScene と同じ横視点（NPC が左→右に流れる構図）
+	camera_->SetTranslate({ 48.0f, 5.0f, 5.0f });
+	camera_->SetDefaultTransform(camera_->GetTransform());
+	camera_->SetRotation({ 0.0f, -1.57f, 0.0f });
+
 	usingCamera_ = camera_;
 	system_->SetCamera(usingCamera_);
 
@@ -29,6 +36,7 @@ TitleScene::TitleScene(kEngine* system) {
 	titleTextObject_->IntObject(system_);
 	titleTextObject_->CreateModelData(titleTextModelHandle_);
 	titleTextObject_->mainPosition.transform = CreateDefaultTransform();
+	// タイトル用カメラ（デフォルト位置）で描画するので元の transform に戻す
 	titleTextObject_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
 	titleTextObject_->mainPosition.transform.rotate = { 3.1415f / 2.0f ,0.0f, 0.0f };
 	titleTextObject_->mainPosition.transform.scale = { 1.0f,1.0f,1.0f };
@@ -37,21 +45,154 @@ TitleScene::TitleScene(kEngine* system) {
 	nextButton_->SetButton({ 640.0f, 550.0f }, 400.0f, 80.0f);
 
 	font_.Initialize(system_);
+
+	//===============================
+	// 背景NPC演出
+	//===============================
+	titleNpcPlayer_ = std::make_unique<TravelPlayer>(system_);
+	titleNpcPlayer_->Initialize(kNpcStartX);
+
+	titleNpcDummyData_ = ModBody::CreateDefaultCustomizeData();
+	titleNpcPlayer_->SetCustomizeData(titleNpcDummyData_.get());
+	titleNpcPlayer_->LoadCustomizeData();
+	titleNpcPlayer_->BuildFeaturesFromCustomizeData();
+	titleNpcPlayer_->ApplyCustomizeToMovementParam();
+
+	titleNpcModelHandle_ =
+		system_->SetModelObj("GAME/resources/modBody/body/body.obj");
+
+	titleNpcManager_ = std::make_unique<TravelNpcManager>(system_);
+	titleNpcManager_->npcModelHandle_ = titleNpcModelHandle_;
+	titleNpcManager_->InitializeNpcRunners(
+		titleNpcDummyData_.get(), titleNpcPlayer_.get(), kNpcLoopLimitX);
+
+	// 3体に絞る
+	if (titleNpcManager_->npcRunners_.size() > 3) {
+		titleNpcManager_->npcRunners_.resize(3);
+	}
+
+	// 各NPC のキャラ付け（速度差・初期ヘッドスタート・横位置）
+	struct NpcInit {
+		float timingSkill;
+		float headStartTime;  // 初期から何秒走った状態にするか
+		float laneX;
+		float cooldown;
+	};
+	const NpcInit initData[3] = {
+		{ 1.15f, 3.5f,  0.0f, 3.5f },  // 速い・先頭
+		{ 1.00f, 1.5f, -1.5f, 2.8f },  // 中・中盤
+		{ 0.85f, 0.0f,  1.5f, 2.2f },  // 遅い・スタート地点
+	};
+
+	npcLoopSettings_.clear();
+	npcLoopSettings_.resize(titleNpcManager_->npcRunners_.size());
+
+	for (size_t i = 0; i < titleNpcManager_->npcRunners_.size() && i < 3; ++i) {
+		auto& npc = titleNpcManager_->npcRunners_[i];
+		npc.timingSkill    = initData[i].timingSkill;
+		npc.headStartSpeed = 2.0f * npc.timingSkill;
+		npc.startDelay     = 0.0f;
+		npc.started        = true;
+		npc.laneX          = initData[i].laneX;
+		npcLoopSettings_[i].cooldownDuration = initData[i].cooldown;
+
+		// ヘッドスタート分のシミュレーションを回して初期位置をずらす
+		if (initData[i].headStartTime > 0.0f) {
+			titleNpcManager_->SimulateNpcHeadStart(
+				npc, initData[i].headStartTime,
+				static_cast<int>(i), kNpcLoopLimitX);
+		}
+
+		// シミュレーションでゴール超えた場合の安全ネット
+		if (npc.finished || npc.moveX >= kNpcLoopLimitX) {
+			static const float kFallbackPos[3] = { 5.0f, -5.0f, -14.0f };
+			npc.moveX     = kFallbackPos[i];
+			npc.finished  = false;
+			npc.finishRank = -1;
+			npc.velocityX = 0.0f;
+			npc.velocityY = 0.0f;
+		}
+	}
 }
 
 TitleScene::~TitleScene() {
 	font_.Cleanup();
+
+	if (titleNpcManager_) {
+		for (auto& npc : titleNpcManager_->npcRunners_) {
+			titleNpcManager_->ClearNpcCustomizedVisual(npc);
+		}
+	}
+	titleNpcManager_.reset();
+	titleNpcPlayer_.reset();
+	titleNpcDummyData_.reset();
+
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
+	system_->DestroyCamera(titleCamera_);
 	system_->RemoveLight(light1_);
 	delete titleTextObject_;
 	delete light1_;
+}
+
+void TitleScene::ResetTitleNpc(int index) {
+	if (index < 0 || index >= static_cast<int>(titleNpcManager_->npcRunners_.size())) {
+		return;
+	}
+	auto& npc = titleNpcManager_->npcRunners_[index];
+
+	npc.moveX = kNpcStartX;
+	npc.moveY = 1.94f;
+	npc.velocityX = 0.0f;
+	npc.velocityY = 0.0f;
+
+	npc.leftLegBend = 0.0f;
+	npc.rightLegBend = 0.0f;
+	npc.leftLegBendSpeed = 0.0f;
+	npc.rightLegBendSpeed = 0.0f;
+
+	npc.bodyTilt = 0.0f;
+	npc.bodyTiltVelocity = 0.0f;
+
+	npc.landTimer = 0.0f;
+	npc.isGrounded = true;
+	npc.prevGrounded = true;
+
+	npc.leftInput = false;
+	npc.rightInput = false;
+	npc.kickThisFrame = false;
+	npc.kickSideThisFrame = 0;
+	npc.isKickHolding = false;
+	npc.kickHoldLeft = false;
+	npc.hasKickPlan = false;
+	npc.kickedThisAirborne = false;
+
+	npc.finished = false;
+	npc.finishRank = -1;
+
+	// startDelay をそのままクールタイムとして流用
+	npc.started = false;
+	npc.startDelay = npcLoopSettings_[index].cooldownDuration;
 }
 
 void TitleScene::Update() {
 	system_->SetCamera(usingCamera_);
 
 	nextButton_->Update();
+
+	//===============================
+	// 背景NPC更新（ループ管理）
+	//===============================
+	const float dt = system_->GetDeltaTime();
+	if (titleNpcManager_) {
+		titleNpcManager_->UpdateNpcRunners(dt, kNpcLoopLimitX, usingCamera_);
+
+		for (int i = 0; i < static_cast<int>(titleNpcManager_->npcRunners_.size()); ++i) {
+			if (titleNpcManager_->npcRunners_[i].finished) {
+				ResetTitleNpc(i);
+			}
+		}
+	}
 
 	// スペースキーでお題発表シーンへ
 	if (!fade_.IsBusy() && (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsPress())) {
@@ -70,9 +211,17 @@ void TitleScene::Update() {
 
 void TitleScene::Draw() {
 
+	// 背景NPC（先に描画）
+	if (titleNpcManager_) {
+		titleNpcManager_->DrawNpcs(kNpcLoopLimitX, true);
+	}
+
 	if (titleTextObject_) {
-		titleTextObject_->Update(usingCamera_);
+		// タイトルロゴはデフォルト正面カメラで描画
+		system_->SetCamera(titleCamera_);
+		titleTextObject_->Update(titleCamera_);
 		titleTextObject_->Draw();
+		system_->SetCamera(usingCamera_); // NPC カメラに戻す
 	}
 
 	nextButton_->Render();
