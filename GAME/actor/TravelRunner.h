@@ -3,17 +3,17 @@
 #include "GAME/actor/ModBody.h"
 #include "Object/Object.h"
 #include <array>
-#include <unordered_map>
 #include <memory>
+#include <unordered_map>
 
 class kEngine;
 class Camera;
 class Object;
 
-class TravelPlayer {
+class TravelRunner {
 public:
-  TravelPlayer(kEngine* system);
-  ~TravelPlayer();
+  TravelRunner(kEngine *system);
+  ~TravelRunner();
 
   void Initialize(float startX);
 
@@ -24,8 +24,8 @@ public:
 
   void BuildAllVisualParts();
   void UpdateModObjects();
-  void DrawModObjects(Camera* camera);
-  void UpdateParticle(Camera* camera);
+  void DrawModObjects(Camera *camera);
+  void UpdateParticle(Camera *camera);
   void DrawParticle();
   void ClearParticle();
   void LoadCustomizeData();
@@ -35,7 +35,6 @@ public:
   void SavePreviousFrameState();
   void ResolveVisualGroundPenetration();
   void BuildFeaturesFromCustomizeData();
-  
 
   enum class LowestBodyPart {
     None,
@@ -47,7 +46,7 @@ public:
     Chest,
     Stomach
   };
-  
+
   float GetLowestVisualBodyY(LowestBodyPart *outPart) const;
   const char *GetLowestBodyPartName(LowestBodyPart part) const;
 
@@ -57,11 +56,15 @@ public:
   float GetMoveX() const { return moveX_; }
   void SetMoveX(float x) { moveX_ = x; }
 
+  float GetLaneX() const { return laneX_; }
+  void SetLaneX(float x) { laneX_ = x; }
+
   float GetMoveY() const { return moveY_; }
   void SetMoveY(float y) { moveY_ = y; }
 
   float GetVelocityX() const { return velocityX_; }
   float GetVelocityY() const { return velocityY_; }
+  void SetVelocityY(float y) { velocityY_ = y; }
 
   float GetBodyTilt() const { return bodyTilt_; }
   float GetLeftLegBend() const { return leftLegBend_; }
@@ -79,10 +82,69 @@ public:
 
   void SetIsGrounded(bool isGrounded) { isGrounded_ = isGrounded; }
 
+  float GetLegRecoverAngle() const { return legRecoverAngle_; }
+  void SetLeftLegBend(float v) { leftLegBend_ = v; }
+  void SetRightLegBend(float v) { rightLegBend_ = v; }
+  void SetLeftLegPrevBend(float v) { leftLegPrevBend_ = v; }
+  void SetRightLegPrevBend(float v) { rightLegPrevBend_ = v; }
+  void SetLeftLegBendSpeed(float v) { leftLegBendSpeed_ = v; }
+  void SetRightLegBendSpeed(float v) { rightLegBendSpeed_ = v; }
+  void SetLeftLegPrevBendSpeed(float v) { leftLegPrevBendSpeed_ = v; }
+  void SetRightLegPrevBendSpeed(float v) { rightLegPrevBendSpeed_ = v; }
+  void SetBodyTilt(float v) { bodyTilt_ = v; }
+  void SetBodyTiltVelocity(float v) { bodyTiltVelocity_ = v; }
+  void SetLeftDriveAccum(float v) { leftDriveAccum_ = v; }
+  void SetRightDriveAccum(float v) { rightDriveAccum_ = v; }
+  void SetLeftHoldTime(float v) { leftHoldTime_ = v; }
+  void SetRightHoldTime(float v) { rightHoldTime_ = v; }
+  void SetLastKickSide(int v) { lastKickSide_ = v; }
+  void SetGaitTiltTarget(float v) { gaitTiltTarget_ = v; }
+  void SetLandTimer(float v) { landTimer_ = v; }
+  float GetGroundY() const { return groundY_; }
+  void SetGroundY(float v) { groundY_ = v; }
+  bool GetIsGrounded() const { return isGrounded_; }
+  float GetLandTimer() const { return landTimer_; }
+  float GetVisualLiftY() const { return visualLiftY_; }
+  float GetLegDiffTiltPower() const { return legDiffTiltPower_; }
+  float GetIdealRunTilt() const { return idealRunTilt_; }
+  float GetPostureTolerance() const { return postureTolerance_; }
+  bool* GetDebugForceTiltPtr() { return &debugForceTilt_; }
+  float* GetDebugTiltValuePtr() { return &debugTiltValue_; }
+  bool* GetUseCustomizeMovePtr() { return &useCustomizeMove_; }
+  std::unique_ptr<Object>& GetShadowRef() { return shadow_; }
+
+  bool GetIsPlayer() const { return isPlayer_; }
+  void SetIsPlayer(bool v) { isPlayer_ = v; }
+
+  void SetCustomizeData(const ModBodyCustomizeData *data) {
+    customizeData_ = data;
+  }
+
+  float GetLegKickAngle() const { return legKickAngle_; }
+  float GetLegFollowPower() const { return legFollowPower_; }
+  float GetLegMaxSpeed() const { return legMaxSpeed_; }
+  float GetJointDamping() const { return jointDamping_; }
+  float GetMaxForwardTilt() const { return maxForwardTilt_; }
+  float GetMaxBackwardTilt() const { return maxBackwardTilt_; }
+  float GetInertia() const { return inertia_; }
+  float GetGravity() const { return gravity_; }
+
+  struct TravelTuning {
+    float runPower = 1.0f;
+    float maxSpeed = 1.0f;
+    float stability = 1.0f;
+    float lift = 1.0f;
+    float turnResponse = 1.0f;
+    float strideScale = 1.0f;
+  };
+  TravelTuning* GetTuningPtr() { return &tuning_; }
+
+private:
   // Variables transferred from TravelScene
   float moveX_ = 0.0f;
+  float laneX_ = 0.0f;
   float velocityX_ = 0.0f;
-  float inertia_ = 0.96f; 
+  float inertia_ = 0.96f;
 
   float moveY_ = 0.0f;
   float velocityY_ = 0.0f;
@@ -161,14 +223,6 @@ public:
   float leftLegPrevBendSpeed_ = 0.0f;
   float rightLegPrevBendSpeed_ = 0.0f;
 
-  struct TravelTuning {
-    float runPower = 1.0f;
-    float maxSpeed = 1.0f;
-    float stability = 1.0f;
-    float lift = 1.0f;
-    float turnResponse = 1.0f;
-    float strideScale = 1.0f;
-  };
   TravelTuning tuning_;
   bool useCustomizeMove_ = true;
 
@@ -198,14 +252,12 @@ public:
   float torsoSizeScale_ = 1.0f;
 
   int perfectStreak_ = 0;
+  bool isPlayer_ = false;
 
   const ModBodyCustomizeData *customizeData_ = nullptr;
-  void SetCustomizeData(const ModBodyCustomizeData *data) {
-    customizeData_ = data;
-  }
   std::vector<ModControlPointSnapshot> controlPointSnapshots_;
-  
-  std::unordered_map<int, Object*> allPartObjects_;
+
+  std::unordered_map<int, Object *> allPartObjects_;
 
   std::unique_ptr<Object> shadow_;
   float visualLiftY_ = 0.0f;
@@ -236,7 +288,7 @@ public:
   bool GetPartInstanceLocalRotate(int partId, Vector3 &outRotate) const;
   bool GetFirstPartTypeLocalTranslate(ModBodyPart partType,
                                       Vector3 &outLocal) const;
-  Object* GetStandardPart(ModBodyPart partType) const;
+  Object *GetStandardPart(ModBodyPart partType) const;
 
   int GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
                               int parentId) const;
@@ -245,8 +297,6 @@ public:
                               float &outBaseAngleX, float &outBaseAngleZ) const;
 
   float ComputeExtraAnimAngleX(ModBodyPart partType) const;
-
-
 
   struct CharacterFeatures {
     int headCount = 0;
@@ -281,8 +331,6 @@ public:
   bool BuildSegmentFromSnapshot(ModBodyPart partType, int partId,
                                 SegmentVisual &out);
 
-
-
 private:
-  kEngine* system_ = nullptr;
+  kEngine *system_ = nullptr;
 };

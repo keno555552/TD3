@@ -5,7 +5,7 @@
 #include "GAME/effect/Perfect_Particle.h"
 #include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
-#include "GAME/actor/TravelPlayer.h"
+#include "GAME/actor/TravelRunner.h"
 #include "GAME/manager/TravelNpcManager.h"
 #include <array>
 #include <memory>
@@ -88,7 +88,7 @@ private:
 
 
 
-  std::unique_ptr<TravelPlayer> player_;
+  std::unique_ptr<TravelRunner> player_;
 
 private:
   /// <summary>
@@ -113,6 +113,9 @@ private:
   };
 
   int playerRank_ = 1;
+  int displayedRank_ = 1;
+  float rankAnimationTimer_ = 0.0f;
+  const float rankAnimationDuration_ = 0.6f;
   void UpdateRaceRanking();
 
   // レース通過人数
@@ -133,7 +136,6 @@ private:
 
   void UpdateRaceFinishState();
 
-  std::array<Object *, 16> npcDebugCpObjects_{};
   bool showBaseModel_ = true;
   bool showExtraModel_ = true;
   bool showNpcModel_ = true;
@@ -150,15 +152,21 @@ private:
   int spriteAHandle_ = 0;
   int spriteDHandle_ = 0;
 
+  // 順位表示用
+  std::unique_ptr<SimpleSprite> rankSprites_[5];
+
   float aKeyFlashTimer_ = 0.0f;
   float dKeyFlashTimer_ = 0.0f;
 
   float startUITextTimer_ = 0.0f;
 
   // チュートリアル用
-  bool isTutorialMode_;
+  bool isTutorialMode_;  // チュートリアル用
   std::unique_ptr<SimpleSprite> tutorialBgSprite_;
   int whiteTextureHandle_ = 0;
+
+  // ミニマップ用
+  std::unique_ptr<SimpleSprite> minimapLineSprite_;
 
   /* 失敗時のリトライ選択
   ---------------------------*/

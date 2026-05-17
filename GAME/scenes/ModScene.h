@@ -903,7 +903,6 @@ private:
                             float skillMultiplier) const;
 
   float GetNpcBaseModTime() const;
-  float GetNpcPresetTimeBonus(NpcPresetType presetType) const;
   float GetNpcSkillMultiplierByIndex(int index) const;
   float GetNpcRunTimingSkillByIndex(int index) const;
 

@@ -66,6 +66,11 @@ std::unique_ptr<ModBodyCustomizeData> &SharedCustomizeDataStorage() {
   return sharedData;
 }
 
+std::vector<std::unique_ptr<ModBodyCustomizeData>> &SharedNpcCustomizeDataStorage() {
+  static std::vector<std::unique_ptr<ModBodyCustomizeData>> sharedNpcData;
+  return sharedNpcData;
+}
+
 /// <summary>
 /// 部位タイプが有効範囲かチェックする
 /// </summary>
@@ -220,6 +225,199 @@ void ModCustomizeDataStore::SetSharedCustomizeData(const ModBodyCustomizeData &d
 
 const ModBodyCustomizeData *ModCustomizeDataStore::GetSharedCustomizeData() {
   return SharedCustomizeDataStorage().get();
+}
+
+std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(NpcPresetType type, const ModBodyCustomizeData* baseData) {
+  std::unique_ptr<ModBodyCustomizeData> data;
+  if (baseData != nullptr) {
+    data = std::make_unique<ModBodyCustomizeData>(*baseData);
+  } else {
+    data = ModBody::CreateDefaultCustomizeData();
+  }
+
+  if (data == nullptr) return nullptr;
+
+  switch (type) {
+  case NpcPresetType::Default:
+    break;
+
+  case NpcPresetType::HeadBig:
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::Head) {
+        inst.param.scale.x *= 2.0f;
+        inst.param.scale.y *= 2.0f;
+        inst.param.scale.z *= 2.0f;
+      } else if (inst.partType == ModBodyPart::Neck) {
+        inst.param.scale.x *= 1.15f;
+        inst.param.scale.z *= 1.15f;
+      }
+    }
+    break;
+
+  case NpcPresetType::LongLeg:
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
+        inst.param.scale.y *= 2.0f;
+      }
+    }
+    break;
+
+  case NpcPresetType::BigTorso:
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
+        inst.param.scale.x *= 2.0f;
+        inst.param.scale.y *= 2.0f;
+        inst.param.scale.z *= 2.0f;
+      }
+    }
+    break;
+
+  case NpcPresetType::Gorilla:
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
+          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
+        inst.param.scale.x *= 1.5f;
+        inst.param.scale.z *= 1.5f;
+        inst.param.scale.y *= 1.3f;
+      } else if (inst.partType == ModBodyPart::ChestBody) {
+        inst.param.scale.x *= 1.6f;
+        inst.param.scale.z *= 1.4f;
+      } else if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+                 inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
+        inst.param.scale.y *= 0.6f;
+      }
+    }
+    break;
+
+  case NpcPresetType::Slender:
+    for (auto& inst : data->partInstances) {
+      inst.param.scale.x *= 0.6f;
+      inst.param.scale.z *= 0.6f;
+      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin ||
+          inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
+        inst.param.scale.y *= 1.3f;
+      }
+    }
+    break;
+
+  case NpcPresetType::Chubby:
+    for (auto& inst : data->partInstances) {
+      inst.param.scale.x *= 1.8f;
+      inst.param.scale.z *= 1.8f;
+      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
+        inst.param.scale.y *= 0.8f;
+      } else if (inst.partType == ModBodyPart::StomachBody) {
+        inst.param.scale.x *= 1.3f;
+        inst.param.scale.z *= 1.5f;
+      }
+    }
+    break;
+
+  case NpcPresetType::Giant:
+    for (auto& inst : data->partInstances) {
+      inst.param.scale.x *= 2.0f;
+      inst.param.scale.y *= 2.0f;
+      inst.param.scale.z *= 2.0f;
+    }
+    break;
+
+  case NpcPresetType::Mini:
+    for (auto& inst : data->partInstances) {
+      inst.param.scale.x *= 0.5f;
+      inst.param.scale.y *= 0.5f;
+      inst.param.scale.z *= 0.5f;
+    }
+    break;
+
+  case NpcPresetType::LongArm:
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
+          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
+        inst.param.scale.y *= 2.0f;
+      }
+    }
+    break;
+
+  case NpcPresetType::WideShoulder:
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::LeftUpperArm) {
+        snap.localPosition.x -= 1.5f;
+        snap.localPosition.y += 0.5f;
+      } else if (partType == ModBodyPart::RightUpperArm) {
+        snap.localPosition.x += 1.5f;
+        snap.localPosition.y += 0.5f;
+      }
+    }
+    break;
+
+  case NpcPresetType::WideHip:
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::LeftThigh) {
+        snap.localPosition.x -= 1.5f;
+      } else if (partType == ModBodyPart::RightThigh) {
+        snap.localPosition.x += 1.5f;
+      }
+    }
+    break;
+
+  case NpcPresetType::LowHead:
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::Neck || partType == ModBodyPart::Head) {
+        snap.localPosition.y -= 1.0f;
+        snap.localPosition.z += 0.8f; // Move forward slightly for a hunched look
+      }
+    }
+    break;
+  }
+
+  NormalizeCustomizeData(*data);
+  return data;
+}
+
+void ModCustomizeDataStore::SetSharedNpcCustomizeData(int rankIndex, const ModBodyCustomizeData &data) {
+  std::vector<std::unique_ptr<ModBodyCustomizeData>> &storage = SharedNpcCustomizeDataStorage();
+  if (rankIndex >= storage.size()) {
+    storage.resize(rankIndex + 1);
+  }
+  ModBodyCustomizeData normalized = data;
+  NormalizeCustomizeData(normalized);
+  storage[rankIndex] = std::make_unique<ModBodyCustomizeData>(normalized);
+}
+
+const ModBodyCustomizeData *ModCustomizeDataStore::GetSharedNpcCustomizeData(int rankIndex) {
+  std::vector<std::unique_ptr<ModBodyCustomizeData>> &storage = SharedNpcCustomizeDataStorage();
+  if (rankIndex >= 0 && rankIndex < storage.size()) {
+    return storage[rankIndex].get();
+  }
+  return nullptr;
+}
+
+void ModCustomizeDataStore::ClearSharedNpcCustomizeData() {
+  SharedNpcCustomizeDataStorage().clear();
 }
 
 void ModCustomizeDataStore::NormalizeCustomizeData(ModBodyCustomizeData &data) {
