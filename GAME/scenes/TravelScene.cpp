@@ -331,7 +331,7 @@ void TravelScene::Update() {
   // チュートリアル入力待ち
   //===============================
   if (isTutorialMode_) {
-    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN)) {
+    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetMouseTriggerOn(0)) {
       isTutorialMode_ = false;
       s_hasSeenTravelTutorial = true;
     }
@@ -692,7 +692,7 @@ void TravelScene::Draw() {
         {1.0f, 1.0f, 1.0f, 1.0f});
 
     bitmapFont.RenderText(
-        "[SPACE]キー または [ENTER]キー で スタート", {640.0f, 480.0f},
+        "クリック または [SPACE] キーで スタート", {640.0f, 480.0f},
         32.0f, BitmapFont::Align::Center, 5.0f,
         {1.0f, 1.0f, 0.5f, 1.0f});
   }
