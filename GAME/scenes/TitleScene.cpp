@@ -1,6 +1,8 @@
 #include "TitleScene.h"
 #include "TravelScene.h"
 #include "ModScene.h"
+#include "GAME/actor/ModCustomizeDataStore.h"
+#include <random>
 
 TitleScene::TitleScene(kEngine* system) {
 	system_ = system;
@@ -98,6 +100,9 @@ TitleScene::TitleScene(kEngine* system) {
 		npc.laneX          = initData[i].laneX;
 		npcLoopSettings_[i].cooldownDuration = initData[i].cooldown;
 
+		// 最初の1回目のランダムプリセット適用
+		ResetTitleNpcBody(static_cast<int>(i));
+
 		// ヘッドスタート分のシミュレーションを回して初期位置をずらす
 		if (initData[i].headStartTime > 0.0f) {
 			titleNpcManager_->SimulateNpcHeadStart(
@@ -130,13 +135,68 @@ TitleScene::~TitleScene() {
 	delete light1_;
 }
 
+void TitleScene::ResetTitleNpcBody(int index) {
+	if (index < 0 || index >= static_cast<int>(titleNpcManager_->npcRunners_.size())) {
+		return;
+	}
+	auto& npc = titleNpcManager_->npcRunners_[index];
+
+	// ランダムなプリセットを選択
+	std::vector<NpcPresetType> presetPool = {
+		NpcPresetType::HeadBig, NpcPresetType::BigTorso,
+		NpcPresetType::LongLeg, NpcPresetType::Gorilla, NpcPresetType::Slender,
+		NpcPresetType::Chubby, NpcPresetType::Giant, NpcPresetType::Mini,
+		NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip,
+		NpcPresetType::LowHead, NpcPresetType::Default
+	};
+
+	// 現在他のNPCが使用中のプリセットを除外する
+	std::vector<NpcPresetType> availablePool;
+	for (auto preset : presetPool) {
+		bool used = false;
+		for (size_t i = 0; i < npcLoopSettings_.size(); ++i) {
+			if (static_cast<int>(i) != index && npcLoopSettings_[i].currentPresetId == static_cast<int>(preset)) {
+				used = true;
+				break;
+			}
+		}
+		if (!used) {
+			availablePool.push_back(preset);
+		}
+	}
+
+	if (availablePool.empty()) {
+		availablePool = presetPool; // 万が一枯渇した場合は元に戻す
+	}
+
+	int randIdx = rand() % availablePool.size();
+	NpcPresetType randomPreset = availablePool[randIdx];
+
+	npcLoopSettings_[index].currentPresetId = static_cast<int>(randomPreset);
+
+	// 新しいプリセットデータを作成して適用
+	auto newPreset = ModCustomizeDataStore::CreateNpcPreset(randomPreset, nullptr);
+	if (newPreset) {
+		npc.customizeData = std::move(newPreset);
+		npc.runner->SetCustomizeData(npc.customizeData.get());
+		npc.runner->LoadCustomizeData();
+		npc.runner->BuildFeaturesFromCustomizeData();
+		npc.runner->BuildAllVisualParts();
+		npc.runner->ApplyCustomizeToMovementParam();
+	}
+}
+
 void TitleScene::ResetTitleNpc(int index) {
 	if (index < 0 || index >= static_cast<int>(titleNpcManager_->npcRunners_.size())) {
 		return;
 	}
 	auto& npc = titleNpcManager_->npcRunners_[index];
 
+	// 位置と状態のリセット
 	npc.runner->Initialize(kNpcStartX);
+
+	// 体型をランダムに変更
+	ResetTitleNpcBody(index);
 
 	npc.leftInput = false;
 	npc.rightInput = false;
