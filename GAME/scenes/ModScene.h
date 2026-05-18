@@ -5,6 +5,7 @@
 #include "GAME/actor/ModAssemblyGraph.h"
 #include "GAME/actor/ModAssemblyResolver.h"
 #include "GAME/actor/ModAssemblyUtil.h"
+#include "GAME/actor/TravelRunner.h"
 #include "GAME/actor/ModAttachCandidate.h"
 #include "GAME/actor/ModBody.h"
 #include "GAME/font/BitmapFont.h"
@@ -218,6 +219,12 @@ private:
   int addHeadSetTextureHandle_ = 0;
   int addBodyTextureHandle_ = 0;
   int trashTextureHandle_ = 0;
+
+  // ステータスゲージ用のスプライト群 (4項目 x 5段階 = 20個)
+  std::array<std::unique_ptr<SimpleSprite>, 20> gaugeBlocks_{};
+
+  // パラメータ計算プレビュー用のランナー
+  std::unique_ptr<class TravelRunner> previewRunner_;
 
 private:
   /// <summary>

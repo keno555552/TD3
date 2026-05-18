@@ -121,8 +121,10 @@ void TravelNpcManager::InitializeNpcRunners(const ModBodyCustomizeData* customiz
 
 void TravelNpcManager::UpdateNpcRunners(float deltaTime, float goalX, Camera* camera) {
   static float speedLogTimer = 0.0f;
-  static std::array<float, 4> prevMoveX = {-18.0f, -18.0f, -18.0f, -18.0f};
-
+  static std::vector<float> prevMoveX;
+  if (prevMoveX.size() < npcRunners_.size()) {
+      prevMoveX.resize(npcRunners_.size(), -18.0f);
+  }
   speedLogTimer += deltaTime;
 
   for (size_t i = 0; i < npcRunners_.size(); ++i) {
