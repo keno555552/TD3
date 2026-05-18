@@ -4,7 +4,7 @@
 #include <Object/Object.h>
 #include"GAME/Object/DetailButton/DetailButton.h"
 #include "GAME/font/BitmapFont.h"
-#include "GAME/actor/TravelPlayer.h"
+#include "GAME/actor/TravelRunner.h"
 #include "GAME/manager/TravelNpcManager.h"
 #include <vector>
 
@@ -38,7 +38,7 @@ private:
   bool isStartTransition_ = false;
 
   // 背景NPC演出
-  std::unique_ptr<TravelPlayer>           titleNpcPlayer_;
+  std::unique_ptr<TravelRunner>           titleNpcPlayer_;
   std::unique_ptr<TravelNpcManager>       titleNpcManager_;
   std::unique_ptr<ModBodyCustomizeData>   titleNpcDummyData_;
   int titleNpcModelHandle_ = 0;

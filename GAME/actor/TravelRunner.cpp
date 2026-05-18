@@ -23,7 +23,28 @@ TravelRunner::~TravelRunner() {
   }
 }
 
-void TravelRunner::Initialize(float startX) { moveX_ = startX; }
+void TravelRunner::Initialize(float startX) { 
+  moveX_ = startX; 
+  moveY_ = 1.94f;
+  velocityX_ = 0.0f;
+  velocityY_ = 0.0f;
+  
+  leftLegBend_ = 0.0f;
+  rightLegBend_ = 0.0f;
+  leftLegBendSpeed_ = 0.0f;
+  rightLegBendSpeed_ = 0.0f;
+  
+  bodyTilt_ = 0.0f;
+  bodyTiltVelocity_ = 0.0f;
+  
+  landTimer_ = 0.0f;
+  isGrounded_ = true;
+  
+  leftHoldTime_ = 0.0f;
+  rightHoldTime_ = 0.0f;
+  leftDriveAccum_ = 0.0f;
+  rightDriveAccum_ = 0.0f;
+}
 
 void TravelRunner::UpdateHoldState(bool leftNowInput, bool rightNowInput,
                                    float deltaTime) {
@@ -1340,9 +1361,19 @@ void TravelRunner::ApplyVisualState() {
     // dynamic offsets applied)
     obj->mainPosition.transform.translate = instance.resolvedLocalTranslate;
 
+    // Check if this part is a standard part (first of its kind)
+    bool isStandard = false;
+    int firstId = -1;
+    if (GetFirstPartTypePartId(instance.partType, firstId)) {
+      if (firstId == instance.partId) {
+        isStandard = true;
+      }
+    }
+
     // Apply parent's scale to the local translation if parent is Torso
-    // This fixes the issue where big-bodied NPCs have normal shoulder widths
-    if (instance.parentId >= 0) {
+    // This fixes the issue where big-bodied NPCs have normal shoulder widths.
+    // IMPORTANT: Only apply this to EXTRA parts. Standard parts are already positioned correctly by IK snapshots.
+    if (instance.parentId >= 0 && !isStandard) {
       auto parentIt = allPartObjects_.find(instance.parentId);
       if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
         if (!parentIt->second->objectParts_.empty()) {
@@ -1470,6 +1501,13 @@ void TravelRunner::ApplyVisualState() {
             default:
               break;
             }
+
+            int parentSnapshotOwnerId = GetExtraSnapshotOwnerId(parentType, instance.parentId, -1);
+            float pSegLen = GetSnapshotSegmentLength(parentType, parentSnapshotOwnerId);
+            if (pSegLen > 0.0001f && parentDefaultLength > 0.0001f) {
+                parentScaleY *= (pSegLen / parentDefaultLength);
+            }
+
             obj->mainPosition.transform.translate = {
                 0.0f, -(parentScaleY * parentDefaultLength), 0.0f};
           }
@@ -1721,7 +1759,16 @@ void TravelRunner::ApplyVisualState() {
       obj->objectParts_[0].transform.scale.z =
           thicknessScale * instance.param.scale.z;
 
-      if (!isIKDriven) {
+      bool isStandard = false;
+      int firstId = -1;
+      if (GetFirstPartTypePartId(instance.partType, firstId)) {
+        if (firstId == instance.partId) {
+          isStandard = true;
+        }
+      }
+
+      Vector3 meshPivotShift = {0.0f, 0.0f, 0.0f};
+      if (!isStandard) {
         if (instance.partType == ModBodyPart::LeftUpperArm ||
             instance.partType == ModBodyPart::LeftForeArm ||
             instance.partType == ModBodyPart::RightUpperArm ||
@@ -1730,17 +1777,17 @@ void TravelRunner::ApplyVisualState() {
             instance.partType == ModBodyPart::LeftShin ||
             instance.partType == ModBodyPart::RightThigh ||
             instance.partType == ModBodyPart::RightShin) {
-          obj->objectParts_[0].transform.translate = {0.0f, -finalScaleY * 0.5f,
-                                                      0.0f};
+          meshPivotShift = {0.0f, -finalScaleY * 0.5f, 0.0f};
         } else if (instance.partType == ModBodyPart::Head ||
                    instance.partType == ModBodyPart::Neck) {
-          obj->objectParts_[0].transform.translate = {0.0f, finalScaleY * 0.5f,
-                                                      0.0f};
-        } else {
-          obj->objectParts_[0].transform.translate = {0.0f, 0.0f, 0.0f};
+          meshPivotShift = {0.0f, finalScaleY * 0.5f, 0.0f};
         }
+      }
+
+      if (!isIKDriven) {
+        obj->objectParts_[0].transform.translate = meshPivotShift;
       } else {
-        Vector3 startPos = {0.0f, 0.0f, 0.0f};
+        Vector3 startPos = meshPivotShift;
         if (instance.partType == ModBodyPart::ChestBody) {
           for (const auto &snap : customizeData_->controlPointSnapshots) {
             if (snap.role == ModControlPointRole::Chest) {
