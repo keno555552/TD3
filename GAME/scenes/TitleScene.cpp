@@ -51,7 +51,7 @@ TitleScene::TitleScene(kEngine* system) {
 	//===============================
 	// 背景NPC演出
 	//===============================
-	titleNpcPlayer_ = std::make_unique<TravelPlayer>(system_);
+	titleNpcPlayer_ = std::make_unique<TravelRunner>(system_);
 	titleNpcPlayer_->Initialize(kNpcStartX);
 
 	titleNpcDummyData_ = ModBody::CreateDefaultCustomizeData();
@@ -106,13 +106,11 @@ TitleScene::TitleScene(kEngine* system) {
 		}
 
 		// シミュレーションでゴール超えた場合の安全ネット
-		if (npc.finished || npc.moveX >= kNpcLoopLimitX) {
+		if (npc.finished || npc.runner->GetMoveX() >= kNpcLoopLimitX) {
 			static const float kFallbackPos[3] = { 5.0f, -5.0f, -14.0f };
-			npc.moveX     = kFallbackPos[i];
+			npc.runner->Initialize(kFallbackPos[i]);
 			npc.finished  = false;
 			npc.finishRank = -1;
-			npc.velocityX = 0.0f;
-			npc.velocityY = 0.0f;
 		}
 	}
 }
@@ -120,11 +118,6 @@ TitleScene::TitleScene(kEngine* system) {
 TitleScene::~TitleScene() {
 	font_.Cleanup();
 
-	if (titleNpcManager_) {
-		for (auto& npc : titleNpcManager_->npcRunners_) {
-			titleNpcManager_->ClearNpcCustomizedVisual(npc);
-		}
-	}
 	titleNpcManager_.reset();
 	titleNpcPlayer_.reset();
 	titleNpcDummyData_.reset();
@@ -143,31 +136,15 @@ void TitleScene::ResetTitleNpc(int index) {
 	}
 	auto& npc = titleNpcManager_->npcRunners_[index];
 
-	npc.moveX = kNpcStartX;
-	npc.moveY = 1.94f;
-	npc.velocityX = 0.0f;
-	npc.velocityY = 0.0f;
-
-	npc.leftLegBend = 0.0f;
-	npc.rightLegBend = 0.0f;
-	npc.leftLegBendSpeed = 0.0f;
-	npc.rightLegBendSpeed = 0.0f;
-
-	npc.bodyTilt = 0.0f;
-	npc.bodyTiltVelocity = 0.0f;
-
-	npc.landTimer = 0.0f;
-	npc.isGrounded = true;
-	npc.prevGrounded = true;
+	npc.runner->Initialize(kNpcStartX);
 
 	npc.leftInput = false;
 	npc.rightInput = false;
-	npc.kickThisFrame = false;
-	npc.kickSideThisFrame = 0;
 	npc.isKickHolding = false;
 	npc.kickHoldLeft = false;
 	npc.hasKickPlan = false;
 	npc.kickedThisAirborne = false;
+	npc.prevGrounded = true;
 
 	npc.finished = false;
 	npc.finishRank = -1;
@@ -215,7 +192,7 @@ void TitleScene::Draw() {
 
 	// 背景NPC（先に描画）
 	if (titleNpcManager_) {
-		titleNpcManager_->DrawNpcs(kNpcLoopLimitX, true);
+		titleNpcManager_->DrawNpcs(kNpcLoopLimitX, true, usingCamera_);
 	}
 
 	if (titleTextObject_) {
