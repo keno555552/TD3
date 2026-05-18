@@ -63,10 +63,11 @@ void Perfect_Particle::Spawn(const Vector3 &pos, KickEffectType type) {
     auto &p = particleObjectList_.back();
 
     p->part->CreateModelData(defaultModelHandle_);
-    *p->part->objectParts_[0].materialConfig = *commonMaterialConfig;
-
-    p->part->objectParts_[0].materialConfig->useModelTexture = false;
-    p->part->objectParts_[0].materialConfig->textureColor = color;
+    if (!p->part->objectParts_.empty()) {
+        *p->part->objectParts_[0].materialConfig = *commonMaterialConfig;
+        p->part->objectParts_[0].materialConfig->useModelTexture = false;
+        p->part->objectParts_[0].materialConfig->textureColor = color;
+    }
 
     p->part->mainPosition.transform = CreateDefaultTransform();
     p->part->mainPosition.transform.translate = pos;
@@ -108,7 +109,9 @@ void Perfect_Particle::ClearAll() {
 void Perfect_Particle::UpdatePerfect() {
   for (auto &object : particleObjectList_) {
     float t = object->lifeTimeTimer.parameter_ / object->lifeTimeTimer.maxTime_;
-    object->part->objectParts_[0].materialConfig->textureColor.w = 1.0f - t;
+    if (!object->part->objectParts_.empty()) {
+        object->part->objectParts_[0].materialConfig->textureColor.w = 1.0f - t;
+    }
   }
 }
 

@@ -1040,13 +1040,15 @@ ModScene::ModScene(kEngine *system) {
   // テキスト描画用のビットマップフォントを初期化する
   bitmapFont_.Initialize(system);
 
+  // 白テクスチャの読み込み (UI等で使用)
+  whiteTextureHandle_ = system_->LoadTexture(
+      "kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
+
   // 画面UIを初期化する
   InitializeScreenUi();
 
   // チュートリアル
   isTutorialMode_ = !s_hasSeenModTutorial;
-  whiteTextureHandle_ = system_->LoadTexture(
-      "kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
   tutorialBgSprite_ = std::make_unique<SimpleSprite>();
   tutorialBgSprite_->IntObject(system_);
   tutorialBgSprite_->CreateDefaultData();
@@ -6686,6 +6688,36 @@ void ModScene::InitializeScreenUi() {
   SetupUiSprite(nextSceneButton_, {1200.0f, 640.0f}, {100.0f, 100.0f},
                 uiFrameTextureHandle_);
   nextSceneButton_.label = "つぎへ";
+
+  // パラメータ計算用ランナー初期化
+  previewRunner_ = std::make_unique<TravelRunner>(system_);
+
+  // ステータスゲージUIの初期化 (4パラメータ x 5ブロック = 20個)
+  for (int i = 0; i < 20; ++i) {
+      gaugeBlocks_[i] = std::make_unique<SimpleSprite>();
+      gaugeBlocks_[i]->IntObject(system_);
+      gaugeBlocks_[i]->CreateDefaultData();
+      
+      auto& part = gaugeBlocks_[i]->objectParts_[0];
+      part.materialConfig->textureHandle = whiteTextureHandle_;
+      part.materialConfig->useModelTexture = false;
+      part.materialConfig->enableLighting = false;
+      
+      part.cropLT = {0.0f, 0.0f};
+      part.cropSize = {0.0f, 0.0f};
+      part.anchorPoint = {0.0f, 0.0f};
+      
+      const float bw = 24.0f;
+      const float bh = 16.0f;
+      part.conerData.coner[0] = {0.0f, 0.0f};
+      part.conerData.coner[1] = {0.0f, bh};
+      part.conerData.coner[2] = {bw, bh};
+      part.conerData.coner[3] = {bw, 0.0f};
+      
+      part.transform.translate = {0.0f, 0.0f, 0.0f};
+      part.transform.rotate = {0.0f, 0.0f, 0.0f};
+      part.transform.scale = {1.0f, 1.0f, 1.0f};
+  }
 }
 
 int ModScene::ExecuteAddButton(UiAddButtonType type) {
@@ -6964,6 +6996,77 @@ void ModScene::DrawScreenUi() {
         "つぎへ",
         {nextSceneButton_.center.x, nextSceneButton_.center.y - 12.0f}, 28.0f,
         BitmapFont::Align::Center, 5.0f, textColor);
+  }
+
+  // ==========================================
+  // パラメータゲージの計算と描画
+  // ==========================================
+  if (previewRunner_ != nullptr && customizeData_ != nullptr) {
+      previewRunner_->SetCustomizeData(customizeData_.get());
+      previewRunner_->LoadCustomizeData();
+      previewRunner_->ApplyCustomizeToMovementParam();
+
+      auto tuning = previewRunner_->GetTuningPtr();
+
+      auto MapToGauge = [](float val, float baseVal) -> int {
+          float diff = val - baseVal;
+          if (diff < -0.6f) return 1;
+          if (diff < -0.1f) return 2;
+          if (diff <  0.1f) return 3;
+          if (diff <  0.6f) return 4;
+          return 5;
+      };
+
+      int levels[4] = {
+          MapToGauge(tuning->maxSpeed, 5.0f),
+          MapToGauge(tuning->runPower, 1.0f),
+          MapToGauge(tuning->lift, 3.0f),
+          MapToGauge(tuning->stability, 1.0f)
+      };
+
+      const char* labels[4] = {
+          "スピード",
+          "かそく",
+          "ジャンプ",
+          "あんてい"
+      };
+
+      const float startX = 960.0f; // 右上に配置
+      const float startY = 40.0f;  // 右上に配置
+      const float stepY = 48.0f;
+      const float blockWidth = 24.0f;
+      const float blockHeight = 16.0f;
+      const float blockGap = 4.0f;
+      
+      for (int row = 0; row < 4; ++row) {
+          float currentY = startY + row * stepY;
+
+          // ラベル描画 (漢字非対応のためカタカナ・ひらがな使用)
+          bitmapFont_.RenderText(labels[row], {startX, currentY}, 20.0f,
+                                 BitmapFont::Align::Left, 4.0f, {1.0f, 1.0f, 1.0f, 1.0f});
+
+          // ゲージブロック描画 (5段階)
+          for (int col = 0; col < 5; ++col) {
+              int blockIndex = row * 5 + col;
+              auto& block = gaugeBlocks_[blockIndex];
+              
+              float bx = startX + 130.0f + col * (blockWidth + blockGap);
+              float by = currentY + 2.0f; // テキストの高さに合わせる微調整
+
+              block->mainPosition.transform.translate = {bx, by, 0.0f};
+              block->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f}; // スケールではなく conerData でサイズ指定
+
+              Vector4 color = {0.2f, 0.2f, 0.2f, 0.8f}; // 未到達
+              if (col < levels[row]) {
+                  if (col < 2) color = {0.8f, 0.2f, 0.2f, 1.0f};      // 1-2: 赤
+                  else if (col == 2) color = {0.8f, 0.8f, 0.2f, 1.0f}; // 3: 黄色
+                  else color = {0.2f, 0.8f, 0.2f, 1.0f};               // 4-5: 緑
+              }
+
+              block->objectParts_[0].materialConfig->textureColor = color;
+              block->Draw();
+          }
+      }
   }
 }
 

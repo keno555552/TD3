@@ -178,13 +178,10 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   }
 
   // 無改造基準
-  const float baseLegLength = 2.0f;
   const float baseLegThicknessScale = 0.95f;
-  const float baseLegSlimness =
-      baseLegLength / (baseLegThicknessScale + 0.001f);
 
-  const float baseHeadSizeScale = 1.684f;
-  const float baseTorsoScaleAvg = 1.899f;
+  const float baseHeadSizeScale = 2.026f;
+  const float baseTorsoScaleAvg = 1.100f;
   const float baseAsymmetry = 0.0f;
   const float baseCenterOfMassY = 0.150f;
 
@@ -225,128 +222,134 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   };
 
   //==============================
-  // 長さ（scale.y をそのまま使う）
+  // 長さ（IK制御点からの実際の見た目長さを反映する）
   //==============================
-  const float leftLegLength = leftThigh.scale.y + leftShin.scale.y;
-  const float rightLegLength = rightThigh.scale.y + rightShin.scale.y;
+  auto GetIKScaleY = [&](ModBodyPart partType, const ModBodyPartParam& p, float defaultLen) -> float {
+      float scale = p.scale.y * p.length;
+      int partId = -1;
+      if (GetFirstPartTypePartId(partType, partId)) {
+          int parentId = -1;
+          GetPartInstanceParentId(partId, parentId);
+          int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
+          float segLen = GetSnapshotSegmentLength(partType, snapshotOwnerId);
+          if (segLen > 0.0001f && defaultLen > 0.0001f) {
+              scale *= (segLen / defaultLen);
+          }
+      }
+      return scale;
+  };
+
+  const float leftLegLength = GetIKScaleY(ModBodyPart::LeftThigh, leftThigh, 1.57f) + GetIKScaleY(ModBodyPart::LeftShin, leftShin, 2.62f);
+  const float rightLegLength = GetIKScaleY(ModBodyPart::RightThigh, rightThigh, 1.57f) + GetIKScaleY(ModBodyPart::RightShin, rightShin, 2.62f);
   const float avgLegLength = (leftLegLength + rightLegLength) * 0.5f;
 
-  const float neckLengthScale = neck.scale.y;
+  // 無改造時の正確な脚の長さ（ログから取得した正解値）
+  const float baseLegLength = 2.000f;
+  const float baseLegSlimness = baseLegLength / (baseLegThicknessScale + 0.001f);
+
+  const float neckLengthScale = GetIKScaleY(ModBodyPart::Neck, neck, 0.3462f);
 
   //==============================
-  // 太さ
+  // 太さ (脚は物理カプセルから取得)
   //==============================
   const float baseRadius = 0.1f;
 
   const float leftThighStartR = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
   const float leftThighBendR = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
   const float leftThighEndR = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
-
   const float rightThighStartR = GetSnapshotRadius(ModBodyPart::RightThigh, 1);
   const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
   const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
 
-  // 太さは見た目と同じく snapshot 半径ベースで取る
-  const float leftThighThickness =
-      (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
-  const float leftShinThickness =
-      (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
+  const float leftThighThickness = (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
+  const float leftShinThickness = (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
+  const float rightThighThickness = (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
+  const float rightShinThickness = (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
 
-  const float rightThighThickness =
-      (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
-  const float rightShinThickness =
-      (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
-
-  const float leftLegThickness =
-      (leftThighThickness + leftShinThickness) * 0.5f;
-  const float rightLegThickness =
-      (rightThighThickness + rightShinThickness) * 0.5f;
-
+  const float leftLegThickness = (leftThighThickness + leftShinThickness) * 0.5f;
+  const float rightLegThickness = (rightThighThickness + rightShinThickness) * 0.5f;
   const float legThicknessScale = (leftLegThickness + rightLegThickness) * 0.5f;
 
-  const float leftArmThickness =
-      (AvgXZ(leftUpperArm) + AvgXZ(leftForeArm)) * 0.5f;
-  const float rightArmThickness =
-      (AvgXZ(rightUpperArm) + AvgXZ(rightForeArm)) * 0.5f;
+  auto GetLimbThickness = [&](ModBodyPart part) -> float {
+      float r1 = GetSnapshotRadius(part, 1);
+      float r2 = GetSnapshotRadius(part, 2);
+      float r3 = GetSnapshotRadius(part, 3);
+      return (std::max)({r1, r2, r3}) / 0.1f;
+  };
+  auto GetLimbLength = [&](ModBodyPart partType) -> float {
+      int partId = -1;
+      if (GetFirstPartTypePartId(partType, partId)) {
+          int parentId = -1;
+          GetPartInstanceParentId(partId, parentId);
+          int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
+          return GetSnapshotSegmentLength(partType, snapshotOwnerId);
+      }
+      return 0.0f;
+  };
+
+  const float leftArmThickness = (GetLimbThickness(ModBodyPart::LeftUpperArm) + GetLimbThickness(ModBodyPart::LeftForeArm)) * 0.5f;
+  const float rightArmThickness = (GetLimbThickness(ModBodyPart::RightUpperArm) + GetLimbThickness(ModBodyPart::RightForeArm)) * 0.5f;
   const float armThicknessScale = (leftArmThickness + rightArmThickness) * 0.5f;
+
+  const float leftArmLength = GetLimbLength(ModBodyPart::LeftUpperArm) + GetLimbLength(ModBodyPart::LeftForeArm);
+  const float rightArmLength = GetLimbLength(ModBodyPart::RightUpperArm) + GetLimbLength(ModBodyPart::RightForeArm);
+  const float avgArmLength = (leftArmLength + rightArmLength) * 0.5f;
+
+  // 無改造時の推測値
+  const float baseArmThicknessScale = 0.950f;
+  const float baseArmLength = 3.220f;
+
+  const float armThicknessRatio = armThicknessScale / (baseArmThicknessScale + 0.001f);
+  const float armLengthRatio = avgArmLength / (baseArmLength + 0.001f);
+  const float armSizeScale = (armThicknessRatio + armLengthRatio) * 0.5f;
 
   const float neckThicknessScale = AvgXZ(neck);
 
   //==============================
-  // 頭サイズは snapshot + control point ベースで取る
+  // 頭サイズ
   //==============================
   const float upperNeckR = GetSnapshotRadius(ModBodyPart::Head, 8);
   const float headCenterR = GetSnapshotRadius(ModBodyPart::Head, 9);
-
-  const float headThicknessScale =
-      (std::max)(upperNeckR, headCenterR) / baseRadius;
+  const float headThicknessScale = (std::max)(upperNeckR, headCenterR) / baseRadius;
 
   const Vector3 &upperNeckPos = customizeData_->controlPoints.upperNeckPos;
   const Vector3 &headCenterPos = customizeData_->controlPoints.headCenterPos;
-
-  Vector3 headVec = {headCenterPos.x - upperNeckPos.x,
-                     headCenterPos.y - upperNeckPos.y,
-                     headCenterPos.z - upperNeckPos.z};
-
+  Vector3 headVec = {headCenterPos.x - upperNeckPos.x, headCenterPos.y - upperNeckPos.y, headCenterPos.z - upperNeckPos.z};
   const float currentHeadLength = Length(headVec);
   const float baseHeadLength = 0.55f;
+  float headLengthScale = currentHeadLength > 0.0001f ? currentHeadLength / baseHeadLength : 1.0f;
 
-  float headLengthScale = 1.0f;
-  if (currentHeadLength > 0.0001f) {
-    headLengthScale = currentHeadLength / baseHeadLength;
-  }
-
-  // 太さ寄りで平均
-  const float headSizeScale =
-      (headThicknessScale * 2.0f + headLengthScale) / 3.0f;
-
+  const float headSizeScale = (headThicknessScale + headLengthScale) * 0.5f;
   headSizeScale_ = headSizeScale;
 
   //==============================
   // 胴体サイズ
-  // 旧: 太さだけ
-  // 新: 頭と同じ考え方で「太さ + 長さ」
   //==============================
   const float chestR = GetControlPointRadius(ModControlPointRole::Chest);
   const float bellyR = GetControlPointRadius(ModControlPointRole::Belly);
   const float waistR = GetControlPointRadius(ModControlPointRole::Waist);
-
   const float chestThicknessScale = (std::max)(chestR, bellyR) / baseRadius;
   const float stomachThicknessScale = (std::max)(bellyR, waistR) / baseRadius;
 
   const Vector3 &chestPos = customizeData_->controlPoints.chestPos;
   const Vector3 &bellyPos = customizeData_->controlPoints.bellyPos;
   const Vector3 &waistPos = customizeData_->controlPoints.waistPos;
-
-  Vector3 chestToBelly = {bellyPos.x - chestPos.x, bellyPos.y - chestPos.y,
-                          bellyPos.z - chestPos.z};
-  Vector3 bellyToWaist = {waistPos.x - bellyPos.x, waistPos.y - bellyPos.y,
-                          waistPos.z - bellyPos.z};
+  Vector3 chestToBelly = {bellyPos.x - chestPos.x, bellyPos.y - chestPos.y, bellyPos.z - chestPos.z};
+  Vector3 bellyToWaist = {waistPos.x - bellyPos.x, waistPos.y - bellyPos.y, waistPos.z - bellyPos.z};
 
   const float chestLength = Length(chestToBelly);
   const float stomachLength = Length(bellyToWaist);
+  const float baseChestLength = 1.2796f;
+  const float baseStomachLength = 1.6880f;
 
-  // 無改造基準は今の見た目に合わせた仮値
-  const float baseChestLength = 0.45f;
-  const float baseStomachLength = 0.45f;
+  float chestLengthScale = chestLength > 0.0001f ? chestLength / baseChestLength : 1.0f;
+  float stomachLengthScale = stomachLength > 0.0001f ? stomachLength / baseStomachLength : 1.0f;
 
-  float chestLengthScale = 1.0f;
-  if (chestLength > 0.0001f) {
-    chestLengthScale = chestLength / baseChestLength;
-  }
-
-  float stomachLengthScale = 1.0f;
-  if (stomachLength > 0.0001f) {
-    stomachLengthScale = stomachLength / baseStomachLength;
-  }
-
-  // 頭と同じく「太さ寄り」で平均
-  const float chestScale =
-      (chestThicknessScale * 2.0f + chestLengthScale) / 3.0f;
-  const float stomachScale =
-      (stomachThicknessScale * 2.0f + stomachLengthScale) / 3.0f;
-
+  const float chestScale = (chestThicknessScale + chestLengthScale) * 0.5f;
+  const float stomachScale = (stomachThicknessScale + stomachLengthScale) * 0.5f;
   const float torsoScaleAvg = (chestScale + stomachScale) * 0.5f;
+  
+
 
   torsoSizeScale_ = torsoScaleAvg;
 
@@ -376,50 +379,56 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   tuning_.turnResponse = 1.0f;
 
   //==============================
-  // 前進力
+  // 前進力 (加速力)
   //==============================
-  tuning_.runPower += (avgLegLength - baseLegLength) * 1.2f;
-  tuning_.runPower -= (legThicknessScale - baseLegThicknessScale) * 1.2f;
-  tuning_.runPower -= legDiff * 1.8f;
+  // 加速は「腕の太さと長さの総合値（armSizeScale）」と「太い脚」でプラス。脚が長すぎるとマイナス。
+  tuning_.runPower += (legThicknessScale - baseLegThicknessScale) * 1.5f;
+  tuning_.runPower -= (avgLegLength - baseLegLength) * 0.5f;
+  tuning_.runPower += (armSizeScale - 1.0f) * 1.2f; // 腕全体の大きさが加速に影響
+  tuning_.runPower -= legDiff * 0.3f;
+
+
 
   //==============================
   // 最高速
   //==============================
-  tuning_.maxSpeed += (avgLegLength - baseLegLength) * 2.7f;
-  tuning_.maxSpeed -= (legThicknessScale - baseLegThicknessScale) * 0.9f;
-  tuning_.maxSpeed -= (headSizeScale - baseHeadSizeScale) * 0.5f;
-  tuning_.maxSpeed -= legDiff * 1.6f;
+  // 最高速は「長い脚」でプラス。太すぎると重くてマイナス。頭や胴体が大きいとマイナス。
+  tuning_.maxSpeed += (avgLegLength - baseLegLength) * 2.5f;
+  tuning_.maxSpeed -= (legThicknessScale - baseLegThicknessScale) * 0.5f;
+  tuning_.maxSpeed -= (torsoScaleAvg - baseTorsoScaleAvg) * 1.0f;
+  tuning_.maxSpeed -= (headSizeScale - baseHeadSizeScale) * 0.8f;
+  tuning_.maxSpeed -= legDiff * 0.4f;
 
   //==============================
   // 安定性
   //==============================
-  tuning_.stability += (legThicknessScale - baseLegThicknessScale) * 1.5f;
-  tuning_.stability += (armThicknessScale - 1.0f) * 0.5f;
-  tuning_.stability += (neckThicknessScale - 1.0f) * 0.7f;
-
-  tuning_.stability -= (legSlimness - baseLegSlimness) * 1.5f;
-  tuning_.stability -= (neckLengthScale - 1.0f) * 1.2f;
-  tuning_.stability -= (headSizeScale - baseHeadSizeScale) * 1.0f;
-  tuning_.stability -= legDiff * 1.8f;
-  tuning_.stability -= (features_.asymmetry - baseAsymmetry) * 0.35f;
-
-  //==============================
-  // 上方向
-  //==============================
-  tuning_.lift += (avgLegLength - baseLegLength) * 2.3f;
-  tuning_.lift -= (legThicknessScale - baseLegThicknessScale) * 0.7f;
-  tuning_.lift -= (headSizeScale - baseHeadSizeScale) * 0.3f;
-
-  float comOffset =
-      std::clamp(features_.centerOfMassY - baseCenterOfMassY, -3.0f, 3.0f);
-  tuning_.lift += comOffset * 0.2f;
+  // 安定性は「太さ」「どっしり感」でプラス。細長さ、長すぎる首でマイナス。
+  tuning_.stability += (legThicknessScale - baseLegThicknessScale) * 2.0f;
+  tuning_.stability += (torsoScaleAvg - baseTorsoScaleAvg) * 1.5f;
+  tuning_.stability -= (legSlimness - baseLegSlimness) * 1.0f;
+  tuning_.stability -= (neckLengthScale - 1.0f) * 0.8f;
+  tuning_.stability -= (headSizeScale - baseHeadSizeScale) * 0.5f;
+  
+  float comOffset = std::clamp(features_.centerOfMassY - baseCenterOfMassY, -3.0f, 3.0f);
+  tuning_.stability -= comOffset * 0.5f; // 重心が高いと不安定
+  tuning_.stability -= legDiff * 0.5f;
+  tuning_.stability -= (features_.asymmetry - baseAsymmetry) * 0.5f;
 
   //==============================
-  // 傾きやすさ
+  // 上方向 (ジャンプ力)
   //==============================
-  tuning_.turnResponse += (legSlimness - baseLegSlimness) * 1.2f;
-  tuning_.turnResponse += legDiff * 2.0f;
-  tuning_.turnResponse += (neckLengthScale - 1.0f) * 0.8f;
+  // ジャンプ力は「細長い脚」「軽い胴体・頭」でプラス。
+  tuning_.lift += (legSlimness - baseLegSlimness) * 1.5f;
+  tuning_.lift -= (torsoScaleAvg - baseTorsoScaleAvg) * 1.0f; // 胴体が大きいと重い
+  tuning_.lift -= (headSizeScale - baseHeadSizeScale) * 0.8f;
+  tuning_.lift -= legDiff * 0.2f;
+
+  //==============================
+  // 傾きやすさ (旋回性能)
+  //==============================
+  tuning_.turnResponse += (legSlimness - baseLegSlimness) * 1.0f;
+  tuning_.turnResponse += legDiff * 0.8f;
+  tuning_.turnResponse += (neckLengthScale - 1.0f) * 0.5f;
   tuning_.turnResponse += (features_.asymmetry - baseAsymmetry) * 0.5f;
 
   //==============================
@@ -429,26 +438,31 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   float extraArmCount = (std::max)(0.0f, features_.armCount - 2.0f);
   float extraLegCount = (std::max)(0.0f, features_.legCount - 2.0f);
 
+  // 頭が多いと重いし不安定
   tuning_.stability -= extraHeadCount * 0.8f;
-  tuning_.turnResponse += extraHeadCount * 0.8f;
-  tuning_.lift += extraHeadCount * 0.2f;
+  tuning_.maxSpeed -= extraHeadCount * 0.5f;
+  tuning_.lift -= extraHeadCount * 0.5f;
 
-  tuning_.stability -= extraArmCount * 0.15f;
-  tuning_.runPower += extraArmCount * 0.1f;
+  // 腕が多いと加速・旋回アップ、空気抵抗で少し最高速ダウン
+  tuning_.runPower += extraArmCount * 0.4f;
+  tuning_.turnResponse += extraArmCount * 0.3f;
+  tuning_.maxSpeed -= extraArmCount * 0.2f;
 
-  tuning_.stability += extraLegCount * 1.5f;
-  tuning_.runPower += extraLegCount * 0.6f;
-  tuning_.maxSpeed -= extraLegCount * 0.2f;
-  tuning_.turnResponse -= extraLegCount * 0.5f;
+  // 脚が多いと加速・安定性アップ、最高速・ジャンプはダウン
+  tuning_.stability += extraLegCount * 1.2f;
+  tuning_.runPower += extraLegCount * 0.8f;
+  tuning_.maxSpeed -= extraLegCount * 0.5f;
+  tuning_.lift -= extraLegCount * 0.5f;
 
   //==============================
-  // クランプ
+  // クランプ (上限・下限)
   //==============================
-  tuning_.runPower = std::clamp(tuning_.runPower, 0.4f, 4.0f);
-  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 0.5f, 4.5f);
-  tuning_.stability = std::clamp(tuning_.stability, 0.1f, 3.5f);
-  tuning_.lift = std::clamp(tuning_.lift, 0.2f, 3.5f);
-  tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 4.0f);
+  // ベース値: runPower=1.0, maxSpeed=5.0, stability=1.0, lift=3.0
+  tuning_.runPower = std::clamp(tuning_.runPower, 0.2f, 2.0f);
+  tuning_.maxSpeed = std::clamp(tuning_.maxSpeed, 2.0f, 8.0f);
+  tuning_.stability = std::clamp(tuning_.stability, 0.2f, 2.0f);
+  tuning_.lift = std::clamp(tuning_.lift, 1.0f, 6.0f);
+  tuning_.turnResponse = std::clamp(tuning_.turnResponse, 0.2f, 3.0f);
 
   leftLegReturnScale_ = std::clamp(
       1.0f - (leftLegThickness - baseLegThicknessScale) * 0.20f, 0.55f, 1.0f);
@@ -1016,17 +1030,21 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     bodyTiltVelocity_ +=
         tiltImpulse * turnResponse * headHeavyFactor * torsoTiltResistance_;
 
-    const Vector3 lt = GetStandardPart(ModBodyPart::LeftThigh)
-                           ->objectParts_[0]
-                           .transform.scale;
-    const Vector3 rt = GetStandardPart(ModBodyPart::RightThigh)
-                           ->objectParts_[0]
-                           .transform.scale;
-    const Vector3 ls =
-        GetStandardPart(ModBodyPart::LeftShin)->objectParts_[0].transform.scale;
-    const Vector3 rs = GetStandardPart(ModBodyPart::RightShin)
-                           ->objectParts_[0]
-                           .transform.scale;
+    Vector3 lt = {1.0f, 1.0f, 1.0f};
+    Object* ltObj = GetStandardPart(ModBodyPart::LeftThigh);
+    if (ltObj && !ltObj->objectParts_.empty()) lt = ltObj->objectParts_[0].transform.scale;
+
+    Vector3 rt = {1.0f, 1.0f, 1.0f};
+    Object* rtObj = GetStandardPart(ModBodyPart::RightThigh);
+    if (rtObj && !rtObj->objectParts_.empty()) rt = rtObj->objectParts_[0].transform.scale;
+
+    Vector3 ls = {1.0f, 1.0f, 1.0f};
+    Object* lsObj = GetStandardPart(ModBodyPart::LeftShin);
+    if (lsObj && !lsObj->objectParts_.empty()) ls = lsObj->objectParts_[0].transform.scale;
+
+    Vector3 rs = {1.0f, 1.0f, 1.0f};
+    Object* rsObj = GetStandardPart(ModBodyPart::RightShin);
+    if (rsObj && !rsObj->objectParts_.empty()) rs = rsObj->objectParts_[0].transform.scale;
 
     float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
     float legLengthScale =
@@ -1347,6 +1365,13 @@ void TravelRunner::ApplyVisualState() {
           if (parentType == ModBodyPart::ChestBody || parentType == ModBodyPart::StomachBody) {
             float parentScaleX = parentParamScaleX;
             float parentScaleY = parentParamScaleY * parentParamLength;
+            
+            float pSegLen = GetSnapshotSegmentLength(parentType, -1);
+            float pDefLen = (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
+            if (pSegLen > 0.0001f && pDefLen > 0.0001f) {
+                parentScaleY *= (pSegLen / pDefLen);
+            }
+            
             float parentScaleZ = parentParamScaleZ;
 
             obj->mainPosition.transform.translate.x *= parentScaleX;
@@ -1374,6 +1399,10 @@ void TravelRunner::ApplyVisualState() {
                 for (const auto &pInst : customizeData_->partInstances) {
                     if (pInst.partType == ModBodyPart::ChestBody) {
                         chestScaleY = pInst.param.scale.y * pInst.param.length;
+                        float cSegLen = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
+                        if (cSegLen > 0.0001f) {
+                            chestScaleY *= (cSegLen / 1.2796f);
+                        }
                         break;
                     }
                 }
