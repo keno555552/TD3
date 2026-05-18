@@ -1836,19 +1836,23 @@ void TravelRunner::ApplyVisualState() {
       } else {
         Vector3 startPos = meshPivotShift;
         if (instance.partType == ModBodyPart::ChestBody) {
-          for (const auto &snap : customizeData_->controlPointSnapshots) {
-            if (snap.role == ModControlPointRole::Chest) {
-              startPos = snap.localPosition;
-              break;
+          float chestY = 1.2796f;
+          if (customizeData_ != nullptr) {
+            for (const auto &snap : customizeData_->controlPointSnapshots) {
+              if (snap.role == ModControlPointRole::Chest) { chestY = snap.localPosition.y; break; }
             }
           }
+          float visualScaleY = instance.param.scale.y * instance.param.length;
+          startPos = {0.0f, chestY * visualScaleY, 0.0f};
         } else if (instance.partType == ModBodyPart::StomachBody) {
-          for (const auto &snap : customizeData_->controlPointSnapshots) {
-            if (snap.role == ModControlPointRole::Belly) {
-              startPos = snap.localPosition;
-              break;
+          float bellyY = 0.0f;
+          if (customizeData_ != nullptr) {
+            for (const auto &snap : customizeData_->controlPointSnapshots) {
+              if (snap.role == ModControlPointRole::Belly) { bellyY = snap.localPosition.y; break; }
             }
           }
+          float visualScaleY = instance.param.scale.y * instance.param.length;
+          startPos = {0.0f, bellyY * visualScaleY, 0.0f};
         }
         obj->objectParts_[0].transform.translate = startPos;
       }

@@ -43,13 +43,15 @@ private:
   std::unique_ptr<ModBodyCustomizeData>   titleNpcDummyData_;
   int titleNpcModelHandle_ = 0;
 
-  static constexpr float kNpcLoopLimitX = 25.0f;
-  static constexpr float kNpcStartX     = -18.0f;
+  static constexpr float kNpcLoopLimitX = 35.0f;
+  static constexpr float kNpcStartX     = -20.0f;
 
   struct NpcLoopSetting {
     float cooldownDuration = 3.0f;
+    int currentPresetId = -1;
   };
   std::vector<NpcLoopSetting> npcLoopSettings_;
 
+  void ResetTitleNpcBody(int index);
   void ResetTitleNpc(int index);
 };
