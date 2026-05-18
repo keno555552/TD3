@@ -31,6 +31,10 @@ public:
 	bool GetIsSelect(Vector2 mouse, float width, float height);
 	bool GetIsPress() { return buttonState_ == PRESS; }
 	bool GetIsLock() { return buttonState_ == LOCK; }
+
+	bool GetIsClicked() { return isClicked_; }
+	bool GetIsRelease() { return isRelease_; }
+
 	void ResetButton();
 
 	void SetButton(Vector2 pos, float width, float height, float layer = 0);
@@ -54,6 +58,10 @@ private:
 		LOCK,
 	};
 	int buttonState_ = NORMAL;
+	bool isClicked_ = false;
+
+	bool wasPressed_ = false;
+	bool isRelease_ = false;
 
 private:
 
