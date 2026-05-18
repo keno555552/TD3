@@ -816,16 +816,16 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
       return {0.0f, 1.2796f, 0.0f};
 
     case ModBodyPart::LeftUpperArm:
-      return {-0.75f, 1.15f, 0.0f};
+      return {-1.25f, 1.15f, 0.0f};
 
     case ModBodyPart::RightUpperArm:
-      return {0.75f, 1.15f, 0.0f};
+      return {1.25f, 1.15f, 0.0f};
 
     case ModBodyPart::LeftThigh:
-      return {-0.35f, -0.70f, 0.0f};
+      return {-0.5f, -0.70f, 0.0f};
 
     case ModBodyPart::RightThigh:
-      return {0.35f, -0.70f, 0.0f};
+      return {0.5f, -0.70f, 0.0f};
 
     default:
       break;
@@ -852,10 +852,10 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
   case ModBodyPart::StomachBody: {
     switch (childPart) {
     case ModBodyPart::LeftThigh:
-      return {-0.35f, -0.45f, 0.0f};
+      return {-0.5f, -1.68f, 0.0f};
 
     case ModBodyPart::RightThigh:
-      return {0.35f, -0.45f, 0.0f};
+      return {0.5f, -1.68f, 0.0f};
 
     default:
       break;

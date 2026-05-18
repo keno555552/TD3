@@ -1,4 +1,5 @@
-#include "ModCustomizeDataStore.h"
+#include "GAME/actor/ModCustomizeDataStore.h"
+#include "GAME/actor/ModAssemblyGraph.h"
 
 namespace {
 
@@ -46,6 +47,59 @@ ModBodyCustomizeData MakeDefaultCustomizeDataLocal() {
 
   // 新方式の操作点は空からスタート
   data.controlPointSnapshots.clear();
+
+  // 新方式のデフォルト部位・操作点構成を生成する
+  ModAssemblyGraph graph;
+  graph.InitializeDefaultHumanoid();
+
+  std::vector<int> ids = graph.GetNodeIdsSorted();
+  for (size_t i = 0; i < ids.size(); ++i) {
+    const int id = ids[i];
+    const PartNode* node = graph.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    ModPartInstanceData instance;
+    instance.partId = node->id;
+    instance.partType = node->part;
+    instance.parentId = node->parentId;
+    instance.parentConnectorId = node->parentConnectorId;
+    instance.selfConnectorId = node->selfConnectorId;
+    instance.localTransform = node->localTransform;
+    instance.resolvedLocalTranslate = node->localTransform.translate;
+
+    instance.param.scale = {1.0f, 1.0f, 1.0f};
+    instance.param.length = 1.0f;
+    instance.param.enabled = true;
+    instance.param.count = 1;
+
+    data.partInstances.push_back(instance);
+
+    // デフォルトのコントロールポイントも生成する
+    ModBody dummyBody;
+    dummyBody.Initialize(nullptr, node->part);
+    const std::vector<ModControlPoint>& cps = dummyBody.GetControlPoints();
+
+    for (size_t cpIndex = 0; cpIndex < cps.size(); ++cpIndex) {
+      const ModControlPoint& cp = cps[cpIndex];
+      ModControlPointSnapshot snapshot;
+      snapshot.ownerPartId = node->id;
+      snapshot.ownerPartType = node->part;
+      snapshot.role = cp.role;
+      snapshot.localPosition = cp.localPosition;
+      snapshot.radius = cp.radius;
+      snapshot.movable = cp.movable;
+      snapshot.isConnectionPoint = cp.isConnectionPoint;
+      snapshot.acceptsParent = cp.acceptsParent;
+      snapshot.acceptsChild = cp.acceptsChild;
+
+      data.controlPointSnapshots.push_back(snapshot);
+    }
+  }
+
+  // 初期生成後に新旧の整合性（旧配列へ反映）を取る
+  ModCustomizeDataStore::NormalizeCustomizeData(data);
 
   return data;
 }
