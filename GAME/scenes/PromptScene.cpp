@@ -93,7 +93,7 @@ void PromptScene::UpdatePromptRoll() {
 
         // 入力ロック解除後にスペースキーでお題決定
         if (stopInputLockCounter_ >= stopInputLockFrame_) {
-            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsPress()) {
+            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsClicked()) {
                 DecidePrompt();
             }
         }
@@ -102,7 +102,7 @@ void PromptScene::UpdatePromptRoll() {
     case PromptRollState::Stopped:
         if (promptBoard_ != nullptr && promptBoard_->IsStopAnimationFinished()) {
             // スペースキーで次のシーンへ
-            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsPress()) {
+            if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsClicked()) {
                 fade_.StartFadeOut();
                 isStartTransition_ = true;
                 rollState_ = PromptRollState::FadeOut;

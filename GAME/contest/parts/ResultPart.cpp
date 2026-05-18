@@ -54,7 +54,7 @@ void ResultPart::Update() {
 	nextButton_->Update();
 
 	// SPACEで次のステップへ
-	if (system_->GetTriggerOn(DIK_SPACE)||nextButton_->GetIsPress()) {
+	if (system_->GetTriggerOn(DIK_SPACE)||nextButton_->GetIsClicked()) {
 		switch (step_) {
 		case ResultStep::StarsAndChart:
 			step_ = ResultStep::RankAndNickname;

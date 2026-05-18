@@ -1,5 +1,4 @@
 #include "DetailButton.h"
-#
 
 DetailButton::DetailButton(kEngine* system) {
 	system_ = system;
@@ -39,7 +38,7 @@ DetailButton::DetailButton(kEngine* system) {
 	setColor_[NORMAL] = { 0.22f, 0.28f, 0.36f, 1.0f };
 	setColor_[PRESS] = { 0.16f, 0.20f, 0.26f, 1.0f };
 	setColor_[SELECT] = { 0.30f, 0.45f, 0.85f, 1.0f };
-	setColor_[LOCK]  = { 0.45f, 0.48f, 0.52f, 1.0f };
+	setColor_[LOCK] = { 0.45f, 0.48f, 0.52f, 1.0f };
 
 	/// スプライトの初期化
 	int i = 0;
@@ -54,8 +53,7 @@ DetailButton::DetailButton(kEngine* system) {
 	}
 }
 
-DetailButton::~DetailButton() {
-}
+DetailButton::~DetailButton() {}
 
 void DetailButton::LoadTexture(kEngine* system) {
 	system->LoadTexture("./GAME/resources/texture/button/1.png");
@@ -170,19 +168,19 @@ void DetailButton::SetButton(Vector2 pos, float width, float height, float layer
 	Vector2 intPos2 = LTInitStartPos;
 
 	for (int j = 0; j < 3; j++) {
-	
+
 		intPos2.x = LTInitStartPos.x;
-	
+
 		for (int i = 0; i < 3; i++) {
-	
+
 			SetQuad(sprite_[x].get(), intPos2, spriteSize_[x]);
-	
+
 			if (layer != 0)sprite_[x]->objectParts_[0].transform.translate.z = layer;
-	
+
 			intPos2.x += (colWidth[i] - 1);
 			x++;
 		}
-	
+
 		intPos2.y += rowHeight[j];
 	}
 }
@@ -197,17 +195,41 @@ void DetailButton::Update() {
 	mouseX = system_->GetMousePosX();
 	mouseY = system_->GetMousePosY();
 
-	/// ボタンの状態変換
+	bool hover = GetIsSelect({ (float)mouseX, (float)mouseY }, 1, 1);
+	bool press = system_->GetMouseIsPush(0);
+	bool triggerOn = system_->GetMouseTriggerOn(0);
+	bool triggerOff = system_->GetMouseTriggerOff(0);
+
+	// 點擊事件（只維持一幀）
+	isClicked_ = (triggerOn && hover);
+
+	// 記錄是否曾經按下
+	if (triggerOn && hover) {
+		wasPressed_ = true;
+	}
+
+	// 放開事件（只在曾經按下後才觸發）
+	if (wasPressed_ && triggerOff) {
+		isRelease_ = true;
+		wasPressed_ = false; // 重置
+	} else {
+		isRelease_ = false;
+	}
+
+	// 狀態機
 	if (buttonState_ != LOCK) {
-		if (GetIsSelect({ (float)mouseX,(float)mouseY }, 1, 1)) {
-			buttonState_ = SELECT;
-			if (system_->GetMouseIsPush(0)) {
+
+		if (hover) {
+			if (press) {
 				buttonState_ = PRESS;
+			} else {
+				buttonState_ = SELECT;
 			}
 		} else {
-			if (!system_->GetMouseIsPush(0)) buttonState_ = NORMAL;
+			buttonState_ = NORMAL;
 		}
 	}
+
 }
 
 void DetailButton::Render() {
