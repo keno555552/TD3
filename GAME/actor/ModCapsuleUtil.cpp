@@ -1,5 +1,7 @@
 #include "ModCapsuleUtil.h"
+#include "Data/Render/CPUData/VertexData.h"
 #include <cmath>
+#include <algorithm>
 
 namespace {
 
@@ -167,6 +169,82 @@ Vector3 GetAttachSideNormal(ModCapsuleAttachSide side) {
   default:
     return {0.0f, 1.0f, 0.0f};
   }
+}
+
+static Vector3 TransformPointByMatrixLocal(const Matrix4x4 &m, const Vector3 &p) {
+  Vector3 result{};
+  result.x = p.x * m.m[0][0] + p.y * m.m[1][0] + p.z * m.m[2][0] + m.m[3][0];
+  result.y = p.x * m.m[0][1] + p.y * m.m[1][1] + p.z * m.m[2][1] + m.m[3][1];
+  result.z = p.x * m.m[0][2] + p.y * m.m[1][2] + p.z * m.m[2][2] + m.m[3][2];
+  return result;
+}
+
+ModCapsule CalculateMinimalCapsuleFromVertices(const std::vector<VertexData>& vertices, const Matrix4x4& localMatrix) {
+  ModCapsule capsule{};
+  if (vertices.empty()) {
+    return capsule;
+  }
+
+  float minX = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float minY = FLT_MAX;
+  float maxY = -FLT_MAX;
+  float minZ = FLT_MAX;
+  float maxZ = -FLT_MAX;
+
+  for (size_t i = 0; i < vertices.size(); ++i) {
+    const Vector4& pos4 = vertices[i].position;
+    Vector3 localPos = {pos4.x, pos4.y, pos4.z};
+    Vector3 transformed = TransformPointByMatrixLocal(localMatrix, localPos);
+
+    if (transformed.x < minX) minX = transformed.x;
+    if (transformed.x > maxX) maxX = transformed.x;
+
+    if (transformed.y < minY) minY = transformed.y;
+    if (transformed.y > maxY) maxY = transformed.y;
+
+    if (transformed.z < minZ) minZ = transformed.z;
+    if (transformed.z > maxZ) maxZ = transformed.z;
+  }
+
+  // もし頂点が存在しなかった場合のフォールバック（FLT_MAXのままなら）
+  if (minY > maxY) {
+      minX = 0.0f; maxX = 0.0f;
+      minY = 0.0f; maxY = 0.0f;
+      minZ = 0.0f; maxZ = 0.0f;
+  }
+
+  // Yの幅が0の場合の安全対策
+  if (maxY - minY < 0.0001f) {
+    maxY = minY + 0.0001f;
+  }
+
+  const float halfWidthX = (maxX - minX) * 0.5f;
+  const float halfWidthZ = (maxZ - minZ) * 0.5f;
+  capsule.radius = (std::max)(halfWidthX, halfWidthZ);
+  capsule.radiusX = halfWidthX;
+  capsule.radiusZ = halfWidthZ;
+
+  const float midX = (minX + maxX) * 0.5f;
+  const float midZ = (minZ + maxZ) * 0.5f;
+
+  // 3. 実際のカプセルは「半球」が出っ張るので、startとendはradius分だけ内側に寄せる
+  capsule.start = {midX, minY + capsule.radius, midZ};
+  capsule.end = {midX, maxY - capsule.radius, midZ};
+
+  // もし長さが短すぎて radius * 2 より小さい場合は、球に近い形にする
+  if (capsule.start.y > capsule.end.y) {
+    float midY = (minY + maxY) * 0.5f;
+    capsule.start = {midX, midY, midZ};
+    capsule.end = {midX, midY, midZ};
+    // 半径をY方向の長さで補正（Y軸方向もカバーできるように）
+    float halfHeight = (maxY - minY) * 0.5f;
+    if (halfHeight > capsule.radius) {
+      capsule.radius = halfHeight;
+    }
+  }
+
+  return capsule;
 }
 
 } // namespace ModCapsuleUtil

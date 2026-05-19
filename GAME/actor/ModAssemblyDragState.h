@@ -20,6 +20,9 @@ struct ModAssemblyDragState {
   Vector3 beforeLocalTranslate{0.0f, 0.0f, 0.0f};
   Vector3 previewLocalTranslate{0.0f, 0.0f, 0.0f};
 
+  Vector3 beforeLocalRotate{0.0f, 0.0f, 0.0f};
+  Vector3 previewLocalRotate{0.0f, 0.0f, 0.0f};
+
   // 胴体ドラッグ時の全パーツの初期座標
   std::unordered_map<int, Vector3> beforeBodyTranslations;
   // 胴体ドラッグ時の全操作点初期座標
@@ -52,6 +55,8 @@ struct ModAssemblyDragState {
     beforeSelfConnectorId = -1;
     beforeLocalTranslate = {0.0f, 0.0f, 0.0f};
     previewLocalTranslate = {0.0f, 0.0f, 0.0f};
+    beforeLocalRotate = {0.0f, 0.0f, 0.0f};
+    previewLocalRotate = {0.0f, 0.0f, 0.0f};
     beforeBodyTranslations.clear();
     beforeTorsoPoints.clear();
     hoveredParentPartId = -1;

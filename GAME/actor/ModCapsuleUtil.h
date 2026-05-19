@@ -1,5 +1,9 @@
 #pragma once
 #include "kEngine/Math/Vector3.h"
+#include "kEngine/Math/Matrix4x4.h"
+#include <vector>
+
+struct VertexData;
 
 enum class ModCapsuleAttachSide {
   PosX = 0,
@@ -14,6 +18,8 @@ struct ModCapsule {
   Vector3 start{0.0f, 0.0f, 0.0f};
   Vector3 end{0.0f, 0.0f, 0.0f};
   float radius = 0.0f;
+  float radiusX = 0.0f;
+  float radiusZ = 0.0f;
 };
 
 struct ModCapsuleClosestPoints {
@@ -62,6 +68,9 @@ Vector3 GetSurfacePointTowardDirection(const ModCapsule &capsule,
 Vector3 GetSurfacePointTowardPosition(const ModCapsule &capsule,
                                       const Vector3 &targetPosition,
                                       const Vector3 &preferredNormal);
+
+/// 頂点データ群から、Y軸を主軸とした場合の包含カプセルを計算する
+ModCapsule CalculateMinimalCapsuleFromVertices(const std::vector<VertexData>& vertices, const Matrix4x4& localMatrix);
 
 /// 接続面 enum からローカル法線相当の方向を返す
 Vector3 GetAttachSideNormal(ModCapsuleAttachSide side);

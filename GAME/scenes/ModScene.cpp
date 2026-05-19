@@ -1091,7 +1091,7 @@ void ModScene::Update() {
   // チュートリアル入力待ち
   //===============================
   if (isTutorialMode_) {
-    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN)) {
+    if (system_->GetTriggerOn(DIK_SPACE) || system_->GetMouseTriggerOn(0)) {
       isTutorialMode_ = false;
       s_hasSeenModTutorial = true;
     }
@@ -1277,7 +1277,7 @@ void ModScene::Draw() {
     bitmapFont_.RenderText(
         "パーツをドラッグしたりサイズを変えて 体を改造しろ！", {640.0f, 360.0f},
         48.0f, BitmapFont::Align::Center, 4, {1.0f, 1.0f, 1.0f, 1.0f});
-    bitmapFont_.RenderText("[SPACE]キー または [ENTER]キー で スタート",
+    bitmapFont_.RenderText("クリック または [SPACE] キーで スタート",
                            {640.0f, 480.0f}, 36.0f, BitmapFont::Align::Center,
                            4, {1.0f, 1.0f, 0.5f, 1.0f});
   }
@@ -1689,7 +1689,7 @@ void ModScene::ApplyAssemblyToSceneHierarchy() {
     }
 
     object->mainPosition.transform.translate = localTranslate;
-    // object->mainPosition.transform.rotate = localRotate;
+    object->mainPosition.transform.rotate = localRotate;
     object->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 }
@@ -3782,13 +3782,19 @@ bool ModScene::BuildPartPickBoxes(int partId,
     const Vector3 waist =
         GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
 
-    const float chestHalfWidth =
-        GetModelLocalVisualRadius(ModBodyPart::ChestBody);
-    const float stomachHalfWidth =
-        GetModelLocalVisualRadius(ModBodyPart::StomachBody);
+    const float chestThicknessScale = GetTorsoVisualSegmentRadius(ModControlPointRole::Chest, ModControlPointRole::Belly) / 0.11f;
+    const float stomachThicknessScale = GetTorsoVisualSegmentRadius(ModControlPointRole::Belly, ModControlPointRole::Waist) / 0.11f;
 
-    pushBox(chest, belly, chestHalfWidth, chestHalfWidth);
-    pushBox(belly, waist, stomachHalfWidth, stomachHalfWidth);
+    Vector2 chestXZ = GetModelLocalVisualRadiusXZ(ModBodyPart::ChestBody);
+    chestXZ.x *= chestThicknessScale;
+    chestXZ.y *= chestThicknessScale;
+
+    Vector2 stomachXZ = GetModelLocalVisualRadiusXZ(ModBodyPart::StomachBody);
+    stomachXZ.x *= stomachThicknessScale;
+    stomachXZ.y *= stomachThicknessScale;
+
+    pushBox(chest, belly, chestXZ.x, chestXZ.y);
+    pushBox(belly, waist, stomachXZ.x, stomachXZ.y);
 
     return outBoxes.count > 0;
   }
@@ -3798,26 +3804,27 @@ bool ModScene::BuildPartPickBoxes(int partId,
     return false;
   }
 
-  if (modBodies_.count(ownerId) == 0 || modObjects_.count(ownerId) == 0) {
+  if (modBodies_.count(ownerId) == 0 || modObjects_.count(ownerId) == 0 || modBodies_.count(partId) == 0) {
     return false;
   }
 
-  const ModBody &body = modBodies_.at(ownerId);
+  const ModBody &ownerBody = modBodies_.at(ownerId);
+  const ModBody &selfBody = modBodies_.at(partId);
   const Object *object = modObjects_.at(ownerId).get();
   if (object == nullptr) {
     return false;
   }
 
-  const int rootIndex = body.FindControlPointIndex(ModControlPointRole::Root);
-  const int bendIndex = body.FindControlPointIndex(ModControlPointRole::Bend);
-  const int endIndex = body.FindControlPointIndex(ModControlPointRole::End);
+  const int rootIndex = ownerBody.FindControlPointIndex(ModControlPointRole::Root);
+  const int bendIndex = ownerBody.FindControlPointIndex(ModControlPointRole::Bend);
+  const int endIndex = ownerBody.FindControlPointIndex(ModControlPointRole::End);
 
   auto worldAt = [&](int index) -> Vector3 {
-    return body.GetControlPointWorldPosition(object,
-                                             static_cast<size_t>(index));
+    return ownerBody.GetControlPointWorldPosition(object,
+                                                  static_cast<size_t>(index));
   };
 
-  auto pushSegmentBox = [&](int startIndex, int endIndex) {
+  auto pushSegmentBox = [&](int startIndex, int endIndex, ModControlPointRole startRole, ModControlPointRole endRole) {
     if (startIndex < 0 || endIndex < 0) {
       return;
     }
@@ -3825,7 +3832,14 @@ bool ModScene::BuildPartPickBoxes(int partId,
     const Vector3 startWorld = worldAt(startIndex);
     const Vector3 endWorld = worldAt(endIndex);
 
-    const float halfWidth = GetModelLocalVisualRadius(node->part);
+    // 自身のModBodyから正確な描画カプセル半径を取得する
+    float halfWidth = selfBody.GetVisualSegmentRadius(startRole, endRole);
+    
+    // フォールバック（もし0なら旧方式）
+    if (halfWidth <= 0.0001f) {
+      halfWidth = GetModelLocalVisualRadius(node->part);
+    }
+    
     const float halfDepth = halfWidth;
 
     pushBox(startWorld, endWorld, halfWidth, halfDepth);
@@ -3837,7 +3851,7 @@ bool ModScene::BuildPartPickBoxes(int partId,
   case ModBodyPart::LeftThigh:
   case ModBodyPart::RightThigh:
   case ModBodyPart::Neck:
-    pushSegmentBox(rootIndex, bendIndex);
+    pushSegmentBox(rootIndex, bendIndex, ModControlPointRole::Root, ModControlPointRole::Bend);
     break;
 
   case ModBodyPart::LeftForeArm:
@@ -3845,7 +3859,7 @@ bool ModScene::BuildPartPickBoxes(int partId,
   case ModBodyPart::LeftShin:
   case ModBodyPart::RightShin:
   case ModBodyPart::Head:
-    pushSegmentBox(bendIndex, endIndex);
+    pushSegmentBox(bendIndex, endIndex, ModControlPointRole::Bend, ModControlPointRole::End);
     break;
 
   default:
@@ -4203,8 +4217,10 @@ void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
   assemblyDrag_.beforeParentConnectorId = rootNode->parentConnectorId;
   assemblyDrag_.beforeSelfConnectorId = rootNode->selfConnectorId;
   assemblyDrag_.beforeLocalTranslate = rootNode->localTransform.translate;
+  assemblyDrag_.beforeLocalRotate = rootNode->localTransform.rotate;
 
   assemblyDrag_.previewLocalTranslate = rootNode->localTransform.translate;
+  assemblyDrag_.previewLocalRotate = rootNode->localTransform.rotate;
 
   // 胴体ドラッグ用に全操作点の初期座標を保存
   assemblyDrag_.beforeTorsoPoints.clear();
@@ -4572,6 +4588,57 @@ Vector3 ModScene::ComputeAssemblyPreviewLocalTranslate(
   return Add(childNode->localTransform.translate, worldDelta);
 }
 
+Vector3 ModScene::ComputeAssemblyPreviewLocalRotate(
+    int childRootPartId, const ModAttachFaceCandidate &candidate) const {
+  const PartNode *childNode = assembly_.FindNode(childRootPartId);
+  if (childNode == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  if (candidate.parentPartId < 0) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  auto parentIt = modObjects_.find(candidate.parentPartId);
+  if (parentIt == modObjects_.end() || parentIt->second == nullptr) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+
+  // ワールド法線を親パーツのローカル座標系に変換
+  Vector3 localNormal = ModObjectUtil::TransformWorldVectorToLocal(
+      parentIt->second.get(), candidate.worldNormal);
+
+  const float len = Length(localNormal);
+  if (len < 0.0001f) {
+    return {0.0f, 0.0f, 0.0f};
+  }
+  
+  Vector3 n = {localNormal.x / len, localNormal.y / len, localNormal.z / len};
+
+  // パーツごとに伸びる方向が異なる
+  // (手足は -Y 方向、首や頭は +Y 方向に伸びる)
+  bool isPositiveY = false;
+  if (childNode->part == ModBodyPart::Neck || childNode->part == ModBodyPart::Head) {
+    isPositiveY = true;
+  }
+
+  // -Y方向に伸びるパーツなら、+Y軸を-localNormal(接続元の内側)に向けることで、
+  // 結果的に-Y軸が+localNormal(外側)を向くようにする。
+  if (!isPositiveY) {
+    n = {-n.x, -n.y, -n.z};
+  }
+
+  // +Y 軸 (0, 1, 0) を n の方向に向けるためのオイラー角を計算する。
+  // RotateByEulerXYZLocal( (0,1,0) ) = (-cos(x)*sin(z), cos(x)*cos(z), sin(x))
+  Vector3 rot{};
+  const float clampedZ = (std::max)(-1.0f, (std::min)(n.z, 1.0f));
+  rot.x = std::asin(clampedZ);
+  rot.y = 0.0f;
+  rot.z = std::atan2(-n.x, n.y);
+
+  return rot;
+}
+
 void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
   if (!assemblyDrag_.isDragging || assemblyDrag_.assemblyRootPartId < 0) {
     return;
@@ -4588,6 +4655,7 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
     assemblyDrag_.hasSnappedCandidate = false;
     assemblyDrag_.isPlacementValid = false;
     assemblyDrag_.previewLocalTranslate = assemblyDrag_.beforeLocalTranslate;
+    assemblyDrag_.previewLocalRotate = assemblyDrag_.beforeLocalRotate;
     return;
   }
 
@@ -4595,6 +4663,7 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
 
   assemblyDrag_.previewLocalTranslate = ComputeAssemblyFreeDragLocalTranslate(
       assemblyDrag_.assemblyRootPartId, desiredRootWorld);
+  assemblyDrag_.previewLocalRotate = assemblyDrag_.beforeLocalRotate;
 
   ModAttachSearchResult search = FindBestAttachCandidate(
       assemblyDrag_.assemblyRootPartId, desiredRootWorld);
@@ -4625,6 +4694,8 @@ void ModScene::UpdateAssemblyAttachCandidateFromMouseRay(const Ray &mouseRay) {
 
   if (insideSnapRange) {
     assemblyDrag_.previewLocalTranslate = ComputeAssemblyPreviewLocalTranslate(
+        assemblyDrag_.assemblyRootPartId, search.bestCandidate);
+    assemblyDrag_.previewLocalRotate = ComputeAssemblyPreviewLocalRotate(
         assemblyDrag_.assemblyRootPartId, search.bestCandidate);
 
     assemblyDrag_.isPlacementValid = true;
@@ -4663,6 +4734,7 @@ void ModScene::ApplyAssemblyDragPreview() {
   } else {
     // 通常パーツ
     assembly_.SetPartLocalTranslate(rootId, currentLocal);
+    assembly_.SetPartLocalRotate(rootId, assemblyDrag_.previewLocalRotate);
   }
 }
 
@@ -4781,6 +4853,7 @@ void ModScene::CancelAssemblyDragPlacement() {
         // 胴体パーツ間で初期座標が異なる可能性に備えるなら本来は個別保持が必要。
         // ここでは簡易的に beforeLocalTranslate をセット
         assembly_.SetPartLocalTranslate(id, assemblyDrag_.beforeLocalTranslate);
+        assembly_.SetPartLocalRotate(id, assemblyDrag_.beforeLocalRotate);
       }
     }
 
@@ -4794,6 +4867,7 @@ void ModScene::CancelAssemblyDragPlacement() {
   } else {
     assembly_.SetPartLocalTranslate(rootPartId,
                                     assemblyDrag_.beforeLocalTranslate);
+    assembly_.SetPartLocalRotate(rootPartId, assemblyDrag_.beforeLocalRotate);
   }
 
   SelectPart(assemblyDrag_.pickedPartId >= 0 ? assemblyDrag_.pickedPartId
@@ -4836,6 +4910,8 @@ void ModScene::ConfirmAssemblyDragPlacement() {
 
   const Vector3 snappedLocalTranslate =
       ComputeAssemblyPreviewLocalTranslate(rootPartId, snappedCandidate);
+  const Vector3 snappedLocalRotate =
+      ComputeAssemblyPreviewLocalRotate(rootPartId, snappedCandidate);
 
   if (!assembly_.MovePart(rootPartId, newParentId, newParentConnectorId)) {
     CancelAssemblyDragPlacement();
@@ -4843,6 +4919,7 @@ void ModScene::ConfirmAssemblyDragPlacement() {
   }
 
   assembly_.SetPartLocalTranslate(rootPartId, snappedLocalTranslate);
+  assembly_.SetPartLocalRotate(rootPartId, snappedLocalRotate);
 
   SelectPart(rootPartId);
   assemblyDrag_.Clear();
@@ -6027,6 +6104,66 @@ float ModScene::GetModelLocalVisualRadius(ModBodyPart part) const {
   return safeRadius;
 }
 
+Vector2 ModScene::GetModelLocalVisualRadiusXZ(ModBodyPart part) const {
+  const int key = static_cast<int>(part);
+
+  auto cacheIt = modelLocalVisualRadiusXZCache_.find(key);
+  if (cacheIt != modelLocalVisualRadiusXZCache_.end()) {
+    return cacheIt->second;
+  }
+
+  const std::string path = ModelPath(part);
+  const std::vector<ModelData> models = LoadFileTop(path);
+
+  if (models.empty()) {
+    modelLocalVisualRadiusXZCache_[key] = {0.10f, 0.10f};
+    return {0.10f, 0.10f};
+  }
+
+  const ModelData &model = models[0];
+
+  if (model.vertices.empty()) {
+    modelLocalVisualRadiusXZCache_[key] = {0.10f, 0.10f};
+    return {0.10f, 0.10f};
+  }
+
+  float minX = FLT_MAX;
+  float maxX = -FLT_MAX;
+  float minZ = FLT_MAX;
+  float maxZ = -FLT_MAX;
+
+  for (size_t i = 0; i < model.vertices.size(); ++i) {
+    const Vector4 &pos4 = model.vertices[i].position;
+    const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
+
+    const Vector3 transformed =
+        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+
+    if (transformed.x < minX) {
+      minX = transformed.x;
+    }
+    if (transformed.x > maxX) {
+      maxX = transformed.x;
+    }
+    if (transformed.z < minZ) {
+      minZ = transformed.z;
+    }
+    if (transformed.z > maxZ) {
+      maxZ = transformed.z;
+    }
+  }
+
+  const float halfWidthX = (maxX - minX) * 0.5f;
+  const float halfWidthZ = (maxZ - minZ) * 0.5f;
+
+  const float safeX = (std::max)(halfWidthX, 0.01f);
+  const float safeZ = (std::max)(halfWidthZ, 0.01f);
+
+  Vector2 result = {safeX, safeZ};
+  modelLocalVisualRadiusXZCache_[key] = result;
+  return result;
+}
+
 float ModScene::GetAutoCapsuleRadiusScale(ModBodyPart part,
                                           ModControlPointRole startRole,
                                           ModControlPointRole endRole) const {
@@ -6808,6 +6945,8 @@ bool ModScene::TryHandleAddButtonInteraction() {
           // ドラッグ開始時の状態を現在のマウス位置に合わせて上書き
           assemblyDrag_.beforeLocalTranslate = localPos;
           assemblyDrag_.previewLocalTranslate = localPos;
+          assemblyDrag_.beforeLocalRotate = {0.0f, 0.0f, 0.0f};
+          assemblyDrag_.previewLocalRotate = {0.0f, 0.0f, 0.0f};
           assemblyDrag_.dragPlanePoint =
               hitPoint; // 今のマウス位置を移動の起点にする
 
