@@ -20,7 +20,9 @@
 #include "GAME/font/BitmapFont.h"
 
 #include "GAME/contest/parts/IContestPart.h"
+#include "GAME/contest/parts/RankingPart.h"
 #include <memory>
+
 
 /// <summary>
 /// コンテストの進行フェーズ
@@ -29,7 +31,9 @@ enum class ContestPhase {
   ShowOff, /// お披露目
   Judging, /// 審査
   Result,  /// 結果
+  Ranking, /// 総合ランキング
   Trophy,  /// トロフィー・選択
+
 };
 
 struct SceneObject {
@@ -112,6 +116,14 @@ private:
                         const Vector3 &rot, float scale);
 
   ModCustomizedBodyActor customizedBodyActor_;
+
+  // NPC
+  ModCustomizedBodyActor npcBodyActors_[2];
+  ScoreResult npcScoreResults_[2];
+  bool npcScoreCalculated_[2] = { false, false };
+
+  std::vector<ContestRankEntry> contestRanking_;
+
 
   // フェード
   Fade fade_;

@@ -102,9 +102,9 @@ void TravelNpcManager::InitializeNpcRunners(const ModBodyCustomizeData* customiz
     }
 
     if (presetType == NpcPresetType::Default) {
-      preset = ModCustomizeDataStore::CreateNpcPreset(NpcPresetType::Default, nullptr);
+      preset = ModCustomizeDataStore::CreateNpcPreset(NpcPresetType::Default, customizeData_);
     } else {
-      preset = ModCustomizeDataStore::CreateNpcPreset(presetType, nullptr);
+      preset = ModCustomizeDataStore::CreateNpcPreset(presetType, customizeData_);
     }
 
     npcRunners_[i].customizeData = std::move(preset);

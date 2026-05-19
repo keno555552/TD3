@@ -835,6 +835,9 @@ void TravelScene::UpdateSceneTransition() {
       }
       // ==============================================================
 
+      // プレイヤーの到着順位をコンテストシーンへ引き渡す
+      ModCustomizeDataStore::SetTravelFinishRank(playerFinishRank_);
+
       fade_.StartFadeOut();
       isStartTransition_ = true;
       nextOutcome_ = SceneOutcome::NEXT;
