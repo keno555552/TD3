@@ -37,15 +37,15 @@ void TrophyPart::Update() {
 		choice_ = TrophyChoice::Title;
 	}
 
-	if (nextThemeButton_->GetIsClicked()) {
+	if (nextThemeButton_->GetIsRelease()) {
 		choice_ = TrophyChoice::NextTheme;
 	}
 
-	if (sameThemeButton_->GetIsClicked()) {
+	if (sameThemeButton_->GetIsRelease()) {
 		choice_ = TrophyChoice::Retry;
 	}
 
-	if (titleButton_->GetIsClicked()){
+	if (titleButton_->GetIsRelease()){
 		choice_ = TrophyChoice::Title;
 	}
 }
