@@ -4,6 +4,9 @@
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <random>
 
+#ifdef _DEBUG
+#include "ImGuiManager.h"
+#endif
 TitleScene::TitleScene(kEngine* system) {
 	system_ = system;
 
@@ -147,7 +150,8 @@ void TitleScene::ResetTitleNpcBody(int index) {
 		NpcPresetType::HeadBig, NpcPresetType::BigTorso,
 		NpcPresetType::LongLeg, NpcPresetType::Gorilla, NpcPresetType::Slender,
 		NpcPresetType::Chubby, NpcPresetType::Giant, NpcPresetType::Mini,
-		NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip
+		NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip,
+		NpcPresetType::MutantAsura, NpcPresetType::OctopusLegs
 	};
 
 	// 現在他のNPCが使用中のプリセットを除外する
@@ -274,6 +278,28 @@ void TitleScene::Draw() {
 	// 現在シーン表示
 	ImGui::Begin("Scene");
 	ImGui::Text("TitleScene");
+	ImGui::End();
+
+	ImGui::Begin("Title Scene Debug");
+	const char* presetNames[] = {
+		"Default", "HeadBig", "LongLeg", "BigTorso", "Gorilla", "Slender", "Chubby", "Giant", "Mini", "LongArm", "WideShoulder", "WideHip", "MutantAsura", "OctopusLegs"
+	};
+	static int currentPresetIndex = static_cast<int>(NpcPresetType::OctopusLegs);
+	ImGui::Combo("Force Preset", &currentPresetIndex, presetNames, IM_ARRAYSIZE(presetNames));
+	if (ImGui::Button("Apply Preset to All NPCs")) {
+		for (size_t i = 0; i < titleNpcManager_->npcRunners_.size(); ++i) {
+			auto& npc = titleNpcManager_->npcRunners_[i];
+			npcLoopSettings_[i].currentPresetId = currentPresetIndex;
+			auto presetData = ModCustomizeDataStore::CreateNpcPreset(
+				static_cast<NpcPresetType>(currentPresetIndex), titleNpcDummyData_.get());
+			npc.customizeData = std::move(presetData);
+			npc.runner->SetCustomizeData(npc.customizeData.get());
+			npc.runner->LoadCustomizeData();
+			npc.runner->BuildFeaturesFromCustomizeData();
+			npc.runner->BuildAllVisualParts();
+			npc.runner->ApplyCustomizeToMovementParam();
+		}
+	}
 	ImGui::End();
 #endif
 

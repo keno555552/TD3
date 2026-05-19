@@ -2,6 +2,7 @@
 #include "kEngine.h"
 #include "Object/Sprite.h"
 #include "config.h"
+#include "Button/Button.h"
 
 enum class MenuPhase {
 	ENTRY,
@@ -88,7 +89,7 @@ private:
 	/// ============ オブジェクト ============///
 	/// 背景スプライト+mainPosition
 	std::unique_ptr<SimpleSprite> sMenuBG_ = std::make_unique <SimpleSprite>();
-	
+
 	std::unique_ptr<SimpleSprite> sMenuPause = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuBGM = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuBGM_NL = std::make_unique <SimpleSprite>();
@@ -96,14 +97,14 @@ private:
 	std::unique_ptr<SimpleSprite> sMenuMASTER_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuSE = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuSE_NL = std::make_unique <SimpleSprite>();
-	
+
 	std::unique_ptr<SimpleSprite> sMenuClose = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuClose_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuBack = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuBack_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuRetry = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuRetry_NL = std::make_unique <SimpleSprite>();
-	
+
 	std::unique_ptr<SimpleSprite> sMenuButtonM = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuButtonM_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuButtonB = std::make_unique <SimpleSprite>();
@@ -113,6 +114,15 @@ private:
 	std::unique_ptr<SimpleSprite> sMenuVolumeBarM = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuVolumeBarB = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuVolumeBarS = std::make_unique <SimpleSprite>();
+
+	/// ============ ボタンhitBox ============///
+
+	std::unique_ptr<Button> bMenuClose{};
+	std::unique_ptr<Button> bMenuBack{};
+	std::unique_ptr<Button> bMenuRetry{};
+	std::unique_ptr<Button> bMenuBGM{};
+	std::unique_ptr<Button> bMenuMASTER{};
+	std::unique_ptr<Button> bMenuSE{};
 
 	///	============= サント関連 ==============///
 	float masterVolume_ = 1.0f;
@@ -130,11 +140,16 @@ private:
 	bool clickUp_ = false;
 	bool clickDown_ = false;
 	bool clickDecide_ = false;
-	
+
+	bool isSelectedBMenuSE_ = false;
+	bool isSelectedBMenuBGM_ = false;
+	bool isSelectedBMenuMASTER_ = false;
+
 	MenuPhase phase_ = MenuPhase::EXIT;
 
 	std::unique_ptr <Timer> animationTimer_ = nullptr;
 	std::unique_ptr <Timer> buttonTimer_ = nullptr;
+	bool isAnimation_ = false;
 
 	Transform startTransform_{};
 
@@ -148,11 +163,15 @@ private:
 	/// セレクト関係
 	void ChangeSelect();
 	void CheckClick();
+	void CheckMouse();
 	void WorkChange();
 	void ChangeButtonLight();
 
 	/// オブジェクト関係
 	void MenuObjectUpdate();
+
+	/// Sound関連
+	float BarTuneVolume(Vector2 mousePos, float startX, float endX);
 
 	/// ============ Test =============///
 

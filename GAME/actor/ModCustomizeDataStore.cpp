@@ -487,6 +487,261 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
       }
     }
     break;
+
+  case NpcPresetType::MutantAsura:
+  {
+    // BigTorso like body to support 4 arms
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
+        inst.param.scale.x *= 1.5f;
+        inst.param.scale.y *= 1.5f;
+        inst.param.scale.z *= 1.5f;
+      }
+      // Main (upper) arms
+      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
+          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
+        inst.param.scale.x *= 1.3f;
+        inst.param.scale.y *= 1.5f;
+        inst.param.scale.z *= 1.3f;
+      }
+      if (inst.partType == ModBodyPart::LeftUpperArm) {
+        inst.localTransform.translate.y += 0.5f; // Push upper arms slightly up
+        inst.resolvedLocalTranslate.y += 0.5f;
+      } else if (inst.partType == ModBodyPart::RightUpperArm) {
+        inst.localTransform.translate.y += 0.5f;
+        inst.resolvedLocalTranslate.y += 0.5f;
+      }
+    }
+
+    // Adjust snapshots for main upper arms
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::LeftUpperArm || partType == ModBodyPart::RightUpperArm) {
+        snap.localPosition.y += 0.5f;
+      }
+    }
+
+    // Add extra (lower) arms
+    std::vector<ModPartInstanceData> newArms;
+    std::vector<ModControlPointSnapshot> newSnaps;
+    int chestId = -1;
+    for (const auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::ChestBody) chestId = inst.partId;
+    }
+
+    int nextId = 100;
+    for (int armType = static_cast<int>(ModBodyPart::LeftUpperArm); armType <= static_cast<int>(ModBodyPart::RightForeArm); ++armType) {
+      for (const auto& inst : data->partInstances) {
+        if (static_cast<int>(inst.partType) == armType) {
+          ModPartInstanceData extraArm = inst;
+          extraArm.partId = nextId;
+          if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
+             extraArm.parentId = chestId; // attach to chest
+             // Position them significantly lower and wider
+             extraArm.localTransform.translate.y -= 1.0f;
+             extraArm.resolvedLocalTranslate.y -= 1.0f;
+             if (inst.partType == ModBodyPart::LeftUpperArm) {
+               extraArm.localTransform.translate.x -= 0.6f;
+               extraArm.resolvedLocalTranslate.x -= 0.6f;
+             } else {
+               extraArm.localTransform.translate.x += 0.6f;
+               extraArm.resolvedLocalTranslate.x += 0.6f;
+             }
+          } else {
+             extraArm.parentId = nextId - 1;
+          }
+          // The extra arms are also massive to stand out
+          extraArm.param.scale.x = 1.3f;
+          extraArm.param.scale.y = 1.5f;
+          extraArm.param.scale.z = 1.3f;
+
+          newArms.push_back(extraArm);
+
+          for (const auto& snap : data->controlPointSnapshots) {
+            if (snap.ownerPartId == inst.partId) {
+              ModControlPointSnapshot extraSnap = snap;
+              extraSnap.ownerPartId = extraArm.partId;
+              if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
+                 extraSnap.localPosition.y -= 1.0f;
+                 if (inst.partType == ModBodyPart::LeftUpperArm) {
+                   extraSnap.localPosition.x -= 0.6f;
+                 } else {
+                   extraSnap.localPosition.x += 0.6f;
+                 }
+              }
+              newSnaps.push_back(extraSnap);
+            }
+          }
+          nextId++;
+          break;
+        }
+      }
+    }
+
+    data->partInstances.insert(data->partInstances.end(), newArms.begin(), newArms.end());
+    data->controlPointSnapshots.insert(data->controlPointSnapshots.end(), newSnaps.begin(), newSnaps.end());
+    break;
+  }
+
+  case NpcPresetType::OctopusLegs:
+  {
+    // Arms slightly smaller
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
+          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
+        inst.param.scale.x *= 0.7f;
+        inst.param.scale.y *= 0.7f;
+        inst.param.scale.z *= 0.7f;
+      }
+      // Make all legs thinner, and slightly longer (1.2x) so they can stretch radially
+      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
+        inst.param.scale.x *= 0.6f;
+        inst.param.scale.z *= 0.6f;
+        inst.param.length *= 1.2f;
+      }
+      
+      // No translation modification to base legs here!
+    }
+
+    std::vector<ModPartInstanceData> newLegs;
+    std::vector<ModControlPointSnapshot> newSnaps;
+
+    int parentIdLeft = -1;
+    int parentIdRight = -1;
+    for (const auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftThigh) parentIdLeft = inst.parentId;
+      if (inst.partType == ModBodyPart::RightThigh) parentIdRight = inst.parentId;
+    }
+
+    // Radial spread directions (dirZ, dirX multiplier)
+    struct RadialDir { float dirZ; float dirX; };
+    RadialDir dirs[4] = {
+      { 1.0f, 0.0f },    // Pair 0: Front
+      { 0.5f, 1.0f },    // Pair 1: Outer-Front
+      { -0.5f, 1.0f },   // Pair 2: Outer-Back
+      { -1.0f, 0.0f }    // Pair 3: Back
+    };
+
+    int nextId = 200;
+    
+    // Process Pair 0 (Original legs) - Apply offset ONLY to Bend and End snapshots
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::LeftThigh || partType == ModBodyPart::RightThigh || 
+          partType == ModBodyPart::LeftShin || partType == ModBodyPart::RightShin) {
+        float dirZ = dirs[0].dirZ;
+        float dirX = (partType == ModBodyPart::LeftThigh || partType == ModBodyPart::LeftShin) ? -dirs[0].dirX : dirs[0].dirX;
+        
+        if (partType == ModBodyPart::LeftThigh || partType == ModBodyPart::RightThigh) {
+          if (snap.role == ModControlPointRole::Bend) {
+            snap.localPosition.z += dirZ * 0.7f;
+            snap.localPosition.x += dirX * 0.7f;
+          } else if (snap.role == ModControlPointRole::End) {
+            snap.localPosition.z += dirZ * 1.8f;
+            snap.localPosition.x += dirX * 1.8f;
+          }
+        } else {
+          // Shins
+          if (snap.role == ModControlPointRole::Root) {
+            snap.localPosition.z += dirZ * 0.7f;
+            snap.localPosition.x += dirX * 0.7f;
+          } else if (snap.role == ModControlPointRole::End) {
+            snap.localPosition.z += dirZ * 1.8f;
+            snap.localPosition.x += dirX * 1.8f;
+          }
+        }
+      }
+    }
+
+    // Process Pair 1, 2, 3 (Extra legs)
+    for (int pairIdx = 1; pairIdx < 4; ++pairIdx) {
+      float dirZ = dirs[pairIdx].dirZ;
+      float dirXBase = dirs[pairIdx].dirX;
+
+      int extraLeftThighId = -1;
+      int extraRightThighId = -1;
+
+      for (int legType = static_cast<int>(ModBodyPart::LeftThigh); legType <= static_cast<int>(ModBodyPart::RightShin); ++legType) {
+        for (const auto& inst : data->partInstances) {
+          if (static_cast<int>(inst.partType) == legType) {
+            ModPartInstanceData extraLeg = inst;
+            extraLeg.partId = nextId;
+
+            if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh) {
+               extraLeg.parentId = (inst.partType == ModBodyPart::LeftThigh) ? parentIdLeft : parentIdRight;
+               
+               if (inst.partType == ModBodyPart::LeftThigh) extraLeftThighId = nextId;
+               if (inst.partType == ModBodyPart::RightThigh) extraRightThighId = nextId;
+               
+               // Fix the visual Y-coordinate gap for extra legs ONLY!
+               // The user explicitly requested to fix the height (Y) gap for the added legs.
+               extraLeg.localTransform.translate.y += 0.4f;
+               extraLeg.resolvedLocalTranslate.y += 0.4f;
+               
+            } else if (inst.partType == ModBodyPart::LeftShin) {
+               extraLeg.parentId = extraLeftThighId;
+            } else if (inst.partType == ModBodyPart::RightShin) {
+               extraLeg.parentId = extraRightThighId;
+            }
+
+            newLegs.push_back(extraLeg);
+
+            for (const auto& snap : data->controlPointSnapshots) {
+              if (snap.ownerPartId == inst.partId) {
+                ModControlPointSnapshot extraSnap = snap;
+                extraSnap.ownerPartId = extraLeg.partId;
+                
+                if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
+                    inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
+                   float dirX = (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::LeftShin) ? -dirXBase : dirXBase;
+                   float baseDirX = (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::LeftShin) ? -dirs[0].dirX : dirs[0].dirX;
+                   
+                   if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh) {
+                     if (extraSnap.role == ModControlPointRole::Bend) {
+                       extraSnap.localPosition.z += (dirZ * 0.7f) - 0.7f;
+                       extraSnap.localPosition.x += (dirX - baseDirX) * 0.7f;
+                     } else if (extraSnap.role == ModControlPointRole::End) {
+                       extraSnap.localPosition.z += (dirZ * 1.8f) - 1.8f;
+                       extraSnap.localPosition.x += (dirX - baseDirX) * 1.8f;
+                     }
+                   } else {
+                     // Shins
+                     if (extraSnap.role == ModControlPointRole::Root) {
+                       extraSnap.localPosition.z += (dirZ * 0.7f) - 0.7f;
+                       extraSnap.localPosition.x += (dirX - baseDirX) * 0.7f;
+                     } else if (extraSnap.role == ModControlPointRole::End) {
+                       extraSnap.localPosition.z += (dirZ * 1.8f) - 1.8f;
+                       extraSnap.localPosition.x += (dirX - baseDirX) * 1.8f;
+                     }
+                   }
+                }
+                newSnaps.push_back(extraSnap);
+              }
+            }
+            nextId++;
+            break;
+          }
+        }
+      }
+    }
+
+    data->partInstances.insert(data->partInstances.end(), newLegs.begin(), newLegs.end());
+    data->controlPointSnapshots.insert(data->controlPointSnapshots.end(), newSnaps.begin(), newSnaps.end());
+    break;
+  }
   }
 
   NormalizeCustomizeData(*data);
