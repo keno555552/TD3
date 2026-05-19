@@ -101,6 +101,9 @@ ModBodyCustomizeData MakeDefaultCustomizeDataLocal() {
   // 初期生成後に新旧の整合性（旧配列へ反映）を取る
   ModCustomizeDataStore::NormalizeCustomizeData(data);
 
+  // defaultControlPointSnapshots にも初期値をコピーしておく（ScoreCalculator用）
+  data.defaultControlPointSnapshots = data.controlPointSnapshots;
+
   return data;
 }
 
@@ -291,108 +294,98 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
 
   if (data == nullptr) return nullptr;
 
+  auto scalePart = [&](ModBodyPart targetType, float sx, float sy, float sz) {
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == targetType) {
+        inst.param.scale.x *= sx;
+        inst.param.scale.y *= sy;
+        inst.param.scale.z *= sz;
+        
+        for (auto& snap : data->controlPointSnapshots) {
+          if (snap.ownerPartId == inst.partId) {
+            snap.localPosition.x *= sx;
+            snap.localPosition.y *= sy;
+            snap.localPosition.z *= sz;
+            snap.radius *= (sx + sz) * 0.5f;
+          }
+        }
+      }
+    }
+  };
+
   switch (type) {
   case NpcPresetType::Default:
     break;
 
   case NpcPresetType::HeadBig:
-    for (auto& inst : data->partInstances) {
-      if (inst.partType == ModBodyPart::Head) {
-        inst.param.scale.x *= 2.0f;
-        inst.param.scale.y *= 2.0f;
-        inst.param.scale.z *= 2.0f;
-      } else if (inst.partType == ModBodyPart::Neck) {
-        inst.param.scale.x *= 1.15f;
-        inst.param.scale.z *= 1.15f;
-      }
-    }
+    scalePart(ModBodyPart::Head, 2.0f, 2.0f, 2.0f);
+    scalePart(ModBodyPart::Neck, 1.15f, 1.0f, 1.15f);
     break;
 
   case NpcPresetType::LongLeg:
-    for (auto& inst : data->partInstances) {
-      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
-          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
-        inst.param.scale.y *= 2.0f;
-      }
-    }
+    scalePart(ModBodyPart::LeftThigh, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::RightThigh, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::LeftShin, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::RightShin, 1.0f, 2.0f, 1.0f);
     break;
 
   case NpcPresetType::BigTorso:
-    for (auto& inst : data->partInstances) {
-      if (inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
-        inst.param.scale.x *= 2.0f;
-        inst.param.scale.y *= 2.0f;
-        inst.param.scale.z *= 2.0f;
-      }
-    }
+    scalePart(ModBodyPart::ChestBody, 2.0f, 2.0f, 2.0f);
+    scalePart(ModBodyPart::StomachBody, 2.0f, 2.0f, 2.0f);
     break;
 
   case NpcPresetType::Gorilla:
-    for (auto& inst : data->partInstances) {
-      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
-          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
-        inst.param.scale.x *= 1.5f;
-        inst.param.scale.z *= 1.5f;
-        inst.param.scale.y *= 1.3f;
-      } else if (inst.partType == ModBodyPart::ChestBody) {
-        inst.param.scale.x *= 1.6f;
-        inst.param.scale.z *= 1.4f;
-      } else if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
-                 inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
-        inst.param.scale.y *= 0.6f;
-      }
-    }
+    scalePart(ModBodyPart::LeftUpperArm, 1.5f, 1.3f, 1.5f);
+    scalePart(ModBodyPart::RightUpperArm, 1.5f, 1.3f, 1.5f);
+    scalePart(ModBodyPart::LeftForeArm, 1.5f, 1.3f, 1.5f);
+    scalePart(ModBodyPart::RightForeArm, 1.5f, 1.3f, 1.5f);
+    scalePart(ModBodyPart::ChestBody, 1.6f, 1.0f, 1.4f);
+    scalePart(ModBodyPart::LeftThigh, 1.0f, 0.6f, 1.0f);
+    scalePart(ModBodyPart::RightThigh, 1.0f, 0.6f, 1.0f);
+    scalePart(ModBodyPart::LeftShin, 1.0f, 0.6f, 1.0f);
+    scalePart(ModBodyPart::RightShin, 1.0f, 0.6f, 1.0f);
     break;
 
   case NpcPresetType::Slender:
-    for (auto& inst : data->partInstances) {
-      inst.param.scale.x *= 0.6f;
-      inst.param.scale.z *= 0.6f;
-      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
-          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin ||
-          inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
-        inst.param.scale.y *= 1.3f;
-      }
+    for(int i=0; i<static_cast<int>(ModBodyPart::Count); ++i) {
+      scalePart(static_cast<ModBodyPart>(i), 0.6f, 1.0f, 0.6f);
     }
+    scalePart(ModBodyPart::LeftThigh, 1.0f, 1.3f, 1.0f);
+    scalePart(ModBodyPart::RightThigh, 1.0f, 1.3f, 1.0f);
+    scalePart(ModBodyPart::LeftShin, 1.0f, 1.3f, 1.0f);
+    scalePart(ModBodyPart::RightShin, 1.0f, 1.3f, 1.0f);
+    scalePart(ModBodyPart::ChestBody, 1.0f, 1.3f, 1.0f);
+    scalePart(ModBodyPart::StomachBody, 1.0f, 1.3f, 1.0f);
     break;
 
   case NpcPresetType::Chubby:
-    for (auto& inst : data->partInstances) {
-      inst.param.scale.x *= 1.8f;
-      inst.param.scale.z *= 1.8f;
-      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh ||
-          inst.partType == ModBodyPart::LeftShin || inst.partType == ModBodyPart::RightShin) {
-        inst.param.scale.y *= 0.8f;
-      } else if (inst.partType == ModBodyPart::StomachBody) {
-        inst.param.scale.x *= 1.3f;
-        inst.param.scale.z *= 1.5f;
-      }
+    for(int i=0; i<static_cast<int>(ModBodyPart::Count); ++i) {
+      scalePart(static_cast<ModBodyPart>(i), 1.8f, 1.0f, 1.8f);
     }
+    scalePart(ModBodyPart::LeftThigh, 1.0f, 0.8f, 1.0f);
+    scalePart(ModBodyPart::RightThigh, 1.0f, 0.8f, 1.0f);
+    scalePart(ModBodyPart::LeftShin, 1.0f, 0.8f, 1.0f);
+    scalePart(ModBodyPart::RightShin, 1.0f, 0.8f, 1.0f);
+    scalePart(ModBodyPart::StomachBody, 1.3f, 1.0f, 1.5f);
     break;
 
   case NpcPresetType::Giant:
-    for (auto& inst : data->partInstances) {
-      inst.param.scale.x *= 2.0f;
-      inst.param.scale.y *= 2.0f;
-      inst.param.scale.z *= 2.0f;
+    for(int i=0; i<static_cast<int>(ModBodyPart::Count); ++i) {
+      scalePart(static_cast<ModBodyPart>(i), 2.0f, 2.0f, 2.0f);
     }
     break;
 
   case NpcPresetType::Mini:
-    for (auto& inst : data->partInstances) {
-      inst.param.scale.x *= 0.5f;
-      inst.param.scale.y *= 0.5f;
-      inst.param.scale.z *= 0.5f;
+    for(int i=0; i<static_cast<int>(ModBodyPart::Count); ++i) {
+      scalePart(static_cast<ModBodyPart>(i), 0.5f, 0.5f, 0.5f);
     }
     break;
 
   case NpcPresetType::LongArm:
-    for (auto& inst : data->partInstances) {
-      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
-          inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
-        inst.param.scale.y *= 2.0f;
-      }
-    }
+    scalePart(ModBodyPart::LeftUpperArm, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::RightUpperArm, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::LeftForeArm, 1.0f, 2.0f, 1.0f);
+    scalePart(ModBodyPart::RightForeArm, 1.0f, 2.0f, 1.0f);
     break;
 
   case NpcPresetType::WideShoulder:
