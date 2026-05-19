@@ -135,7 +135,6 @@ enum class NpcPresetType {
   LongArm,
   WideShoulder,
   WideHip,
-  LowHead,
 };
 
 // NPCのスタートからゴールまでの進行状況を保存する構造体

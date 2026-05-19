@@ -324,6 +324,27 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
         inst.param.scale.y *= 2.0f;
         inst.param.scale.z *= 2.0f;
       }
+      if (inst.partType == ModBodyPart::LeftUpperArm) {
+        inst.localTransform.translate.x -= 0.8f;
+        inst.resolvedLocalTranslate.x -= 0.8f;
+      } else if (inst.partType == ModBodyPart::RightUpperArm) {
+        inst.localTransform.translate.x += 0.8f;
+        inst.resolvedLocalTranslate.x += 0.8f;
+      }
+    }
+    for (auto& snap : data->controlPointSnapshots) {
+      ModBodyPart partType = ModBodyPart::Count;
+      for (const auto& inst : data->partInstances) {
+        if (inst.partId == snap.ownerPartId) {
+          partType = inst.partType;
+          break;
+        }
+      }
+      if (partType == ModBodyPart::LeftUpperArm) {
+        snap.localPosition.x -= 0.8f;
+      } else if (partType == ModBodyPart::RightUpperArm) {
+        snap.localPosition.x += 0.8f;
+      }
     }
     break;
 
@@ -396,6 +417,24 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
     break;
 
   case NpcPresetType::WideShoulder:
+    // 肩幅をさらに広げ、腕の太さも追加して「肩幅おばけ」にする
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
+        inst.param.scale.x *= 1.8f;
+        inst.param.scale.z *= 1.8f;
+      }
+      if (inst.partType == ModBodyPart::LeftUpperArm) {
+        inst.localTransform.translate.x -= 1.2f;
+        inst.localTransform.translate.y += 0.1f;
+        inst.resolvedLocalTranslate.x -= 1.2f;
+        inst.resolvedLocalTranslate.y += 0.1f;
+      } else if (inst.partType == ModBodyPart::RightUpperArm) {
+        inst.localTransform.translate.x += 1.2f;
+        inst.localTransform.translate.y += 0.1f;
+        inst.resolvedLocalTranslate.x += 1.2f;
+        inst.resolvedLocalTranslate.y += 0.1f;
+      }
+    }
     for (auto& snap : data->controlPointSnapshots) {
       ModBodyPart partType = ModBodyPart::Count;
       for (const auto& inst : data->partInstances) {
@@ -405,16 +444,32 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
         }
       }
       if (partType == ModBodyPart::LeftUpperArm) {
-        snap.localPosition.x -= 1.5f;
-        snap.localPosition.y += 0.5f;
+        snap.localPosition.x -= 1.2f; // さらに外へ
+        snap.localPosition.y += 0.1f; // 少し上へ
+        snap.radius *= 1.8f;
       } else if (partType == ModBodyPart::RightUpperArm) {
-        snap.localPosition.x += 1.5f;
-        snap.localPosition.y += 0.5f;
+        snap.localPosition.x += 1.2f;
+        snap.localPosition.y += 0.1f;
+        snap.radius *= 1.8f;
       }
     }
     break;
 
   case NpcPresetType::WideHip:
+    // 腰をさらに広くし、太ももを太くして「下半身どっしり型」にする
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh) {
+        inst.param.scale.x *= 1.8f;
+        inst.param.scale.z *= 1.8f;
+      }
+      if (inst.partType == ModBodyPart::LeftThigh) {
+        inst.localTransform.translate.x -= 2.2f;
+        inst.resolvedLocalTranslate.x -= 2.2f;
+      } else if (inst.partType == ModBodyPart::RightThigh) {
+        inst.localTransform.translate.x += 2.2f;
+        inst.resolvedLocalTranslate.x += 2.2f;
+      }
+    }
     for (auto& snap : data->controlPointSnapshots) {
       ModBodyPart partType = ModBodyPart::Count;
       for (const auto& inst : data->partInstances) {
@@ -424,25 +479,11 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
         }
       }
       if (partType == ModBodyPart::LeftThigh) {
-        snap.localPosition.x -= 1.5f;
+        snap.localPosition.x -= 2.2f; // さらに外へ
+        snap.radius *= 1.8f;
       } else if (partType == ModBodyPart::RightThigh) {
-        snap.localPosition.x += 1.5f;
-      }
-    }
-    break;
-
-  case NpcPresetType::LowHead:
-    for (auto& snap : data->controlPointSnapshots) {
-      ModBodyPart partType = ModBodyPart::Count;
-      for (const auto& inst : data->partInstances) {
-        if (inst.partId == snap.ownerPartId) {
-          partType = inst.partType;
-          break;
-        }
-      }
-      if (partType == ModBodyPart::Neck || partType == ModBodyPart::Head) {
-        snap.localPosition.y -= 1.0f;
-        snap.localPosition.z += 0.8f; // Move forward slightly for a hunched look
+        snap.localPosition.x += 2.2f;
+        snap.radius *= 1.8f;
       }
     }
     break;
