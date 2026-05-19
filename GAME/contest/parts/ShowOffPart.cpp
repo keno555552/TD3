@@ -27,7 +27,7 @@ void ShowOffPart::Update() {
 			step_ = ShowOffStep::TurnToJudges;
 		}
 
-		if(nextButton_->GetIsClicked()){
+		if(nextButton_->GetIsRelease()){
 			step_ = ShowOffStep::TurnToJudges;
 		}
 		break;
