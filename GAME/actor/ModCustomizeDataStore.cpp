@@ -474,6 +474,17 @@ void ModCustomizeDataStore::ClearSharedNpcCustomizeData() {
   SharedNpcCustomizeDataStorage().clear();
 }
 
+// トラベルシーンでのプレイヤー到着順位
+static int s_travelFinishRank = -1;
+
+void ModCustomizeDataStore::SetTravelFinishRank(int rank) {
+  s_travelFinishRank = rank;
+}
+
+int ModCustomizeDataStore::GetTravelFinishRank() {
+  return s_travelFinishRank;
+}
+
 void ModCustomizeDataStore::NormalizeCustomizeData(ModBodyCustomizeData &data) {
   data.dataVersion = 2;
 

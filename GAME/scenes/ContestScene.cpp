@@ -3,6 +3,9 @@
 #include "GAME/contest/parts/ResultPart.h"
 #include "GAME/contest/parts/ShowOffPart.h"
 #include "GAME/contest/parts/TrophyPart.h"
+#include "GAME/contest/parts/RankingPart.h"
+#include "GAME/actor/ModCustomizeDataStore.h"
+#include <algorithm>
 
 ContestScene::ContestScene(kEngine *system) {
   system_ = system;
@@ -218,6 +221,69 @@ ContestScene::ContestScene(kEngine *system) {
     customizedBodyActor_.SetAutoGroundEnabled(true);
     customizedBodyActor_.BuildFromCustomizeData(*playerData);
   }
+
+  // NPCのデータ取得と構築
+  for (int i = 0; i < 2; ++i) {
+    const ModBodyCustomizeData* npcData = ModCustomizeDataStore::GetSharedNpcCustomizeData(i);
+    if (npcData != nullptr) {
+      npcBodyActors_[i].Initialize(system_);
+      npcBodyActors_[i].SetActorScale({0.03f, 0.03f, 0.03f});
+      
+      // 配置を左右に散らす
+      float npcX = (i == 0) ? -1.0f : 1.0f; // プレイヤーは 0.0f とする
+      npcBodyActors_[i].SetActorTranslate({npcX, 0.0f, -0.2f});
+      npcBodyActors_[i].SetGroundY(0.15f);
+      npcBodyActors_[i].SetGroundOffsetY(0.02f);
+      npcBodyActors_[i].SetAutoGroundEnabled(true);
+      npcBodyActors_[i].BuildFromCustomizeData(*npcData);
+
+      // スコア計算
+      if (theme != nullptr) {
+        std::vector<JudgeData> judgeList;
+        if (judges != nullptr) {
+            judgeList = *judges;
+        }
+        npcScoreResults_[i] = ScoreCalculator::Calculate(*theme, *npcData, judgeList);
+        npcScoreCalculated_[i] = true;
+      }
+    }
+  }
+
+  // Ranking data build
+  if (isScoreCalculated_) {
+    ContestRankEntry pEntry;
+    pEntry.name = "あなた";
+    pEntry.totalStars = scoreResult_.totalStars;
+    pEntry.overallRank = scoreResult_.overallRank;
+    pEntry.finalScore = scoreResult_.finalScore;
+    pEntry.rank = 0;
+    contestRanking_.push_back(pEntry);
+  }
+  
+  for(int i=0; i<2; ++i) {
+    if(npcScoreCalculated_[i]) {
+      ContestRankEntry nEntry;
+      nEntry.name = "ライバル " + std::to_string(i + 1);
+      nEntry.totalStars = npcScoreResults_[i].totalStars;
+      nEntry.overallRank = npcScoreResults_[i].overallRank;
+      nEntry.finalScore = npcScoreResults_[i].finalScore;
+      nEntry.rank = 0;
+      contestRanking_.push_back(nEntry);
+    }
+  }
+
+  // スコア順にソートしてRank決定
+  std::sort(contestRanking_.begin(), contestRanking_.end(), [](const ContestRankEntry& a, const ContestRankEntry& b) {
+      if (a.totalStars != b.totalStars) {
+          return a.totalStars > b.totalStars;
+      }
+      return a.finalScore > b.finalScore;
+  });
+  
+  for(size_t i=0; i<contestRanking_.size(); ++i){
+      contestRanking_[i].rank = static_cast<int>(i) + 1;
+  }
+
 
   // 最初のパートを生成
   phase_ = ContestPhase::ShowOff;
@@ -576,6 +642,12 @@ void ContestScene::Draw() {
 
   customizedBodyActor_.UpdateAndDraw(usingCamera_);
 
+  for (int i = 0; i < 2; ++i) {
+    if (npcScoreCalculated_[i]) {
+      npcBodyActors_[i].UpdateAndDraw(usingCamera_);
+    }
+  }
+
   // 現在のパートの描画
   if (currentPart_) {
     currentPart_->Draw();
@@ -609,6 +681,9 @@ void ContestScene::AdvancePhase() {
     phase_ = ContestPhase::Result;
     break;
   case ContestPhase::Result:
+    phase_ = ContestPhase::Ranking;
+    break;
+  case ContestPhase::Ranking:
     phase_ = ContestPhase::Trophy;
     break;
   case ContestPhase::Trophy:
@@ -633,6 +708,9 @@ std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
   case ContestPhase::Result:
     return std::make_unique<ResultPart>(system_, &bitmapFont_, scoreResult_,
                                         earnedNickname_);
+
+  case ContestPhase::Ranking:
+    return std::make_unique<RankingPart>(system_, &bitmapFont_, contestRanking_);
 
   case ContestPhase::Trophy:
     return std::make_unique<TrophyPart>(system_, &bitmapFont_);

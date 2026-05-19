@@ -107,6 +107,12 @@ public:
   /// </summary>
   static void ClearSharedNpcCustomizeData();
 
+  /// トラベルシーンでのプレイヤー到着順位を保存する
+  static void SetTravelFinishRank(int rank);
+
+  /// トラベルシーンでのプレイヤー到着順位を取得する（未設定なら -1）
+  static int GetTravelFinishRank();
+
   /// <summary>
   /// 改造データを正規化する
   ///

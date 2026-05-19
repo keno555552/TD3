@@ -9,7 +9,11 @@ ShowOffPart::ShowOffPart(kEngine* system, BitmapFont* font,
 	cameraTransform_.position = { 0.0f, 3.5f, -13.0f };
 	cameraTransform_.rotation = { 0.15f, 0.0f, 0.0f };
 
-	GenerateRandomDisplays();
+	// 乱数生成器の初期化
+	std::random_device rd;
+	rng_.seed(rd());
+
+	GenerateScrollingComments();
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
@@ -19,6 +23,29 @@ void ShowOffPart::Update() {
 	if (isFinished_) return;
 
 	nextButton_->Update();
+
+	// === スクロール更新 === //
+	float dt = system_->GetDeltaTime();
+
+	// ざわのスクロール更新
+	for (auto& sc : zawaScrolls_) {
+		sc.position.x -= sc.speed * dt;
+
+		// 画面左端を超えたら右端からリスタート（ループ）
+		if (sc.position.x < -kSpawnMargin) {
+			ResetScrollPosition(sc, rng_);
+		}
+	}
+
+	// コメントのスクロール更新
+	for (auto& sc : commentScrolls_) {
+		sc.position.x -= sc.speed * dt;
+
+		// 画面左端を超えたら右端からリスタート（ループ）
+		if (sc.position.x < -kSpawnMargin) {
+			ResetScrollPosition(sc, rng_);
+		}
+	}
 
 	switch (step_) {
 	case ShowOffStep::StageView:
@@ -41,22 +68,23 @@ void ShowOffPart::Update() {
 
 void ShowOffPart::Draw() {
 
-	// ざわをランダム配置で表示
-	for (const auto& zawa : zawaDisplays_) {
-		font_->RenderText("ざわ・・・", zawa.position, zawa.size,
-			BitmapFont::Align::Center);
+	// ざわをスクロール表示（奥側：layer=6）
+	for (const auto& sc : zawaScrolls_) {
+		font_->RenderText("ざわ・・・",
+			{ sc.position.x, sc.yPos }, sc.size,
+			BitmapFont::Align::Center, 6.0f);
 	}
 
-	// 観客コメントをランダム配置で表示
+	// 観客コメントをスクロール表示（手前側：layer=5）
 	for (int i = 0; i < 3; ++i) {
-		if (i < (int)commentDisplays_.size() &&
+		if (i < (int)commentScrolls_.size() &&
 			!audienceResult_.comments[i].empty()) {
 			font_->RenderText(
 				audienceResult_.comments[i],
-				commentDisplays_[i].position,
-				commentDisplays_[i].size,
+				{ commentScrolls_[i].position.x, commentScrolls_[i].yPos },
+				commentScrolls_[i].size,
 				BitmapFont::Align::Center,
-				5,{1.0f,0.0f,0.0f,1.0f});
+				5.0f, { 1.0f,0.0f,0.0f,1.0f });
 		}
 	}
 
@@ -99,26 +127,40 @@ PartCameraTransform ShowOffPart::GetCameraTransform() const {
 	return cameraTransform_;
 }
 
-void ShowOffPart::GenerateRandomDisplays() {
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_real_distribution<float> distX(70.0f, 1210.0f);
-	std::uniform_real_distribution<float> distY(50.0f, 670.0f);
+void ShowOffPart::GenerateScrollingComments() {
+	std::uniform_real_distribution<float> distY(50.0f, 550.0f);
+	std::uniform_real_distribution<float> distSpeed(100.0f, 300.0f);
+	std::uniform_real_distribution<float> distStartX(kScreenWidth, kScreenWidth + 600.0f);
 	std::uniform_int_distribution<int> distSize(0, 2);
 
 	float sizes[] = { 32.0f, 48.0f, 64.0f };
 
-	// ざわ8個
-	zawaDisplays_.resize(8);
-	for (auto& zawa : zawaDisplays_) {
-		zawa.position = { distX(gen), distY(gen) };
-		zawa.size = sizes[distSize(gen)];
+	// ざわ8個（初期X位置をばらけさせて一斉に出ないようにする）
+	zawaScrolls_.resize(8);
+	for (auto& sc : zawaScrolls_) {
+		sc.position.x = distStartX(rng_);
+		sc.yPos = distY(rng_);
+		sc.size = sizes[distSize(rng_)];
+		sc.speed = distSpeed(rng_);
 	}
 
 	// コメント3個
-	commentDisplays_.resize(3);
-	for (auto& comment : commentDisplays_) {
-		comment.position = { distX(gen), distY(gen) };
-		comment.size = sizes[distSize(gen)];
+	commentScrolls_.resize(3);
+	for (auto& sc : commentScrolls_) {
+		sc.position.x = distStartX(rng_);
+		sc.yPos = distY(rng_);
+		sc.size = sizes[distSize(rng_)];
+		sc.speed = distSpeed(rng_);
 	}
+}
+
+void ShowOffPart::ResetScrollPosition(ScrollingComment& sc, std::mt19937& gen) {
+	std::uniform_real_distribution<float> distY(50.0f, 550.0f);
+	std::uniform_real_distribution<float> distSpeed(100.0f, 300.0f);
+	std::uniform_real_distribution<float> distStartX(kScreenWidth, kScreenWidth + 400.0f);
+
+	// 右端外からリスタート、Y座標と速度も再ランダム
+	sc.position.x = distStartX(gen);
+	sc.yPos = distY(gen);
+	sc.speed = distSpeed(gen);
 }
