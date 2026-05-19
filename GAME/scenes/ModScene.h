@@ -188,6 +188,7 @@ private:
   float assemblyAttachSnapRadius_ = 0.55f;   // 接続時スナップ距離
 
   mutable std::unordered_map<int, float> modelLocalVisualRadiusCache_;
+  mutable std::unordered_map<int, Vector2> modelLocalVisualRadiusXZCache_;
   mutable std::unordered_map<int, float> modelLocalVisualHalfHeightCache_;
 
   BitmapFont bitmapFont_; // テキスト描画用のビットマップフォント
@@ -656,6 +657,9 @@ private:
   Vector3 ComputeAssemblyPreviewLocalTranslate(
       int childRootPartId, const ModAttachFaceCandidate &candidate) const;
 
+  Vector3 ComputeAssemblyPreviewLocalRotate(
+      int childRootPartId, const ModAttachFaceCandidate &candidate) const;
+
   /// <summary>
   /// 現在のマウス Ray に基づいて、部位ドラッグの接続候補を更新する
   /// </summary>
@@ -817,6 +821,7 @@ private:
   /// OBJ頂点を rootNode.localMatrix 込みで評価し、X/Z の横幅だけから求める
   /// </summary>
   float GetModelLocalVisualRadius(ModBodyPart part) const;
+  Vector2 GetModelLocalVisualRadiusXZ(ModBodyPart part) const;
 
   /// <summary>
   /// 指定部位のカプセル半径補正倍率を自動計算する

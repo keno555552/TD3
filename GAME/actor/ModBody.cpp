@@ -1,6 +1,8 @@
 #include "ModBody.h"
 #include "ModCustomizeDataStore.h"
 #include "GAME/actor/ModObjectUtil.h"
+#include "Renderer/Resource/ResourceManager.h"
+#include "Renderer/Mesh/ModelGroup.h"
 #include <cmath>
 
 namespace {
@@ -420,21 +422,31 @@ Vector3 ModBody::GetVisualScaleRatio() const {
 
 float ModBody::GetVisualSegmentRadius(ModControlPointRole startRole,
                                       ModControlPointRole endRole) const {
-  const int startIndex = FindControlPointIndex(startRole);
-  const int endIndex = FindControlPointIndex(endRole);
+  const std::vector<ModControlPoint> *sourcePoints = &controlPoints_;
+  if (externalControlPoints_ != nullptr) {
+    sourcePoints = externalControlPoints_;
+  }
+
+  const int startIndex = FindRoleIndexInPoints(*sourcePoints, startRole);
+  const int endIndex = FindRoleIndexInPoints(*sourcePoints, endRole);
+
+  const float lateralScale = (std::max)(param_.scale.x, param_.scale.z);
 
   if (startIndex < 0 || endIndex < 0) {
+    // 役割が見つからない場合のフォールバック
+    if (autoCalculatedCapsule_.radius > 0.0f) {
+      return autoCalculatedCapsule_.radius * lateralScale;
+    }
     return 0.0f;
   }
 
   const float startRadius =
-      controlPoints_[static_cast<size_t>(startIndex)].radius;
-  const float endRadius = controlPoints_[static_cast<size_t>(endIndex)].radius;
+      (*sourcePoints)[static_cast<size_t>(startIndex)].radius;
+  const float endRadius = (*sourcePoints)[static_cast<size_t>(endIndex)].radius;
 
   const float safeStartRadius = (std::max)(startRadius, 0.01f);
   const float safeEndRadius = (std::max)(endRadius, 0.01f);
 
-  // ApplySegmentToObjectPart() と同じ考え方
   const float segmentRadius = (std::max)(safeStartRadius, safeEndRadius);
 
   const float defaultSegmentRadius =
@@ -443,12 +455,24 @@ float ModBody::GetVisualSegmentRadius(ModControlPointRole startRole,
   const float thicknessScale =
       segmentRadius / (std::max)(defaultSegmentRadius, 0.0001f);
 
-  // 実際の見た目幅は base mesh の太さ × thicknessScale × param.scale
-  // カプセル半径は最終的な見た目の外半径に合わせたいので
-  // X/Z の大きい方を掛ける
-  const float lateralScale = (std::max)(param_.scale.x, param_.scale.z);
+  if (autoCalculatedCapsule_.radius > 0.0f) {
+    // 腕や脚など（肘や膝の出っ張りがある部位）は、純粋な太さである小さい方を採用する
+    // 胴体などは全体を包める大きい方を採用する
+    float baseRadius = 0.0f;
+    if (part_ == ModBodyPart::LeftForeArm || part_ == ModBodyPart::RightForeArm ||
+        part_ == ModBodyPart::LeftUpperArm || part_ == ModBodyPart::RightUpperArm ||
+        part_ == ModBodyPart::LeftShin || part_ == ModBodyPart::RightShin ||
+        part_ == ModBodyPart::LeftThigh || part_ == ModBodyPart::RightThigh ||
+        part_ == ModBodyPart::Neck) {
+        baseRadius = (std::min)(autoCalculatedCapsule_.radiusX, autoCalculatedCapsule_.radiusZ);
+    } else {
+        baseRadius = (std::max)(autoCalculatedCapsule_.radiusX, autoCalculatedCapsule_.radiusZ);
+    }
 
-  return defaultSegmentRadius * thicknessScale * lateralScale;
+    return baseRadius * baseMeshTransform_.scale.x * thicknessScale * lateralScale;
+  }
+
+  return defaultSegmentRadius * baseMeshTransform_.scale.x * thicknessScale * lateralScale;
 }
 
 std::unique_ptr<ModBodyCustomizeData> ModBody::CreateDefaultCustomizeData() {
@@ -525,6 +549,25 @@ void ModBody::CacheBaseTransforms(Object *target) {
     basePartTransforms_.reserve(target->objectParts_.size());
     for (size_t i = 0; i < target->objectParts_.size(); ++i) {
       basePartTransforms_.push_back(target->objectParts_[i].transform);
+    }
+
+    // --- メッシュからカプセルを自動計算 ---
+    if (target->modelHandle_ >= 0) {
+      ResourceManager *rm = ResourceManager::GetInstance();
+      if (rm != nullptr &&
+          target->modelHandle_ < static_cast<int>(rm->modelGroupList_.size())) {
+        std::shared_ptr<ModelGroup> group =
+            rm->modelGroupList_[target->modelHandle_];
+        if (group != nullptr && group->GetModelNum() > 0) {
+          Model *model = group->GetModel(0);
+          if (model != nullptr) {
+            ModelData modelData = model->GetModelData();
+            autoCalculatedCapsule_ =
+                ModCapsuleUtil::CalculateMinimalCapsuleFromVertices(
+                    modelData.vertices, modelData.rootNode.localMatrix);
+          }
+        }
+      }
     }
 
     isBaseCached_ = true;

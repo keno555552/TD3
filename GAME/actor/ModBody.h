@@ -1,6 +1,7 @@
 #pragma once
 #include "ControlPointChain.h"
 #include "ModControlPointTypes.h"
+#include "ModCapsuleUtil.h"
 #include "Object/Object.h"
 #include <array>
 #include <memory>
@@ -546,4 +547,9 @@ private:
   const std::vector<ModControlPoint> *externalControlPoints_ = nullptr;
   ModControlPointRole externalStartRole_ = ModControlPointRole::None;
   ModControlPointRole externalEndRole_ = ModControlPointRole::None;
+
+  /// <summary>
+  /// メッシュ頂点から自動計算された最小カプセル
+  /// </summary>
+  ModCapsule autoCalculatedCapsule_{};
 };
