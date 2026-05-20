@@ -4,6 +4,9 @@
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <random>
 
+#ifdef _DEBUG
+#include "ImGuiManager.h"
+#endif
 TitleScene::TitleScene(kEngine* system) {
 	system_ = system;
 
@@ -70,9 +73,9 @@ TitleScene::TitleScene(kEngine* system) {
 	titleNpcManager_->InitializeNpcRunners(
 		titleNpcDummyData_.get(), titleNpcPlayer_.get(), kNpcLoopLimitX);
 
-	// 3体に絞る
-	if (titleNpcManager_->npcRunners_.size() > 3) {
-		titleNpcManager_->npcRunners_.resize(3);
+	// 4体に絞る
+	if (titleNpcManager_->npcRunners_.size() > 4) {
+		titleNpcManager_->npcRunners_.resize(4);
 	}
 
 	// 各NPC のキャラ付け（速度差・初期ヘッドスタート・横位置）
@@ -82,16 +85,17 @@ TitleScene::TitleScene(kEngine* system) {
 		float laneX;
 		float cooldown;
 	};
-	const NpcInit initData[3] = {
+	const NpcInit initData[4] = {
 		{ 1.15f, 3.5f,  0.0f, 3.5f },  // 速い・先頭
+		{ 1.05f, 2.5f, -3.0f, 3.2f },  // 追加: やや速い・奥レーン
 		{ 1.00f, 1.5f, -1.5f, 2.8f },  // 中・中盤
-		{ 0.85f, 0.0f,  1.5f, 2.2f },  // 遅い・スタート地点
+		{ 0.85f, 0.0f,  1.5f, 2.2f },  // 遅い・手前・スタート地点
 	};
 
 	npcLoopSettings_.clear();
 	npcLoopSettings_.resize(titleNpcManager_->npcRunners_.size());
 
-	for (size_t i = 0; i < titleNpcManager_->npcRunners_.size() && i < 3; ++i) {
+	for (size_t i = 0; i < titleNpcManager_->npcRunners_.size() && i < 4; ++i) {
 		auto& npc = titleNpcManager_->npcRunners_[i];
 		npc.timingSkill    = initData[i].timingSkill;
 		npc.headStartSpeed = 2.0f * npc.timingSkill;
@@ -112,7 +116,7 @@ TitleScene::TitleScene(kEngine* system) {
 
 		// シミュレーションでゴール超えた場合の安全ネット
 		if (npc.finished || npc.runner->GetMoveX() >= kNpcLoopLimitX) {
-			static const float kFallbackPos[3] = { 5.0f, -5.0f, -14.0f };
+			static const float kFallbackPos[4] = { 5.0f, 0.0f, -5.0f, -14.0f };
 			npc.runner->Initialize(kFallbackPos[i]);
 			npc.finished  = false;
 			npc.finishRank = -1;
@@ -147,7 +151,7 @@ void TitleScene::ResetTitleNpcBody(int index) {
 		NpcPresetType::LongLeg, NpcPresetType::Gorilla, NpcPresetType::Slender,
 		NpcPresetType::Chubby, NpcPresetType::Giant, NpcPresetType::Mini,
 		NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip,
-		NpcPresetType::LowHead, NpcPresetType::Default
+		NpcPresetType::MutantAsura, NpcPresetType::OctopusLegs
 	};
 
 	// 現在他のNPCが使用中のプリセットを除外する
@@ -274,6 +278,28 @@ void TitleScene::Draw() {
 	// 現在シーン表示
 	ImGui::Begin("Scene");
 	ImGui::Text("TitleScene");
+	ImGui::End();
+
+	ImGui::Begin("Title Scene Debug");
+	const char* presetNames[] = {
+		"Default", "HeadBig", "LongLeg", "BigTorso", "Gorilla", "Slender", "Chubby", "Giant", "Mini", "LongArm", "WideShoulder", "WideHip", "MutantAsura", "OctopusLegs"
+	};
+	static int currentPresetIndex = static_cast<int>(NpcPresetType::OctopusLegs);
+	ImGui::Combo("Force Preset", &currentPresetIndex, presetNames, IM_ARRAYSIZE(presetNames));
+	if (ImGui::Button("Apply Preset to All NPCs")) {
+		for (size_t i = 0; i < titleNpcManager_->npcRunners_.size(); ++i) {
+			auto& npc = titleNpcManager_->npcRunners_[i];
+			npcLoopSettings_[i].currentPresetId = currentPresetIndex;
+			auto presetData = ModCustomizeDataStore::CreateNpcPreset(
+				static_cast<NpcPresetType>(currentPresetIndex), titleNpcDummyData_.get());
+			npc.customizeData = std::move(presetData);
+			npc.runner->SetCustomizeData(npc.customizeData.get());
+			npc.runner->LoadCustomizeData();
+			npc.runner->BuildFeaturesFromCustomizeData();
+			npc.runner->BuildAllVisualParts();
+			npc.runner->ApplyCustomizeToMovementParam();
+		}
+	}
 	ImGui::End();
 #endif
 

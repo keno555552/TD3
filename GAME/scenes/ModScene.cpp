@@ -6387,7 +6387,7 @@ void ModScene::InitializeNpcModProgress() {
       NpcPresetType::LongLeg, NpcPresetType::Gorilla, NpcPresetType::Slender,
       NpcPresetType::Chubby, NpcPresetType::Giant, NpcPresetType::Mini,
       NpcPresetType::LongArm, NpcPresetType::WideShoulder, NpcPresetType::WideHip,
-      NpcPresetType::LowHead};
+      NpcPresetType::MutantAsura, NpcPresetType::OctopusLegs};
 
   std::random_device rd;
   std::mt19937 rng(rd());

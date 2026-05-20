@@ -548,6 +548,29 @@ void TravelScene::Draw() {
 
   ImGui::Checkbox("Show NPC Model", &showNpcModel_);
 
+  // --- プリセット切り替えのデバッグメニュー ---
+  ImGui::Separator();
+  const char* presetNames[] = {
+    "Default", "HeadBig", "LongLeg", "BigTorso", "Gorilla", "Slender", "Chubby", "Giant", "Mini", "LongArm", "WideShoulder", "WideHip", "MutantAsura", "OctopusLegs"
+  };
+  static int currentPresetIndex = static_cast<int>(NpcPresetType::BigTorso);
+  ImGui::Combo("Force NPC Preset", &currentPresetIndex, presetNames, IM_ARRAYSIZE(presetNames));
+  if (ImGui::Button("Apply Preset to All NPCs")) {
+    for (size_t i = 0; i < npcManager_->npcRunners_.size(); ++i) {
+      auto& npc = npcManager_->npcRunners_[i];
+      auto presetData = ModCustomizeDataStore::CreateNpcPreset(
+        static_cast<NpcPresetType>(currentPresetIndex), nullptr);
+      npc.customizeData = std::move(presetData);
+      npc.runner->SetCustomizeData(npc.customizeData.get());
+      npc.runner->LoadCustomizeData();
+      npc.runner->BuildFeaturesFromCustomizeData();
+      npc.runner->BuildAllVisualParts();
+      npc.runner->ApplyCustomizeToMovementParam();
+    }
+  }
+  ImGui::Separator();
+  // ------------------------------------------
+
   for (size_t i = 0; i < npcManager_->npcRunners_.size(); ++i) {
     const auto &npc = npcManager_->npcRunners_[i];
 

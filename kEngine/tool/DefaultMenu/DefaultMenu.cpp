@@ -163,7 +163,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 	sMenuButtonM_NL->CreateDefaultData();
 	sMenuButtonM_NL->objectParts_[0].materialConfig->textureHandle = TH_menuButton_NL;
 	sMenuButtonM_NL->mainPosition.transform.translate = { 0, 0, -1.0f };
-	sMenuButtonM_NL->followObject_ = sMenuButtonS.get();
+	sMenuButtonM_NL->followObject_ = sMenuButtonM.get();
 	sMenuButtonM_NL->Update(nullptr);
 
 	sMenuButtonB->IntObject(system_);
@@ -179,7 +179,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 	sMenuButtonB_NL->CreateDefaultData();
 	sMenuButtonB_NL->objectParts_[0].materialConfig->textureHandle = TH_menuButton_NL;
 	sMenuButtonB_NL->mainPosition.transform.translate = { 0, 0, -1.0f };
-	sMenuButtonB_NL->followObject_ = sMenuButtonS.get();
+	sMenuButtonB_NL->followObject_ = sMenuButtonB.get();
 	sMenuButtonB_NL->Update(nullptr);
 
 	sMenuButtonS->IntObject(system_);
@@ -218,6 +218,60 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 	sMenuVolumeBarS->mainPosition.transform.translate = { 204.0f, 270.0f, 122.0f };
 	sMenuVolumeBarS->followObject_ = sMenuBG_.get();
 	sMenuVolumeBarS->Update(nullptr);
+
+	/// ================== ボタン ==================///
+
+	bMenuClose = std::make_unique<Button>(system_);
+	bMenuClose->Init(
+		{ 45.5f, 45.5f , 0.0f },
+		91.0f, 91.0f,
+		-1, -1, -1, -1,
+		0, 0);
+	bMenuClose->SetFollowObject(sMenuClose.get());
+
+	bMenuRetry = std::make_unique<Button>(system_);
+	bMenuRetry->Init(
+		{ 45.5f, 45.5f , 0.0f },
+		91.0f, 91.0f,
+		-1, -1, -1, -1,
+		0, 0);
+	bMenuRetry->SetFollowObject(sMenuRetry.get());
+
+	bMenuBack = std::make_unique<Button>(system_);
+	bMenuBack->Init(
+		{ 45.5f, 45.5f , 0.0f },
+		91.0f, 91.0f,
+		TH_menuRetry, -1, -1, -1,
+		0, 0);
+	bMenuBack->SetFollowObject(sMenuBack.get());
+
+	bMenuBGM = std::make_unique<Button>(system_);
+	bMenuBGM->Init(
+		{ 16.5f, 16.5f , 0.0f },
+		33.0f, 33.0f,
+		-1, -1, -1, -1,
+		0, 0);
+	bMenuBGM->SetFollowObject(sMenuButtonB.get());
+
+	bMenuMASTER = std::make_unique<Button>(system_);
+	bMenuMASTER->Init(
+		{ 16.5f, 16.5f , 0.0f },
+		33.0f, 33.0f,
+		-1, -1, -1, -1,
+		0, 0);
+	bMenuMASTER->SetFollowObject(sMenuButtonM.get());
+
+	bMenuSE = std::make_unique<Button>(system_);
+	bMenuSE->Init(
+		{ 16.5f, 16.5f , 0.0f },
+		33.0f, 33.0f,
+		-1, -1, -1, -1,
+		0, 0);
+	bMenuSE->SetFollowObject(sMenuButtonS.get());
+
+
+
+
 
 	/// ================ testSound ================///
 	//SH_menuSE_ = system_->SoundLoadSE("resources/TemplateResource/sound/SE/game_start.wav");
@@ -309,6 +363,7 @@ void DefaultMenu::Updata() {
 
 		CheckClick();
 		ChangeSelect();
+		CheckMouse();
 		WorkChange();
 
 		break;
@@ -373,40 +428,24 @@ void DefaultMenu::Draw() {
 
 void DefaultMenu::MenuObjectUpdate() {
 	if (isOpened_) {
-		sMenuBG_->Update(nullptr);
+		bMenuClose->Update();
+		bMenuBack->Update();
+		bMenuRetry->Update();
+		bMenuBGM->Update();
+		bMenuMASTER->Update();
+		bMenuSE->Update();
 
-		sMenuPause->Update(nullptr);
-		sMenuBGM_NL->Update(nullptr);
-		sMenuBGM->Update(nullptr);
-		sMenuMASTER_NL->Update(nullptr);
-		sMenuMASTER->Update(nullptr);
-		sMenuSE_NL->Update(nullptr);
-		sMenuSE->Update(nullptr);
-
-		sMenuClose_NL->Update(nullptr);
-		sMenuClose->Update(nullptr);
-		sMenuBack_NL->Update(nullptr);
-		sMenuBack->Update(nullptr);
-		sMenuRetry_NL->Update(nullptr);
-		sMenuRetry->Update(nullptr);
-
-		sMenuButtonM_NL->Update(nullptr);
-		sMenuButtonM->Update(nullptr);
-		sMenuButtonB_NL->Update(nullptr);
-		sMenuButtonB->Update(nullptr);
-		sMenuButtonS_NL->Update(nullptr);
-		sMenuButtonS->Update(nullptr);
-
-		sMenuVolumeBarM->Update(nullptr);
-		sMenuVolumeBarB->Update(nullptr);
-		sMenuVolumeBarS->Update(nullptr);
-
-
-		//system_->SoundPlayBGM(SH_menuBGM_, BGMVolume_);
 	}
 	//else {
 	//	system_->SoundStop(SH_menuBGM_);
 	//}
+}
+
+float DefaultMenu::BarTuneVolume(Vector2 mousePos, float startX, float endX) {
+	float mouseX = mousePos.x;
+	float clampValue = std::clamp(mouseX, startX, endX);
+	float volume = (clampValue - startX) / (endX - startX);
+	return linearity(0.0f, 1.0f, volume);
 }
 
 bool DefaultMenu::IsRetry() {
@@ -467,6 +506,130 @@ void DefaultMenu::CheckClick() {
 	clickUp_ = system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W);
 	clickDown_ = system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S);
 	clickDecide_ = system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
+}
+
+void DefaultMenu::CheckMouse() {
+
+	Vector2 mousePos = system_->GetMousePosVector2();
+	bool isTrickingBar =
+		isSelectedBMenuSE_
+		|| isSelectedBMenuBGM_
+		|| isSelectedBMenuMASTER_;
+
+	if (!isTrickingBar) {
+		if (bMenuClose->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::Close) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::Close;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuClose->GetIsClick()) {
+				clickDecide_ = true;
+			}
+		}
+	}
+
+	if (!isTrickingBar) {
+		if (bMenuRetry->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::Retry) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::Retry;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuRetry->GetIsClick()) {
+				clickDecide_ = true;
+			}
+		}
+	}
+
+	if (!isTrickingBar) {
+		if (bMenuBack->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::Back) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::Back;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuBack->GetIsClick()) {
+				clickDecide_ = true;
+			}
+		}
+	}
+
+	if (!isTrickingBar) {
+		if (bMenuBGM->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeBGM) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::VolumeBGM;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuBGM->GetIsClick()) {
+				isSelectedBMenuBGM_ = true;
+			}
+		}
+	}
+	if (isSelectedBMenuBGM_) {
+		/// ここの計算よくない、真ん中の数字はマテリアルと判定の幅、時間があれば修正したい
+		float TunningVBX = menuStartPos_.x + 11.5f + volumeButton0x_;
+		float TunningVEX = menuStartPos_.x + 11.5f + volumeButton1x_;
+		BGMVolume_ = BarTuneVolume(mousePos, TunningVBX, TunningVEX);
+		system_->SoundSetBGMVolume(BGMVolume_);
+		sMenuButtonB->mainPosition.transform.translate.x = linearity(volumeButton0x_, volumeButton1x_, BGMVolume_);
+
+	}
+
+	if (!isTrickingBar) {
+		if (bMenuMASTER->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeMASTER) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::VolumeMASTER;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuMASTER->GetIsClick()) {
+				isSelectedBMenuMASTER_ = true;
+			}
+		}
+	}
+	if (isSelectedBMenuMASTER_) {
+		/// ここの計算よくない、真ん中の数字はマテリアルと判定の幅、時間があれば修正したい
+		float TunningVBX = menuStartPos_.x + 11.5f + volumeButton0x_;
+		float TunningVEX = menuStartPos_.x + 11.5f + volumeButton1x_;
+		masterVolume_ = BarTuneVolume(mousePos, TunningVBX, TunningVEX);
+		system_->SoundSetMasterVolume(masterVolume_);
+		sMenuButtonM->mainPosition.transform.translate.x = linearity(volumeButton0x_, volumeButton1x_, masterVolume_);
+
+	}
+
+	if (!isTrickingBar) {
+		if (bMenuSE->GetIsSelect(mousePos, 1.0f, 1.0f)) {
+			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeSE) {
+				lastSelectedMenuIndex_ = selectedMenuIndex_;
+				selectedMenuIndex_ = (int)ButtonIndex::VolumeSE;
+				buttonTimer_->Reset0();
+			}
+			if (bMenuSE->GetIsClick()) {
+				isSelectedBMenuSE_ = true;
+			}
+		}
+	}
+	if (isSelectedBMenuSE_) {
+		/// ここの計算よくない、真ん中の数字はマテリアルと判定の幅、時間があれば修正したい
+		float TunningVBX = menuStartPos_.x + 11.5f + volumeButton0x_;
+		float TunningVEX = menuStartPos_.x + 11.5f + volumeButton1x_;
+		SEVolume_ = BarTuneVolume(mousePos, TunningVBX, TunningVEX);
+		system_->SoundSetSEVolume(SEVolume_);
+		sMenuButtonS->mainPosition.transform.translate.x = linearity(volumeButton0x_, volumeButton1x_, SEVolume_);
+	}
+
+	if (bMenuBGM->GetIsRelease()) {
+		isSelectedBMenuBGM_ = false;
+	}
+	if (bMenuMASTER->GetIsRelease()) {
+		isSelectedBMenuMASTER_ = false;
+	}
+	if (bMenuSE->GetIsRelease()) {
+		isSelectedBMenuSE_ = false;
+	}
+
 }
 
 void DefaultMenu::WorkChange() {
