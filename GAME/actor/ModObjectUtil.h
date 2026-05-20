@@ -35,6 +35,14 @@ inline Vector3 TransformPoint(const Matrix4x4 &m, const Vector3 &p) {
   return result;
 }
 
+inline Vector3 TransformVector(const Matrix4x4 &m, const Vector3 &v) {
+  Vector3 result{};
+  result.x = v.x * m.m[0][0] + v.y * m.m[1][0] + v.z * m.m[2][0];
+  result.y = v.x * m.m[0][1] + v.y * m.m[1][1] + v.z * m.m[2][1];
+  result.z = v.x * m.m[0][2] + v.y * m.m[1][2] + v.z * m.m[2][2];
+  return result;
+}
+
 inline Vector3 ComputeMainPositionWorldTranslate(const Object *target) {
   const Matrix4x4 world = ComputeMainPositionWorldMatrix(target);
   return {world.m[3][0], world.m[3][1], world.m[3][2]};
@@ -59,6 +67,17 @@ inline Vector3 TransformWorldPointToLocal(const Object *target,
   Matrix4x4 world = ComputeMainPositionWorldMatrix(target);
   Matrix4x4 invWorld = world.Inverse();
   return TransformPoint(invWorld, worldPoint);
+}
+
+inline Vector3 TransformWorldVectorToLocal(const Object *target,
+                                           const Vector3 &worldVector) {
+  if (target == nullptr) {
+    return worldVector;
+  }
+
+  Matrix4x4 world = ComputeMainPositionWorldMatrix(target);
+  Matrix4x4 invWorld = world.Inverse();
+  return TransformVector(invWorld, worldVector);
 }
 
 } // namespace ModObjectUtil

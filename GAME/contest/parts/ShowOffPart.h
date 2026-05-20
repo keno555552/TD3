@@ -12,10 +12,12 @@ enum class ShowOffStep {
 	TurnToJudges,
 };
 
-// ランダム表示用の構造体
-struct RandomTextDisplay {
-	Vector2 position;
-	float size;
+/// ニコニコ風スクロールコメント用の構造体
+struct ScrollingComment {
+	Vector2 position;   /// 現在の描画位置
+	float size;         /// フォントサイズ
+	float speed;        /// スクロール速度（px/秒）
+	float yPos;         /// Y座標（固定、ループ時に再利用）
 };
 
 class ShowOffPart : public IContestPart {
@@ -35,11 +37,23 @@ private:
 	ShowOffStep step_ = ShowOffStep::StageView;
 	bool isFinished_ = false;
 
-	void GenerateRandomDisplays();
+	/// スクロールコメントの初期化
+	void GenerateScrollingComments();
 
-	// ざわ8個＋コメント3個の表示情報
-	std::vector<RandomTextDisplay> zawaDisplays_;
-	std::vector<RandomTextDisplay> commentDisplays_;
+	/// 画面外に出たコメントを右端からリスタートさせる
+	void ResetScrollPosition(ScrollingComment& sc, std::mt19937& gen);
+
+	/// ざわ8個＋コメント3個のスクロール情報
+	std::vector<ScrollingComment> zawaScrolls_;
+	std::vector<ScrollingComment> commentScrolls_;
+
+	/// ループ用の乱数生成器
+	std::mt19937 rng_;
+
+	/// 画面幅（スクロール範囲の基準）
+	static constexpr float kScreenWidth = 1280.0f;
+	/// 画面外マージン（右端からの出現位置オフセット）
+	static constexpr float kSpawnMargin = 200.0f;
 
 	// カメラ設定（ImGuiで調整用）
 	PartCameraTransform cameraTransform_;

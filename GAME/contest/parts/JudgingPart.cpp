@@ -24,7 +24,7 @@ void JudgingPart::Update() {
 	nextButton_->Update();
 
 	// SPACEで次の審査員へ
-	if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsClicked()) {
+	if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsRelease()) {
 		currentJudgeIndex_++;
 		if (currentJudgeIndex_ >= 3) {
 			isFinished_ = true;

@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include "SceneManager.h"
+#include <ctime>
 
 const char kWindowTitle[] = "進化しろ";
 
@@ -13,6 +14,7 @@ const int32_t kWindowWidth = 1280;
 const int32_t kWindowHeight = 720;
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
+	srand(static_cast<unsigned int>(time(nullptr)));
 	CoInitializeEx(0, COINIT_MULTITHREADED);
 	std::unique_ptr<kEngine> system;
 	system = std::make_unique<kEngine>();
