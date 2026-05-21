@@ -1,4 +1,5 @@
 #include "PromptBoard.h"
+#include "kEngine/Scenes/SceneManager.h"
 
 namespace {
 
@@ -26,23 +27,23 @@ void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
   //promptTextureHandle_ = 0;
 
   frameSprite_ = CreateSprite(frameTextureHandle_,
-                              {position.x, position.y, 20.0f},
+                              {position.x, position.y, 200.0f},
                               {0.0f, 0.0f});
 
   promptSprite_ =
-      CreateSprite(promptTextureHandle_, {0.0f, 0.0f, 10.0f}, {0.0f, 0.0f});
+      CreateSprite(promptTextureHandle_, {0.0f, 0.0f, 200.0f}, {0.0f, 0.0f});
   promptSprite_->followObject_ = frameSprite_;
 
   topFlapSprite_ =
-      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 14.0f}, {250.0f, 50.0f});
+      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 200.0f}, {250.0f, 50.0f});
   topFlapSprite_->followObject_ = frameSprite_;
 
   bottomFlapSprite_ =
-      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 15.0f}, {250.0f, 0.0f});
+      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 200.0f}, {250.0f, 0.0f});
   bottomFlapSprite_->followObject_ = frameSprite_;
 
   hingeSprite_ =
-      CreateSprite(hingeTextureHandle_, {0.0f, 50.0f, 18.0f}, {0.0f, 0.0f});
+      CreateSprite(hingeTextureHandle_, {0.0f, 50.0f, 200.0f}, {0.0f, 0.0f});
   hingeSprite_->followObject_ = frameSprite_;
 
   SetSpriteAlpha(promptSprite_, 0.0f);
@@ -99,11 +100,11 @@ void PromptBoard::Draw() {
   }
 }
 
-void PromptBoard::SetPromptTexture(int textureHandle) {
- promptTextureHandle_ = textureHandle;
+ void PromptBoard::SetPromptTexture(int textureHandle) {
+  promptTextureHandle_ = textureHandle;
 
- promptSprite_= CreateSprite(promptTextureHandle_, { 0.0f, 0.0f, 10.0f }, { 0.0f, 0.0f });
- promptSprite_->followObject_ = frameSprite_;
+  promptSprite_= CreateSprite(promptTextureHandle_, { 0.0f, 0.0f, 200.0f }, { 0.0f, 0.0f });
+  promptSprite_->followObject_ = frameSprite_;
 
   Logger::Log("[PromptBoard] SetPromptTexture handle=%d", textureHandle);
 
@@ -179,6 +180,11 @@ void PromptBoard::UpdateStopAnimation() {
 }
 
 void PromptBoard::ApplyFlapRotation(float topAngle, float bottomAngle) {
+  if (SceneManager::GetInstance().IsPause()) {
+    topAngle = 0.0f;
+    bottomAngle = 0.0f;
+  }
+
   if (topFlapSprite_ != nullptr) {
     topFlapSprite_->mainPosition.transform.rotate = {topAngle, 0.0f, 0.0f};
   }

@@ -10,6 +10,18 @@ void SceneManager::Initialize(kEngine* system) {
 	sceneUsingNameHandle_ = "TITLE";
 
 	defaultMenu_ = std::make_unique <DefaultMenu>(system_);
+
+	// パーズ案内UIの初期化
+	pauseTextureHandle_ = system_->LoadTexture("GAME/resources/pause_UI.png");
+	pauseSprite_ = std::make_unique<SimpleSprite>();
+	pauseSprite_->IntObject(system_);
+	pauseSprite_->CreateDefaultData();
+	if (!pauseSprite_->objectParts_.empty()) {
+		pauseSprite_->objectParts_[0].materialConfig->textureHandle = pauseTextureHandle_;
+	}
+	pauseSprite_->mainPosition.transform.scale = { 0.35f, 0.35f, 1.0f };
+	pauseSprite_->mainPosition.transform.translate = { 5.0f, 650.0f, 0.0f };
+	pauseSprite_->Update(nullptr);
 }
 
 void SceneManager::Finalize() {
@@ -17,6 +29,7 @@ void SceneManager::Finalize() {
 	sceneOld_.reset();
 	sceneFactory_.reset();
 	defaultMenu_.reset();
+	pauseSprite_.reset();
 }
 
 SceneManager& SceneManager::GetInstance() {
@@ -107,6 +120,24 @@ void SceneManager::Render() {
 	}
 
 	 defaultMenu_->Draw();
+
+	if (pauseSprite_) {
+		if (sceneUsing_ != nullptr) {
+			float alpha = 1.0f - sceneUsing_->GetFadeAlpha();
+			
+			if (defaultMenu_ && defaultMenu_->GetIsPause()) {
+				alpha = 0.0f;
+			}
+
+			pauseSprite_->objectParts_[0].materialConfig->textureColor.w = alpha;
+
+			if (alpha > 0.0f) {
+				pauseSprite_->Draw();
+			}
+		} else {
+			pauseSprite_->Draw();
+		}
+	}
 
 #ifdef USE_IMGUI
 	ImGuiPart();
