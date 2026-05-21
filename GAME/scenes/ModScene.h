@@ -125,13 +125,18 @@ private:
   float orbitYaw_ = 0.0f;
   float orbitPitch_ = 0.25f;
   float orbitDistance_ = 8.0f;
+  float targetOrbitDistance_ = 8.0f;   // オートフォーカス用の目標ズーム距離
   float orbitRotateSpeed_ = 0.01f;
   float orbitZoomSpeed_ = 0.8f;
   float orbitMinDistance_ = 2.5f;
   float orbitMaxDistance_ = 40.0f;
+  float manualOrbitZoomRatio_ = 1.0f;  // B案: ユーザーの手動ズーム倍率を保持する
 
   void UpdateOrbitCamera();
   Vector3 ComputeOrbitTarget() const;
+  float ComputeCharacterHeight() const;    // キャラクターの現在の総身長（高さ）を計算する
+  float ComputeCharacterLowestY() const;   // キャラクターの足元のY座標（一番低い部分）を計算する
+  float ComputeIdealOrbitDistance() const; // 選択パーツや総身長から最適なズーム距離を計算する
 
   ModAssemblyGraph assembly_;       // 部位構造と親子関係を管理するグラフ
   std::vector<int> orderedPartIds_; // 描画や更新順に使う部位ID一覧
@@ -145,6 +150,7 @@ private:
       nullptr; // シーン間共有用の改造結果
 
   Fade fade_;                      // シーン開始・終了時のフェード演出
+  //float GetFadeAlpha() const override { return fade_.GetAlpha(); }
   bool isStartTransition_ = false; // フェードアウトによる遷移を開始したかどうか
   std::string selectedPrompt_;     // 現在のお題文
 
@@ -220,6 +226,16 @@ private:
   int addHeadSetTextureHandle_ = 0;
   int addBodyTextureHandle_ = 0;
   int trashTextureHandle_ = 0;
+
+  // お題画像・フレーム用
+  int promptTextureHandle_ = 0;
+  std::unique_ptr<SimpleSprite> promptSprite_;
+  int frameTextureHandle_ = 0;
+  std::unique_ptr<SimpleSprite> frameSprite_;
+
+  // 背景モデル用
+  std::unique_ptr<Object> stageObject_;
+  std::unique_ptr<Object> studioObject_;
 
   // ステータスゲージ用のスプライト群 (4項目 x 5段階 = 20個)
   std::array<std::unique_ptr<SimpleSprite>, 20> gaugeBlocks_{};

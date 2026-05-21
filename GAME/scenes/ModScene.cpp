@@ -274,7 +274,8 @@ float ClampFloatLocal(float value, float minValue, float maxValue) {
 }
 
 float GetControlPointGizmoDrawRadius(float influenceRadius) {
-  return ClampFloatLocal(influenceRadius * 0.90f, 0.07f, 0.24f);
+  // パーツの縮小や太さに依存せず、操作点を常にクリックしやすい大きめな固定サイズ(0.18f)にする
+  return 0.18f;
 }
 
 float GetWheelScaleFactorFromDelta(int wheelDelta) {
@@ -973,6 +974,45 @@ ModScene::ModScene(kEngine *system) {
   // PromptScene で決まったお題文を取得する
   selectedPrompt_ = PromptData::GetSelectedPrompt();
 
+  std::string promptTexPath = PromptData::GetSelectedPromptTexturePath();
+  if (!promptTexPath.empty()) {
+    promptTextureHandle_ = system_->LoadTexture(promptTexPath);
+    promptSprite_ = std::make_unique<SimpleSprite>();
+    promptSprite_->IntObject(system_);
+    promptSprite_->CreateDefaultData();
+    promptSprite_->mainPosition.transform = CreateDefaultTransform();
+    promptSprite_->mainPosition.transform.translate = {474.0f, 20.0f, 10.0f}; // 奥側に配置
+    promptSprite_->mainPosition.transform.scale = {2.0f / 3.0f, 2.0f / 3.0f, 1.0f};
+    promptSprite_->objectParts_[0].anchorPoint = {0.0f, 0.0f};
+    promptSprite_->objectParts_[0].materialConfig->textureHandle = promptTextureHandle_;
+    promptSprite_->objectParts_[0].materialConfig->useModelTexture = false;
+  }
+
+  frameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
+  frameSprite_ = std::make_unique<SimpleSprite>();
+  frameSprite_->IntObject(system_);
+  frameSprite_->CreateDefaultData();
+  frameSprite_->mainPosition.transform = CreateDefaultTransform();
+  frameSprite_->mainPosition.transform.translate = {474.0f, 20.0f, 20.0f}; // さらに奥側に配置
+  frameSprite_->mainPosition.transform.scale = {2.0f / 3.0f, 2.0f / 3.0f, 1.0f};
+  frameSprite_->objectParts_[0].anchorPoint = {0.0f, 0.0f};
+  frameSprite_->objectParts_[0].materialConfig->textureHandle = frameTextureHandle_;
+  frameSprite_->objectParts_[0].materialConfig->useModelTexture = false;
+
+  // 背景モデルの追加
+  int stageModelHandle = system_->SetModelObj("GAME/resources/stage/stage.obj");
+  stageObject_ = std::make_unique<Object>();
+  stageObject_->IntObject(system_);
+  stageObject_->CreateModelData(stageModelHandle);
+  stageObject_->mainPosition.transform = CreateDefaultTransform();
+  stageObject_->mainPosition.transform.translate = {0.0f, -2.5f, 0.0f};
+
+  int studioModelHandle = system_->SetModelObj("GAME/resources/studio/studio.obj");
+  studioObject_ = std::make_unique<Object>();
+  studioObject_->IntObject(system_);
+  studioObject_->CreateModelData(studioModelHandle);
+  studioObject_->mainPosition.transform = CreateDefaultTransform();
+
   // 前シーンから共有されている改造データを取得する
   customizeData_ = ModBody::CopySharedCustomizeData();
   if (customizeData_ == nullptr) {
@@ -990,11 +1030,17 @@ ModScene::ModScene(kEngine *system) {
 
   EnsureValidSelection();
 
-  // Orbitカメラの初期値を「モデル前面」基準で決める
+  // 1. まず初期状態を「未選択（全体表示）」にする
+  selectedPartId_ = -1;
+
+  // 2. 未選択状態の正しい注視点と引き距離をガチで計算する
   orbitTarget_ = ComputeOrbitTarget();
+  targetOrbitDistance_ = ComputeIdealOrbitDistance();
+  orbitDistance_ = targetOrbitDistance_; // 初期位置も目標値と完全に一致させる
+
+  // 3. カメラの初期角度を設定（モデル前面）
   orbitYaw_ = 3.14159265f;
   orbitPitch_ = 0.0f;
-  orbitDistance_ = 25.0f;
 
   // orbit値から初期カメラ位置を計算する
   {
@@ -1211,6 +1257,7 @@ void ModScene::Draw() {
 
 #ifdef USE_IMGUI
   // 接続判定ボックスを可視化する
+  // 接続判定ボックスを可視化する
   DrawPickBoxesDebug();
 
   // シーン共通の簡易操作説明を表示する
@@ -1331,41 +1378,99 @@ void ModScene::ResetForRetryFromFailure() {
 }
 
 Vector3 ModScene::ComputeOrbitTarget() const {
-  // 腰を最優先で注視する
-  const int waistIndex = FindTorsoControlPointIndex(ModControlPointRole::Waist);
-  if (waistIndex >= 0) {
-    return GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
-  }
+  // 最小値・最大値を極限値で初期化
+  Vector3 minBounds = {FLT_MAX, FLT_MAX, FLT_MAX};
+  Vector3 maxBounds = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+  bool hasPoints = false;
 
-  // 腰が取れないときは胴体中心
-  const int chestIndex = FindTorsoControlPointIndex(ModControlPointRole::Chest);
-  const int bellyIndex = FindTorsoControlPointIndex(ModControlPointRole::Belly);
+  // 1.
+  // 部位が選択されている場合、そのパーツが属する「四肢/頭首セット全体」の操作点を集める
+  // ただし、接続先変更（ドラッグ）中は改造体全体を映すためにこの処理をスキップする
+  if (selectedPartId_ >= 0 && !assemblyDrag_.isDragging) {
+    // 上腕・前腕のどちらが選ばれても、セットの根本（UpperArmやThigh、Neckなど）のパーツIDを解決
+    int assemblyRootId = ModAssemblyResolver::ResolveAssemblyRootPartId(
+        assembly_, selectedPartId_);
 
-  if (chestIndex >= 0 && bellyIndex >= 0 && waistIndex >= 0) {
-    const Vector3 chest =
-        GetTorsoControlPointWorldPosition(ModControlPointRole::Chest);
-    const Vector3 belly =
-        GetTorsoControlPointWorldPosition(ModControlPointRole::Belly);
-    const Vector3 waist =
-        GetTorsoControlPointWorldPosition(ModControlPointRole::Waist);
+    // そのセットに属するすべてのパーツID（例：UpperArm と
+    // ForeArm）をガッと集める
+    std::vector<int> partIds =
+        ModAssemblyResolver::CollectAssemblyPartIds(assembly_, assemblyRootId);
 
-    Vector3 center{};
-    center.x = (chest.x + belly.x + waist.x) / 3.0f;
-    center.y = (chest.y + belly.y + waist.y) / 3.0f;
-    center.z = (chest.z + belly.z + waist.z) / 3.0f;
-    return center;
-  }
+    for (int pid : partIds) {
+      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+        continue;
 
-  // 胴体が取れないときは選択部位を見る
-  if (selectedPartId_ >= 0 && modObjects_.count(selectedPartId_) > 0) {
-    Object *object = modObjects_.at(selectedPartId_).get();
-    if (object != nullptr) {
-      return ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+      const Object *obj = modObjects_.at(pid).get();
+      const ModBody &body = modBodies_.at(pid);
+
+      // その部位が持っているすべての操作点（Root, Bend,
+      // Endなど）の最新のワールド座標を拾う
+      const auto &points = body.GetControlPoints();
+      for (size_t i = 0; i < points.size(); ++i) {
+        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+        float r = points[i].radius * 3.0f;
+
+        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+        hasPoints = true;
+      }
     }
   }
 
-  // 何も無ければ原点少し上
-  return {0.0f, 0.5f, 0.0f};
+  // 2.
+  // 何も選択されていない、または操作点が見つからなかった場合は「改造体全体」の全操作点を対象にする
+  if (!hasPoints) {
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int pid : allIds) {
+      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+        continue;
+
+      // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
+      // （長さ変更等の操作点ドラッグ中はそのまま含める）
+      if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
+        continue;
+
+      const Object *obj = modObjects_.at(pid).get();
+      const ModBody &body = modBodies_.at(pid);
+
+      // 胴体を含む全パーツの全操作点を網羅（頭のてっぺんから足の先まで）
+      const auto &points = body.GetControlPoints();
+      for (size_t i = 0; i < points.size(); ++i) {
+        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+        float r = points[i].radius * 3.0f;
+
+        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+        hasPoints = true;
+      }
+    }
+  }
+
+  // 3. ターゲットを囲むボックスの中心点を注視点として返す
+  if (hasPoints) {
+    Vector3 center = {(minBounds.x + maxBounds.x) * 0.5f,
+                      (minBounds.y + maxBounds.y) * 0.5f,
+                      (minBounds.z + maxBounds.z) * 0.5f};
+
+    // 何も選択していない（全体表示）の時は、注視点が低くなりすぎないよう
+    // 計算された中心点の高さをそのまま使う（原点フォールバックをしない）
+    return center;
+  }
+
+  // 万が一操作点が一つも取れなかった場合の安全弁
+  return {0.0f, 0.9f, 0.0f}; // 基準を少し高めに設定
 }
 
 void ModScene::UpdateOrbitCamera() {
@@ -1380,7 +1485,7 @@ void ModScene::UpdateOrbitCamera() {
 #endif
 
   const bool blockCameraInput =
-      wantCaptureMouse || ShouldBlockDebugCameraMouseControl();
+      wantCaptureMouse || ShouldBlockDebugCameraMouseControl() || isTutorialMode_;
 
   static bool wasRightPressed = false;
   static POINT prevCursorPos{};
@@ -1390,13 +1495,27 @@ void ModScene::UpdateOrbitCamera() {
 
   const bool rightPressed = IsMouseRightPressed();
 
-  // 注視ターゲットだけは毎フレーム更新
-  orbitTarget_ = ComputeOrbitTarget();
+  // --------------------------------
+  // オートフォーカス：注視目標への滑らかな補間 (Lerp)
+  // --------------------------------
+  const Vector3 idealTarget = ComputeOrbitTarget();
+  orbitTarget_.x += (idealTarget.x - orbitTarget_.x) * 0.08f;
+  orbitTarget_.y += (idealTarget.y - orbitTarget_.y) * 0.08f;
+  orbitTarget_.z += (idealTarget.z - orbitTarget_.z) * 0.08f;
+
+  // --------------------------------
+  // オートフォーカス：ズーム目標の計算と滑らかな補間 (Lerp)
+  // --------------------------------
+  const float idealDistance = ComputeIdealOrbitDistance();
+  targetOrbitDistance_ = idealDistance * manualOrbitZoomRatio_;
+  targetOrbitDistance_ = (std::clamp)(targetOrbitDistance_, orbitMinDistance_, orbitMaxDistance_);
+
+  orbitDistance_ += (targetOrbitDistance_ - orbitDistance_) * 0.08f;
+  orbitDistance_ = (std::clamp)(orbitDistance_, orbitMinDistance_, orbitMaxDistance_);
 
   // --------------------------------
   // 右クリック開始時：
   // 「今のカメラ位置」から orbit パラメータを逆算する
-  // これで初期位置は変えない
   // --------------------------------
   if (!blockCameraInput && rightPressed && !wasRightPressed) {
     Vector3 currentPos = debugCamera_->GetTransform().translate;
@@ -1406,6 +1525,12 @@ void ModScene::UpdateOrbitCamera() {
     if (orbitDistance_ < 0.0001f) {
       orbitDistance_ = 0.0001f;
     }
+
+    // 操作開始時の距離を元に、手動ズーム倍率を逆算してオートフォーカスをロック
+    if (idealDistance > 0.0001f) {
+      manualOrbitZoomRatio_ = orbitDistance_ / idealDistance;
+    }
+    targetOrbitDistance_ = orbitDistance_;
 
     orbitYaw_ = atan2f(offset.x, -offset.z);
 
@@ -1417,7 +1542,7 @@ void ModScene::UpdateOrbitCamera() {
   }
 
   // --------------------------------
-  // 右ドラッグ中だけ orbit 回転
+  // 右ドラッグ中：orbit 回転角度 (Yaw/Pitch) の更新
   // --------------------------------
   if (!blockCameraInput && rightPressed) {
     if (wasRightPressed) {
@@ -1432,61 +1557,50 @@ void ModScene::UpdateOrbitCamera() {
     }
 
     prevCursorPos = currentCursorPos;
-
-    const float cosPitch = cosf(orbitPitch_);
-    const float sinPitch = sinf(orbitPitch_);
-    const float cosYaw = cosf(orbitYaw_);
-    const float sinYaw = sinf(orbitYaw_);
-
-    Vector3 cameraPos{};
-    cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
-    cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
-    cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
-
-    Vector3 toTarget = Subtract(orbitTarget_, cameraPos);
-    Vector3 dir = NormalizeSafeV(toTarget, {0.0f, 0.0f, 1.0f});
-
-    Vector3 cameraRotate{};
-    cameraRotate.y = atan2f(dir.x, dir.z);
-
-    const float horizontalLength = sqrtf(dir.x * dir.x + dir.z * dir.z);
-    cameraRotate.x = atan2f(-dir.y, horizontalLength);
-
-    cameraRotate.z = 0.0f;
-
-    debugCamera_->SetTranslate(cameraPos);
-    debugCamera_->SetRotation(cameraRotate);
-
-    camera_->SetTranslate(cameraPos);
-    camera_->SetRotation(cameraRotate);
   }
 
   // --------------------------------
-  // ホイール zoom も右押し中だけ反映
-  // 初期位置を勝手に変えないため
+  // ホイールスクロール：手動ズーム（目標値も同期してオートフォーカスをロック）
   // --------------------------------
   if (!blockCameraInput) {
     const int wheelDelta = system_->GetMouseScrollOrigin();
     if (wheelDelta != 0) {
-      orbitDistance_ -=
-          (static_cast<float>(wheelDelta) / 120.0f) * orbitZoomSpeed_;
-      orbitDistance_ =
-          (std::clamp)(orbitDistance_, orbitMinDistance_, orbitMaxDistance_);
-
-      const float cosPitch = cosf(orbitPitch_);
-      const float sinPitch = sinf(orbitPitch_);
-      const float cosYaw = cosf(orbitYaw_);
-      const float sinYaw = sinf(orbitYaw_);
-
-      Vector3 cameraPos{};
-      cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
-      cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
-      cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
-
-      debugCamera_->SetTranslate(cameraPos);
-      camera_->SetTranslate(cameraPos);
+      // プレイヤーが意図的にホイールを動かした時だけ、ズーム倍率を更新する
+      float scrollAmount = (static_cast<float>(wheelDelta) / 120.0f) * 0.15f; // 倍率変化の感度
+      manualOrbitZoomRatio_ -= scrollAmount;
+      manualOrbitZoomRatio_ = (std::clamp)(manualOrbitZoomRatio_, 0.2f, 5.0f); // 倍率の下限と上限
     }
   }
+
+  // --------------------------------
+  // 毎フレーム常にカメラの位置・回転を更新して適用
+  // （Lerpアニメーションを反映するため、ドラッグ時以外も適用する）
+  // --------------------------------
+  const float cosPitch = cosf(orbitPitch_);
+  const float sinPitch = sinf(orbitPitch_);
+  const float cosYaw = cosf(orbitYaw_);
+  const float sinYaw = sinf(orbitYaw_);
+
+  Vector3 cameraPos{};
+  cameraPos.x = orbitTarget_.x + orbitDistance_ * cosPitch * sinYaw;
+  cameraPos.y = orbitTarget_.y + orbitDistance_ * sinPitch;
+  cameraPos.z = orbitTarget_.z - orbitDistance_ * cosPitch * cosYaw;
+
+  Vector3 toTarget = Subtract(orbitTarget_, cameraPos);
+  Vector3 dir = NormalizeSafeV(toTarget, {0.0f, 0.0f, 1.0f});
+
+  Vector3 cameraRotate{};
+  cameraRotate.y = atan2f(dir.x, dir.z);
+
+  const float horizontalLength = sqrtf(dir.x * dir.x + dir.z * dir.z);
+  cameraRotate.x = atan2f(-dir.y, horizontalLength);
+  cameraRotate.z = 0.0f;
+
+  debugCamera_->SetTranslate(cameraPos);
+  debugCamera_->SetRotation(cameraRotate);
+
+  camera_->SetTranslate(cameraPos);
+  camera_->SetRotation(cameraRotate);
 
   wasRightPressed = rightPressed;
 }
@@ -2230,38 +2344,35 @@ void ModScene::SelectPart(int partId) {
 
   // 部位を選び直したら操作点選択もいったん解除する
   ClearControlPointSelection();
+
+  // 部位を選択し直した時は、手動ズーム倍率をリセットする（常に最適なフォーカスで見せるため）
+  manualOrbitZoomRatio_ = 1.0f;
+
+  // 選択された部位に適した理想のズーム距離を算出し、目標値に設定する
+  targetOrbitDistance_ = ComputeIdealOrbitDistance() * manualOrbitZoomRatio_;
 }
 
 void ModScene::EnsureValidSelection() {
-  // 現在の選択がまだ有効ならそのまま維持する
+  // 現在の選択がまだ有効（存在するパーツ）ならそのまま維持する
   if (selectedPartId_ >= 0 && assembly_.FindNode(selectedPartId_) != nullptr &&
       modObjects_.count(selectedPartId_) > 0) {
     return;
   }
 
-  // 無効ならいったん未選択に戻す
-  selectedPartId_ = -1;
-
-  // 選択可能な先頭部位を新たな選択対象にする
-  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-    const int id = orderedPartIds_[i];
-    const PartNode *node = assembly_.FindNode(id);
-    if (node == nullptr) {
-      continue;
-    }
-    if (!IsSelectablePart(node->part)) {
-      continue;
-    }
-
-    selectedPartId_ = id;
-    break;
+  // selectedPartId_ が -1
+  // の場合は「意図的な未選択状態」なので、勝手に選び直さずにそのまま維持する！
+  if (selectedPartId_ == -1) {
+    return;
   }
 
-  // 付け替え候補はリセットする
+  // 完全に削除されたIDなど、不正な値が入っていた場合のみ安全のためにリセットする
+  selectedPartId_ = -1;
+
+  // 付け替え候補もリセット
   reattachParentId_ = -1;
   reattachConnectorId_ = -1;
 
-  // 部位選択が無効化された場合は操作点選択も解除する
+  // 操作点選択も解除
   ClearControlPointSelection();
 }
 
@@ -5244,6 +5355,15 @@ ModScene::GetTorsoControlPointWorldPosition(ModControlPointRole role) const {
 }
 
 void ModScene::UpdateModObjects() {
+  if (stageObject_) {
+    // キャラクターの足元（一番低いY座標）に合わせて台座を移動
+    stageObject_->mainPosition.transform.translate.y = ComputeCharacterLowestY();
+    stageObject_->Update(nullptr);
+  }
+  if (studioObject_) {
+    studioObject_->Update(nullptr);
+  }
+
   ApplyAssemblyToSceneHierarchy();
 
   torsoSharedPointsBuffer_.clear();
@@ -5406,6 +5526,13 @@ void ModScene::UpdateModObjects() {
 }
 
 void ModScene::DrawModObjects() {
+  if (stageObject_) {
+    stageObject_->Draw();
+  }
+  if (studioObject_) {
+    studioObject_->Draw();
+  }
+
   // orderedPartIds_ の順に各部位 Object を描画する
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
     const int id = orderedPartIds_[i];
@@ -6978,6 +7105,55 @@ bool ModScene::TryHandleAddButtonInteraction() {
   return false;
 }
 
+float ModScene::ComputeCharacterLowestY() const {
+  float minY = FLT_MAX;
+  bool hasObjects = false;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+    if (modObjects_.count(id) == 0) {
+      continue;
+    }
+    Object *object = modObjects_.at(id).get();
+    if (object == nullptr) {
+      continue;
+    }
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    ModSceneSegmentBoxSet boxSet{};
+    if (!BuildPartPickBoxes(id, boxSet)) {
+      continue;
+    }
+
+    for (int bi = 0; bi < boxSet.count; ++bi) {
+      const ModSceneSegmentBox& box = boxSet.segments[bi];
+      // バウンディングボックス(OBB)の8つの頂点のうち、一番低いY座標を計算する
+      for (int dx = -1; dx <= 1; dx += 2) {
+        for (int dy = -1; dy <= 1; dy += 2) {
+          for (int dz = -1; dz <= 1; dz += 2) {
+            float pointY = box.center.y 
+                         + dx * box.axisX.y * box.halfWidth 
+                         + dy * box.axisY.y * box.halfLength 
+                         + dz * box.axisZ.y * box.halfDepth;
+            if (pointY < minY) {
+              minY = pointY;
+            }
+          }
+        }
+      }
+    }
+    hasObjects = true;
+  }
+
+  if (!hasObjects) {
+    return 0.0f; // 何もない場合は0
+  }
+  return minY;
+}
+
 bool ModScene::IsMouseOverAnyScreenUi() const {
   const Vector2 mouse = system_->GetMousePosVector2();
 
@@ -7008,6 +7184,13 @@ bool ModScene::IsMouseOverTrashArea() const {
 }
 
 void ModScene::UpdateScreenUi() {
+  if (frameSprite_ != nullptr) {
+    frameSprite_->Update(nullptr);
+  }
+  if (promptSprite_ != nullptr) {
+    promptSprite_->Update(nullptr);
+  }
+
   for (size_t i = 0; i < addButtons_.size(); ++i) {
     UpdateUiSpriteTransform(addButtons_[i]);
   }
@@ -7067,6 +7250,13 @@ void ModScene::UpdateScreenUi() {
 }
 
 void ModScene::DrawScreenUi() {
+  if (frameSprite_ != nullptr) {
+    frameSprite_->Draw();
+  }
+  if (promptSprite_ != nullptr) {
+    promptSprite_->Draw();
+  }
+
   for (size_t i = 0; i < addButtons_.size(); ++i) {
     if (addButtons_[i].visible && addButtons_[i].sprite != nullptr) {
       addButtons_[i].sprite->Draw();
@@ -7283,4 +7473,150 @@ void ModScene::DrawPickBoxesDebug() {
     }
   }
 #endif
+}
+
+float ModScene::ComputeCharacterHeight() const {
+  float minY = FLT_MAX;
+  float maxY = -FLT_MAX;
+  bool hasObjects = false;
+
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    const int id = orderedPartIds_[i];
+    if (modObjects_.count(id) == 0) {
+      continue;
+    }
+    Object *object = modObjects_.at(id).get();
+    if (object == nullptr) {
+      continue;
+    }
+    const PartNode *node = assembly_.FindNode(id);
+    if (node == nullptr) {
+      continue;
+    }
+
+    const Vector3 worldPos = ModObjectUtil::ComputeObjectRootWorldTranslate(object);
+    const float halfHeight = GetModelLocalVisualHalfHeight(node->part);
+    
+    const Vector3 partScale = node->localTransform.scale;
+    const float worldHalfHeight = halfHeight * partScale.y;
+
+    if (worldPos.y - worldHalfHeight < minY) {
+      minY = worldPos.y - worldHalfHeight;
+    }
+    if (worldPos.y + worldHalfHeight > maxY) {
+      maxY = worldPos.y + worldHalfHeight;
+    }
+    hasObjects = true;
+  }
+
+  if (!hasObjects) {
+    return 1.8f;
+  }
+
+  const float height = maxY - minY;
+  return (std::max)(height, 1.0f);
+}
+
+float ModScene::ComputeIdealOrbitDistance() const {
+  // 最小値・最大値を極限値で初期化
+  Vector3 minBounds = {FLT_MAX, FLT_MAX, FLT_MAX};
+  Vector3 maxBounds = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+  bool hasPoints = false;
+
+  // 1.
+  // 部位が選択されている場合、そのパーツが属する「四肢/頭首セット全体」の操作点を集める
+  // ただし、接続先変更（ドラッグ）中は改造体全体を映すためにこの処理をスキップする
+  if (selectedPartId_ >= 0 && !assemblyDrag_.isDragging) {
+    int assemblyRootId = ModAssemblyResolver::ResolveAssemblyRootPartId(
+        assembly_, selectedPartId_);
+    std::vector<int> partIds =
+        ModAssemblyResolver::CollectAssemblyPartIds(assembly_, assemblyRootId);
+
+    for (int pid : partIds) {
+      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+        continue;
+
+      const Object *obj = modObjects_.at(pid).get();
+      const ModBody &body = modBodies_.at(pid);
+      const auto &points = body.GetControlPoints();
+
+      for (size_t i = 0; i < points.size(); ++i) {
+        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+        float r = points[i].radius * 3.0f;
+
+        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+        hasPoints = true;
+      }
+    }
+  }
+
+  // 2. 未選択状態（selectedPartId_ == -1）の場合は、改造体全体のAABBを計測
+  if (!hasPoints) {
+    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    for (int pid : allIds) {
+      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+        continue;
+
+      // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
+      if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
+        continue;
+
+      const Object *obj = modObjects_.at(pid).get();
+      const ModBody &body = modBodies_.at(pid);
+      const auto &points = body.GetControlPoints();
+
+      for (size_t i = 0; i < points.size(); ++i) {
+        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+        float r = points[i].radius * 3.0f;
+
+        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+        hasPoints = true;
+      }
+    }
+  }
+
+  if (hasPoints) {
+    // 対象を囲むボックスの対角線（直径）を計算
+    float dx = maxBounds.x - minBounds.x;
+    float dy = maxBounds.y - minBounds.y;
+    float dz = maxBounds.z - minBounds.z;
+    float requiredRadius = sqrtf(dx * dx + dy * dy + dz * dz) * 0.5f;
+
+    float idealDistance = 8.0f;
+
+    if (selectedPartId_ >= 0) {
+      const PartNode *node = assembly_.FindNode(selectedPartId_);
+      // 胴体単体が選ばれている時は、全体を見せたいので少し引き気味にする
+      if (node != nullptr && (node->part == ModBodyPart::ChestBody ||
+                              node->part == ModBodyPart::StomachBody)) {
+        idealDistance = requiredRadius * 5.5f;
+      } else {
+        // 腕や脚などの四肢セット：マージンをガッツリ広げるために倍率をさらに強化
+        idealDistance = requiredRadius * 6.0f;
+      }
+    } else {
+      // 何も選択されていない時（全体表示）：近すぎるのを解消するため、倍率を 5.5f に設定
+      idealDistance = requiredRadius * 5.5f;
+    }
+
+    // クランプの下限値も、全体時に近づきすぎないよう調整（未選択時は最低でも 20.0f 引く）
+    float minLimit = (selectedPartId_ >= 0) ? orbitMinDistance_ : 20.0f;
+    return (std::clamp)(idealDistance, minLimit, orbitMaxDistance_);
+  }
+
+  return 15.0f; // 完全なフォールバック
 }
