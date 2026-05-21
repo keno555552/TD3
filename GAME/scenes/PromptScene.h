@@ -34,6 +34,7 @@ private:
 
 	// フェード
 	Fade fade_;
+	float GetFadeAlpha() const override { return fade_.GetAlpha(); }
 	bool isStartTransition_ = false;
 
 	// お題管理

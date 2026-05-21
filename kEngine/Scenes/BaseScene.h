@@ -20,6 +20,8 @@ public:
 	ScenePhase GetScenePhase() const { return phase_; }
 	void SetScenePhase(ScenePhase phase) { phase_ = phase; }
 	
+	virtual float GetFadeAlpha() const { return 0.0f; }
+
 	SceneOutcome GetOutcome() const { return outcome_; }
 
 public:

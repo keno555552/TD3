@@ -30,6 +30,8 @@ public:
 public:
   std::string sceneUsingNameHandle_ = "NONE";
 
+  bool IsPause() const { return defaultMenu_ && defaultMenu_->GetIsPause(); }
+
   void SceneChanger();
 
 private:
@@ -56,10 +58,12 @@ private:
   /// ========= リソースハンドル ========= ///
 
   // int helperTextureHandle_ = 0;
+  int pauseTextureHandle_ = 0;
 
   /// ============ オブジェクト =========== ///
 
   // SimpleSprite *helperSprite_ = nullptr;
+  std::unique_ptr<SimpleSprite> pauseSprite_ = nullptr;
   // Vector2 helperSpriteScale_ = {1.0f, 1.0f};
   // Vector2 helperSpritePos_ = {50.0f, 50.0f};
 
