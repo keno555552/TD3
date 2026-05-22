@@ -94,13 +94,11 @@ ThemeData* ThemeManager::SelectRandom() {
 		}
 	}
 
-	// ランダム選出
-	std::random_device rd;
-	std::mt19937 gen(rd());
-	std::uniform_int_distribution<int> dist(0,
-		static_cast<int>(candidates.size()) - 1);
-
-	currentIndex_ = candidates[dist(gen)];
+	// 乱数で選出
+	static std::random_device rd;
+	static std::mt19937 gen(rd());
+	std::uniform_int_distribution<> dis(0, candidates.size() - 1);
+	currentIndex_ = candidates[dis(gen)];
 
 	// セーブファイルに記録
 	SaveLastThemeId(themes_[currentIndex_].themeId);

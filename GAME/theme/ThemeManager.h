@@ -25,6 +25,9 @@ public:
   /// 読み込み済みのお題数を取得する
   size_t GetThemeCount() const;
 
+  /// 全てのお題データを取得する
+  const std::vector<ThemeData>& GetAllThemes() const { return themes_; }
+
 private:
   // 読み込んだ全お題データ
   std::vector<ThemeData> themes_;
