@@ -2,22 +2,27 @@
 #include "GAME/actor/prompt/PromptBoard.h"
 #include "GAME/actor/prompt/PromptData.h"
 #include "config.h"
+#include <time.h>
 
 PromptScene::PromptScene(kEngine* system) {
     system_ = system;
 
     PromptData::Clear();
+    
+    srand((unsigned int)time(NULL));
 
     // ライト
     light1_ = new Light;
-    light1_->direction = { -0.5f, -1.0f, -0.3f };
+    light1_->direction = { -0.0f, -1.0f, -0.3f };
     light1_->color = { 1.0f, 1.0f, 1.0f };
-    light1_->intensity = 1.0f;
+    light1_->intensity = 10.0f;
     system_->AddLight(light1_);
 
     // カメラ
     debugCamera_ = system_->CreateDebugCamera();
+    debugCamera_->SetFarClip(200.0f);
     camera_ = system_->CreateCamera();
+    camera_->SetFarClip(200.0f);
     usingCamera_ = camera_;
     system_->SetCamera(usingCamera_);
 
@@ -33,6 +38,15 @@ PromptScene::PromptScene(kEngine* system) {
         system_,
         { static_cast<float>(config::GetClientWidth()) * 0.5f - 250.0f,
          static_cast<float>(config::GetClientHeight()) * 0.5f - 75.0f });
+
+    if (themeManager_) {
+        std::vector<int> textures;
+        for (const auto& theme : themeManager_->GetAllThemes()) {
+            int handle = system_->LoadTexture(theme.texturePath);
+            textures.push_back(handle);
+        }
+        promptBoard_->SetThemeTextures(textures);
+    }
 
     rollState_ = PromptRollState::Rolling;
     stopInputLockCounter_ = 0;
@@ -63,6 +77,9 @@ PromptScene::~PromptScene() {
 
     delete judgeManager_;
     judgeManager_ = nullptr;
+
+    // クリーンアップ：不要になったマテリアル（GPUバッファ）を解放する
+    ResourceManager::GetInstance()->CleanupUnusedMaterials();
 }
 
 void PromptScene::Update() {
@@ -75,7 +92,7 @@ void PromptScene::Update() {
     }
 
     if (promptBoard_ != nullptr) {
-        promptBoard_->Update();
+        promptBoard_->Update(usingCamera_);
     }
 
     // フェード更新

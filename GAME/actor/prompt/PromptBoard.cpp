@@ -1,226 +1,270 @@
 #include "PromptBoard.h"
+#include <cmath>
 #include "kEngine/Scenes/SceneManager.h"
 
 namespace {
-
 const float kPi = 3.14159265f;
-
-} // namespace
+}
 
 PromptBoard::~PromptBoard() {
-  delete frameSprite_;
-  delete hingeSprite_;
-  delete topFlapSprite_;
-  delete bottomFlapSprite_;
-  delete promptSprite_;
+  delete topFlapObject_;
+  delete bottomFlapObject_;
+  delete fallingFlapUpperObject_;
+  delete fallingFlapLowerObject_;
 }
 
 void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
   system_ = system;
 
-  frameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
-  hingeTextureHandle_ = system_->LoadTexture("GAME/resources/texture/hinge.png");
-  flapTextureHandle_ =
-      system_->LoadTexture("GAME/resources/texture/ReversibleFlap.png");
-  promptTextureHandle_ =
-      system_->LoadTexture("GAME/resources/texture/themes/prompt.png");
-  //promptTextureHandle_ = 0;
+  flapTextureHandle_ = system_->LoadTexture("GAME/resources/texture/ReversibleFlap.png");
+  promptTextureHandle_ = system_->LoadTexture("GAME/resources/texture/themes/prompt.png");
+  
+  if (dummyTextureHandles_.empty()) {
+      dummyTextureHandles_.push_back(flapTextureHandle_);
+  }
 
-  frameSprite_ = CreateSprite(frameTextureHandle_,
-                              {position.x, position.y, 200.0f},
-                              {0.0f, 0.0f});
+  topFlapModelHandle_ = system_->SetModelObj("GAME/resources/model/top_flap.obj");
+  bottomFlapModelHandle_ = system_->SetModelObj("GAME/resources/model/bottom_flap.obj");
 
-  promptSprite_ =
-      CreateSprite(promptTextureHandle_, {0.0f, 0.0f, 200.0f}, {0.0f, 0.0f});
-  promptSprite_->followObject_ = frameSprite_;
+  int initialTex = dummyTextureHandles_[0];
 
-  topFlapSprite_ =
-      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 200.0f}, {250.0f, 50.0f});
-  topFlapSprite_->followObject_ = frameSprite_;
+  // The center of the 3D projection, used to align perfectly with the UI
+  Vector3 basePos = {0.0f, 0.0f, 100.0f};
 
-  bottomFlapSprite_ =
-      CreateSprite(flapTextureHandle_, {250.0f, 75.0f, 200.0f}, {250.0f, 0.0f});
-  bottomFlapSprite_->followObject_ = frameSprite_;
+  topFlapObject_ = CreateFlapObject(topFlapModelHandle_, initialTex, basePos);
+  bottomFlapObject_ = CreateFlapObject(bottomFlapModelHandle_, initialTex, basePos);
+  
+  fallingFlapUpperObject_ = CreateFlapObject(topFlapModelHandle_, initialTex, basePos);
+  fallingFlapLowerObject_ = CreateFlapObject(bottomFlapModelHandle_, initialTex, basePos);
 
-  hingeSprite_ =
-      CreateSprite(hingeTextureHandle_, {0.0f, 50.0f, 200.0f}, {0.0f, 0.0f});
-  hingeSprite_->followObject_ = frameSprite_;
+  isRolling_ = true;
+  isStopAnimation_ = false;
+  isStopAnimationFinished_ = false;
+  isShowingFinal_ = false;
 
-  SetSpriteAlpha(promptSprite_, 0.0f);
-  SetSpriteAlpha(topFlapSprite_, 1.0f);
-  SetSpriteAlpha(bottomFlapSprite_, 1.0f);
+  rollingFrameCounter_ = 0;
+  stopAnimationCounter_ = 0;
+  fallingFlapAngle_ = 0.0f;
+  isFlapFallingUpper_ = true;
 
-  ApplyFlapRotation(0.0f, 0.0f);
-  UpdateSprites();
+  ApplyFlapRotation(0.0f);
+  UpdateSprites(nullptr);
 }
+
+Object *PromptBoard::CreateFlapObject(int modelHandle, int textureHandle, const Vector3 &translate) {
+    Object *obj = new Object;
+    obj->IntObject(system_);
+    obj->CreateModelData(modelHandle);
+    
+    obj->mainPosition.transform = CreateDefaultTransform();
+    obj->mainPosition.transform.translate = translate;
+    
+    // FOV and distance calculated scaling to match 500x150 pixel UI
+    obj->mainPosition.transform.scale = { 4.17f, 5.0f, 1.0f };
+    
+    obj->objectParts_[0].materialConfig->textureHandle = textureHandle;
+    
+    return obj;
+  }
 
 SimpleSprite *PromptBoard::CreateSprite(int textureHandle,
                                         const Vector3 &translate,
                                         const Vector2 &anchorPoint) {
-  SimpleSprite *sprite = new SimpleSprite;
+  SimpleSprite *sprite = new SimpleSprite();
   sprite->IntObject(system_);
   sprite->CreateDefaultData();
-  sprite->mainPosition.transform = CreateDefaultTransform();
+  sprite->objectParts_[0].materialConfig->textureHandle = textureHandle;
   sprite->mainPosition.transform.translate = translate;
   sprite->objectParts_[0].anchorPoint = anchorPoint;
-  sprite->objectParts_[0].materialConfig->textureHandle = textureHandle;
-  sprite->objectParts_[0].materialConfig->useModelTexture = false;
   return sprite;
 }
 
-void PromptBoard::Update() {
-  if (isStopAnimation_) {
-    UpdateStopAnimation();
-  } else if (isRolling_) {
-    UpdateRollingAnimation();
-  }
-
-  UpdateSprites();
-}
-
-void PromptBoard::Draw() {
-  if (hingeSprite_ != nullptr) {
-    hingeSprite_->Draw();
-  }
-
-  if (topFlapSprite_ != nullptr) {
-    topFlapSprite_->Draw();
-  }
-
-  if (bottomFlapSprite_ != nullptr) {
-    bottomFlapSprite_->Draw();
-  }
-
-  if (promptSprite_ != nullptr) {
-    promptSprite_->Draw();
-  }
-
-  if (frameSprite_ != nullptr) {
-    frameSprite_->Draw();
-  }
-}
-
- void PromptBoard::SetPromptTexture(int textureHandle) {
+void PromptBoard::SetPromptTexture(int textureHandle) {
   promptTextureHandle_ = textureHandle;
+}
 
-  promptSprite_= CreateSprite(promptTextureHandle_, { 0.0f, 0.0f, 200.0f }, { 0.0f, 0.0f });
-  promptSprite_->followObject_ = frameSprite_;
-
-  Logger::Log("[PromptBoard] SetPromptTexture handle=%d", textureHandle);
-
+void PromptBoard::SetThemeTextures(const std::vector<int>& textureHandles) {
+  if (!textureHandles.empty()) {
+      dummyTextureHandles_ = textureHandles;
+      Logger::Log("[PromptBoard] SetThemeTextures called. Handles: ");
+      for (size_t i = 0; i < dummyTextureHandles_.size(); ++i) {
+          Logger::Log("  [%zu] = %d", i, dummyTextureHandles_[i]);
+      }
+  }
 }
 
 void PromptBoard::StartStopAnimation() {
-  isRolling_ = false;
-  isStopAnimation_ = true;
-  isStopAnimationFinished_ = false;
-  stopAnimationCounter_ = 0;
+  if (isRolling_) {
+    willStopOnNextFlap_ = true;
+  }
+}
 
-  SetSpriteAlpha(promptSprite_, 0.0f);
-  SetSpriteAlpha(topFlapSprite_, 1.0f);
-  SetSpriteAlpha(bottomFlapSprite_, 1.0f);
+void PromptBoard::Update(Camera* camera) {
+  if (isRolling_) {
+    UpdateRollingAnimation();
+  } else if (isStopAnimation_) {
+    UpdateStopAnimation();
+  }
+    if (!isShowingFinal_) {
+        int currentTex = dummyTextureHandles_[currentDummyIndex_ % dummyTextureHandles_.size()];
+        int nextTex = dummyTextureHandles_[(currentDummyIndex_ + 1) % dummyTextureHandles_.size()];
+        
+        if (isStopAnimation_) {
+            nextTex = promptTextureHandle_;
+        }
+        
+        UpdateFlapTextures(currentTex, nextTex);
+    }
+  
+  UpdateSprites(camera);
 }
 
 void PromptBoard::UpdateRollingAnimation() {
-  ++rollingFrameCounter_;
-
-  const float wave = sinf(static_cast<float>(rollingFrameCounter_) * 0.75f);
-  const float angle = flapMaxAngle_ * wave;
-
-  ApplyFlapRotation(angle, -angle);
-
-  SetSpriteAlpha(promptSprite_, 0.0f);
-  SetSpriteAlpha(topFlapSprite_, 1.0f);
-  SetSpriteAlpha(bottomFlapSprite_, 1.0f);
+  rollingFrameCounter_++;
+  
+  // Speed of the rolling animation
+  fallingFlapAngle_ -= 0.3f;
+    if (fallingFlapAngle_ <= -kPi) {
+        fallingFlapAngle_ += kPi;
+        currentDummyIndex_++;
+        isFlapFallingUpper_ = true;
+        
+        if (willStopOnNextFlap_) {
+            isRolling_ = false;
+            isStopAnimation_ = true;
+            stopAnimationCounter_ = 0;
+            willStopOnNextFlap_ = false;
+        }
+    } else if (fallingFlapAngle_ <= -kPi / 2.0f && isFlapFallingUpper_) {
+        isFlapFallingUpper_ = false;
+    }
+  
+  ApplyFlapRotation(fallingFlapAngle_);
 }
 
 void PromptBoard::UpdateStopAnimation() {
-  ++stopAnimationCounter_;
+  stopAnimationCounter_++;
 
-  float t = static_cast<float>(stopAnimationCounter_) /
-            static_cast<float>(stopAnimationFrame_);
-  if (t > 1.0f) {
-    t = 1.0f;
+  // Calculate speed based on how far the flap has fallen (progress from 0.0 to 1.0)
+  // Starts at 0.3f and smoothly slows down to a minimum of 0.02f for a dramatic reveal
+  float progress = fallingFlapAngle_ / -kPi;
+  float speed = 0.3f * (1.0f - progress);
+  if (speed < 0.03f) {
+      speed = 0.03f;
   }
-
-  const float angle = flapMaxAngle_ * (1.0f - t) * sinf(t * kPi * 4.0f);
-  ApplyFlapRotation(angle, -angle);
-
-  if (stopAnimationCounter_ >= promptRevealFrame_) {
-    const int revealFrame = stopAnimationFrame_ - promptRevealFrame_;
-    float promptAlpha = 1.0f;
-
-    if (revealFrame > 0) {
-      promptAlpha =
-          static_cast<float>(stopAnimationCounter_ - promptRevealFrame_) /
-          static_cast<float>(revealFrame);
-    }
-
-    if (promptAlpha < 0.0f) {
-      promptAlpha = 0.0f;
-    }
-    if (promptAlpha > 1.0f) {
-      promptAlpha = 1.0f;
-    }
-
-    SetSpriteAlpha(promptSprite_, promptAlpha);
-    SetSpriteAlpha(topFlapSprite_, 1.0f - promptAlpha);
-    SetSpriteAlpha(bottomFlapSprite_, 1.0f - promptAlpha);
+  
+  fallingFlapAngle_ -= speed;
+  
+  if (fallingFlapAngle_ <= -kPi) {
+      fallingFlapAngle_ = -kPi;
+      isFlapFallingUpper_ = false;
+      isStopAnimation_ = false;
+      isStopAnimationFinished_ = true;
+      isShowingFinal_ = true;
+      
+      // Stop exactly at the prompt texture
+      UpdateFlapTextures(promptTextureHandle_, promptTextureHandle_);
+  } else if (fallingFlapAngle_ <= -kPi / 2.0f && isFlapFallingUpper_) {
+      isFlapFallingUpper_ = false;
   }
+  
+  ApplyFlapRotation(fallingFlapAngle_);
+}
 
-  if (stopAnimationCounter_ >= stopAnimationFrame_) {
-    ApplyFlapRotation(0.0f, 0.0f);
-    SetSpriteAlpha(promptSprite_, 1.0f);
-    SetSpriteAlpha(topFlapSprite_, 0.0f);
-    SetSpriteAlpha(bottomFlapSprite_, 0.0f);
-
-    isStopAnimation_ = false;
-    isStopAnimationFinished_ = true;
+void PromptBoard::ApplyFlapRotation(float angle) {
+  if (SceneManager::GetInstance().IsPause()) {
+    return;
+  }
+  
+  if (fallingFlapUpperObject_) {
+      fallingFlapUpperObject_->mainPosition.transform.rotate.x = angle;
+      fallingFlapUpperObject_->mainPosition.transform.scale.y = isFlapFallingUpper_ ? 5.0f : 0.0f;
+  }
+  if (fallingFlapLowerObject_) {
+      fallingFlapLowerObject_->mainPosition.transform.rotate.x = angle + kPi;
+      fallingFlapLowerObject_->mainPosition.transform.scale.y = (!isFlapFallingUpper_ && !isShowingFinal_) ? 5.0f : 0.0f;
   }
 }
 
-void PromptBoard::ApplyFlapRotation(float topAngle, float bottomAngle) {
-  if (SceneManager::GetInstance().IsPause()) {
-    topAngle = 0.0f;
-    bottomAngle = 0.0f;
-  }
+void PromptBoard::UpdateFlapTextures(int currentTex, int nextTex) {
+    // Check if the textures are already correct to avoid massive memory leaks
+    if (topFlapObject_ && topFlapObject_->objectParts_[0].materialConfig->textureHandle == nextTex &&
+        bottomFlapObject_ && bottomFlapObject_->objectParts_[0].materialConfig->textureHandle == currentTex) {
+        return;
+    }
 
-  if (topFlapSprite_ != nullptr) {
-    topFlapSprite_->mainPosition.transform.rotate = {topAngle, 0.0f, 0.0f};
-  }
-
-  if (bottomFlapSprite_ != nullptr) {
-    bottomFlapSprite_->mainPosition.transform.rotate = {bottomAngle, 0.0f,
-                                                        0.0f};
-  }
+    static int lastCurrent = -1, lastNext = -1;
+    if (lastCurrent != currentTex || lastNext != nextTex) {
+        Logger::Log("[PromptBoard] Flap Update: currentTex=%d, nextTex=%d, promptTex=%d, index=%d", 
+            currentTex, nextTex, promptTextureHandle_, currentDummyIndex_);
+        lastCurrent = currentTex; lastNext = nextTex;
+    }
+    
+    if (topFlapObject_) {
+        auto newMat = std::make_shared<MaterialConfig>(*topFlapObject_->objectParts_[0].materialConfig);
+        newMat->textureHandle = nextTex;
+        topFlapObject_->objectParts_[0].materialConfig = newMat;
+    }
+    if (bottomFlapObject_) {
+        auto newMat = std::make_shared<MaterialConfig>(*bottomFlapObject_->objectParts_[0].materialConfig);
+        newMat->textureHandle = currentTex;
+        bottomFlapObject_->objectParts_[0].materialConfig = newMat;
+    }
+    if (fallingFlapUpperObject_) {
+        auto newMat = std::make_shared<MaterialConfig>(*fallingFlapUpperObject_->objectParts_[0].materialConfig);
+        newMat->textureHandle = currentTex;
+        fallingFlapUpperObject_->objectParts_[0].materialConfig = newMat;
+    }
+    if (fallingFlapLowerObject_) {
+        auto newMat = std::make_shared<MaterialConfig>(*fallingFlapLowerObject_->objectParts_[0].materialConfig);
+        newMat->textureHandle = nextTex;
+        fallingFlapLowerObject_->objectParts_[0].materialConfig = newMat;
+    }
 }
 
 void PromptBoard::SetSpriteAlpha(SimpleSprite *sprite, float alpha) {
-  if (sprite == nullptr || sprite->objectParts_.empty()) {
-    return;
+  if (sprite && sprite->objectParts_[0].materialConfig) {
+    sprite->objectParts_[0].materialConfig->textureColor.w = alpha;
   }
-
-  sprite->objectParts_[0].materialConfig->textureColor.w = alpha;
 }
 
-void PromptBoard::UpdateSprites() {
-  if (frameSprite_ != nullptr) {
-    frameSprite_->Update(nullptr);
+void PromptBoard::SetObjectAlpha(Object *object, float alpha) {
+  if (object && object->objectParts_[0].materialConfig) {
+    object->objectParts_[0].materialConfig->textureColor.w = alpha;
+  }
+}
+
+void PromptBoard::UpdateSprites(Camera* camera) {
+  if (topFlapObject_) {
+    topFlapObject_->Update(camera);
+  }
+  if (bottomFlapObject_) {
+    bottomFlapObject_->Update(camera);
+  }
+  if (fallingFlapUpperObject_) {
+    fallingFlapUpperObject_->Update(camera);
+  }
+  if (fallingFlapLowerObject_) {
+    fallingFlapLowerObject_->Update(camera);
+  }
+}
+
+void PromptBoard::Draw() {
+  if (isShowingFinal_) {
+      if (topFlapObject_) topFlapObject_->objectParts_[0].materialConfig->textureHandle = promptTextureHandle_;
+      if (bottomFlapObject_) bottomFlapObject_->objectParts_[0].materialConfig->textureHandle = promptTextureHandle_;
   }
 
-  if (promptSprite_ != nullptr) {
-    promptSprite_->Update(nullptr);
+  if (topFlapObject_ != nullptr) {
+    system_->Draw3D(topFlapObject_);
   }
-
-  if (topFlapSprite_ != nullptr) {
-    topFlapSprite_->Update(nullptr);
+  if (bottomFlapObject_ != nullptr) {
+    system_->Draw3D(bottomFlapObject_);
   }
-
-  if (bottomFlapSprite_ != nullptr) {
-    bottomFlapSprite_->Update(nullptr);
-  }
-
-  if (hingeSprite_ != nullptr) {
-    hingeSprite_->Update(nullptr);
+  
+  if (isFlapFallingUpper_ && fallingFlapUpperObject_ != nullptr) {
+    system_->Draw3D(fallingFlapUpperObject_);
+  } else if (!isFlapFallingUpper_ && !isShowingFinal_ && fallingFlapLowerObject_ != nullptr) {
+    system_->Draw3D(fallingFlapLowerObject_);
   }
 }
