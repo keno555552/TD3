@@ -376,21 +376,10 @@ public:
   /// </summary>
   static void NormalizeCustomizeData(ModBodyCustomizeData &data);
 
-    /// <summary>
+  /// <summary>
   /// 外部から操作点一覧を丸ごと設定する（デバッグ用途 / 特殊用途向け）
   /// </summary>
-  void SetControlPoints(const std::vector<ModControlPoint> &points) {
-    controlPoints_ = points;
-
-    // 復元直後に Bend-End / Chest-Belly-Waist の整合を必ず取る
-    UpdateControlPointHierarchy();
-
-    // 外部復元時は chain の内部状態とズレる可能性があるため、
-    // 以降の操作はフォールバック経路で扱う
-    if (HasOwnControlPoints()) {
-      chain_.Clear();
-    }
-  }
+  void SetControlPoints(const std::vector<ModControlPoint> &points);
 
   /// <summary>
   /// この部位が owner として操作点チェーンを直接持つかどうか
