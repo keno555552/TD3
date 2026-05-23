@@ -49,6 +49,7 @@ private:
   Camera *camera_ = nullptr;
   DebugCamera *debugCamera_ = nullptr;
   Camera *usingCamera_ = nullptr;
+  Camera *loupeCamera_ = nullptr;
 
   bool useDebugCamera_ = false;
 
@@ -76,6 +77,10 @@ private:
   // ゴール判定
   float goalX_ = 80.0f;
   bool isGoalReached_ = false;
+
+  // スカイドーム
+  std::unique_ptr<Object> skydome_;
+  int skydomeModelHandle_ = 0;
 
   // 地面
   std::vector<std::unique_ptr<Object>> grounds_;
@@ -152,6 +157,15 @@ private:
 
   int spriteAHandle_ = 0;
   int spriteDHandle_ = 0;
+
+  // ルーペ関連
+  std::unique_ptr<SimpleSprite> loupeFrameSprite_;
+  int loupeFrameTexHandle_ = 0;
+  std::unique_ptr<Object> loupeBgObj_; // 背景用（Spriteの後ろに描画されるため3Dオブジェクトで円盤を作る）
+  bool isLoupeActive_ = false;
+  float loupeScale_ = 1.0f;
+  float loupeScreenX_ = 0.0f;
+  float loupeScreenY_ = 100.0f;
 
   // 順位表示用
   std::unique_ptr<SimpleSprite> rankSprites_[5];
