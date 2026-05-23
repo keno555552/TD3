@@ -3766,8 +3766,12 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   MakeEditRangeFromBase(baseBellyWaistLength, &bellyWaistMin, &bellyWaistMax);
 
   if (index == static_cast<size_t>(chestIndex)) {
-    torsoControlPoints_[index].localPosition = newLocalPosition;
-    torsoChestToBellyLength_ = Length(Subtract(newLocalPosition, bellyPos));
+    Vector3 candidate = newLocalPosition;
+    // 胸を動かした際の腹との距離を制限する
+    candidate = ClampDistance(bellyPos, candidate, chestBellyMin, chestBellyMax,
+                              {0.0f, 1.0f, 0.0f});
+    torsoControlPoints_[index].localPosition = candidate;
+    torsoChestToBellyLength_ = Length(Subtract(candidate, bellyPos));
     return true;
   }
 
@@ -3794,8 +3798,12 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   }
 
   if (index == static_cast<size_t>(waistIndex)) {
-    torsoControlPoints_[index].localPosition = newLocalPosition;
-    torsoBellyToWaistLength_ = Length(Subtract(bellyPos, newLocalPosition));
+    Vector3 candidate = newLocalPosition;
+    // 腰を動かした際の腹との距離を制限する
+    candidate = ClampDistance(bellyPos, candidate, bellyWaistMin, bellyWaistMax,
+                              {0.0f, -1.0f, 0.0f});
+    torsoControlPoints_[index].localPosition = candidate;
+    torsoBellyToWaistLength_ = Length(Subtract(bellyPos, candidate));
     return true;
   }
 
