@@ -1,3 +1,4 @@
+#pragma once
 #include "PromptBoard.h"
 #include <cmath>
 #include "kEngine/Scenes/SceneManager.h"
@@ -11,6 +12,7 @@ PromptBoard::~PromptBoard() {
   delete bottomFlapObject_;
   delete fallingFlapUpperObject_;
   delete fallingFlapLowerObject_;
+  delete frameObject_;
 }
 
 void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
@@ -29,7 +31,22 @@ void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
   int initialTex = dummyTextureHandles_[0];
 
   // The center of the 3D projection, used to align perfectly with the UI
-  Vector3 basePos = {0.0f, 0.0f, 100.0f};
+  Vector3 basePos = {0.0f, 0.0f, 110.0f}; // 壁(Z=130)から少し手前に戻す
+
+  int frameTex = system_->LoadTexture("GAME/resources/texture/white100x100.png");
+  int frameModelHandle = system_->SetModelObj("GAME/resources/model/flap_frame.obj"); // ご用意いただいた枠モデル
+  frameObject_ = CreateFlapObject(frameModelHandle, frameTex, basePos);
+  
+  // パネルのいっこ後ろ（奥）に配置
+  frameObject_->mainPosition.transform.translate.z = basePos.z + 1.0f;
+  
+  // サイズを0.9倍に縮小
+  frameObject_->mainPosition.transform.scale.x *= 0.9f;
+  frameObject_->mainPosition.transform.scale.y *= 0.9f;
+  frameObject_->mainPosition.transform.scale.z *= 0.9f;
+  
+  // 色をさらにもうちょっと黒っぽく（暗い紺色）にする (RGBA)
+  frameObject_->objectParts_[0].materialConfig->textureColor = { 0.05f, 0.08f, 0.15f, 1.0f };
 
   topFlapObject_ = CreateFlapObject(topFlapModelHandle_, initialTex, basePos);
   bottomFlapObject_ = CreateFlapObject(bottomFlapModelHandle_, initialTex, basePos);
@@ -41,6 +58,16 @@ void PromptBoard::Initialize(kEngine *system, const Vector2 &position) {
   isStopAnimation_ = false;
   isStopAnimationFinished_ = false;
   isShowingFinal_ = false;
+
+  isBounceAnimation_ = false;
+  bounceAnimationCounter_ = 0.0f;
+  hasSpawnedParticle_ = false;
+  
+  if (!confettiParticle_) {
+      confettiParticle_ = std::make_unique<ConfettiParticle>(system_);
+  } else {
+      confettiParticle_->ClearAll();
+  }
 
   rollingFrameCounter_ = 0;
   stopAnimationCounter_ = 0;
@@ -105,6 +132,73 @@ void PromptBoard::Update(Camera* camera) {
   } else if (isStopAnimation_) {
     UpdateStopAnimation();
   }
+
+  if (isBounceAnimation_) {
+    bounceAnimationCounter_ += 0.12f; // アニメーション速度
+    if (bounceAnimationCounter_ >= kPi) {
+        bounceAnimationCounter_ = 0.0f;
+        isBounceAnimation_ = false;
+        hasSpawnedParticle_ = false;
+        
+        // スケールと色と回転を元に戻す
+        if (topFlapObject_) {
+            topFlapObject_->mainPosition.transform.scale = { 4.17f, 5.0f, 1.0f };
+            topFlapObject_->objectParts_[0].materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+            topFlapObject_->mainPosition.transform.rotate.y = 0.0f;
+            topFlapObject_->mainPosition.transform.rotate.z = 0.0f;
+        }
+        if (bottomFlapObject_) {
+            bottomFlapObject_->mainPosition.transform.scale = { 4.17f, 5.0f, 1.0f };
+            bottomFlapObject_->objectParts_[0].materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+            bottomFlapObject_->mainPosition.transform.rotate.y = 0.0f;
+            bottomFlapObject_->mainPosition.transform.rotate.z = 0.0f;
+        }
+    } else {
+        // sin関数を使ってスケールをバウンス (最大1.3倍)
+        float bounce = std::sin(bounceAnimationCounter_);
+        float scaleMultiplier = 1.0f + bounce * 0.3f;
+        
+        // --- ここから演出の切り替え ---
+        // 以下の「パターン1」と「パターン2」のうち、使いたい方のコメントを外して試してください。
+
+        // パターン1：ブルブル震えて光る演出（パーティクルなし）
+        //float rotationZ = std::sin(bounceAnimationCounter_ * 20.0f) * 0.1f;
+        //float rotationY = std::cos(bounceAnimationCounter_ * 25.0f) * 0.15f;
+
+        // パターン2：ちょっと傾いて飛び出してきて、紙吹雪パーティクルを出す演出
+        
+        float rotationZ = 0.0f; // 斜めにならないように変更
+        float rotationY = 0.0f;
+        if (!hasSpawnedParticle_) {
+            if (confettiParticle_) {
+                // UIパネルの中央から発生させる
+                confettiParticle_->Spawn({0.0f, 0.0f, 95.0f});
+            }
+            hasSpawnedParticle_ = true;
+        }
+        
+        // --- 演出切り替えここまで ---
+
+        // 色をピカッとゴールドに光らせる
+        float colorR = 1.0f + bounce * 1.5f; 
+        float colorG = 1.0f + bounce * 1.0f; 
+        float colorB = 1.0f - bounce * 0.5f; 
+
+        if (topFlapObject_) {
+            topFlapObject_->mainPosition.transform.scale = { 4.17f * scaleMultiplier, 5.0f * scaleMultiplier, 1.0f };
+            topFlapObject_->objectParts_[0].materialConfig->textureColor = { colorR, colorG, colorB, 1.0f };
+            topFlapObject_->mainPosition.transform.rotate.y = rotationY;
+            topFlapObject_->mainPosition.transform.rotate.z = rotationZ;
+        }
+        if (bottomFlapObject_) {
+            bottomFlapObject_->mainPosition.transform.scale = { 4.17f * scaleMultiplier, 5.0f * scaleMultiplier, 1.0f };
+            bottomFlapObject_->objectParts_[0].materialConfig->textureColor = { colorR, colorG, colorB, 1.0f };
+            bottomFlapObject_->mainPosition.transform.rotate.y = rotationY;
+            bottomFlapObject_->mainPosition.transform.rotate.z = rotationZ;
+        }
+    }
+  }
+
     if (!isShowingFinal_) {
         int currentTex = dummyTextureHandles_[currentDummyIndex_ % dummyTextureHandles_.size()];
         int nextTex = dummyTextureHandles_[(currentDummyIndex_ + 1) % dummyTextureHandles_.size()];
@@ -161,6 +255,9 @@ void PromptBoard::UpdateStopAnimation() {
       isStopAnimation_ = false;
       isStopAnimationFinished_ = true;
       isShowingFinal_ = true;
+      
+      isBounceAnimation_ = true;
+      bounceAnimationCounter_ = 0.0f;
       
       // Stop exactly at the prompt texture
       UpdateFlapTextures(promptTextureHandle_, promptTextureHandle_);
@@ -247,6 +344,14 @@ void PromptBoard::UpdateSprites(Camera* camera) {
   if (fallingFlapLowerObject_) {
     fallingFlapLowerObject_->Update(camera);
   }
+  
+  if (confettiParticle_) {
+      confettiParticle_->Update(camera);
+  }
+
+  if (frameObject_) {
+      frameObject_->Update(camera);
+  }
 }
 
 void PromptBoard::Draw() {
@@ -266,5 +371,13 @@ void PromptBoard::Draw() {
     system_->Draw3D(fallingFlapUpperObject_);
   } else if (!isFlapFallingUpper_ && !isShowingFinal_ && fallingFlapLowerObject_ != nullptr) {
     system_->Draw3D(fallingFlapLowerObject_);
+  }
+  
+  if (confettiParticle_) {
+      confettiParticle_->Draw();
+  }
+
+  if (frameObject_) {
+      system_->Draw3D(frameObject_);
   }
 }

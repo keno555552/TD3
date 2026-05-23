@@ -9,6 +9,7 @@
 #include <memory>
 
 class PromptBoard;
+class Object;
 
 class PromptScene : public BaseScene {
 public:
@@ -35,6 +36,12 @@ private:
 	// フェード
 	Fade fade_;
 	float GetFadeAlpha() const override { return fade_.GetAlpha(); }
+
+	Light* spotLight_ = nullptr;
+	float spotLightTimer_ = 0.0f;
+
+	Object* backgroundWall_ = nullptr;
+
 	bool isStartTransition_ = false;
 
 	// お題管理
@@ -47,9 +54,17 @@ private:
 	BitmapFont font_;
 	std::unique_ptr<DetailButton>themeButton_;
 
+	// 音声
+	int drumrollSoundHandle_ = -1;
+	int drumrollEndSoundHandle_ = -1;
+	bool isEndSoundPlayed_ = false;
+
 	// お題演出
 	std::unique_ptr<PromptBoard> promptBoard_ = nullptr;
 	PromptRollState rollState_ = PromptRollState::Rolling;
+
+	// UI
+	SimpleSprite* titleSprite_ = nullptr;
 
 	int stopInputLockFrame_ = 20;
 	int stopInputLockCounter_ = 0;
