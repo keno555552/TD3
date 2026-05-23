@@ -1,7 +1,8 @@
-#pragma once
 #include "Object/Sprite.h"
 #include "Object/Object.h"
+#include "GAME/effect/ConfettiParticle.h"
 #include <vector>
+#include <memory>
 
 class PromptBoard {
 public:
@@ -41,6 +42,8 @@ private:
   int flapTextureHandle_ = 0;
   int promptTextureHandle_ = 0;
 
+  Object* frameObject_ = nullptr;
+
   int topFlapModelHandle_ = 0;
   int bottomFlapModelHandle_ = 0;
 
@@ -53,6 +56,9 @@ private:
   bool isStopAnimationFinished_ = false;
   bool isShowingFinal_ = false;
 
+  bool isBounceAnimation_ = false;
+  float bounceAnimationCounter_ = 0.0f;
+
   int rollingFrameCounter_ = 0;
   int stopAnimationCounter_ = 0;
 
@@ -61,4 +67,7 @@ private:
 
   float fallingFlapAngle_ = 0.0f;
   bool isFlapFallingUpper_ = true;
+
+  bool hasSpawnedParticle_ = false;
+  std::unique_ptr<ConfettiParticle> confettiParticle_ = nullptr;
 };

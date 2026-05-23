@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -409,6 +409,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Geometry\CrashData\OBB.cpp" />
     <ClCompile Include="GAME\actor\ModCapsuleUtil.cpp" />
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp" />
+    <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
@@ -669,6 +670,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModAttachCandidate.h" />
     <ClInclude Include="GAME\actor\ModCapsuleUtil.h" />
     <ClInclude Include="GAME\effect\Perfect_Particle.h" />
+    <ClInclude Include="GAME\effect\ConfettiParticle.h" />
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />
