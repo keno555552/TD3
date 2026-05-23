@@ -62,6 +62,7 @@ TravelScene::TravelScene(kEngine *system) {
   //===============================
   debugCamera_ = system_->CreateDebugCamera();
   camera_ = system_->CreateCamera();
+  loupeCamera_ = system_->CreateCamera();
 
   // デバッグカメラ初期位置
   debugCamera_->SetTranslate({48.0f, 5.0f, 0.0f});
@@ -155,6 +156,18 @@ TravelScene::TravelScene(kEngine *system) {
     grounds_.push_back(std::move(ground));
   }
 
+  // スカイドーム
+  skydomeModelHandle_ = system_->SetModelObj("GAME/resources/skydome/SkyDome.obj");
+  skydome_ = std::make_unique<Object>();
+  skydome_->IntObject(system_);
+  skydome_->CreateModelData(skydomeModelHandle_);
+  skydome_->mainPosition.transform = CreateDefaultTransform();
+  // 空が大きくなるようにスケール調整
+  skydome_->mainPosition.transform.scale = {100.0f, 100.0f, 100.0f};
+  for (auto& part : skydome_->objectParts_) {
+    part.materialConfig->enableLighting = false;
+  }
+
   // 影
   shadowModelHandle_ =
       system_->SetModelObj("GAME/resources/object/Plane/plane.gltf");
@@ -209,6 +222,31 @@ TravelScene::TravelScene(kEngine *system) {
   spriteD_->mainPosition.transform.translate = {100.0f, 520.0f, 0.0f};
   spriteD_->mainPosition.transform.scale = {0.6f, 0.6f, 1.0f};
 
+  // ルーペ用テクスチャ読み込み
+  loupeFrameTexHandle_ = system_->LoadTexture("GAME/resources/texture/loupe_frame.png");
+
+  loupeFrameSprite_ = std::make_unique<SimpleSprite>();
+  loupeFrameSprite_->IntObject(system_);
+  loupeFrameSprite_->CreateDefaultData();
+  loupeFrameSprite_->objectParts_[0].materialConfig->textureHandle = loupeFrameTexHandle_;
+  
+  // 256x256ピクセルぴったりにするためのローカル頂点設定（余白をなくす）
+  float lhw = 128.0f;
+  float lhh = 128.0f;
+  loupeFrameSprite_->objectParts_[0].conerData.coner[0] = {-lhw, -lhh};
+  loupeFrameSprite_->objectParts_[0].conerData.coner[1] = {-lhw,  lhh};
+  loupeFrameSprite_->objectParts_[0].conerData.coner[2] = { lhw,  lhh};
+  loupeFrameSprite_->objectParts_[0].conerData.coner[3] = { lhw, -lhh};
+
+  // ルーペの背景（Spriteより奥に描画されるため、3Dの球を潰して円盤にする）
+  int whiteTex = system_->LoadTexture("GAME/resources/texture/white100x100.png");
+  loupeBgObj_ = std::make_unique<Object>();
+  loupeBgObj_->IntObject(system_);
+  loupeBgObj_->CreateModelData(config::default_Sphere_MeshBufferHandle_);
+  loupeBgObj_->mainPosition.transform = CreateDefaultTransform();
+  loupeBgObj_->objectParts_[0].materialConfig->textureColor = {0.0f, 0.0f, 0.0f, 0.65f}; // 半透明の黒
+  loupeBgObj_->objectParts_[0].materialConfig->textureHandle = whiteTex; // エラー防止のため無地の白テクスチャをセット
+  loupeBgObj_->objectParts_[0].materialConfig->enableLighting = false; // ライティング無効
   for (int i = 0; i < 5; ++i) {
     std::string path = "GAME/resources/" + std::to_string(i + 1) + "st.png";
     if (i == 1) path = "GAME/resources/2nd.png";
@@ -287,6 +325,7 @@ TravelScene::~TravelScene() {
   Logger::Log("TravelScene dtor");
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
+  system_->DestroyCamera(loupeCamera_);
 
   player_->ClearParticle();
 
@@ -305,6 +344,7 @@ TravelScene::~TravelScene() {
 
   bitmapFont.Cleanup();
 
+  skydome_.reset();
   player_.reset();
   npcManager_.reset();
   grounds_.clear();
@@ -392,6 +432,84 @@ void TravelScene::Update() {
   spriteD_->objectParts_[0].materialConfig->textureColor.w =
       rightNowInput ? 0.4f : 1.0f;
 
+  if (skydome_) {
+    skydome_->mainPosition.transform.translate = usingCamera_->GetTransform().translate;
+    skydome_->Update(usingCamera_);
+  }
+
+  // ルーペの更新
+  isLoupeActive_ = false;
+  if (!useDebugCamera_) {
+    // プレイヤーのワールド座標（移動方向はZ軸、高さはY軸）
+    Vector3 playerWorld = {0.0f, player_->GetMoveY() + player_->GetVisualLiftY(), player_->GetMoveX()};
+    Vector3 headWorld = playerWorld;
+    headWorld.y += 5.0f; // 少し頭上を基準に
+    Vector2 screenPos = usingCamera_->GetObjectScreenPos(headWorld);
+
+    // ルーペが出るタイミングがまだ早い問題の修正（完全に画面外はるか上に消えてからにする）
+    if (screenPos.y < -300.0f) {
+      isLoupeActive_ = true;
+      loupeScreenX_ = std::clamp(screenPos.x, 100.0f, 1180.0f); // 画面幅に収める
+
+      // スケール計算（高い時はもっと小さくなるように範囲を拡張）
+      float distance = std::abs(screenPos.y + 300.0f);
+      float t = std::clamp(distance / 1200.0f, 0.0f, 1.0f);
+      loupeScale_ = 1.0f - (t * 0.7f); // 最小で0.3倍まで小さくする
+
+      // ルーペが天井との間に隙間ができる問題の修正
+      float radius = 128.0f * 0.6f * loupeScale_;
+      loupeScreenY_ = radius + 10.0f; // 上端から10pxのマージン
+
+      // プレイヤーをさらに小さくする（カメラの基準距離を130から180に遠ざける）
+      float camDistance = 180.0f / loupeScale_;
+      Vector3 camPos = playerWorld;
+      camPos.x += camDistance; // サイドから写すためにX軸側にカメラを引く
+
+      // カメラの位置を逆算してずらす (kEngineのデフォルトFOV 0.45f に合わせた正確な係数)
+      // これがズレていたため、画面端に行くほどプレイヤーが枠外に飛び出していました。
+      float units_per_pixel = camDistance * 0.0006356f; 
+      float dx_pixels = loupeScreenX_ - 640.0f;
+      float dy_pixels = loupeScreenY_ - 360.0f; 
+
+      // カメラを移動させて被写体を画面上でずらす
+      camPos.z += (-dx_pixels * units_per_pixel);
+      camPos.y += (dy_pixels * units_per_pixel);
+      
+      // プレイヤーをもう少し上に表示させる（カメラをさらに下に下げる）
+      camPos.y -= 4.0f;
+
+      loupeCamera_->SetTranslate(camPos);
+      loupeCamera_->SetRotation({0.0f, -1.57f, 0.0f});
+      
+      // スカイドームに遮蔽されてプレイヤーが描画されない問題の根本解決
+      loupeCamera_->SetNearClip(camDistance * 0.5f);
+      loupeCamera_->SetFarClip(camDistance * 2.0f + 100.0f); // 背景用円盤が入るようにFarを少し延長
+      
+      loupeCamera_->Update();
+
+      // 背景円盤の更新（カメラの正面奥ではなく、ルーペ枠の中心に重なるようにパース補正して配置）
+      float bgDepth = camDistance + 50.0f;
+      Vector3 bgPos;
+      bgPos.x = camPos.x - bgDepth; // プレイヤーよりさらに奥に配置
+      
+      // ルーペ枠の中心となる3D空間上のターゲット位置 T
+      Vector3 T = playerWorld;
+      T.y -= 4.0f; // 上記のカメラYオフセットと同じ調整値
+      
+      // ターゲット位置を基準に、深度の比率を掛けて背景の座標を算出（パースペクティブ補正）
+      bgPos.y = camPos.y + (T.y - camPos.y) * (bgDepth / camDistance);
+      bgPos.z = camPos.z + (T.z - camPos.z) * (bgDepth / camDistance);
+      
+      loupeBgObj_->mainPosition.transform.translate = bgPos;
+      
+      // 画面上の半径に合わせてワールド座標での半径を逆算
+      float bgRadius = radius * bgDepth * 0.0006356f;
+      // 円盤にするためX軸スケールを潰す。少し小さめ(0.95倍)にして枠から出ないようにする
+      loupeBgObj_->mainPosition.transform.scale = {0.05f, bgRadius * 0.95f, bgRadius * 0.95f};
+      loupeBgObj_->Update(loupeCamera_);
+    }
+  }
+
   player_->UpdateParticle(camera_);
 
   UpdateSceneTransition();
@@ -412,11 +530,23 @@ void TravelScene::Update() {
 }
 
 void TravelScene::Draw() {
+  // ルーペ用のプレイヤーと背景を最優先で描画（Zバッファクリア直後）
+  if (isLoupeActive_) {
+    system_->SetCamera(loupeCamera_);
+    loupeBgObj_->Draw();
+    player_->DrawModObjects(loupeCamera_);
+    system_->SetCamera(usingCamera_);
+  }
+
   if (showBaseModel_) {
     player_->DrawModObjects(usingCamera_);
   }
 
   npcManager_->DrawNpcs(goalX_, showNpcModel_, camera_);
+
+  if (skydome_) {
+    skydome_->Draw();
+  }
 
   for (auto &ground : grounds_) {
     ground->Draw();
@@ -702,6 +832,14 @@ void TravelScene::Draw() {
 
   spriteA_->Draw();
   spriteD_->Draw();
+
+  // ルーペの枠の描画（UIの手前に表示）
+  if (isLoupeActive_) {
+    // 手前の枠（透過済みの画像なので背景スプライトは不要）
+    loupeFrameSprite_->mainPosition.transform.translate = {loupeScreenX_, loupeScreenY_, 0.0f};
+    loupeFrameSprite_->mainPosition.transform.scale = {loupeScale_ * 0.6f, loupeScale_ * 0.6f, 1.0f}; 
+    loupeFrameSprite_->Draw();
+  }
 
   //===============================
   // チュートリアル描画
