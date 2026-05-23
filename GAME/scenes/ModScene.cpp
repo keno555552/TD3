@@ -2094,6 +2094,18 @@ void ModScene::RebuildControlPointSnapshotsFromScene() {
       PushTorsoAnchorSnapshot(
           ModControlPointRole::RightHip,
           GetControlPointLocalPosition(ModControlPointRole::RightHip), 0.10f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::Chest,
+          FindTorsoLocal(ModControlPointRole::Chest, {0.0f, 1.27f, 0.0f}), 0.10f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::Belly,
+          FindTorsoLocal(ModControlPointRole::Belly, {0.0f, 1.05f, 0.0f}), 0.10f);
+
+      PushTorsoAnchorSnapshot(
+          ModControlPointRole::Waist,
+          FindTorsoLocal(ModControlPointRole::Waist, {0.0f, 0.85f, 0.0f}), 0.10f);
     }
   }
 

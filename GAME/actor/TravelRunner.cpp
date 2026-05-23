@@ -650,25 +650,6 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       }
     }
 
-    float chestScaleY = 1.0f;
-    float stomachScaleY = 1.0f;
-    if (customizeData_) {
-      for (const auto &inst : customizeData_->partInstances) {
-        if (inst.partType == ModBodyPart::ChestBody)
-          chestScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::StomachBody)
-          stomachScaleY = inst.param.scale.y * inst.param.length;
-      }
-    }
-    float chestSegLength = GetSnapshotSegmentLength(ModBodyPart::ChestBody, -1);
-    if (chestSegLength <= 0.0001f) chestSegLength = 1.2796f;
-    float stomachSegLength = GetSnapshotSegmentLength(ModBodyPart::StomachBody, -1);
-    if (stomachSegLength <= 0.0001f) stomachSegLength = 1.6880f;
-
-    // Apply the same downward shift to the invisible logic anchors that the visual mesh does
-    float hipShiftY = -(chestScaleY - 1.0f) * chestSegLength - (stomachScaleY - 1.0f) * stomachSegLength;
-    leftHipAnchorLocal.y += hipShiftY;
-    rightHipAnchorLocal.y += hipShiftY;
 
     const float leftAnkleRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
     const float rightAnkleRadius =
@@ -1442,21 +1423,7 @@ void TravelRunner::ApplyVisualState() {
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
       
-      if (instance.partType == ModBodyPart::ChestBody) {
-          float chestScaleY = instance.param.scale.y * instance.param.length;
-          float chestSegLength = 1.2796f;
-          float chestY = 1.2796f;
-          float bellyY = 0.0f;
-          for (const auto &snap : customizeData_->controlPointSnapshots) {
-              if (snap.role == ModControlPointRole::Chest) chestY = snap.localPosition.y;
-              if (snap.role == ModControlPointRole::Belly) bellyY = snap.localPosition.y;
-          }
-          chestSegLength = chestY - bellyY;
-          if (chestSegLength > 0.0001f) {
-              chestScaleY *= (chestSegLength / 1.2796f);
-          }
-          // No global shift needed: the root pivot stays at its IK position.
-      }
+
     }
 
     ModBodyPart parentType = ModBodyPart::Count;
@@ -1793,6 +1760,21 @@ void TravelRunner::ApplyVisualState() {
             }
             
             float pFinalScaleY = pInst.param.scale.y * pInst.param.length * 1.0f;
+            float pOriginalSegLength = GetSnapshotSegmentLength(pInst.partType, pInst.parentId);
+            if (pOriginalSegLength > 0.0001f) {
+                float pDefaultSegLength = 1.0f;
+                if (pInst.partType == ModBodyPart::ChestBody) pDefaultSegLength = 1.2796f;
+                else if (pInst.partType == ModBodyPart::StomachBody) pDefaultSegLength = 1.6880f;
+                else if (pInst.partType == ModBodyPart::LeftUpperArm || pInst.partType == ModBodyPart::RightUpperArm) pDefaultSegLength = 0.3462f;
+                else if (pInst.partType == ModBodyPart::LeftThigh || pInst.partType == ModBodyPart::RightThigh) pDefaultSegLength = 1.6790f;
+                else if (pInst.partType == ModBodyPart::Neck) pDefaultSegLength = 1.08f;
+                else if (pInst.partType == ModBodyPart::LeftForeArm || pInst.partType == ModBodyPart::RightForeArm) pDefaultSegLength = 2.14f;
+                else if (pInst.partType == ModBodyPart::LeftShin || pInst.partType == ModBodyPart::RightShin) pDefaultSegLength = 1.57f;
+                else if (pInst.partType == ModBodyPart::Head) pDefaultSegLength = 2.62f;
+                if (pDefaultSegLength > 0.0001f) {
+                    pFinalScaleY *= (pOriginalSegLength / pDefaultSegLength);
+                }
+            }
             parentScale = {
                 pInst.param.scale.x * pThicknessScale,
                 pFinalScaleY,
@@ -1835,24 +1817,26 @@ void TravelRunner::ApplyVisualState() {
         obj->objectParts_[0].transform.translate = meshPivotShift;
       } else {
         Vector3 startPos = meshPivotShift;
-        if (instance.partType == ModBodyPart::ChestBody) {
-          float chestY = 1.2796f;
+        if (instance.partType == ModBodyPart::ChestBody || instance.partType == ModBodyPart::StomachBody) {
+          ModControlPointRole startRole = (instance.partType == ModBodyPart::ChestBody) ? ModControlPointRole::Chest : ModControlPointRole::Belly;
+          ModControlPointRole endRole = (instance.partType == ModBodyPart::ChestBody) ? ModControlPointRole::Belly : ModControlPointRole::Waist;
+          Vector3 sPos = {0.0f, (instance.partType == ModBodyPart::ChestBody) ? 1.2796f : 0.0f, 0.0f};
+          Vector3 ePos = {0.0f, (instance.partType == ModBodyPart::ChestBody) ? 0.0f : -1.6880f, 0.0f};
           if (customizeData_ != nullptr) {
             for (const auto &snap : customizeData_->controlPointSnapshots) {
-              if (snap.role == ModControlPointRole::Chest) { chestY = snap.localPosition.y; break; }
+              if (snap.role == startRole) sPos = snap.localPosition;
+              else if (snap.role == endRole) ePos = snap.localPosition;
             }
           }
-          float visualScaleY = instance.param.scale.y * instance.param.length;
-          startPos = {0.0f, chestY * visualScaleY, 0.0f};
-        } else if (instance.partType == ModBodyPart::StomachBody) {
-          float bellyY = 0.0f;
-          if (customizeData_ != nullptr) {
-            for (const auto &snap : customizeData_->controlPointSnapshots) {
-              if (snap.role == ModControlPointRole::Belly) { bellyY = snap.localPosition.y; break; }
-            }
+          startPos = sPos;
+          Vector3 vec = {ePos.x - sPos.x, ePos.y - sPos.y, ePos.z - sPos.z};
+          float length = Length(vec);
+          if (length >= 0.0001f) {
+            vec = Normalize(vec);
+            obj->objectParts_[0].transform.rotate.z = atan2(vec.x, -vec.y);
+            obj->objectParts_[0].transform.rotate.x = -asinf(std::clamp(vec.z, -1.0f, 1.0f));
+            obj->objectParts_[0].transform.rotate.y = 0.0f;
           }
-          float visualScaleY = instance.param.scale.y * instance.param.length;
-          startPos = {0.0f, bellyY * visualScaleY, 0.0f};
         }
         obj->objectParts_[0].transform.translate = startPos;
       }
