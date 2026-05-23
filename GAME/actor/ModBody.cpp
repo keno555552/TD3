@@ -823,10 +823,45 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
   controlPoints_[index].localPosition = newLocalPosition;
 
   switch (role) {
-  case ModControlPointRole::Chest:
-  case ModControlPointRole::Waist:
-    // 胸と腰は独立して動かすため、他への波及処理は行わない
+  case ModControlPointRole::Chest: {
+    const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
+    if (bellyIndex >= 0) {
+      const Vector3 bellyPos = controlPoints_[static_cast<size_t>(bellyIndex)].localPosition;
+      const float defaultRadius = 1.2796f; // baseChestBellyLength
+      const float minRadius = defaultRadius * 0.35f;
+      const float maxRadius = defaultRadius * 1.75f;
+
+      Vector3 rootToCandidate = Subtract(newLocalPosition, bellyPos);
+      Vector3 direction = NormalizeSafe(rootToCandidate, {0.0f, 1.0f, 0.0f});
+      float radius = Length(rootToCandidate);
+      radius = ClampFloat(radius, minRadius, maxRadius);
+
+      controlPoints_[index].localPosition = Add(bellyPos, Multiply(radius, direction));
+      UpdateControlPointHierarchy();
+      return true;
+    }
     break;
+  }
+
+  case ModControlPointRole::Waist: {
+    const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
+    if (bellyIndex >= 0) {
+      const Vector3 bellyPos = controlPoints_[static_cast<size_t>(bellyIndex)].localPosition;
+      const float defaultRadius = 1.6880f; // baseBellyWaistLength
+      const float minRadius = defaultRadius * 0.35f;
+      const float maxRadius = defaultRadius * 1.75f;
+
+      Vector3 rootToCandidate = Subtract(newLocalPosition, bellyPos);
+      Vector3 direction = NormalizeSafe(rootToCandidate, {0.0f, -1.0f, 0.0f});
+      float radius = Length(rootToCandidate);
+      radius = ClampFloat(radius, minRadius, maxRadius);
+
+      controlPoints_[index].localPosition = Add(bellyPos, Multiply(radius, direction));
+      UpdateControlPointHierarchy();
+      return true;
+    }
+    break;
+  }
 
   case ModControlPointRole::Belly: {
     const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
