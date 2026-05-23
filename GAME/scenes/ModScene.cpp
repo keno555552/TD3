@@ -1396,9 +1396,32 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     std::vector<int> partIds =
         ModAssemblyResolver::CollectAssemblyPartIds(assembly_, assemblyRootId);
 
+    bool torsoProcessed = false;
     for (int pid : partIds) {
       if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
         continue;
+
+      if (IsTorsoVisiblePartId(pid)) {
+        if (!torsoProcessed) {
+          torsoProcessed = true;
+          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+            float r = torsoControlPoints_[i].radius * 3.0f;
+
+            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+            hasPoints = true;
+          }
+        }
+        continue;
+      }
 
       const Object *obj = modObjects_.at(pid).get();
       const ModBody &body = modBodies_.at(pid);
@@ -1427,6 +1450,7 @@ Vector3 ModScene::ComputeOrbitTarget() const {
   // 何も選択されていない、または操作点が見つからなかった場合は「改造体全体」の全操作点を対象にする
   if (!hasPoints) {
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    bool torsoProcessed = false;
     for (int pid : allIds) {
       if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
         continue;
@@ -1435,6 +1459,28 @@ Vector3 ModScene::ComputeOrbitTarget() const {
       // （長さ変更等の操作点ドラッグ中はそのまま含める）
       if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
         continue;
+
+      if (IsTorsoVisiblePartId(pid)) {
+        if (!torsoProcessed) {
+          torsoProcessed = true;
+          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+            float r = torsoControlPoints_[i].radius * 3.0f;
+
+            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+            hasPoints = true;
+          }
+        }
+        continue;
+      }
 
       const Object *obj = modObjects_.at(pid).get();
       const ModBody &body = modBodies_.at(pid);
@@ -2410,7 +2456,7 @@ void ModScene::ReattachSelectedPart() {
     return;
   }
 
-  if (!assembly_.MovePart(targetId, reattachParentId_, -1)) {
+  if (!assembly_.MovePart(targetId, reattachParentId_, reattachConnectorId_)) {
     return;
   }
 
@@ -3720,63 +3766,36 @@ bool ModScene::MoveTorsoControlPoint(size_t index,
   MakeEditRangeFromBase(baseBellyWaistLength, &bellyWaistMin, &bellyWaistMax);
 
   if (index == static_cast<size_t>(chestIndex)) {
-    Vector3 candidate = newLocalPosition;
-
-    candidate = ClampDistance(bellyPos, candidate, chestBellyMin, chestBellyMax,
-                              {0.0f, 1.0f, 0.0f});
-
-    if (candidate.y <= bellyPos.y + 0.05f) {
-      candidate.y = bellyPos.y + 0.05f;
-      candidate = ClampDistance(bellyPos, candidate, chestBellyMin,
-                                chestBellyMax, {0.0f, 1.0f, 0.0f});
-    }
-
-    torsoControlPoints_[index].localPosition = candidate;
-    torsoChestToBellyLength_ = Length(Subtract(candidate, bellyPos));
+    torsoControlPoints_[index].localPosition = newLocalPosition;
+    torsoChestToBellyLength_ = Length(Subtract(newLocalPosition, bellyPos));
     return true;
   }
 
   if (index == static_cast<size_t>(bellyIndex)) {
     Vector3 candidate = newLocalPosition;
-
-    candidate = ClampDistance(chestPos, candidate, chestBellyMin, chestBellyMax,
-                              {0.0f, -1.0f, 0.0f});
+    const Vector3 bellyToChestOffset = Subtract(chestPos, bellyPos);
 
     candidate = ClampDistance(waistPos, candidate, bellyWaistMin, bellyWaistMax,
                               {0.0f, 1.0f, 0.0f});
 
-    if (candidate.y >= chestPos.y - 0.05f) {
-      candidate.y = chestPos.y - 0.05f;
-    }
     if (candidate.y <= waistPos.y + 0.05f) {
       candidate.y = waistPos.y + 0.05f;
+      candidate = ClampDistance(waistPos, candidate, bellyWaistMin, bellyWaistMax,
+                                {0.0f, 1.0f, 0.0f});
     }
 
-    candidate = ClampDistance(chestPos, candidate, chestBellyMin, chestBellyMax,
-                              {0.0f, -1.0f, 0.0f});
-    candidate = ClampDistance(waistPos, candidate, bellyWaistMin, bellyWaistMax,
-                              {0.0f, 1.0f, 0.0f});
-
     torsoControlPoints_[index].localPosition = candidate;
-    torsoChestToBellyLength_ = Length(Subtract(chestPos, candidate));
+    torsoControlPoints_[static_cast<size_t>(chestIndex)].localPosition =
+        Add(candidate, bellyToChestOffset);
+
+    torsoChestToBellyLength_ = Length(bellyToChestOffset);
     torsoBellyToWaistLength_ = Length(Subtract(candidate, waistPos));
     return true;
   }
 
   if (index == static_cast<size_t>(waistIndex)) {
-    Vector3 candidate = newLocalPosition;
-
-    candidate = ClampDistance(bellyPos, candidate, bellyWaistMin, bellyWaistMax,
-                              {0.0f, -1.0f, 0.0f});
-
-    if (candidate.y >= bellyPos.y - 0.05f) {
-      candidate.y = bellyPos.y - 0.05f;
-      candidate = ClampDistance(bellyPos, candidate, bellyWaistMin,
-                                bellyWaistMax, {0.0f, -1.0f, 0.0f});
-    }
-
-    torsoControlPoints_[index].localPosition = candidate;
-    torsoBellyToWaistLength_ = Length(Subtract(bellyPos, candidate));
+    torsoControlPoints_[index].localPosition = newLocalPosition;
+    torsoBellyToWaistLength_ = Length(Subtract(bellyPos, newLocalPosition));
     return true;
   }
 
@@ -5024,12 +5043,36 @@ void ModScene::ConfirmAssemblyDragPlacement() {
   const Vector3 snappedLocalRotate =
       ComputeAssemblyPreviewLocalRotate(rootPartId, snappedCandidate);
 
+  Vector3 finalLocalTranslate = snappedLocalTranslate;
+  auto parentIt = modObjects_.find(newParentId);
+  if (parentIt != modObjects_.end() && parentIt->second != nullptr) {
+    const Object *parentObj = parentIt->second.get();
+    
+    // Calculate the required local translation relative to the parent object's pivot.
+    Vector3 requiredLocal = ModObjectUtil::TransformWorldPointToLocal(
+        parentObj, snappedCandidate.worldPosition);
+
+    const Vector3 defaultAttach = assembly_.GetDefaultAttachLocal(
+        parentNode->part, childNode->part, childNode->side);
+    const Vector3 dynamicBase = ResolveDynamicAttachBase(*parentNode, *childNode);
+    const Vector3 childSelfOffset = ResolveChildSelfAttachOffset(*childNode);
+
+    // ResolveAttachedLocalTranslate computes:
+    //   dynamicBase + (localTranslate - defaultAttach) + childSelfOffset
+    // We want this to equal requiredLocal. So we solve for localTranslate:
+    //   localTranslate = requiredLocal - dynamicBase + defaultAttach - childSelfOffset
+    
+    Vector3 temp = Subtract(requiredLocal, dynamicBase);
+    temp = Add(temp, defaultAttach);
+    finalLocalTranslate = Subtract(temp, childSelfOffset);
+  }
+
   if (!assembly_.MovePart(rootPartId, newParentId, newParentConnectorId)) {
     CancelAssemblyDragPlacement();
     return;
   }
 
-  assembly_.SetPartLocalTranslate(rootPartId, snappedLocalTranslate);
+  assembly_.SetPartLocalTranslate(rootPartId, finalLocalTranslate);
   assembly_.SetPartLocalRotate(rootPartId, snappedLocalRotate);
 
   SelectPart(rootPartId);
@@ -7532,9 +7575,32 @@ float ModScene::ComputeIdealOrbitDistance() const {
     std::vector<int> partIds =
         ModAssemblyResolver::CollectAssemblyPartIds(assembly_, assemblyRootId);
 
+    bool torsoProcessed = false;
     for (int pid : partIds) {
       if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
         continue;
+
+      if (IsTorsoVisiblePartId(pid)) {
+        if (!torsoProcessed) {
+          torsoProcessed = true;
+          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+            float r = torsoControlPoints_[i].radius * 3.0f;
+
+            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+            hasPoints = true;
+          }
+        }
+        continue;
+      }
 
       const Object *obj = modObjects_.at(pid).get();
       const ModBody &body = modBodies_.at(pid);
@@ -7560,6 +7626,7 @@ float ModScene::ComputeIdealOrbitDistance() const {
   // 2. 未選択状態（selectedPartId_ == -1）の場合は、改造体全体のAABBを計測
   if (!hasPoints) {
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
+    bool torsoProcessed = false;
     for (int pid : allIds) {
       if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
         continue;
@@ -7567,6 +7634,28 @@ float ModScene::ComputeIdealOrbitDistance() const {
       // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
       if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
         continue;
+
+      if (IsTorsoVisiblePartId(pid)) {
+        if (!torsoProcessed) {
+          torsoProcessed = true;
+          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+            float r = torsoControlPoints_[i].radius * 3.0f;
+
+            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+            hasPoints = true;
+          }
+        }
+        continue;
+      }
 
       const Object *obj = modObjects_.at(pid).get();
       const ModBody &body = modBodies_.at(pid);

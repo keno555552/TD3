@@ -665,6 +665,43 @@ void ModBody::Apply(Object *target) {
   HideUnusedMeshes(target, basePartTransforms_, 1);
 }
 
+void ModBody::SetControlPoints(const std::vector<ModControlPoint> &points) {
+  controlPoints_ = points;
+
+  // 復元直後に Bend-End / Chest-Belly-Waist の整合を必ず取る
+  UpdateControlPointHierarchy();
+
+  // 外部復元時は chain を破棄するのではなく、再構築して同期する
+  if (HasOwnControlPoints()) {
+    chain_.Clear();
+
+    switch (part_) {
+    case ModBodyPart::LeftUpperArm:
+    case ModBodyPart::RightUpperArm:
+      chain_.BuildArmChain();
+      break;
+
+    case ModBodyPart::LeftThigh:
+    case ModBodyPart::RightThigh:
+      chain_.BuildLegChain();
+      break;
+
+    case ModBodyPart::Neck:
+      chain_.BuildNeckChain();
+      break;
+
+    default:
+      break;
+    }
+
+    if (!chain_.GetNodes().empty()) {
+      SyncChainNodesFromControlPoints(&chain_, controlPoints_);
+      SyncControlPointsFromChain(&controlPoints_, chain_);
+      UpdateControlPointHierarchy();
+    }
+  }
+}
+
 void ModBody::ResetControlPoints() {
   BuildDefaultControlPoints();
 
@@ -786,27 +823,43 @@ bool ModBody::MoveControlPoint(size_t index, const Vector3 &newLocalPosition) {
   controlPoints_[index].localPosition = newLocalPosition;
 
   switch (role) {
-  case ModControlPointRole::Chest: {
-    const int bellyIndex = FindControlPointIndex(ModControlPointRole::Belly);
-    const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
-
-    if (bellyIndex >= 0) {
-      controlPoints_[static_cast<size_t>(bellyIndex)].localPosition = Add(
-          controlPoints_[static_cast<size_t>(bellyIndex)].localPosition, delta);
-    }
-
-    if (waistIndex >= 0) {
-      controlPoints_[static_cast<size_t>(waistIndex)].localPosition = Add(
-          controlPoints_[static_cast<size_t>(waistIndex)].localPosition, delta);
-    }
+  case ModControlPointRole::Chest:
+  case ModControlPointRole::Waist:
+    // 胸と腰は独立して動かすため、他への波及処理は行わない
     break;
-  }
 
   case ModControlPointRole::Belly: {
     const int waistIndex = FindControlPointIndex(ModControlPointRole::Waist);
-    if (waistIndex >= 0) {
-      controlPoints_[static_cast<size_t>(waistIndex)].localPosition = Add(
-          controlPoints_[static_cast<size_t>(waistIndex)].localPosition, delta);
+    const int chestIndex = FindControlPointIndex(ModControlPointRole::Chest);
+
+    if (waistIndex >= 0 && chestIndex >= 0) {
+      const Vector3 waistPos =
+          controlPoints_[static_cast<size_t>(waistIndex)].localPosition;
+      const Vector3 oldBellyPos = oldPosition;
+      const Vector3 oldChestPos =
+          controlPoints_[static_cast<size_t>(chestIndex)].localPosition;
+
+      const Vector3 bellyToChestOffset = Subtract(oldChestPos, oldBellyPos);
+
+      // 腹から腰へのデフォルトの距離を基準にする
+      const float defaultRadius = 1.6880f;
+
+      const float minRadius = defaultRadius * 0.35f;
+      const float maxRadius = defaultRadius * 1.75f;
+
+      Vector3 rootToCandidate = Subtract(newLocalPosition, waistPos);
+      Vector3 direction = NormalizeSafe(rootToCandidate, {0.0f, 1.0f, 0.0f});
+      float radius = Length(rootToCandidate);
+      radius = ClampFloat(radius, minRadius, maxRadius);
+
+      const Vector3 clampedBelly = Add(waistPos, Multiply(radius, direction));
+
+      controlPoints_[index].localPosition = clampedBelly;
+      controlPoints_[static_cast<size_t>(chestIndex)].localPosition =
+          Add(clampedBelly, bellyToChestOffset);
+
+      UpdateControlPointHierarchy();
+      return true;
     }
     break;
   }
