@@ -354,6 +354,12 @@ TravelScene::~TravelScene() {
 }
 
 void TravelScene::Update() {
+#ifdef _DEBUG
+  if (system_->GetTriggerOn(DIK_0)) {
+    useDebugCamera_ = !useDebugCamera_;
+  }
+#endif
+
   //===============================
   // カメラ更新
   //===============================
