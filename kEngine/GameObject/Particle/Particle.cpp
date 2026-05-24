@@ -17,7 +17,11 @@ Particle::~Particle() {
 	commonMaterialConfig.reset();
 
 	for (auto& object : particleObjectList_) {
-		delete object, object = nullptr;
+		if (object && object->part) {
+			delete object->part;
+		}
+		delete object;
+		object = nullptr;
 	}
 
 	randomMaker_.reset();
@@ -28,7 +32,11 @@ void Particle::Update(Camera* camera) {
 
 	for (auto object = particleObjectList_.begin(); object != particleObjectList_.end();) {
 		if ((*object)->isAlive == false) {
-			delete* object, * object = nullptr;
+			if ((*object)->part) {
+				delete (*object)->part;
+			}
+			delete *object;
+			*object = nullptr;
 			object = particleObjectList_.erase(object);
 		} else {
 			auto obj = (*object);

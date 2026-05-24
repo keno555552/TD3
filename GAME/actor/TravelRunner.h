@@ -51,6 +51,7 @@ public:
   const char *GetLowestBodyPartName(LowestBodyPart part) const;
 
   bool HasRequiredParts() const;
+  float GetCharacterHeight() const;
 
   // Getters & Setters
   float GetMoveX() const { return moveX_; }
