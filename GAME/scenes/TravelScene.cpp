@@ -45,6 +45,8 @@ TravelScene::TravelScene(kEngine *system) {
   player_->Initialize(-18.0f);
   Logger::Log("TravelScene ctor");
   system_ = system;
+  confettiParticle_ = std::make_unique<ConfettiParticle>(system_);
+  confettiParticle_->ClearAll();
 
   isTutorialMode_ = !s_hasSeenTravelTutorial;
 
@@ -153,6 +155,9 @@ TravelScene::TravelScene(kEngine *system) {
     ground->mainPosition.transform.rotate = {0.0f, -1.57f, 0.0f};
     ground->mainPosition.transform.scale = {8.0f, 8.0f, 8.0f};
 
+    // 影が見えるように地面/背景は明るめのグレーにする
+    ground->objectParts_[0].materialConfig->textureColor = {0.5f, 0.5f, 0.5f, 1.0f};
+
     grounds_.push_back(std::move(ground));
   }
 
@@ -196,6 +201,70 @@ TravelScene::TravelScene(kEngine *system) {
   goalObject_->mainPosition.transform.translate = {0.0f, 0.0f, goalX_};
   goalObject_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
   goalObject_->mainPosition.transform.scale = {2.0f, 2.0f, 2.0f};
+
+  // クリア演出用扉と光
+  leftDoorModelHandle_ = system_->SetModelObj("GAME/resources/model/left_door.obj");
+  rightDoorModelHandle_ = system_->SetModelObj("GAME/resources/model/right_door.obj");
+  float doorZ = goalX_ + 60.0f; // カメラとドアを今度こそ離す（前回45からさらに奥へ）
+  // スケールを4.0倍に変更（元の幅4 × 4.0 = 16.0）。
+  // 隙間ができないようにXの配置も-16と+16に調整。
+  leftDoor_ = std::make_unique<Object>();
+  leftDoor_->IntObject(system_);
+  leftDoor_->CreateModelData(leftDoorModelHandle_);
+  leftDoor_->mainPosition.transform = CreateDefaultTransform();
+  leftDoor_->mainPosition.transform.translate = {-16.0f, 0.0f, doorZ};
+  leftDoor_->mainPosition.transform.scale = {4.0f, 4.0f, 4.0f}; 
+  leftDoor_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  // ステージ背景に合わせた紺色
+  leftDoor_->objectParts_[0].materialConfig->textureColor = {0.15f, 0.2f, 0.45f, 1.0f};
+
+  rightDoor_ = std::make_unique<Object>();
+  rightDoor_->IntObject(system_);
+  rightDoor_->CreateModelData(rightDoorModelHandle_);
+  rightDoor_->mainPosition.transform = CreateDefaultTransform();
+  rightDoor_->mainPosition.transform.translate = {16.0f, 0.0f, doorZ};
+  rightDoor_->mainPosition.transform.scale = {4.0f, 4.0f, 4.0f};
+  rightDoor_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+  rightDoor_->objectParts_[0].materialConfig->textureColor = {0.15f, 0.2f, 0.45f, 1.0f};
+
+  // 建物に見えるように、左右と上に巨大な壁（ドアモデルを流用して巨大化）を配置
+  leftWall_ = std::make_unique<Object>();
+  leftWall_->IntObject(system_);
+  leftWall_->CreateModelData(leftDoorModelHandle_);
+  leftWall_->mainPosition.transform = CreateDefaultTransform();
+  leftWall_->mainPosition.transform.translate = {-56.0f, 0.0f, doorZ}; // 左ドアのヒンジ(-16)から左へ幅40
+  leftWall_->mainPosition.transform.scale = {10.0f, 10.0f, 4.0f}; 
+  leftWall_->objectParts_[0].materialConfig->textureColor = {0.15f, 0.2f, 0.45f, 1.0f};
+
+  rightWall_ = std::make_unique<Object>();
+  rightWall_->IntObject(system_);
+  rightWall_->CreateModelData(rightDoorModelHandle_);
+  rightWall_->mainPosition.transform = CreateDefaultTransform();
+  rightWall_->mainPosition.transform.translate = {56.0f, 0.0f, doorZ}; // 右ドアのヒンジ(+16)から右へ幅40
+  rightWall_->mainPosition.transform.scale = {10.0f, 10.0f, 4.0f};
+  rightWall_->objectParts_[0].materialConfig->textureColor = {0.15f, 0.2f, 0.45f, 1.0f};
+
+  topWall_ = std::make_unique<Object>();
+  topWall_->IntObject(system_);
+  topWall_->CreateModelData(leftDoorModelHandle_); // 左ドア(X正方向伸び)を使用
+  topWall_->mainPosition.transform = CreateDefaultTransform();
+  topWall_->mainPosition.transform.translate = {-16.0f, 24.0f, doorZ}; // 左ヒンジから幅32
+  topWall_->mainPosition.transform.scale = {8.0f, 10.0f, 4.0f}; // Xスケール8で幅32
+  topWall_->objectParts_[0].materialConfig->textureColor = {0.15f, 0.2f, 0.45f, 1.0f};
+
+  doorLight_ = std::make_unique<Object>();
+  doorLight_->IntObject(system_);
+  doorLight_->CreateModelData(config::default_Sphere_MeshBufferHandle_); 
+  doorLight_->mainPosition.transform = CreateDefaultTransform();
+  // 光を少し手前に寄せて、ドアの隙間から強烈に漏れ出るようにする
+  doorLight_->mainPosition.transform.translate = {0.0f, 10.0f, doorZ + 15.0f}; 
+  doorLight_->mainPosition.transform.scale = {45.0f, 45.0f, 1.0f}; 
+  doorLight_->objectParts_[0].materialConfig->enableLighting = false; 
+  doorLight_->objectParts_[0].materialConfig->textureColor = {4.0f, 4.0f, 4.0f, 1.0f}; // 強い白光
+  
+  // エラー防止のため無地の白テクスチャをセット
+  int doorLightTex = system_->LoadTexture("GAME/resources/texture/white100x100.png");
+  doorLight_->objectParts_[0].materialConfig->textureHandle = doorLightTex;
 
   //===============================
   // 2D
@@ -292,6 +361,22 @@ TravelScene::TravelScene(kEngine *system) {
   minimapLineSprite_->mainPosition.transform.translate = {180.0f, 680.0f, 5.0f}; 
   minimapLineSprite_->mainPosition.transform.scale = {164.0f, 3.0f, 1.0f}; // 820px幅の線(180から1000まで)
 
+  // 画面全体を覆うホワイトフェード用スプライト
+  whiteFadeSprite_ = std::make_unique<SimpleSprite>();
+  whiteFadeSprite_->IntObject(system_);
+  whiteFadeSprite_->CreateDefaultData();
+  whiteFadeSprite_->objectParts_[0].materialConfig->textureHandle = whiteTextureHandle_;
+  whiteFadeSprite_->objectParts_[0].materialConfig->textureColor = {4.0f, 4.0f, 4.0f, 0.0f}; // 透明な白
+  whiteFadeSprite_->mainPosition.transform.translate = {0.0f, 0.0f, -0.1f}; // 一番手前
+  whiteFadeSprite_->mainPosition.transform.scale = {2000.0f, 2000.0f, 1.0f}; // 画面全体を覆うスケール
+
+  blackOverlaySprite_ = std::make_unique<SimpleSprite>();
+  blackOverlaySprite_->IntObject(system_);
+  blackOverlaySprite_->CreateDefaultData();
+  blackOverlaySprite_->objectParts_[0].materialConfig->textureHandle = whiteTextureHandle_;
+  blackOverlaySprite_->objectParts_[0].materialConfig->textureColor = {0.0f, 0.0f, 0.0f, 0.0f}; // 透明な黒
+  blackOverlaySprite_->mainPosition.transform.translate = {0.0f, 0.0f, -0.2f}; // whiteFadeSprite_より少し手前
+  blackOverlaySprite_->mainPosition.transform.scale = {2000.0f, 2000.0f, 1.0f}; // 画面全体を覆うスケール
 
   //===============================
   // NPC
@@ -387,6 +472,24 @@ void TravelScene::Update() {
   }
 
   //===============================
+  // ゲームオーバー演出の更新（メニュー表示中もタイマーを進めるため先に処理）
+  //===============================
+  if (isGameOverAnimPlaying_) {
+    gameOverAnimTimer_ += system_->GetDeltaTime();
+    
+    // 演出中は暗転用のアルファ値を更新
+    float alpha = std::clamp(gameOverAnimTimer_ / gameOverAnimDuration_, 0.0f, 0.7f);
+    if (blackOverlaySprite_) {
+      blackOverlaySprite_->objectParts_[0].materialConfig->textureColor.w = alpha;
+    }
+    
+    // 演出終了後にメニューを開く
+    if (gameOverAnimTimer_ >= gameOverAnimDuration_ && !isFailureMenuOpen_) {
+      OpenFailureMenuTravel();
+    }
+  }
+
+  //===============================
   // 失敗時のリトライ更新
   //===============================
   if (isFailureMenuOpen_) {
@@ -395,6 +498,13 @@ void TravelScene::Update() {
     fade_.Update(usingCamera_);
     return;
   }
+
+#ifdef _DEBUG
+  // デバッグ用: Cキーでゴール手前へワープ
+  if (system_->GetIsPush(DIK_C)) {
+    player_->SetMoveX(goalX_ - 5.0f);
+  }
+#endif
 
   //===============================
   // プレイヤー移動
@@ -413,9 +523,7 @@ void TravelScene::Update() {
 
   player_->SavePreviousFrameState();
 
-  UpdateTimeLimit(deltaTime);
-
-  if (!isRaceFinished_) {
+  if (!isRaceFinished_ && !isGameOverAnimPlaying_) {
     player_->UpdateHoldState(leftNowInput, rightNowInput, deltaTime);
     player_->UpdateLegBendState(leftNowInput, rightNowInput);
     player_->UpdateMovementState(leftNowInput, rightNowInput);
@@ -423,8 +531,10 @@ void TravelScene::Update() {
     UpdateRaceRanking();
     UpdateRaceFinishState();
   }
-  npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_);
-
+  
+  if (!isGameOverAnimPlaying_) {
+    npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_);
+  }
 
 
   player_->ApplyVisualState();
@@ -445,7 +555,7 @@ void TravelScene::Update() {
 
   // ルーペの更新
   isLoupeActive_ = false;
-  if (!useDebugCamera_) {
+  if (!useDebugCamera_ && !isClearAnimPlaying_) {
     // プレイヤーのワールド座標（移動方向はZ軸、高さはY軸）
     Vector3 playerWorld = {0.0f, player_->GetMoveY() + player_->GetVisualLiftY(), player_->GetMoveX()};
     Vector3 headWorld = playerWorld;
@@ -517,6 +627,9 @@ void TravelScene::Update() {
   }
 
   player_->UpdateParticle(camera_);
+  if (confettiParticle_) {
+    confettiParticle_->Update(camera_);
+  }
 
   UpdateSceneTransition();
 
@@ -532,6 +645,10 @@ void TravelScene::Update() {
     if (rankAnimationTimer_ < 0.0f) {
       rankAnimationTimer_ = 0.0f;
     }
+  }
+
+  if (isClearAnimPlaying_) {
+    clearAnimTimer_ += system_->GetDeltaTime();
   }
 }
 
@@ -564,6 +681,34 @@ void TravelScene::Draw() {
 
   if (goalObject_ != nullptr) {
     goalObject_->Draw();
+  }
+
+  // 扉の奥の光 -> 扉 の順で描画
+  if (doorLight_ != nullptr) {
+    doorLight_->Draw();
+  }
+  if (leftDoor_ != nullptr) {
+    leftDoor_->Draw();
+  }
+  if (rightDoor_ != nullptr) {
+    rightDoor_->Draw();
+  }
+  if (leftWall_ != nullptr) {
+    leftWall_->Draw();
+  }
+  if (rightWall_ != nullptr) {
+    rightWall_->Draw();
+  }
+  if (topWall_ != nullptr) {
+    topWall_->Draw();
+  }
+  
+  // 最後にホワイトフェードを描画
+  if (whiteFadeSprite_ != nullptr && whiteFadeSprite_->objectParts_[0].materialConfig->textureColor.w > 0.001f) {
+    whiteFadeSprite_->Draw();
+  }
+  if (blackOverlaySprite_ != nullptr && blackOverlaySprite_->objectParts_[0].materialConfig->textureColor.w > 0.001f) {
+    blackOverlaySprite_->Draw();
   }
 
   // for (auto *obj : npcDebugCpObjects_) {
@@ -654,10 +799,6 @@ void TravelScene::Draw() {
 #ifdef USE_IMGUI
   ImGui::Begin("Time");
 
-  ImGui::Text("Remaining Time : %.2f", timeLimit_);
-  ImGui::Text("TimeLimit : %.2f", travelTimeLimit_);
-  ImGui::Text("Time Up : %s", isTimeUp_ ? "YES" : "NO");
-
   ImGui::End();
 #endif
 
@@ -723,6 +864,7 @@ void TravelScene::Draw() {
 
   bitmapFont.BeginFrame();
 
+  if (!isGameOverAnimPlaying_ && !isClearAnimPlaying_) {
   //==============================
   // ミニマップ表示
   //==============================
@@ -832,10 +974,6 @@ void TravelScene::Draw() {
                           {1.0f, 1.0f, 1.0f, alpha});
   }
 
-  DrawFailureMenuTravel();
-
-  player_->DrawParticle();
-
   spriteA_->Draw();
   spriteD_->Draw();
 
@@ -864,6 +1002,15 @@ void TravelScene::Draw() {
         {1.0f, 1.0f, 0.5f, 1.0f});
   }
 
+  } // end if (!isGameOverAnimPlaying_ && !isClearAnimPlaying_)
+
+  DrawFailureMenuTravel();
+
+  player_->DrawParticle();
+  if (confettiParticle_) {
+    confettiParticle_->Draw();
+  }
+
   // フェード描画
   fade_.Draw();
 }
@@ -889,10 +1036,119 @@ void TravelScene::CameraPart() {
       camPos.z = goalX_ - 10.0f;
     }
 
-    camera_->SetTranslate(camPos);
+    if (isGameOverAnimPlaying_) {
+      float progress = std::clamp(gameOverAnimTimer_ / gameOverAnimDuration_, 0.0f, 1.0f);
+      // イージング (OutCubic)
+      float ease = 1.0f - std::pow(1.0f - progress, 3.0f);
 
-    // 向き（横から見る）
-    // camera_->SetRotation({0.0f, -1.57f, 0.0f});
+      // ターゲット（NPC）の横にカメラを寄せる（キャラクターの大きさに応じて距離と高さを変える）
+      // 身長10.0fを基準に、カメラの引き具合(X)と高さ(Y)をスケールさせる
+      float sizeScale = std::clamp(failureNpcHeight_ / 10.0f, 0.5f, 5.0f);
+      Vector3 endCamPos = {failureNpcPos_.x + 42.0f * sizeScale, failureNpcPos_.y + 3.0f * sizeScale, failureNpcPos_.z};
+
+      camPos.x = cameraStartPos_.x + (endCamPos.x - cameraStartPos_.x) * ease;
+      camPos.y = cameraStartPos_.y + (endCamPos.y - cameraStartPos_.y) * ease;
+      camPos.z = cameraStartPos_.z + (endCamPos.z - cameraStartPos_.z) * ease;
+
+      camera_->SetRotation({0.0f, -1.57f, 0.0f});
+    } else if (isClearAnimPlaying_) {
+      // 演出進行度 (0.0 ～ 1.0)
+      float progress = std::clamp(clearAnimTimer_ / clearAnimDuration_, 0.0f, 1.0f);
+      
+      // イージング（滑らかな動き）
+      float easeProgress = progress * progress * (3.0f - 2.0f * progress);
+
+      // ディズニーのアトラクション風：
+      // 1. 扉をずっと「注視」しながら、扉の手前（プレイヤーの前方）へ回り込む
+      // 2. 停止して扉が重々しく開くのを待つ
+      // 3. 扉の奥深く（光のトンネルの中）までゆっくり進んでいく
+      float phase1End = 0.30f; 
+      float phase2End = 0.65f; 
+
+      float doorZ = goalX_ + 60.0f; // カメラとドアを今度こそ離す（前回45からさらに奥へ）
+
+      float startCamX = 48.0f;
+      float startCamZ = goalX_ - 10.0f; 
+      float startCamY = 5.0f;
+
+      float waitCamX = 0.0f;
+      float waitCamZ = goalX_ + 3.0f; // プレイヤーの少し前
+      float waitCamY = 5.0f;
+
+      float endCamX = 0.0f;
+      float endCamZ = doorZ + 60.0f; // 扉の奥深くへ
+      float endCamY = 5.0f;
+
+      if (progress < phase1End) {
+        // フェーズ1: 扉を注視しながら前に回り込む
+        float p = progress / phase1End;
+        float ease = p * p * (3.0f - 2.0f * p);
+        camPos.x = startCamX + (waitCamX - startCamX) * ease;
+        camPos.y = startCamY + (waitCamY - startCamY) * ease;
+        camPos.z = startCamZ + (waitCamZ - startCamZ) * ease;
+        
+        // 元の横向き(-1.57f)から、扉を注視する角度へ滑らかに回転させる
+        float targetRotY = std::atan2(-camPos.x, doorZ - camPos.z);
+        float rotY = -1.57f + (targetRotY - (-1.57f)) * ease;
+        camera_->SetRotation({-0.08f, rotY, 0.0f});
+
+        if (leftDoor_ && rightDoor_) {
+          leftDoor_->mainPosition.transform.rotate.y = 0.0f;
+          rightDoor_->mainPosition.transform.rotate.y = 0.0f;
+        }
+      } else if (progress < phase2End) {
+        // フェーズ2: 扉が開きながら、カメラもじわじわとゆっくり前進する
+        float p = (progress - phase1End) / (phase2End - phase1End);
+        float ease = p * p * (3.0f - 2.0f * p); 
+        float creepDist = 15.0f; // ドアが開ききるまでに進む距離
+
+        camPos.x = waitCamX;
+        camPos.y = waitCamY;
+        camPos.z = waitCamZ + creepDist * ease;
+        camera_->SetRotation({-0.08f, 0.0f, 0.0f}); // ほんの少し上を向く
+
+        if (leftDoor_ && rightDoor_) {
+          // 奥に向かって（+Z方向へ）開くように符号を修正
+          leftDoor_->mainPosition.transform.rotate.y = -1.57f * ease;
+          rightDoor_->mainPosition.transform.rotate.y = 1.57f * ease;
+        }
+      } else {
+        // フェーズ3: 扉が開ききり、奥の光へ向かって進む
+        float p = (progress - phase2End) / (1.0f - phase2End);
+        float ease = p * p * (3.0f - 2.0f * p);
+        float creepDist = 15.0f;
+        float startZ = waitCamZ + creepDist;
+
+        camPos.x = waitCamX + (endCamX - waitCamX) * ease;
+        camPos.y = waitCamY + (endCamY - waitCamY) * ease;
+        camPos.z = startZ + (endCamZ - startZ) * ease;
+        camera_->SetRotation({-0.08f, 0.0f, 0.0f});
+
+        if (leftDoor_ && rightDoor_) {
+          leftDoor_->mainPosition.transform.rotate.y = -1.57f;
+          rightDoor_->mainPosition.transform.rotate.y = 1.57f;
+        }
+      }
+      
+      // ホワイトフェードの更新（フェーズ2中盤以降で徐々に白く）
+      if (whiteFadeSprite_) {
+        // progress: 0.0 ~ 1.0
+        // 扉が開き始める(phase1End)から完了(1.0)に向けてフェード
+        if (progress >= phase1End) {
+          float fadeP = (progress - phase1End) / (1.0f - phase1End);
+          // 演出を強めるため、二乗で加速的に白くする
+          whiteFadeSprite_->objectParts_[0].materialConfig->textureColor.w = fadeP * fadeP * 1.5f; 
+        } else {
+          whiteFadeSprite_->objectParts_[0].materialConfig->textureColor.w = 0.0f;
+        }
+      }
+
+    } else if (!isGameOverAnimPlaying_) {
+      // 向き（横から見る）
+      camera_->SetRotation({0.0f, -1.57f, 0.0f});
+    }
+
+    camera_->SetTranslate(camPos);
   }
 
   system_->SetCamera(usingCamera_);
@@ -946,24 +1202,6 @@ bool TravelScene::HasRequiredParts() const {
 
 
 
-void TravelScene::UpdateTimeLimit(float deltaTime) {
-  if (!isTimeUp_ && !isGoalReached_) {
-    if (!fade_.IsBusy()) {
-      timeLimit_ -= deltaTime;
-    }
-
-    if (timeLimit_ <= 0.0f) {
-      timeLimit_ = 0.0f;
-      isTimeUp_ = true;
-    }
-  }
-
-  /*if (customizeData_ != nullptr) {
-    customizeData_->timeLimit_ = timeLimit_;
-    customizeData_->isTimeUp_ = isTimeUp_;
-  }*/
-}
-
 
 
 
@@ -980,49 +1218,41 @@ void TravelScene::UpdateSceneTransition() {
   // クリアで次シーンへ
   if (isRaceFinished_ && !fade_.IsBusy() && !isStartTransition_) {
     if (raceResultState_ == RaceResultState::Clear) {
-      // ==== ここで暫定順位を計算し、上位2名のNPC情報を保存する ====
-      std::vector<int> npcIndices;
-      for (size_t i = 0; i < npcManager_->npcRunners_.size(); ++i) {
-        if (npcManager_->npcRunners_[i].runner) {
-          npcIndices.push_back(static_cast<int>(i));
-        }
-      }
       
-      // X座標（進んだ距離）で降順ソート
-      std::sort(npcIndices.begin(), npcIndices.end(), [&](int a, int b) {
-        return npcManager_->npcRunners_[a].runner->GetMoveX() > npcManager_->npcRunners_[b].runner->GetMoveX();
-      });
-      
-      ModCustomizeDataStore::ClearSharedNpcCustomizeData();
-      for (int i = 0; i < 2 && i < static_cast<int>(npcIndices.size()); ++i) {
-        int idx = npcIndices[i];
-        if (npcManager_->npcRunners_[idx].customizeData != nullptr) {
-          ModCustomizeDataStore::SetSharedNpcCustomizeData(i, *npcManager_->npcRunners_[idx].customizeData);
+      // アニメーションが十分進んでから（あるいは終わってから）フェードアウトする
+      if (isClearAnimPlaying_ && clearAnimTimer_ >= clearAnimDuration_ * 0.85f) {
+        // ==== ここで暫定順位を計算し、上位2名のNPC情報を保存する ====
+        std::vector<int> npcIndices;
+        for (size_t i = 0; i < npcManager_->npcRunners_.size(); ++i) {
+          if (npcManager_->npcRunners_[i].runner) {
+            npcIndices.push_back(static_cast<int>(i));
+          }
         }
+        
+        // X座標（進んだ距離）で降順ソート
+        std::sort(npcIndices.begin(), npcIndices.end(), [&](int a, int b) {
+          return npcManager_->npcRunners_[a].runner->GetMoveX() > npcManager_->npcRunners_[b].runner->GetMoveX();
+        });
+        
+        ModCustomizeDataStore::ClearSharedNpcCustomizeData();
+        for (int i = 0; i < 2 && i < static_cast<int>(npcIndices.size()); ++i) {
+          int idx = npcIndices[i];
+          if (npcManager_->npcRunners_[idx].customizeData != nullptr) {
+            ModCustomizeDataStore::SetSharedNpcCustomizeData(i, *npcManager_->npcRunners_[idx].customizeData);
+          }
+        }
+        // ==============================================================
+
+        // プレイヤーの到着順位をコンテストシーンへ引き渡す
+        ModCustomizeDataStore::SetTravelFinishRank(playerFinishRank_);
+
+        fade_.StartFadeOut();
+        isStartTransition_ = true;
+        nextOutcome_ = SceneOutcome::NEXT;
       }
-      // ==============================================================
-
-      // プレイヤーの到着順位をコンテストシーンへ引き渡す
-      ModCustomizeDataStore::SetTravelFinishRank(playerFinishRank_);
-
-      fade_.StartFadeOut();
-      isStartTransition_ = true;
-      nextOutcome_ = SceneOutcome::NEXT;
     }
   }
 
-  //================================
-  // 時間切れでもリトライ
-  //================================
-  // if (!isRaceFinished_ && isTimeUp_ && !fade_.IsBusy() &&
-  // !isStartTransition_) {
-  //  fade_.StartFadeOut();
-  //  isStartTransition_ = true;
-  //  nextOutcome_ = SceneOutcome::RETRY;
-
-  //  timeLimit_ = travelTimeLimit_;
-  //  isTimeUp_ = false;
-  //}
 
 #ifdef _DEBUG
 
@@ -1038,10 +1268,7 @@ void TravelScene::UpdateSceneTransition() {
       system_->GetTriggerOn(DIK_RETURN)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
-    nextOutcome_ = SceneOutcome::RETRY;
 
-    timeLimit_ = travelTimeLimit_;
-    isTimeUp_ = false;
   }
 
 #endif
@@ -1156,6 +1383,37 @@ void TravelScene::UpdateRaceFinishState() {
     return;
   }
 
+#ifdef _DEBUG
+  // デバッグ用: Gキーで即座にゲームオーバー
+  if (system_->GetTriggerOn(DIK_G) && !isGameOverAnimPlaying_ && !isClearAnimPlaying_) {
+    raceResultState_ = RaceResultState::GameOver;
+    isRaceFinished_ = true;
+    isGameOverAnimPlaying_ = true;
+    gameOverAnimTimer_ = 0.0f;
+    
+    // 対象のNPCの位置を適当に一番進んでいるNPCにする。いなければプレイヤーにする。
+    float maxX = -9999.0f;
+    bool foundNpc = false;
+    for (auto& npc : npcManager_->npcRunners_) {
+      if (npc.runner && npc.started) {
+        if (npc.runner->GetMoveX() > maxX) {
+          maxX = npc.runner->GetMoveX();
+          failureNpcPos_ = {npc.runner->GetLaneX(), npc.runner->GetMoveY() + npc.runner->GetVisualLiftY(), npc.runner->GetMoveX()};
+          failureNpcHeight_ = npc.runner->GetCharacterHeight();
+          foundNpc = true;
+        }
+      }
+    }
+    
+    if (!foundNpc) {
+      failureNpcPos_ = {player_->GetLaneX(), player_->GetMoveY() + player_->GetVisualLiftY(), player_->GetMoveX()};
+      failureNpcHeight_ = player_->GetCharacterHeight();
+    }
+    cameraStartPos_ = usingCamera_->GetTransform().translate;
+    return;
+  }
+#endif
+
   //==============================
   // プレイヤーのゴール判定
   //==============================
@@ -1164,29 +1422,20 @@ void TravelScene::UpdateRaceFinishState() {
     finishCount_++;
     playerFinishRank_ = finishCount_;
 
+    if (confettiParticle_) {
+      confettiParticle_->Spawn({player_->GetLaneX(), 10.0f, player_->GetMoveX()}, 0.15f);
+    }
+
     if (playerFinishRank_ <= qualifyCount_) {
       raceResultState_ = RaceResultState::Clear;
       isRaceFinished_ = true;
+      if (!isClearAnimPlaying_ && !isStartTransition_) {
+        isClearAnimPlaying_ = true;
+        clearAnimTimer_ = 0.0f;
+      }
     } else {
       raceResultState_ = RaceResultState::GameOver;
       isRaceFinished_ = true;
-      OpenFailureMenuTravel();
-    }
-    return;
-  }
-
-  for (auto &npc : npcManager_->npcRunners_) {
-    if (npc.finished && npc.finishRank < 0) {
-      finishCount_++;
-      npc.finishRank = finishCount_;
-    }
-  }
-
-  if (!isPlayerFinished_ && finishCount_ >= qualifyCount_) {
-    raceResultState_ = RaceResultState::GameOver;
-    isRaceFinished_ = true;
-
-    if (!isFailureMenuOpen_) {
       OpenFailureMenuTravel();
     }
     return;
@@ -1199,16 +1448,24 @@ void TravelScene::UpdateRaceFinishState() {
     if (npc.finished && npc.finishRank < 0) {
       finishCount_++;
       npc.finishRank = finishCount_;
-    }
-  }
 
-  //==============================
-  // プレイヤー到着前に枠が埋まったらゲームオーバー
-  //==============================
-  if (!isPlayerFinished_ && finishCount_ >= qualifyCount_) {
-    raceResultState_ = RaceResultState::GameOver;
-    isRaceFinished_ = true;
-    return;
+      if (confettiParticle_ && npc.runner) {
+        confettiParticle_->Spawn({npc.runner->GetLaneX(), 10.0f, npc.runner->GetMoveX()}, 0.15f);
+      }
+      
+      // プレイヤー到着前に枠が埋まったらゲームオーバー演出開始
+      if (!isPlayerFinished_ && finishCount_ >= qualifyCount_ && !isGameOverAnimPlaying_) {
+        raceResultState_ = RaceResultState::GameOver;
+        isRaceFinished_ = true;
+        isGameOverAnimPlaying_ = true;
+        gameOverAnimTimer_ = 0.0f;
+        
+        // 対象のNPCの位置、高さ、現在のカメラ位置を保存
+        failureNpcPos_ = {npc.runner->GetLaneX(), npc.runner->GetMoveY() + npc.runner->GetVisualLiftY(), npc.runner->GetMoveX()};
+        failureNpcHeight_ = npc.runner->GetCharacterHeight();
+        cameraStartPos_ = usingCamera_->GetTransform().translate;
+      }
+    }
   }
 }
 
@@ -1238,6 +1495,7 @@ void TravelScene::OpenFailureMenuTravel() {
   isFailureMenuOpen_ = true;
   selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
   failureMenuInputCooldown_ = 0.15f;
+  failureMenuAnimTimer_ = 0.0f;
 }
 
 void TravelScene::DecideFailureMenuTravel() {
@@ -1277,6 +1535,8 @@ void TravelScene::UpdateFailureMenuInputTravel() {
   }
 
   const float dt = system_->GetDeltaTime();
+  failureMenuAnimTimer_ += dt;
+
   if (failureMenuInputCooldown_ > 0.0f) {
     failureMenuInputCooldown_ -= dt;
     if (failureMenuInputCooldown_ < 0.0f) {
@@ -1345,15 +1605,21 @@ void TravelScene::DrawFailureMenuTravel() {
     return;
   }
 
-  const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
-  const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
+  float alpha = std::clamp(failureMenuAnimTimer_ / 0.5f, 0.0f, 1.0f);
+  
+  // イージング（ポップイン）
+  float easeOutBack = 1.0f + 0.3f * std::pow(1.0f - alpha, 3.0f); 
+  float yOffset = (1.0f - alpha) * 30.0f;
 
-  // bitmapFont.RenderText("game OVER", {640.0f, 220.0f}, 72.0f,
-  //                       BitmapFont::Align::Center, 5.0f,
-  //                       {1.0f, 0.35f, 0.35f, 1.0f});
+  const Vector4 normalColor = {1.0f, 1.0f, 1.0f, alpha};
+  const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, alpha};
+
+  bitmapFont.RenderText("GAME OVER", {640.0f, 180.0f + yOffset}, 80.0f * easeOutBack,
+                        BitmapFont::Align::Center, 5.0f,
+                        {1.0f, 0.2f, 0.2f, alpha});
 
   bitmapFont.RenderText(
-      "おだいせんたくにもどる", {640.0f, 300.0f},
+      "おだいせんたくにもどる", {640.0f, 300.0f + yOffset},
       selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt ? 44.0f
                                                                     : 36.0f,
       BitmapFont::Align::Center, 5.0f,
@@ -1362,14 +1628,14 @@ void TravelScene::DrawFailureMenuTravel() {
           : normalColor);
 
   bitmapFont.RenderText(
-      "かいぞうにもどる", {640.0f, 380.0f},
+      "かいぞうにもどる", {640.0f, 380.0f + yOffset},
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? 44.0f : 36.0f,
       BitmapFont::Align::Center, 5.0f,
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? selectedColor
                                                                 : normalColor);
 
   bitmapFont.RenderText(
-      "いどうにもどる", {640.0f, 460.0f},
+      "いどうにもどる", {640.0f, 460.0f + yOffset},
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel ? 44.0f
                                                                    : 36.0f,
       BitmapFont::Align::Center, 5.0f,

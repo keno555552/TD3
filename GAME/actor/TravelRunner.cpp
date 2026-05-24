@@ -966,24 +966,30 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         kickFeedbackTimer_ = 0.18f;
         perfectStreak_++;
 
-        perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Perfect);
-        Logger::Log("KICK : PERFECT");
+        if (isPlayer_) {
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Perfect);
+          Logger::Log("KICK : PERFECT");
+        }
 
       } else if (landTimer_ <= bestTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Good;
         kickFeedbackTimer_ = 0.12f;
         perfectStreak_ = 0;
 
-        perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Good);
-        Logger::Log("KICK : GOOD");
+        if (isPlayer_) {
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Good);
+          Logger::Log("KICK : GOOD");
+        }
 
       } else {
         kickFeedbackType_ = KickFeedbackType::Bad;
 
         perfectStreak_ = 0;
 
-        perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
-        Logger::Log("KICK : BAD");
+        if (isPlayer_) {
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
+          Logger::Log("KICK : BAD");
+        }
       }
     }
 
@@ -2049,6 +2055,15 @@ bool TravelRunner::HasRequiredParts() const {
   }
 
   return true;
+}
+
+float TravelRunner::GetCharacterHeight() const {
+  Object *head = GetStandardPart(ModBodyPart::Head);
+  if (head) {
+    // ヘッドのワールドY座標からキャラクターの現在高さを引いた「純粋な身長」を算出
+    return head->mainPosition.transform.translate.y - moveY_;
+  }
+  return 10.0f; // デフォルトの身長
 }
 
 float TravelRunner::GetSnapshotRadius(ModBodyPart ownerPart,

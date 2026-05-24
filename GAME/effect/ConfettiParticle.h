@@ -24,7 +24,7 @@ public:
   void Draw() override;
 
   // 紙吹雪を発生させる
-  void Spawn(const Vector3 &pos);
+  void Spawn(const Vector3 &pos, float scaleMultiplier = 1.0f);
 
   void ClearAll();
 

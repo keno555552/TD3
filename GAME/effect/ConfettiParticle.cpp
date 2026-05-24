@@ -23,12 +23,12 @@ void ConfettiParticle::Update(Camera *camera) {
 
 void ConfettiParticle::Draw() { Particle::Draw(); }
 
-void ConfettiParticle::Spawn(const Vector3 &pos) {
+void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
   SetRootPos(pos);
 
   int spawnCount = 40; // 紙吹雪の数
   float life = 2.0f; // 寿命（長く残す）
-  Vector3 baseScale = {2.5f, 2.5f, 2.5f}; // UIスケールに負けないように大きく
+  Vector3 baseScale = {2.5f * scaleMultiplier, 2.5f * scaleMultiplier, 2.5f * scaleMultiplier}; // UIスケールに負けないように大きく
 
   // 定番のカラフルな色リスト
   Vector4 colors[] = {
@@ -56,10 +56,12 @@ void ConfettiParticle::Spawn(const Vector3 &pos) {
 
     p->part->mainPosition.transform = CreateDefaultTransform();
     
+    float spread = (scaleMultiplier < 0.3f) ? 0.3f : scaleMultiplier;
+
     // 初期位置を少し散らす
-    float px = pos.x + randomMaker_->randomFloat(-15.0f, 15.0f);
-    float py = pos.y + randomMaker_->randomFloat(-5.0f, 5.0f);
-    float pz = pos.z + randomMaker_->randomFloat(-5.0f, 5.0f);
+    float px = pos.x + randomMaker_->randomFloat(-15.0f * spread, 15.0f * spread);
+    float py = pos.y + randomMaker_->randomFloat(-5.0f * spread, 5.0f * spread);
+    float pz = pos.z + randomMaker_->randomFloat(-5.0f * spread, 5.0f * spread);
     p->part->mainPosition.transform.translate = {px, py, pz};
 
     // 初期回転
@@ -77,10 +79,10 @@ void ConfettiParticle::Spawn(const Vector3 &pos) {
     // 紙吹雪なのでビルボードはオフにし、回転をそのまま見せる
     p->part->isBillboard_ = false;
 
-    // 初速（上方向に吹き飛ぶ）
-    float vx = randomMaker_->randomFloat(-10.0f, 10.0f);
-    float vy = randomMaker_->randomFloat(15.0f, 35.0f);
-    float vz = randomMaker_->randomFloat(-10.0f, 10.0f);
+    // 初速（横の散らばりを抑える）
+    float vx = randomMaker_->randomFloat(-10.0f * spread, 10.0f * spread);
+    float vy = randomMaker_->randomFloat(15.0f, 35.0f); // 上への勢いはキープ
+    float vz = randomMaker_->randomFloat(-10.0f * spread, 10.0f * spread);
     p->velocity = {vx, vy, vz};
 
     p->lifeTimeTimer.Init0(life + randomMaker_->randomFloat(-0.5f, 0.5f), system_->GetTimeManager());

@@ -2,6 +2,7 @@
 #include "../effect/Fade.h"
 #include "BaseScene.h"
 #include "GAME/actor/ModBody.h"
+#include "GAME/effect/ConfettiParticle.h"
 #include "GAME/effect/Perfect_Particle.h"
 #include "GAME/font/BitmapFont.h"
 #include "Object/Object.h"
@@ -86,15 +87,11 @@ private:
   std::vector<std::unique_ptr<Object>> grounds_;
   uint32_t groundModelHandle_ = 0;
 
-  // 制限時間
-  float timeLimit_ = 30.0f;
-  float travelTimeLimit_ = 1.0f;
-  bool isTimeUp_ = false;
-
 
 
 
   std::unique_ptr<TravelRunner> player_;
+  std::unique_ptr<ConfettiParticle> confettiParticle_ = nullptr;
 
 private:
   /// <summary>
@@ -102,7 +99,6 @@ private:
   /// </summary>
   void CameraPart();
 
-  void UpdateTimeLimit(float deltaTime);
 
 private:
 
@@ -140,6 +136,8 @@ private:
 
   RaceResultState raceResultState_ = RaceResultState::None;
 
+  float failureMenuAnimTimer_ = 0.0f;
+
   void UpdateRaceFinishState();
 
   bool showBaseModel_ = true;
@@ -150,6 +148,31 @@ private:
   // ゴールオブジェクト
   std::unique_ptr<Object> goalObject_;
   int goalModelHandle_ = 0;
+
+  // クリア演出用オブジェクト
+  std::unique_ptr<Object> leftDoor_;
+  std::unique_ptr<Object> rightDoor_;
+  std::unique_ptr<Object> doorLight_;
+  std::unique_ptr<Object> leftWall_;
+  std::unique_ptr<Object> rightWall_;
+  std::unique_ptr<Object> topWall_;
+  std::unique_ptr<SimpleSprite> whiteFadeSprite_;
+  int leftDoorModelHandle_ = 0;
+  int rightDoorModelHandle_ = 0;
+
+  // クリア演出用アニメーション変数
+  bool isClearAnimPlaying_ = false;
+  float clearAnimTimer_ = 0.0f;
+  const float clearAnimDuration_ = 3.5f; // 少しスピーディに
+
+  // ゲームオーバー演出用アニメーション変数
+  bool isGameOverAnimPlaying_ = false;
+  float gameOverAnimTimer_ = 0.0f;
+  const float gameOverAnimDuration_ = 3.0f;
+  Vector3 failureNpcPos_ = {0,0,0};
+  float failureNpcHeight_ = 10.0f;
+  Vector3 cameraStartPos_ = {0,0,0};
+  std::unique_ptr<SimpleSprite> blackOverlaySprite_;
 
   // UI
   std::unique_ptr<SimpleSprite> spriteA_;
