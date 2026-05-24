@@ -140,6 +140,15 @@ private:
 
   void UpdateRaceFinishState();
 
+  // ピンチ演出用
+  bool isDangerMode_ = false;
+  float dangerAnimTimer_ = 0.0f;
+  int heartbeatSoundHandle_ = -1;
+  bool debugDangerMode_ = false;
+  bool wasPaused_ = false;
+  std::unique_ptr<SimpleSprite> vignetteSprite_;
+  int vignetteTextureHandle_ = 0;
+
   bool showBaseModel_ = true;
   bool showExtraModel_ = true;
   bool showNpcModel_ = true;

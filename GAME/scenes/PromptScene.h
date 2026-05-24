@@ -44,6 +44,8 @@ private:
 
 	bool isStartTransition_ = false;
 
+	bool wasPaused_ = false;
+
 	// お題管理
 	ThemeManager* themeManager_ = nullptr;
 	ThemeData* selectedTheme_ = nullptr;
