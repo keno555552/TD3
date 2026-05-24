@@ -108,6 +108,13 @@ PromptScene::PromptScene(kEngine *system) {
 }
 
 PromptScene::~PromptScene() {
+  if (drumrollSoundHandle_ != -1) {
+    system_->SoundStop(drumrollSoundHandle_);
+  }
+  if (drumrollEndSoundHandle_ != -1) {
+    system_->SoundStop(drumrollEndSoundHandle_);
+  }
+
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
   system_->RemoveLight(light1_);
