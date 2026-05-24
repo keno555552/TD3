@@ -4,6 +4,7 @@
 #include "Object/Object.h"
 #include "config.h"
 #include <time.h>
+#include "Scenes/SceneManager.h"
 
 PromptScene::PromptScene(kEngine *system) {
   system_ = system;
@@ -269,6 +270,24 @@ void PromptScene::DecidePrompt() {
 }
 
 void PromptScene::Draw() {
+  bool currentPause = SceneManager::GetInstance().IsPause();
+  if (currentPause && !wasPaused_) {
+    if (drumrollSoundHandle_ != -1) {
+      system_->SoundPause(drumrollSoundHandle_);
+    }
+    if (drumrollEndSoundHandle_ != -1) {
+      system_->SoundPause(drumrollEndSoundHandle_);
+    }
+  } else if (!currentPause && wasPaused_) {
+    if (drumrollSoundHandle_ != -1) {
+      system_->SoundContinue(drumrollSoundHandle_);
+    }
+    if (drumrollEndSoundHandle_ != -1) {
+      system_->SoundContinue(drumrollEndSoundHandle_);
+    }
+  }
+  wasPaused_ = currentPause;
+
   if (backgroundWall_ != nullptr) {
     backgroundWall_->Draw();
   }

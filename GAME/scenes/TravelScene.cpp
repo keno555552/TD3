@@ -2,6 +2,7 @@
 #include "TravelScene.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <cmath>
+#include "Scenes/SceneManager.h"
 
 namespace {
 /*    enum class を配列添字に変換するための補助関数   */
@@ -378,7 +379,21 @@ TravelScene::TravelScene(kEngine *system) {
   blackOverlaySprite_->mainPosition.transform.translate = {0.0f, 0.0f, -0.2f}; // whiteFadeSprite_より少し手前
   blackOverlaySprite_->mainPosition.transform.scale = {2000.0f, 2000.0f, 1.0f}; // 画面全体を覆うスケール
 
-  //===============================
+  heartbeatSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/心臓の鼓動1.mp3");
+
+  vignetteTextureHandle_ = system_->LoadTexture("GAME/resources/texture/vignette.png");
+  if (vignetteTextureHandle_ == -1) {
+    vignetteTextureHandle_ = whiteTextureHandle_;
+  }
+  vignetteSprite_ = std::make_unique<SimpleSprite>();
+  vignetteSprite_->IntObject(system_);
+  vignetteSprite_->CreateDefaultData();
+  vignetteSprite_->objectParts_[0].materialConfig->textureHandle = vignetteTextureHandle_;
+  vignetteSprite_->objectParts_[0].materialConfig->textureColor = {1.0f, 1.0f, 1.0f, 0.0f};
+  vignetteSprite_->mainPosition.transform.translate = {0.0f, 0.0f, -0.3f};
+  vignetteSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+
+  // 待機プレイヤー表示用のUI画像===============================
   // NPC
   //===============================
   npcManager_->InitializeNpcRunners(customizeData_.get(), player_.get(), goalX_);
@@ -426,6 +441,10 @@ TravelScene::~TravelScene() {
   system_->RemoveLight(light1_);
 
   delete light1_;
+
+  if (heartbeatSoundHandle_ != -1) {
+    system_->SoundStop(heartbeatSoundHandle_);
+  }
 
   bitmapFont.Cleanup();
 
@@ -504,6 +523,10 @@ void TravelScene::Update() {
   if (system_->GetIsPush(DIK_C)) {
     player_->SetMoveX(goalX_ - 5.0f);
   }
+  // デバッグ用: Pキーでピンチ演出の強制ON/OFF
+  if (system_->GetTriggerOn(DIK_P)) {
+    debugDangerMode_ = !debugDangerMode_;
+  }
 #endif
 
   //===============================
@@ -536,6 +559,49 @@ void TravelScene::Update() {
     npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_);
   }
 
+  //==============================
+  // ピンチ演出（Danger Mode）の評価と更新
+  //==============================
+  bool shouldBeDanger = false;
+  if (!isPlayerFinished_ && !isGameOverAnimPlaying_ && !isRaceFinished_ && (qualifyCount_ - goalCount_ == 1)) {
+    shouldBeDanger = true;
+  }
+#ifdef _DEBUG
+  if (debugDangerMode_) {
+    shouldBeDanger = true;
+  }
+#endif
+
+  if (shouldBeDanger) {
+    if (!isDangerMode_) {
+      isDangerMode_ = true;
+      if (heartbeatSoundHandle_ != -1) {
+        system_->SoundPlayBGM(heartbeatSoundHandle_, 1.0f);
+      }
+    }
+  } else {
+    if (isDangerMode_) {
+      isDangerMode_ = false;
+      if (heartbeatSoundHandle_ != -1) {
+        system_->SoundStop(heartbeatSoundHandle_);
+      }
+    }
+  }
+
+  if (isDangerMode_) {
+    dangerAnimTimer_ += deltaTime;
+    // 心音に合わせた明滅 (0.05 〜 0.25)
+    // 6.28f (= 2π) にすることで数学的に「ピッタリ1秒に1回」のペースになります
+    float pulse = (std::sin(dangerAnimTimer_ * 6.28f) + 1.0f) * 0.5f;
+    float alpha = 0.05f + pulse * 0.2f;
+    if (vignetteSprite_) {
+      vignetteSprite_->objectParts_[0].materialConfig->textureColor.w = alpha;
+    }
+  } else {
+    if (vignetteSprite_) {
+      vignetteSprite_->objectParts_[0].materialConfig->textureColor.w = 0.0f;
+    }
+  }
 
   player_->ApplyVisualState();
 
@@ -653,6 +719,18 @@ void TravelScene::Update() {
 }
 
 void TravelScene::Draw() {
+  bool currentPause = SceneManager::GetInstance().IsPause();
+  if (currentPause && !wasPaused_) {
+    if (heartbeatSoundHandle_ != -1) {
+      system_->SoundPause(heartbeatSoundHandle_);
+    }
+  } else if (!currentPause && wasPaused_) {
+    if (heartbeatSoundHandle_ != -1) {
+      system_->SoundContinue(heartbeatSoundHandle_);
+    }
+  }
+  wasPaused_ = currentPause;
+
   // ルーペ用のプレイヤーと背景を最優先で描画（Zバッファクリア直後）
   if (isLoupeActive_) {
     system_->SetCamera(loupeCamera_);
@@ -709,6 +787,9 @@ void TravelScene::Draw() {
   }
   if (blackOverlaySprite_ != nullptr && blackOverlaySprite_->objectParts_[0].materialConfig->textureColor.w > 0.001f) {
     blackOverlaySprite_->Draw();
+  }
+  if (vignetteSprite_ != nullptr && vignetteSprite_->objectParts_[0].materialConfig->textureColor.w > 0.001f) {
+    vignetteSprite_->Draw();
   }
 
   // for (auto *obj : npcDebugCpObjects_) {
@@ -903,8 +984,14 @@ void TravelScene::Draw() {
 
     // Draw Player
     float px = GetMapX(player_->GetMoveX());
-    DrawShadowText("YOU", {px, mapScreenY - 45.0f}, 24.0f, {0.0f, 1.0f, 0.0f, 1.0f});
-    DrawShadowText("v", {px, mapScreenY - 20.0f}, 28.0f, {0.0f, 1.0f, 0.0f, 1.0f});
+    Vector4 playerIconColor = {0.0f, 1.0f, 0.0f, 1.0f}; // 基本は緑
+    if (isDangerMode_) {
+      float pulse = (std::sin(dangerAnimTimer_ * 6.28f) + 1.0f) * 0.5f;
+      // 緑から真っ赤へ心音に合わせて脈打つ
+      playerIconColor = {pulse, 1.0f - pulse, 0.0f, 1.0f};
+    }
+    DrawShadowText("YOU", {px, mapScreenY - 45.0f}, 24.0f, playerIconColor);
+    DrawShadowText("v", {px, mapScreenY - 20.0f}, 28.0f, playerIconColor);
   }
 
   //==============================
@@ -948,7 +1035,22 @@ void TravelScene::Draw() {
   std::string goalText = "GOAL " + std::to_string(goalCount_) + "/" +
                          std::to_string(qualifyCount_);
 
-  bitmapFont.RenderText(goalText, {1000, 60}, 48, BitmapFont::Align::Left);
+  Vector4 goalColor = {1.0f, 1.0f, 1.0f, 1.0f};
+  Vector2 goalPos = {1000.0f, 60.0f};
+
+  if (isDangerMode_) {
+    float pulse = (std::sin(dangerAnimTimer_ * 6.28f) + 1.0f) * 0.5f;
+    // 心音に合わせて赤く脈打つ
+    goalColor = {1.0f, 0.2f + 0.8f * (1.0f - pulse), 0.2f + 0.8f * (1.0f - pulse), 1.0f}; 
+    
+    // ガタガタ振動させる（ご要望に合わせてかなり弱め）
+    float shakeX = ((rand() % 100) / 100.0f - 0.5f) * 2.5f;
+    float shakeY = ((rand() % 100) / 100.0f - 0.5f) * 2.5f;
+    goalPos.x += shakeX;
+    goalPos.y += shakeY;
+  }
+
+  bitmapFont.RenderText(goalText, goalPos, 48, BitmapFont::Align::Left, 5.0f, goalColor);
 
   // if (raceResultState_ == RaceResultState::Clear) {
   //   bitmapFont.RenderText("CLEAR", {900, 300}, 96, BitmapFont::Align::Left);

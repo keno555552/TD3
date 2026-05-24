@@ -96,6 +96,8 @@ void SceneManager::SceneChanger() {
     }
   }
 
+  // 新しいシーンを生成する前に、必ず現在のシーンを破棄する
+  sceneUsing_.reset();
   sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
 }
 
