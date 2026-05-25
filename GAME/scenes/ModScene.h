@@ -34,6 +34,8 @@ struct ModSceneSegmentBoxSet {
   int count = 0;
 };
 
+class ModPartParticle;
+
 /// <summary>
 /// 改造シーン本体
 /// 部位の追加、削除、付け替え、パラメータ編集を行い、次のシーンへ渡す改造結果を作る
@@ -226,6 +228,10 @@ private:
   int addHeadSetTextureHandle_ = 0;
   int addBodyTextureHandle_ = 0;
   int trashTextureHandle_ = 0;
+  
+  // プラスマーク用
+  int plusTextureHandle_ = 0;
+  std::unique_ptr<SimpleSprite> plusSprite_;
 
   // お題画像・フレーム用
   int promptTextureHandle_ = 0;
@@ -242,6 +248,9 @@ private:
 
   // パラメータ計算プレビュー用のランナー
   std::unique_ptr<class TravelRunner> previewRunner_;
+
+  // パーティクル管理
+  std::unique_ptr<ModPartParticle> modPartParticle_;
 
 private:
   /// <summary>

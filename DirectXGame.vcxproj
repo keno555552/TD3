@@ -409,6 +409,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="kEngine\Data\Geometry\CrashData\OBB.cpp" />
     <ClCompile Include="GAME\actor\ModCapsuleUtil.cpp" />
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp" />
+    <ClCompile Include="GAME\effect\ModPartParticle.cpp" />
     <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
@@ -670,6 +671,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\actor\ModAttachCandidate.h" />
     <ClInclude Include="GAME\actor\ModCapsuleUtil.h" />
     <ClInclude Include="GAME\effect\Perfect_Particle.h" />
+    <ClInclude Include="GAME\effect\ModPartParticle.h" />
     <ClInclude Include="GAME\effect\ConfettiParticle.h" />
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
     <ClInclude Include="ResourceLoader.h" />

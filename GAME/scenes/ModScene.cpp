@@ -4,6 +4,7 @@
 #include "GAME/actor/ModObjectUtil.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include "GAME/actor/prompt/PromptData.h"
+#include "GAME/effect/ModPartParticle.h"
 #include "Math/Geometry/Collision/crashDecision.h"
 #include <Windows.h>
 #include <algorithm>
@@ -1093,6 +1094,9 @@ ModScene::ModScene(kEngine *system) {
   // 画面UIを初期化する
   InitializeScreenUi();
 
+  // パーティクルの初期化
+  modPartParticle_ = std::make_unique<ModPartParticle>(system);
+
   // チュートリアル
   isTutorialMode_ = !s_hasSeenModTutorial;
   tutorialBgSprite_ = std::make_unique<SimpleSprite>();
@@ -1235,6 +1239,11 @@ void ModScene::Update() {
   // フェード演出を更新する
   fade_.Update(usingCamera_);
 
+  // パーティクル更新
+  if (modPartParticle_) {
+    modPartParticle_->Update(usingCamera_);
+  }
+
   // フェードアウト完了後に共有データを保存して次シーンへ進む
   if (isStartTransition_ && fade_.IsFinished()) {
     if (customizeData_ != nullptr) {
@@ -1254,6 +1263,11 @@ void ModScene::Draw() {
 
   // 操作点表示球を描画する
   DrawControlPointGizmos();
+
+  // パーティクルの描画
+  if (modPartParticle_) {
+    modPartParticle_->Draw();
+  }
 
 #ifdef USE_IMGUI
   // 接続判定ボックスを可視化する
@@ -2447,8 +2461,12 @@ void ModScene::DeleteSelectedPart() {
   }
 
   // Graph から削除できなければ終了する
+  Vector3 removePos = GetPartWorldPosition(targetId);
   if (!assembly_.RemovePart(targetId)) {
     return;
+  }
+  if (modPartParticle_) {
+    modPartParticle_->Spawn(removePos, ModPartParticleType::Remove);
   }
 
   // 削除後の Object 一覧と選択状態を再同期する
@@ -4970,9 +4988,13 @@ void ModScene::CancelAssemblyDragPlacement() {
 
   if (assemblyDrag_.isNewPartAdding) {
     // 新規追加中のキャンセルなら、追加したパーツを削除する
+    Vector3 removePos = GetPartWorldPosition(assemblyDrag_.assemblyRootPartId);
     assembly_.RemovePart(assemblyDrag_.assemblyRootPartId);
     SyncAfterAssemblyChanged();
     assemblyDrag_.Clear();
+    if (modPartParticle_) {
+      modPartParticle_->Spawn(removePos, ModPartParticleType::Remove);
+    }
     return;
   }
 
@@ -5094,6 +5116,10 @@ void ModScene::ConfirmAssemblyDragPlacement() {
 
   assembly_.SetPartLocalTranslate(rootPartId, finalLocalTranslate);
   assembly_.SetPartLocalRotate(rootPartId, snappedLocalRotate);
+
+  if (modPartParticle_) {
+    modPartParticle_->Spawn(assemblyDrag_.snappedWorldPosition, ModPartParticleType::Add);
+  }
 
   SelectPart(rootPartId);
   assemblyDrag_.Clear();
@@ -6968,41 +6994,76 @@ void ModScene::InitializeScreenUi() {
   trashTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/trash.png");
 
-  const float left = 110.0f;
-  const float top = 40.0f;
-  const float width = 220.0f;
-  const float height = 44.0f;
-  const float spacingY = 52.0f;
+  // 部位追加ボタン用アイコン画像のロードを追加
+  addHeadSetTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/head/head.png");
+  addRightArmTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/rightArm/rightArm.png");
+  addLeftArmTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/leftArm/leftArm.png");
+  addRightLegTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/rightLeg/rightLeg.png");
+  addLeftLegTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/leftLeg/leftLeg.png");
+
+  const float width = 100.0f;
+  const float height = 100.0f;
+  const float centerX = 160.0f;
+  const float topY = 80.0f;
+  const float offsetX = 55.0f;  // 横方向：頭の中心から始まるように修正
+  const float offsetY_arm = 105.0f; // 縦方向：頭のすぐ下
+  const float offsetY_leg = 210.0f; // 縦方向：腕のすぐ下
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddHeadSet)],
-                {left, top + spacingY * 0.0f}, {width, height},
-                uiFrameTextureHandle_);
+                {centerX, topY}, {width, height},
+                addHeadSetTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddHeadSet)].label =
       "あたま";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)],
-                {left, top + spacingY * 1.0f}, {width, height},
-                uiFrameTextureHandle_);
+                {centerX + offsetX, topY + offsetY_arm}, {width, height},
+                addRightArmTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)].label =
       "みぎうで";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)],
-                {left, top + spacingY * 2.0f}, {width, height},
-                uiFrameTextureHandle_);
+                {centerX - offsetX, topY + offsetY_arm}, {width, height},
+                addLeftArmTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)].label =
       "ひだりうで";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)],
-                {left, top + spacingY * 3.0f}, {width, height},
-                uiFrameTextureHandle_);
+                {centerX + offsetX, topY + offsetY_leg}, {width, height},
+                addRightLegTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)].label =
       "みぎあし";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)],
-                {left, top + spacingY * 4.0f}, {width, height},
-                uiFrameTextureHandle_);
+                {centerX - offsetX, topY + offsetY_leg}, {width, height},
+                addLeftLegTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)].label =
       "ひだりあし";
+
+  // プラスマーク用スプライトの初期化
+  plusTextureHandle_ = system_->LoadTexture("GAME/resources/ModScene/plus.png");
+  plusSprite_ = std::make_unique<SimpleSprite>();
+  plusSprite_->IntObject(system_);
+  plusSprite_->CreateDefaultData();
+  if (!plusSprite_->objectParts_.empty()) {
+    auto &part = plusSprite_->objectParts_[0];
+    part.materialConfig->textureHandle = plusTextureHandle_;
+    part.materialConfig->useModelTexture = false;
+    part.materialConfig->enableLighting = false;
+    part.materialConfig->textureColor = MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
+    part.cropLT = {0.0f, 0.0f};
+    part.cropSize = {0.0f, 0.0f};
+    part.anchorPoint = {0.0f, 0.0f};
+    const float ps = 32.0f; // プラスアイコンのサイズ
+    part.conerData.coner[0] = {0.0f, 0.0f};
+    part.conerData.coner[1] = {0.0f, ps};
+    part.conerData.coner[2] = {ps, ps};
+    part.conerData.coner[3] = {ps, 0.0f};
+    part.transform.translate = {0.0f, 0.0f, 0.0f};
+    part.transform.rotate = {0.0f, 0.0f, 0.0f};
+    part.transform.scale = {1.0f, 1.0f, 1.0f};
+    plusSprite_->mainPosition.transform = CreateDefaultTransform();
+    plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
+  }
 
   SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);
@@ -7134,6 +7195,10 @@ bool ModScene::TryHandleAddButtonInteraction() {
 
           // ドラッグ開始時の状態を現在のマウス位置に合わせて上書き
           assemblyDrag_.beforeLocalTranslate = localPos;
+          
+          if (modPartParticle_) {
+            modPartParticle_->Spawn(hitPoint, ModPartParticleType::Add);
+          }
           assemblyDrag_.previewLocalTranslate = localPos;
           assemblyDrag_.beforeLocalRotate = {0.0f, 0.0f, 0.0f};
           assemblyDrag_.previewLocalRotate = {0.0f, 0.0f, 0.0f};
@@ -7338,27 +7403,29 @@ void ModScene::DrawScreenUi() {
     nextSceneButton_.sprite->Draw();
   }
 
-  const float fontHeight = 28.0f;
-  const float textPaddingX = 14.0f;
-  const float textPaddingY = 8.0f;
+  // 各アイコンの右下にプラスマーク（＋）を描画
+  if (plusSprite_ != nullptr && !plusSprite_->objectParts_.empty()) {
+    for (size_t i = 0; i < addButtons_.size(); ++i) {
+      const UiIconButton &button = addButtons_[i];
+      if (!button.visible || button.sprite == nullptr) {
+        continue;
+      }
 
-  for (size_t i = 0; i < addButtons_.size(); ++i) {
-    const UiIconButton &button = addButtons_[i];
-    if (!button.visible) {
-      continue;
+      // アイコンの右下の座標を計算
+      const float plusX = button.center.x + button.size.x * 0.35f - 16.0f;
+      const float plusY = button.center.y + button.size.y * 0.35f - 16.0f;
+
+      plusSprite_->mainPosition.transform.translate = {plusX, plusY, 0.0f};
+
+      Vector4 plusColor = {0.8f, 0.8f, 0.8f, 1.0f};
+      if (IsPointInUiButton(system_->GetMousePosVector2(), button)) {
+        plusColor = {1.0f, 0.95f, 0.65f, 1.0f}; // ホバー時は黄色くする
+      }
+      plusSprite_->objectParts_[0].materialConfig->textureColor = plusColor;
+
+      plusSprite_->Update(nullptr);
+      plusSprite_->Draw();
     }
-
-    const float left = button.center.x - button.size.x * 0.5f;
-    const float top = button.center.y - button.size.y * 0.5f;
-
-    Vector4 textColor = {1.0f, 1.0f, 1.0f, 1.0f};
-    if (IsPointInUiButton(system_->GetMousePosVector2(), button)) {
-      textColor = {1.0f, 0.95f, 0.65f, 1.0f};
-    }
-
-    bitmapFont_.RenderText(
-        button.label, {left + textPaddingX, top + textPaddingY}, fontHeight,
-        BitmapFont::Align::Left, 5.0f, textColor);
   }
 
   if (trashButton_.visible) {
@@ -7485,9 +7552,13 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
 
   // 削除失敗時に元の親・元の位置へ戻せるよう、
   // 先に Clear しない
+  Vector3 removePos = GetPartWorldPosition(deleteTargetId);
   if (!assembly_.RemovePart(deleteTargetId)) {
     CancelAssemblyDragPlacement();
     return false;
+  }
+  if (modPartParticle_) {
+    modPartParticle_->Spawn(removePos, ModPartParticleType::Remove);
   }
 
   assemblyDrag_.Clear();
