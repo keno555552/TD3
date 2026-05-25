@@ -48,10 +48,21 @@ void ModPartParticle::Spawn(const Vector3 &pos, ModPartParticleType type) {
     Particle::AddObject();
     auto &p = particleObjectList_.back();
 
-    // ランダムな色を生成（明るめの色）
-    float r = randomMaker_->randomFloat(0.5f, 1.0f);
-    float g = randomMaker_->randomFloat(0.5f, 1.0f);
-    float b = randomMaker_->randomFloat(0.5f, 1.0f);
+    // 彩度と明度を上げるため、HSVのようなアプローチで色を生成
+    // 明度(Value)を高く、彩度(Saturation)を高く設定する
+    float min_val = randomMaker_->randomFloat(0.4f, 0.6f); // 最小値を上げて少し白み（パステル感）を混ぜ、彩度を抑える
+    float max_val = randomMaker_->randomFloat(0.9f, 1.0f); // 高い値 (高明度)
+    float mid_val = randomMaker_->randomFloat(min_val, max_val);
+
+    float r = 0.0f, g = 0.0f, b = 0.0f;
+    int randType = randomMaker_->randomInt(0, 5);
+    if (randType == 0) { r = max_val; g = mid_val; b = min_val; }
+    else if (randType == 1) { r = max_val; g = min_val; b = mid_val; }
+    else if (randType == 2) { r = mid_val; g = max_val; b = min_val; }
+    else if (randType == 3) { r = min_val; g = max_val; b = mid_val; }
+    else if (randType == 4) { r = mid_val; g = min_val; b = max_val; }
+    else { r = min_val; g = mid_val; b = max_val; }
+
     Vector4 particleColor = {r, g, b, 1.0f};
     
     // 追加時はより明るく（発光っぽく）
@@ -67,7 +78,10 @@ void ModPartParticle::Spawn(const Vector3 &pos, ModPartParticleType type) {
         p->part->objectParts_[0].materialConfig->useModelTexture = false;
         p->part->objectParts_[0].materialConfig->textureColor = particleColor;
         p->part->objectParts_[0].materialConfig->enableLighting = false;
-        p->part->objectParts_[0].materialConfig->lightModelType = LightModelType::HalfLambert;
+        p->part->objectParts_[0].materialConfig->lightModelType = LightModelType::Sprite2D;
+        
+        // エンジン側を変更せずに透過バケット（透明オブジェクトとしての描画順）に入れるためのハック
+        p->part->objectParts_[0].materialConfig->textureColor.w = 0.99f;
     }
 
     p->part->mainPosition.transform = CreateDefaultTransform();
