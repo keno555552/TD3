@@ -306,6 +306,8 @@ private:
     float centerOfMassY = 0.0f;
     float asymmetry = 0.0f;
     float lowestPoint = 999.0f;
+    float extentX = 0.0f;
+    float extentZ = 0.0f;
   };
   CharacterFeatures features_;
 
