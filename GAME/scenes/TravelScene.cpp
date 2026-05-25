@@ -446,6 +446,15 @@ TravelScene::TravelScene(kEngine *system) {
   failureMenuInputCooldown_ = 0.0f;
   selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
 
+  promptButton_ = std::make_unique<DetailButton>(system_);
+  promptButton_->SetButton({640.0f, 300.0f}, 500.0f, 86.0f);
+
+  retryModButton_ = std::make_unique<DetailButton>(system_);
+  retryModButton_->SetButton({640.0f, 400.0f}, 500.0f, 86.0f);
+
+  retryTravelButton_ = std::make_unique<DetailButton>(system_);
+  retryTravelButton_->SetButton({640.0f, 500.0f}, 500.0f, 86.0f);
+
   //===============================
   // 初回フレームの座標(0,0,0)バグ対策
   //===============================
@@ -1668,32 +1677,30 @@ void TravelScene::UpdateFailureMenuInputTravel() {
     }
   }
 
+  float alpha = std::clamp(failureMenuAnimTimer_ / 0.5f, 0.0f, 1.0f);
+  float yOffset = (1.0f - alpha) * 30.0f;
+
+  promptButton_->mainPosition.transform.translate.y = 300.0f + yOffset;
+  retryModButton_->mainPosition.transform.translate.y = 400.0f + yOffset;
+  retryTravelButton_->mainPosition.transform.translate.y = 500.0f + yOffset;
+
+  promptButton_->Update();
+  retryModButton_->Update();
+  retryTravelButton_->Update();
+
+  // Mouse hover overrides current selection
   const Vector2 mouse = system_->GetMousePosVector2();
-
-  struct MenuRect {
-    Vector2 center;
-    Vector2 size;
-  };
-
-  const MenuRect promptRect{{640.0f, 300.0f}, {500.0f, 64.0f}};
-  const MenuRect retryModRect{{640.0f, 380.0f}, {500.0f, 64.0f}};
-  const MenuRect retryTravelRect{{640.0f, 460.0f}, {500.0f, 64.0f}};
-
-  auto IsInside = [](const Vector2 &p, const MenuRect &r) -> bool {
-    const float left = r.center.x - r.size.x * 0.5f;
-    const float right = r.center.x + r.size.x * 0.5f;
-    const float top = r.center.y - r.size.y * 0.5f;
-    const float bottom = r.center.y + r.size.y * 0.5f;
-    return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
-  };
-
-  if (IsInside(mouse, promptRect)) {
+  if (promptButton_->GetIsSelect(mouse, 1, 1)) {
     selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
-  } else if (IsInside(mouse, retryModRect)) {
+  } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
     selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
-  } else if (IsInside(mouse, retryTravelRect)) {
+  } else if (retryTravelButton_->GetIsSelect(mouse, 1, 1)) {
     selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
   }
+
+  promptButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt);
+  retryModButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod);
+  retryTravelButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel);
 
   if (failureMenuInputCooldown_ <= 0.0f) {
     if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
@@ -1714,11 +1721,11 @@ void TravelScene::UpdateFailureMenuInputTravel() {
       failureMenuInputCooldown_ = 0.12f;
     }
 
-    const bool mouseClicked = system_->GetMouseTriggerOn(0);
     const bool keyConfirm =
         system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
 
-    if (mouseClicked || keyConfirm) {
+    if (promptButton_->GetIsClicked() || retryModButton_->GetIsClicked() ||
+        retryTravelButton_->GetIsClicked() || keyConfirm) {
       DecideFailureMenuTravel();
     }
   }
@@ -1742,9 +1749,27 @@ void TravelScene::DrawFailureMenuTravel() {
                         80.0f * easeOutBack, BitmapFont::Align::Center, 5.0f,
                         {1.0f, 0.2f, 0.2f, alpha});
 
+  Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, alpha};
+  Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, alpha};
+
+  promptButton_->SetNormalColor(normalColorBtn);
+  promptButton_->SetSelectColor(selectColorBtn);
+  promptButton_->SetPressColor({0.16f, 0.20f, 0.26f, alpha});
+  promptButton_->Render();
+
+  retryModButton_->SetNormalColor(normalColorBtn);
+  retryModButton_->SetSelectColor(selectColorBtn);
+  retryModButton_->SetPressColor({0.16f, 0.20f, 0.26f, alpha});
+  retryModButton_->Render();
+
+  retryTravelButton_->SetNormalColor(normalColorBtn);
+  retryTravelButton_->SetSelectColor(selectColorBtn);
+  retryTravelButton_->SetPressColor({0.16f, 0.20f, 0.26f, alpha});
+  retryTravelButton_->Render();
+
   bitmapFont.RenderText(
-      "おだいせんたくにもどる", {640.0f, 300.0f + yOffset},
-      selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt ? 44.0f
+      "おだいせんたくにもどる", {640.0f, 300.0f + yOffset - 22.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt ? 40.0f
                                                                     : 36.0f,
       BitmapFont::Align::Center, 5.0f,
       selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt
@@ -1752,15 +1777,15 @@ void TravelScene::DrawFailureMenuTravel() {
           : normalColor);
 
   bitmapFont.RenderText(
-      "かいぞうにもどる", {640.0f, 380.0f + yOffset},
-      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? 44.0f : 36.0f,
+      "かいぞうにもどる", {640.0f, 400.0f + yOffset - 22.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? 40.0f : 36.0f,
       BitmapFont::Align::Center, 5.0f,
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod ? selectedColor
                                                                 : normalColor);
 
   bitmapFont.RenderText(
-      "いどうにもどる", {640.0f, 460.0f + yOffset},
-      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel ? 44.0f
+      "いどうにもどる", {640.0f, 500.0f + yOffset - 22.0f},
+      selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel ? 40.0f
                                                                    : 36.0f,
       BitmapFont::Align::Center, 5.0f,
       selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel

@@ -8,6 +8,7 @@
 #include "Object/Object.h"
 #include "GAME/actor/TravelRunner.h"
 #include "GAME/manager/TravelNpcManager.h"
+#include "GAME/Object/DetailButton/DetailButton.h"
 #include <array>
 #include <memory>
 #include <string>
@@ -229,6 +230,10 @@ private:
   float failureMenuInputCooldown_ = 0.0f;
 
   SceneOutcome pendingFailureOutcome_ = SceneOutcome::NONE;
+
+  std::unique_ptr<DetailButton> promptButton_;
+  std::unique_ptr<DetailButton> retryModButton_;
+  std::unique_ptr<DetailButton> retryTravelButton_;
 
   void OpenFailureMenuTravel();
   void UpdateFailureMenuInputTravel();

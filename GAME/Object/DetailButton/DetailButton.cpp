@@ -232,6 +232,16 @@ void DetailButton::Update() {
 
 }
 
+void DetailButton::ForceSelectState(bool isSelected) {
+	if (buttonState_ != LOCK && buttonState_ != PRESS) {
+		if (isSelected) {
+			buttonState_ = SELECT;
+		} else {
+			buttonState_ = NORMAL;
+		}
+	}
+}
+
 void DetailButton::Render() {
 
 	DrawButton(buttonState_);

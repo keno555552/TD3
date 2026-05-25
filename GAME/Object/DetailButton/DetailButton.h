@@ -22,6 +22,7 @@ public:
 	void SetWidth(float width);
 	void SetHeight(float height);
 	void SetIsLock(bool isLock) { buttonState_ = LOCK; }
+	void ForceSelectState(bool isSelected);
 
 	void SetNormalColor(Vector4 color) { setColor_[NORMAL] = color; }
 	void SetPressColor(Vector4 color) { setColor_[PRESS] = color; }
