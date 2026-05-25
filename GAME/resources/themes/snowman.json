@@ -1,0 +1,113 @@
+{
+  "theme_id": "snowman",
+  "theme_name": "SnowMan",
+  "category": "nature",
+  "texture_path": "GAME/resources/texture/themes/snowman.png",
+  "score_sets": [
+    {
+      "set_name": "default",
+      "parts": {
+        "ChestBody": {
+          "scale_x": 3.0,
+          "scale_y": -1.0,
+          "scale_z": 3.0
+        },
+        "StomachBody": {
+          "scale_x": 4.0,
+          "scale_y": -2.0,
+          "scale_z": 4.0
+        },
+        "Neck": {
+          "scale_x": -3.0,
+          "scale_y": -3.0,
+          "scale_z": -3.0
+        },
+        "Head": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "LeftUpperArm": {
+          "scale_x": -2.0,
+          "scale_y": 2.0,
+          "scale_z": -2.0
+        },
+        "LeftForeArm": {
+          "scale_x": -2.0,
+          "scale_y": 2.0,
+          "scale_z": -2.0
+        },
+        "RightUpperArm": {
+          "scale_x": -2.0,
+          "scale_y": 2.0,
+          "scale_z": -2.0
+        },
+        "RightForeArm": {
+          "scale_x": -2.0,
+          "scale_y": 2.0,
+          "scale_z": -2.0
+        },
+        "LeftThigh": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        },
+        "LeftShin": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        },
+        "RightThigh": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        },
+        "RightShin": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        }
+      },
+      "counts": {
+        "left_arm": {
+          "weight": 1.0,
+          "invert": false
+        },
+        "right_arm": {
+          "weight": 1.0,
+          "invert": false
+        },
+        "left_leg": {
+          "weight": 0.0,
+          "invert": false
+        },
+        "right_leg": {
+          "weight": 0.0,
+          "invert": false
+        }
+      }
+    }
+  ],
+  "bonuses": {
+    "symmetry": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "cost_efficiency": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "minimalist": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "wildcard": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "balance": {
+      "weight": 2.0,
+      "invert": false
+    }
+  }
+}

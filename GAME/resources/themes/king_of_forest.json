@@ -1,0 +1,113 @@
+{
+  "theme_id": "king_of_forest",
+  "theme_name": "森の主になれ",
+  "category": "animal",
+  "texture_path": "GAME/resources/texture/themes/king_of_forest.png",
+  "score_sets": [
+    {
+      "set_name": "default",
+      "parts": {
+        "ChestBody": {
+          "scale_x": 4.0,
+          "scale_y": 3.0,
+          "scale_z": 4.0
+        },
+        "StomachBody": {
+          "scale_x": 4.0,
+          "scale_y": 2.0,
+          "scale_z": 4.0
+        },
+        "Neck": {
+          "scale_x": 3.0,
+          "scale_y": -1.0,
+          "scale_z": 3.0
+        },
+        "Head": {
+          "scale_x": 3.0,
+          "scale_y": 3.0,
+          "scale_z": 3.0
+        },
+        "LeftUpperArm": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "LeftForeArm": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "RightUpperArm": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "RightForeArm": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "LeftThigh": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "LeftShin": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "RightThigh": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        },
+        "RightShin": {
+          "scale_x": 3.0,
+          "scale_y": 2.0,
+          "scale_z": 3.0
+        }
+      },
+      "counts": {
+        "left_arm": {
+          "weight": 2.0,
+          "invert": false
+        },
+        "right_arm": {
+          "weight": 2.0,
+          "invert": false
+        },
+        "left_leg": {
+          "weight": 2.0,
+          "invert": false
+        },
+        "right_leg": {
+          "weight": 2.0,
+          "invert": false
+        }
+      }
+    }
+  ],
+  "bonuses": {
+    "symmetry": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "cost_efficiency": {
+      "weight": 1.0,
+      "invert": true
+    },
+    "minimalist": {
+      "weight": 1.0,
+      "invert": true
+    },
+    "wildcard": {
+      "weight": 2.0,
+      "invert": false
+    },
+    "balance": {
+      "weight": 2.0,
+      "invert": false
+    }
+  }
+}
