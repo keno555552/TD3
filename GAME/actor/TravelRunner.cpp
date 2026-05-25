@@ -1,6 +1,6 @@
+#include "TravelRunner.h"
 #include "GAME/effect/Perfect_Particle.h"
 #include "ModObjectUtil.h"
-#include "TravelRunner.h"
 #include "kEngine.h"
 #include <algorithm>
 #include <cmath>
@@ -23,23 +23,23 @@ TravelRunner::~TravelRunner() {
   }
 }
 
-void TravelRunner::Initialize(float startX) { 
-  moveX_ = startX; 
+void TravelRunner::Initialize(float startX) {
+  moveX_ = startX;
   moveY_ = 1.94f;
   velocityX_ = 0.0f;
   velocityY_ = 0.0f;
-  
+
   leftLegBend_ = 0.0f;
   rightLegBend_ = 0.0f;
   leftLegBendSpeed_ = 0.0f;
   rightLegBendSpeed_ = 0.0f;
-  
+
   bodyTilt_ = 0.0f;
   bodyTiltVelocity_ = 0.0f;
-  
+
   landTimer_ = 0.0f;
   isGrounded_ = true;
-  
+
   leftHoldTime_ = 0.0f;
   rightHoldTime_ = 0.0f;
   leftDriveAccum_ = 0.0f;
@@ -142,7 +142,52 @@ void TravelRunner::UpdateModObjects() {
     float scale = 1.2f - jumpHeight * 0.35f;
     scale = std::clamp(scale, 0.1f, 30.0f);
 
-    shadow_->mainPosition.transform.scale = {scale, scale, 1.0f};
+    float minX = 99999.0f;
+    float maxX = -99999.0f;
+    float minZ = 99999.0f;
+    float maxZ = -99999.0f;
+
+    for (auto &pair : allPartObjects_) {
+      if (pair.second && !pair.second->objectParts_.empty()) {
+        Matrix4x4 localMat =
+            MakeAffineMatrix(pair.second->objectParts_[0].transform.scale,
+                             pair.second->objectParts_[0].transform.rotate,
+                             pair.second->objectParts_[0].transform.translate);
+        Matrix4x4 mainMat = pair.second->mainPosition.UpdateWorldMatrix();
+        Matrix4x4 wMat = localMat * mainMat;
+
+        for (int i = 0; i < 8; ++i) {
+          Vector3 localCorner = {(i & 1) ? 0.5f : -0.5f, (i & 2) ? 0.5f : -0.5f,
+                                 (i & 4) ? 0.5f : -0.5f};
+          float worldX = localCorner.x * wMat.m[0][0] +
+                         localCorner.y * wMat.m[1][0] +
+                         localCorner.z * wMat.m[2][0] + wMat.m[3][0];
+          float worldZ = localCorner.x * wMat.m[0][2] +
+                         localCorner.y * wMat.m[1][2] +
+                         localCorner.z * wMat.m[2][2] + wMat.m[3][2];
+
+          minX = (std::min)(minX, worldX);
+          maxX = (std::max)(maxX, worldX);
+          minZ = (std::min)(minZ, worldZ);
+          maxZ = (std::max)(maxZ, worldZ);
+        }
+      }
+    }
+
+    float dynamicExtentX = features_.extentX;
+    float dynamicExtentZ = features_.extentZ;
+    if (minX <= maxX && minZ <= maxZ) {
+      dynamicExtentX = (std::max)(0.1f, (maxX - minX) * 0.5f);
+      dynamicExtentZ = (std::max)(0.1f, (maxZ - minZ) * 0.5f);
+    }
+
+    float baseScale =
+        scale * 0.5f; // 球体モデルは直径2.0なので半分のスケールをベースにする
+    float scaleX = baseScale * (std::max)(1.0f, dynamicExtentX / 0.8f);
+    float scaleZ = baseScale * (std::max)(1.0f, dynamicExtentZ / 0.8f);
+
+    shadow_->mainPosition.transform.rotate = {0.0f, 0.0f, 0.0f};
+    shadow_->mainPosition.transform.scale = {scaleX, 0.02f, scaleZ};
     shadow_->Update(nullptr);
   }
 }
@@ -245,28 +290,34 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   //==============================
   // 長さ（IK制御点からの実際の見た目長さを反映する）
   //==============================
-  auto GetIKScaleY = [&](ModBodyPart partType, const ModBodyPartParam& p, float defaultLen) -> float {
-      float scale = p.scale.y * p.length;
-      int partId = -1;
-      if (GetFirstPartTypePartId(partType, partId)) {
-          int parentId = -1;
-          GetPartInstanceParentId(partId, parentId);
-          int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
-          float segLen = GetSnapshotSegmentLength(partType, snapshotOwnerId);
-          if (segLen > 0.0001f && defaultLen > 0.0001f) {
-              scale *= (segLen / defaultLen);
-          }
+  auto GetIKScaleY = [&](ModBodyPart partType, const ModBodyPartParam &p,
+                         float defaultLen) -> float {
+    float scale = p.scale.y * p.length;
+    int partId = -1;
+    if (GetFirstPartTypePartId(partType, partId)) {
+      int parentId = -1;
+      GetPartInstanceParentId(partId, parentId);
+      int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
+      float segLen = GetSnapshotSegmentLength(partType, snapshotOwnerId);
+      if (segLen > 0.0001f && defaultLen > 0.0001f) {
+        scale *= (segLen / defaultLen);
       }
-      return scale;
+    }
+    return scale;
   };
 
-  const float leftLegLength = GetIKScaleY(ModBodyPart::LeftThigh, leftThigh, 1.57f) + GetIKScaleY(ModBodyPart::LeftShin, leftShin, 2.62f);
-  const float rightLegLength = GetIKScaleY(ModBodyPart::RightThigh, rightThigh, 1.57f) + GetIKScaleY(ModBodyPart::RightShin, rightShin, 2.62f);
+  const float leftLegLength =
+      GetIKScaleY(ModBodyPart::LeftThigh, leftThigh, 1.57f) +
+      GetIKScaleY(ModBodyPart::LeftShin, leftShin, 2.62f);
+  const float rightLegLength =
+      GetIKScaleY(ModBodyPart::RightThigh, rightThigh, 1.57f) +
+      GetIKScaleY(ModBodyPart::RightShin, rightShin, 2.62f);
   const float avgLegLength = (leftLegLength + rightLegLength) * 0.5f;
 
   // 無改造時の正確な脚の長さ（ログから取得した正解値）
   const float baseLegLength = 2.000f;
-  const float baseLegSlimness = baseLegLength / (baseLegThicknessScale + 0.001f);
+  const float baseLegSlimness =
+      baseLegLength / (baseLegThicknessScale + 0.001f);
 
   const float neckLengthScale = GetIKScaleY(ModBodyPart::Neck, neck, 0.3462f);
 
@@ -282,45 +333,59 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   const float rightThighBendR = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
   const float rightThighEndR = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
 
-  const float leftThighThickness = (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
-  const float leftShinThickness = (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
-  const float rightThighThickness = (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
-  const float rightShinThickness = (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
+  const float leftThighThickness =
+      (std::max)(leftThighStartR, leftThighBendR) / baseRadius;
+  const float leftShinThickness =
+      (std::max)(leftThighBendR, leftThighEndR) / baseRadius;
+  const float rightThighThickness =
+      (std::max)(rightThighStartR, rightThighBendR) / baseRadius;
+  const float rightShinThickness =
+      (std::max)(rightThighBendR, rightThighEndR) / baseRadius;
 
-  const float leftLegThickness = (leftThighThickness + leftShinThickness) * 0.5f;
-  const float rightLegThickness = (rightThighThickness + rightShinThickness) * 0.5f;
+  const float leftLegThickness =
+      (leftThighThickness + leftShinThickness) * 0.5f;
+  const float rightLegThickness =
+      (rightThighThickness + rightShinThickness) * 0.5f;
   const float legThicknessScale = (leftLegThickness + rightLegThickness) * 0.5f;
 
   auto GetLimbThickness = [&](ModBodyPart part) -> float {
-      float r1 = GetSnapshotRadius(part, 1);
-      float r2 = GetSnapshotRadius(part, 2);
-      float r3 = GetSnapshotRadius(part, 3);
-      return (std::max)({r1, r2, r3}) / 0.1f;
+    float r1 = GetSnapshotRadius(part, 1);
+    float r2 = GetSnapshotRadius(part, 2);
+    float r3 = GetSnapshotRadius(part, 3);
+    return (std::max)({r1, r2, r3}) / 0.1f;
   };
   auto GetLimbLength = [&](ModBodyPart partType) -> float {
-      int partId = -1;
-      if (GetFirstPartTypePartId(partType, partId)) {
-          int parentId = -1;
-          GetPartInstanceParentId(partId, parentId);
-          int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
-          return GetSnapshotSegmentLength(partType, snapshotOwnerId);
-      }
-      return 0.0f;
+    int partId = -1;
+    if (GetFirstPartTypePartId(partType, partId)) {
+      int parentId = -1;
+      GetPartInstanceParentId(partId, parentId);
+      int snapshotOwnerId = GetExtraSnapshotOwnerId(partType, partId, parentId);
+      return GetSnapshotSegmentLength(partType, snapshotOwnerId);
+    }
+    return 0.0f;
   };
 
-  const float leftArmThickness = (GetLimbThickness(ModBodyPart::LeftUpperArm) + GetLimbThickness(ModBodyPart::LeftForeArm)) * 0.5f;
-  const float rightArmThickness = (GetLimbThickness(ModBodyPart::RightUpperArm) + GetLimbThickness(ModBodyPart::RightForeArm)) * 0.5f;
+  const float leftArmThickness = (GetLimbThickness(ModBodyPart::LeftUpperArm) +
+                                  GetLimbThickness(ModBodyPart::LeftForeArm)) *
+                                 0.5f;
+  const float rightArmThickness =
+      (GetLimbThickness(ModBodyPart::RightUpperArm) +
+       GetLimbThickness(ModBodyPart::RightForeArm)) *
+      0.5f;
   const float armThicknessScale = (leftArmThickness + rightArmThickness) * 0.5f;
 
-  const float leftArmLength = GetLimbLength(ModBodyPart::LeftUpperArm) + GetLimbLength(ModBodyPart::LeftForeArm);
-  const float rightArmLength = GetLimbLength(ModBodyPart::RightUpperArm) + GetLimbLength(ModBodyPart::RightForeArm);
+  const float leftArmLength = GetLimbLength(ModBodyPart::LeftUpperArm) +
+                              GetLimbLength(ModBodyPart::LeftForeArm);
+  const float rightArmLength = GetLimbLength(ModBodyPart::RightUpperArm) +
+                               GetLimbLength(ModBodyPart::RightForeArm);
   const float avgArmLength = (leftArmLength + rightArmLength) * 0.5f;
 
   // 無改造時の推測値
   const float baseArmThicknessScale = 0.950f;
   const float baseArmLength = 3.220f;
 
-  const float armThicknessRatio = armThicknessScale / (baseArmThicknessScale + 0.001f);
+  const float armThicknessRatio =
+      armThicknessScale / (baseArmThicknessScale + 0.001f);
   const float armLengthRatio = avgArmLength / (baseArmLength + 0.001f);
   const float armSizeScale = (armThicknessRatio + armLengthRatio) * 0.5f;
 
@@ -331,14 +396,18 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   //==============================
   const float upperNeckR = GetSnapshotRadius(ModBodyPart::Head, 8);
   const float headCenterR = GetSnapshotRadius(ModBodyPart::Head, 9);
-  const float headThicknessScale = (std::max)(upperNeckR, headCenterR) / baseRadius;
+  const float headThicknessScale =
+      (std::max)(upperNeckR, headCenterR) / baseRadius;
 
   const Vector3 &upperNeckPos = customizeData_->controlPoints.upperNeckPos;
   const Vector3 &headCenterPos = customizeData_->controlPoints.headCenterPos;
-  Vector3 headVec = {headCenterPos.x - upperNeckPos.x, headCenterPos.y - upperNeckPos.y, headCenterPos.z - upperNeckPos.z};
+  Vector3 headVec = {headCenterPos.x - upperNeckPos.x,
+                     headCenterPos.y - upperNeckPos.y,
+                     headCenterPos.z - upperNeckPos.z};
   const float currentHeadLength = Length(headVec);
   const float baseHeadLength = 0.55f;
-  float headLengthScale = currentHeadLength > 0.0001f ? currentHeadLength / baseHeadLength : 1.0f;
+  float headLengthScale =
+      currentHeadLength > 0.0001f ? currentHeadLength / baseHeadLength : 1.0f;
 
   const float headSizeScale = (headThicknessScale + headLengthScale) * 0.5f;
   headSizeScale_ = headSizeScale;
@@ -355,22 +424,25 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   const Vector3 &chestPos = customizeData_->controlPoints.chestPos;
   const Vector3 &bellyPos = customizeData_->controlPoints.bellyPos;
   const Vector3 &waistPos = customizeData_->controlPoints.waistPos;
-  Vector3 chestToBelly = {bellyPos.x - chestPos.x, bellyPos.y - chestPos.y, bellyPos.z - chestPos.z};
-  Vector3 bellyToWaist = {waistPos.x - bellyPos.x, waistPos.y - bellyPos.y, waistPos.z - bellyPos.z};
+  Vector3 chestToBelly = {bellyPos.x - chestPos.x, bellyPos.y - chestPos.y,
+                          bellyPos.z - chestPos.z};
+  Vector3 bellyToWaist = {waistPos.x - bellyPos.x, waistPos.y - bellyPos.y,
+                          waistPos.z - bellyPos.z};
 
   const float chestLength = Length(chestToBelly);
   const float stomachLength = Length(bellyToWaist);
   const float baseChestLength = 1.2796f;
   const float baseStomachLength = 1.6880f;
 
-  float chestLengthScale = chestLength > 0.0001f ? chestLength / baseChestLength : 1.0f;
-  float stomachLengthScale = stomachLength > 0.0001f ? stomachLength / baseStomachLength : 1.0f;
+  float chestLengthScale =
+      chestLength > 0.0001f ? chestLength / baseChestLength : 1.0f;
+  float stomachLengthScale =
+      stomachLength > 0.0001f ? stomachLength / baseStomachLength : 1.0f;
 
   const float chestScale = (chestThicknessScale + chestLengthScale) * 0.5f;
-  const float stomachScale = (stomachThicknessScale + stomachLengthScale) * 0.5f;
+  const float stomachScale =
+      (stomachThicknessScale + stomachLengthScale) * 0.5f;
   const float torsoScaleAvg = (chestScale + stomachScale) * 0.5f;
-  
-
 
   torsoSizeScale_ = torsoScaleAvg;
 
@@ -405,10 +477,9 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   // 加速は「腕の太さと長さの総合値（armSizeScale）」と「太い脚」でプラス。脚が長すぎるとマイナス。
   tuning_.runPower += (legThicknessScale - baseLegThicknessScale) * 1.5f;
   tuning_.runPower -= (avgLegLength - baseLegLength) * 0.5f;
-  tuning_.runPower += (armSizeScale - 1.0f) * 1.2f; // 腕全体の大きさが加速に影響
+  tuning_.runPower +=
+      (armSizeScale - 1.0f) * 1.2f; // 腕全体の大きさが加速に影響
   tuning_.runPower -= legDiff * 0.3f;
-
-
 
   //==============================
   // 最高速
@@ -429,8 +500,9 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   tuning_.stability -= (legSlimness - baseLegSlimness) * 1.0f;
   tuning_.stability -= (neckLengthScale - 1.0f) * 0.8f;
   tuning_.stability -= (headSizeScale - baseHeadSizeScale) * 0.5f;
-  
-  float comOffset = std::clamp(features_.centerOfMassY - baseCenterOfMassY, -3.0f, 3.0f);
+
+  float comOffset =
+      std::clamp(features_.centerOfMassY - baseCenterOfMassY, -3.0f, 3.0f);
   tuning_.stability -= comOffset * 0.5f; // 重心が高いと不安定
   tuning_.stability -= legDiff * 0.5f;
   tuning_.stability -= (features_.asymmetry - baseAsymmetry) * 0.5f;
@@ -440,7 +512,8 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   //==============================
   // ジャンプ力は「細長い脚」「軽い胴体・頭」でプラス。
   tuning_.lift += (legSlimness - baseLegSlimness) * 1.5f;
-  tuning_.lift -= (torsoScaleAvg - baseTorsoScaleAvg) * 1.0f; // 胴体が大きいと重い
+  tuning_.lift -=
+      (torsoScaleAvg - baseTorsoScaleAvg) * 1.0f; // 胴体が大きいと重い
   tuning_.lift -= (headSizeScale - baseHeadSizeScale) * 0.8f;
   tuning_.lift -= legDiff * 0.2f;
 
@@ -649,7 +722,6 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         }
       }
     }
-
 
     const float leftAnkleRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
     const float rightAnkleRadius =
@@ -967,7 +1039,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         perfectStreak_++;
 
         if (isPlayer_) {
-          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Perfect);
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_},
+                                  KickEffectType::Perfect);
           Logger::Log("KICK : PERFECT");
         }
 
@@ -1039,20 +1112,24 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         tiltImpulse * turnResponse * headHeavyFactor * torsoTiltResistance_;
 
     Vector3 lt = {1.0f, 1.0f, 1.0f};
-    Object* ltObj = GetStandardPart(ModBodyPart::LeftThigh);
-    if (ltObj && !ltObj->objectParts_.empty()) lt = ltObj->objectParts_[0].transform.scale;
+    Object *ltObj = GetStandardPart(ModBodyPart::LeftThigh);
+    if (ltObj && !ltObj->objectParts_.empty())
+      lt = ltObj->objectParts_[0].transform.scale;
 
     Vector3 rt = {1.0f, 1.0f, 1.0f};
-    Object* rtObj = GetStandardPart(ModBodyPart::RightThigh);
-    if (rtObj && !rtObj->objectParts_.empty()) rt = rtObj->objectParts_[0].transform.scale;
+    Object *rtObj = GetStandardPart(ModBodyPart::RightThigh);
+    if (rtObj && !rtObj->objectParts_.empty())
+      rt = rtObj->objectParts_[0].transform.scale;
 
     Vector3 ls = {1.0f, 1.0f, 1.0f};
-    Object* lsObj = GetStandardPart(ModBodyPart::LeftShin);
-    if (lsObj && !lsObj->objectParts_.empty()) ls = lsObj->objectParts_[0].transform.scale;
+    Object *lsObj = GetStandardPart(ModBodyPart::LeftShin);
+    if (lsObj && !lsObj->objectParts_.empty())
+      ls = lsObj->objectParts_[0].transform.scale;
 
     Vector3 rs = {1.0f, 1.0f, 1.0f};
-    Object* rsObj = GetStandardPart(ModBodyPart::RightShin);
-    if (rsObj && !rsObj->objectParts_.empty()) rs = rsObj->objectParts_[0].transform.scale;
+    Object *rsObj = GetStandardPart(ModBodyPart::RightShin);
+    if (rsObj && !rsObj->objectParts_.empty())
+      rs = rsObj->objectParts_[0].transform.scale;
 
     float avgLegScaleY = (lt.y + rt.y + ls.y + rs.y) * 0.25f;
     float legLengthScale =
@@ -1359,7 +1436,8 @@ void TravelRunner::ApplyVisualState() {
 
     // Apply parent's scale to the local translation if parent is Torso
     // This fixes the issue where big-bodied NPCs have normal shoulder widths.
-    // IMPORTANT: Only apply this to EXTRA parts. Standard parts are already positioned correctly by IK snapshots.
+    // IMPORTANT: Only apply this to EXTRA parts. Standard parts are already
+    // positioned correctly by IK snapshots.
     if (instance.parentId >= 0) {
       auto parentIt = allPartObjects_.find(instance.parentId);
       if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
@@ -1380,27 +1458,30 @@ void TravelRunner::ApplyVisualState() {
               break;
             }
           }
-          if (parentType == ModBodyPart::ChestBody || parentType == ModBodyPart::StomachBody) {
+          if (parentType == ModBodyPart::ChestBody ||
+              parentType == ModBodyPart::StomachBody) {
             float parentScaleX = parentParamScaleX;
             float parentScaleY = parentParamScaleY * parentParamLength;
-            
+
             float pSegLen = GetSnapshotSegmentLength(parentType, -1);
-            float pDefLen = (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
+            float pDefLen =
+                (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
             if (pSegLen > 0.0001f && pDefLen > 0.0001f) {
-                parentScaleY *= (pSegLen / pDefLen);
+              parentScaleY *= (pSegLen / pDefLen);
             }
-            
+
             float parentScaleZ = parentParamScaleZ;
 
             obj->mainPosition.transform.translate.x *= parentScaleX;
 
-            // X scale moves the attach point outwards, but the torso's thickness also scales.
-            // We use parentParamScaleX which correctly matches the user's manual width scaling.
-            // Z scale works similarly.
+            // X scale moves the attach point outwards, but the torso's
+            // thickness also scales. We use parentParamScaleX which correctly
+            // matches the user's manual width scaling. Z scale works similarly.
 
             float parentSegLength = GetSnapshotSegmentLength(parentType, -1);
             if (parentSegLength <= 0.0001f) {
-                parentSegLength = (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
+              parentSegLength =
+                  (parentType == ModBodyPart::ChestBody) ? 1.2796f : 1.6880f;
             }
 
             if (instance.partType == ModBodyPart::Neck ||
@@ -1410,12 +1491,14 @@ void TravelRunner::ApplyVisualState() {
                 instance.partType == ModBodyPart::LeftThigh ||
                 instance.partType == ModBodyPart::RightThigh ||
                 instance.partType == ModBodyPart::StomachBody) {
-                
-                // Standard hierarchical scaling: multiply local translation by the VISUAL parameter scale.
-                // We MUST NOT use parentScaleY here, because parentScaleY includes (pSegLen / pDefLen).
-                // Since translate.y is generated by IK and ALREADY includes pSegLen, multiplying by parentScaleY would square the IK scale!
-                float visualParamScaleY = parentParamScaleY * parentParamLength;
-                obj->mainPosition.transform.translate.y *= visualParamScaleY;
+
+              // Standard hierarchical scaling: multiply local translation by
+              // the VISUAL parameter scale. We MUST NOT use parentScaleY here,
+              // because parentScaleY includes (pSegLen / pDefLen). Since
+              // translate.y is generated by IK and ALREADY includes pSegLen,
+              // multiplying by parentScaleY would square the IK scale!
+              float visualParamScaleY = parentParamScaleY * parentParamLength;
+              obj->mainPosition.transform.translate.y *= visualParamScaleY;
             }
             obj->mainPosition.transform.translate.z *= parentScaleZ;
           }
@@ -1423,13 +1506,12 @@ void TravelRunner::ApplyVisualState() {
       }
     }
 
-    // Root objects (like ChestBody or StomachBody with no parent) need world offsets added
+    // Root objects (like ChestBody or StomachBody with no parent) need world
+    // offsets added
     if (instance.parentId < 0) {
       obj->mainPosition.transform.translate.x += laneX_;
       obj->mainPosition.transform.translate.y += moveY_ + visualLiftY_;
       obj->mainPosition.transform.translate.z += moveX_;
-      
-
     }
 
     ModBodyPart parentType = ModBodyPart::Count;
@@ -1478,10 +1560,12 @@ void TravelRunner::ApplyVisualState() {
               break;
             }
 
-            int parentSnapshotOwnerId = GetExtraSnapshotOwnerId(parentType, instance.parentId, -1);
-            float pSegLen = GetSnapshotSegmentLength(parentType, parentSnapshotOwnerId);
+            int parentSnapshotOwnerId =
+                GetExtraSnapshotOwnerId(parentType, instance.parentId, -1);
+            float pSegLen =
+                GetSnapshotSegmentLength(parentType, parentSnapshotOwnerId);
             if (pSegLen > 0.0001f && parentDefaultLength > 0.0001f) {
-                parentScaleY *= (pSegLen / parentDefaultLength);
+              parentScaleY *= (pSegLen / parentDefaultLength);
             }
 
             obj->mainPosition.transform.translate = {
@@ -1729,10 +1813,9 @@ void TravelRunner::ApplyVisualState() {
         }
       }
 
-      Vector3 targetScale = {
-          thicknessScale * instance.param.scale.x,
-          finalScaleY,
-          thicknessScale * instance.param.scale.z};
+      Vector3 targetScale = {thicknessScale * instance.param.scale.x,
+                             finalScaleY,
+                             thicknessScale * instance.param.scale.z};
 
       Vector3 parentScale = {1.0f, 1.0f, 1.0f};
       if (instance.parentId >= 0) {
@@ -1764,32 +1847,44 @@ void TravelRunner::ApplyVisualState() {
             } else {
               pThicknessScale = (std::max)(pRootR, pBendR) / 0.1f;
             }
-            
-            float pFinalScaleY = pInst.param.scale.y * pInst.param.length * 1.0f;
-            float pOriginalSegLength = GetSnapshotSegmentLength(pInst.partType, pInst.parentId);
+
+            float pFinalScaleY =
+                pInst.param.scale.y * pInst.param.length * 1.0f;
+            float pOriginalSegLength =
+                GetSnapshotSegmentLength(pInst.partType, pInst.parentId);
             if (pOriginalSegLength > 0.0001f) {
-                float pDefaultSegLength = 1.0f;
-                if (pInst.partType == ModBodyPart::ChestBody) pDefaultSegLength = 1.2796f;
-                else if (pInst.partType == ModBodyPart::StomachBody) pDefaultSegLength = 1.6880f;
-                else if (pInst.partType == ModBodyPart::LeftUpperArm || pInst.partType == ModBodyPart::RightUpperArm) pDefaultSegLength = 0.3462f;
-                else if (pInst.partType == ModBodyPart::LeftThigh || pInst.partType == ModBodyPart::RightThigh) pDefaultSegLength = 1.6790f;
-                else if (pInst.partType == ModBodyPart::Neck) pDefaultSegLength = 1.08f;
-                else if (pInst.partType == ModBodyPart::LeftForeArm || pInst.partType == ModBodyPart::RightForeArm) pDefaultSegLength = 2.14f;
-                else if (pInst.partType == ModBodyPart::LeftShin || pInst.partType == ModBodyPart::RightShin) pDefaultSegLength = 1.57f;
-                else if (pInst.partType == ModBodyPart::Head) pDefaultSegLength = 2.62f;
-                if (pDefaultSegLength > 0.0001f) {
-                    pFinalScaleY *= (pOriginalSegLength / pDefaultSegLength);
-                }
+              float pDefaultSegLength = 1.0f;
+              if (pInst.partType == ModBodyPart::ChestBody)
+                pDefaultSegLength = 1.2796f;
+              else if (pInst.partType == ModBodyPart::StomachBody)
+                pDefaultSegLength = 1.6880f;
+              else if (pInst.partType == ModBodyPart::LeftUpperArm ||
+                       pInst.partType == ModBodyPart::RightUpperArm)
+                pDefaultSegLength = 0.3462f;
+              else if (pInst.partType == ModBodyPart::LeftThigh ||
+                       pInst.partType == ModBodyPart::RightThigh)
+                pDefaultSegLength = 1.6790f;
+              else if (pInst.partType == ModBodyPart::Neck)
+                pDefaultSegLength = 1.08f;
+              else if (pInst.partType == ModBodyPart::LeftForeArm ||
+                       pInst.partType == ModBodyPart::RightForeArm)
+                pDefaultSegLength = 2.14f;
+              else if (pInst.partType == ModBodyPart::LeftShin ||
+                       pInst.partType == ModBodyPart::RightShin)
+                pDefaultSegLength = 1.57f;
+              else if (pInst.partType == ModBodyPart::Head)
+                pDefaultSegLength = 2.62f;
+              if (pDefaultSegLength > 0.0001f) {
+                pFinalScaleY *= (pOriginalSegLength / pDefaultSegLength);
+              }
             }
-            parentScale = {
-                pInst.param.scale.x * pThicknessScale,
-                pFinalScaleY,
-                pInst.param.scale.z * pThicknessScale};
+            parentScale = {pInst.param.scale.x * pThicknessScale, pFinalScaleY,
+                           pInst.param.scale.z * pThicknessScale};
             break;
           }
         }
       }
-      
+
       obj->objectParts_[0].transform.scale.x = targetScale.x;
       obj->objectParts_[0].transform.scale.y = targetScale.y;
       obj->objectParts_[0].transform.scale.z = targetScale.z;
@@ -1823,15 +1918,30 @@ void TravelRunner::ApplyVisualState() {
         obj->objectParts_[0].transform.translate = meshPivotShift;
       } else {
         Vector3 startPos = meshPivotShift;
-        if (instance.partType == ModBodyPart::ChestBody || instance.partType == ModBodyPart::StomachBody) {
-          ModControlPointRole startRole = (instance.partType == ModBodyPart::ChestBody) ? ModControlPointRole::Chest : ModControlPointRole::Belly;
-          ModControlPointRole endRole = (instance.partType == ModBodyPart::ChestBody) ? ModControlPointRole::Belly : ModControlPointRole::Waist;
-          Vector3 sPos = {0.0f, (instance.partType == ModBodyPart::ChestBody) ? 1.2796f : 0.0f, 0.0f};
-          Vector3 ePos = {0.0f, (instance.partType == ModBodyPart::ChestBody) ? 0.0f : -1.6880f, 0.0f};
+        if (instance.partType == ModBodyPart::ChestBody ||
+            instance.partType == ModBodyPart::StomachBody) {
+          ModControlPointRole startRole =
+              (instance.partType == ModBodyPart::ChestBody)
+                  ? ModControlPointRole::Chest
+                  : ModControlPointRole::Belly;
+          ModControlPointRole endRole =
+              (instance.partType == ModBodyPart::ChestBody)
+                  ? ModControlPointRole::Belly
+                  : ModControlPointRole::Waist;
+          Vector3 sPos = {
+              0.0f,
+              (instance.partType == ModBodyPart::ChestBody) ? 1.2796f : 0.0f,
+              0.0f};
+          Vector3 ePos = {
+              0.0f,
+              (instance.partType == ModBodyPart::ChestBody) ? 0.0f : -1.6880f,
+              0.0f};
           if (customizeData_ != nullptr) {
             for (const auto &snap : customizeData_->controlPointSnapshots) {
-              if (snap.role == startRole) sPos = snap.localPosition;
-              else if (snap.role == endRole) ePos = snap.localPosition;
+              if (snap.role == startRole)
+                sPos = snap.localPosition;
+              else if (snap.role == endRole)
+                ePos = snap.localPosition;
             }
           }
           startPos = sPos;
@@ -1840,7 +1950,8 @@ void TravelRunner::ApplyVisualState() {
           if (length >= 0.0001f) {
             vec = Normalize(vec);
             obj->objectParts_[0].transform.rotate.z = atan2(vec.x, -vec.y);
-            obj->objectParts_[0].transform.rotate.x = -asinf(std::clamp(vec.z, -1.0f, 1.0f));
+            obj->objectParts_[0].transform.rotate.x =
+                -asinf(std::clamp(vec.z, -1.0f, 1.0f));
             obj->objectParts_[0].transform.rotate.y = 0.0f;
           }
         }
@@ -1906,6 +2017,13 @@ void TravelRunner::BuildFeaturesFromCustomizeData() {
     features_.asymmetry += instance.localTransform.translate.x;
     features_.lowestPoint =
         std::min(features_.lowestPoint, instance.localTransform.translate.y);
+
+    float offsetX = std::abs(instance.localTransform.translate.x);
+    float offsetZ = std::abs(instance.localTransform.translate.z);
+    float radiusX = instance.param.scale.x * 0.15f;
+    float radiusZ = instance.param.scale.z * 0.15f;
+    features_.extentX = (std::max)(features_.extentX, offsetX + radiusX);
+    features_.extentZ = (std::max)(features_.extentZ, offsetZ + radiusZ);
   }
   features_.asymmetry = std::abs(features_.asymmetry);
 }
