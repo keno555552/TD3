@@ -1,0 +1,113 @@
+{
+  "theme_id": "hide_everything",
+  "theme_name": "頭かくして尻も隠せ",
+  "category": "abstract",
+  "texture_path": "GAME/resources/texture/themes/hide_everything.png",
+  "score_sets": [
+    {
+      "set_name": "default",
+      "parts": {
+        "ChestBody": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "StomachBody": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": -1.0
+        },
+        "Neck": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": -1.0
+        },
+        "Head": {
+          "scale_x": -3.0,
+          "scale_y": -3.0,
+          "scale_z": -3.0
+        },
+        "LeftUpperArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "LeftForeArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "RightUpperArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "RightForeArm": {
+          "scale_x": 0.0,
+          "scale_y": 0.0,
+          "scale_z": 0.0
+        },
+        "LeftThigh": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        },
+        "LeftShin": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": -1.0
+        },
+        "RightThigh": {
+          "scale_x": -2.0,
+          "scale_y": -2.0,
+          "scale_z": -2.0
+        },
+        "RightShin": {
+          "scale_x": -1.0,
+          "scale_y": -1.0,
+          "scale_z": -1.0
+        }
+      },
+      "counts": {
+        "left_arm": {
+          "weight": 2.0,
+          "invert": true
+        },
+        "right_arm": {
+          "weight": 2.0,
+          "invert": true
+        },
+        "left_leg": {
+          "weight": 2.0,
+          "invert": true
+        },
+        "right_leg": {
+          "weight": 2.0,
+          "invert": true
+        }
+      }
+    }
+  ],
+  "bonuses": {
+    "symmetry": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "cost_efficiency": {
+      "weight": 5.0,
+      "invert": false
+    },
+    "minimalist": {
+      "weight": 5.0,
+      "invert": false
+    },
+    "wildcard": {
+      "weight": 1.0,
+      "invert": false
+    },
+    "balance": {
+      "weight": 1.0,
+      "invert": false
+    }
+  }
+}

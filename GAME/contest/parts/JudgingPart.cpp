@@ -10,9 +10,9 @@ JudgingPart::JudgingPart(kEngine* system, BitmapFont* font,
 	, judgeCommentResults_(judgeCommentResults) 
 {
 	// 審査員ごとのカメラ位置（後でImGuiで調整）
-	cameraTransforms_[0] = { { 0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
-	cameraTransforms_[1] = { {  0.0f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
-	cameraTransforms_[2] = { {  -0.3f, 0.5f, -1.0f }, { 0.0f, 3.1415f, 0.0f } };
+	cameraTransforms_[0] = { { 0.251f, 0.4f, -1.7f }, { 0.0f, 3.1415f, 0.0f } };
+	cameraTransforms_[1] = { {  0.0f, 0.4f, -1.7f }, { 0.0f, 3.1415f, 0.0f } };
+	cameraTransforms_[2] = { {  -0.251f, 0.4f, -1.7f }, { 0.0f, 3.1415f, 0.0f } };
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
@@ -54,6 +54,22 @@ void JudgingPart::Draw() {
 			"Next judge",
 			{ 640.0f, 620.0f }, 48.0f,
 			BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
+	}
+
+	if (currentJudgeIndex_ < 3) {
+		const auto& je = scoreResult_.judgeEvaluations[currentJudgeIndex_];
+		
+		// 審査員の二つ名
+		font_->RenderText(
+			je.judgeTitle,
+			{ 640.0f, 480.0f }, 24.0f,
+			BitmapFont::Align::Center, 5, { 0.8f, 0.8f, 1.0f, 1.0f });
+			
+		// 審査員の名前
+		font_->RenderText(
+			je.judgeName,
+			{ 640.0f, 520.0f }, 32.0f,
+			BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 1.0f, 1.0f });
 	}
 
 #ifdef USE_IMGUI

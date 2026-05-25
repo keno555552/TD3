@@ -6,14 +6,14 @@ ShowOffPart::ShowOffPart(kEngine* system, BitmapFont* font,
 	: IContestPart(system, font), audienceResult_(audienceResult) {
 
 	// 初期カメラ位置（後でImGuiで調整）
-	cameraTransform_.position = { 0.0f, 3.5f, -13.0f };
+	cameraTransform_.position = { 0.0f, 0.9f, -5.0f };
 	cameraTransform_.rotation = { 0.15f, 0.0f, 0.0f };
 
 	// 乱数生成器の初期化
 	std::random_device rd;
 	rng_.seed(rd());
 
-	GenerateScrollingComments();
+	GenerateEffects();
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
@@ -27,13 +27,38 @@ void ShowOffPart::Update() {
 	// === スクロール更新 === //
 	float dt = system_->GetDeltaTime();
 
-	// ざわのスクロール更新
-	for (auto& sc : zawaScrolls_) {
-		sc.position.x -= sc.speed * dt;
-
-		// 画面左端を超えたら右端からリスタート（ループ）
-		if (sc.position.x < -kSpawnMargin) {
-			ResetScrollPosition(sc, rng_);
+	// ざわのフェード更新
+	std::uniform_real_distribution<float> distWait(0.5f, 2.0f);
+	for (auto& zawa : zawaEffects_) {
+		zawa.timer += dt;
+		switch (zawa.state) {
+		case ZawaState::Wait:
+			if (zawa.timer >= zawa.maxTime) {
+				zawa.state = ZawaState::FadeIn;
+				zawa.timer = 0.0f;
+				zawa.maxTime = 0.5f; // フェードイン時間
+				zawa.alpha = 0.0f;
+				zawa.position = GetRandomZawaPosition(rng_, zawa.size);
+			}
+			break;
+		case ZawaState::FadeIn:
+			zawa.alpha = zawa.timer / zawa.maxTime;
+			if (zawa.timer >= zawa.maxTime) {
+				zawa.state = ZawaState::FadeOut;
+				zawa.timer = 0.0f;
+				zawa.maxTime = 1.0f; // フェードアウト時間
+				zawa.alpha = 1.0f;
+			}
+			break;
+		case ZawaState::FadeOut:
+			zawa.alpha = 1.0f - (zawa.timer / zawa.maxTime);
+			if (zawa.timer >= zawa.maxTime) {
+				zawa.state = ZawaState::Wait;
+				zawa.timer = 0.0f;
+				zawa.maxTime = distWait(rng_);
+				zawa.alpha = 0.0f;
+			}
+			break;
 		}
 	}
 
@@ -68,11 +93,14 @@ void ShowOffPart::Update() {
 
 void ShowOffPart::Draw() {
 
-	// ざわをスクロール表示（奥側：layer=6）
-	for (const auto& sc : zawaScrolls_) {
-		font_->RenderText("ざわ・・・",
-			{ sc.position.x, sc.yPos }, sc.size,
-			BitmapFont::Align::Center, 6.0f);
+	// ざわをフェード表示（奥側：layer=6）
+	for (const auto& zawa : zawaEffects_) {
+		if (zawa.state != ZawaState::Wait) {
+			font_->RenderText("ざわ・・・",
+				zawa.position, zawa.size,
+				BitmapFont::Align::Center, 6.0f,
+				{ 1.0f, 1.0f, 1.0f, zawa.alpha });
+		}
 	}
 
 	// 観客コメントをスクロール表示（手前側：layer=5）
@@ -127,21 +155,61 @@ PartCameraTransform ShowOffPart::GetCameraTransform() const {
 	return cameraTransform_;
 }
 
-void ShowOffPart::GenerateScrollingComments() {
+Vector2 ShowOffPart::GetRandomZawaPosition(std::mt19937& gen, float& outSize) {
+	std::uniform_real_distribution<float> distX(50.0f, kScreenWidth - 200.0f);
+	std::uniform_real_distribution<float> distY(50.0f, kScreenHeight - 100.0f);
+	std::uniform_int_distribution<int> distSize(0, 2);
+	float sizes[] = { 32.0f, 48.0f, 64.0f };
+
+	Vector2 pos;
+	outSize = sizes[distSize(gen)];
+
+	for (int i = 0; i < 20; ++i) {
+		pos.x = distX(gen);
+		pos.y = distY(gen);
+
+		// 中央付近を避ける (例: X 440~840, Y 260~460)
+		if (pos.x > 440.0f && pos.x < 840.0f && pos.y > 260.0f && pos.y < 460.0f) {
+			continue;
+		}
+
+		// 他のざわとの距離チェック
+		bool overlap = false;
+		for (const auto& zawa : zawaEffects_) {
+			if (zawa.state == ZawaState::Wait) continue;
+			float dx = zawa.position.x - pos.x;
+			float dy = zawa.position.y - pos.y;
+			float distSq = dx * dx + dy * dy;
+			if (distSq < 150.0f * 150.0f) {
+				overlap = true;
+				break;
+			}
+		}
+
+		if (!overlap) {
+			break; // 見つかった
+		}
+	}
+
+	return pos;
+}
+
+void ShowOffPart::GenerateEffects() {
 	std::uniform_real_distribution<float> distY(50.0f, 550.0f);
 	std::uniform_real_distribution<float> distSpeed(100.0f, 300.0f);
 	std::uniform_real_distribution<float> distStartX(kScreenWidth, kScreenWidth + 600.0f);
 	std::uniform_int_distribution<int> distSize(0, 2);
-
 	float sizes[] = { 32.0f, 48.0f, 64.0f };
 
-	// ざわ8個（初期X位置をばらけさせて一斉に出ないようにする）
-	zawaScrolls_.resize(8);
-	for (auto& sc : zawaScrolls_) {
-		sc.position.x = distStartX(rng_);
-		sc.yPos = distY(rng_);
-		sc.size = sizes[distSize(rng_)];
-		sc.speed = distSpeed(rng_);
+	// ざわ8個
+	std::uniform_real_distribution<float> distWait(0.0f, 2.0f);
+	zawaEffects_.resize(8);
+	for (auto& zawa : zawaEffects_) {
+		zawa.state = ZawaState::Wait;
+		zawa.timer = 0.0f;
+		zawa.maxTime = distWait(rng_);
+		zawa.alpha = 0.0f;
+		zawa.position = GetRandomZawaPosition(rng_, zawa.size);
 	}
 
 	// コメント3個
