@@ -989,17 +989,6 @@ ModScene::ModScene(kEngine *system) {
     promptSprite_->objectParts_[0].materialConfig->useModelTexture = false;
   }
 
-  frameTextureHandle_ = system_->LoadTexture("GAME/resources/texture/frame.png");
-  frameSprite_ = std::make_unique<SimpleSprite>();
-  frameSprite_->IntObject(system_);
-  frameSprite_->CreateDefaultData();
-  frameSprite_->mainPosition.transform = CreateDefaultTransform();
-  frameSprite_->mainPosition.transform.translate = {474.0f, 20.0f, 20.0f}; // さらに奥側に配置
-  frameSprite_->mainPosition.transform.scale = {2.0f / 3.0f, 2.0f / 3.0f, 1.0f};
-  frameSprite_->objectParts_[0].anchorPoint = {0.0f, 0.0f};
-  frameSprite_->objectParts_[0].materialConfig->textureHandle = frameTextureHandle_;
-  frameSprite_->objectParts_[0].materialConfig->useModelTexture = false;
-
   // 背景モデルの追加
   int stageModelHandle = system_->SetModelObj("GAME/resources/stage/stage.obj");
   stageObject_ = std::make_unique<Object>();
@@ -7065,7 +7054,7 @@ void ModScene::InitializeScreenUi() {
     plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 
-  SetupUiSprite(trashButton_, {100.0f, 620.0f}, {84.0f, 84.0f},
+  SetupUiSprite(trashButton_, {100.0f,580.0f}, {84.0f, 84.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
@@ -7076,6 +7065,11 @@ void ModScene::InitializeScreenUi() {
   SetupUiSprite(nextSceneButton_, {1200.0f, 640.0f}, {100.0f, 100.0f},
                 uiFrameTextureHandle_);
   nextSceneButton_.label = "つぎへ";
+
+  howToTextureHandle_ =
+      system_->LoadTexture("GAME/resources/ModScene/howTo.png");
+  SetupUiSprite(howToUi_, {1120.0f, 340.0f}, {300.0f, 300.0f},
+                howToTextureHandle_);
 
   // パラメータ計算用ランナー初期化
   previewRunner_ = std::make_unique<TravelRunner>(system_);
@@ -7312,9 +7306,6 @@ bool ModScene::IsMouseOverTrashArea() const {
 }
 
 void ModScene::UpdateScreenUi() {
-  if (frameSprite_ != nullptr) {
-    frameSprite_->Update(nullptr);
-  }
   if (promptSprite_ != nullptr) {
     promptSprite_->Update(nullptr);
   }
@@ -7326,6 +7317,7 @@ void ModScene::UpdateScreenUi() {
   UpdateUiSpriteTransform(trashButton_);
   UpdateUiSpriteTransform(resetButton_);
   UpdateUiSpriteTransform(nextSceneButton_);
+  UpdateUiSpriteTransform(howToUi_);
 
   isHoverTrash_ = assemblyDrag_.isDragging && IsMouseOverTrashArea();
   isHoverReset_ =
@@ -7378,9 +7370,6 @@ void ModScene::UpdateScreenUi() {
 }
 
 void ModScene::DrawScreenUi() {
-  if (frameSprite_ != nullptr) {
-    frameSprite_->Draw();
-  }
   if (promptSprite_ != nullptr) {
     promptSprite_->Draw();
   }
@@ -7401,6 +7390,10 @@ void ModScene::DrawScreenUi() {
 
   if (nextSceneButton_.visible && nextSceneButton_.sprite != nullptr) {
     nextSceneButton_.sprite->Draw();
+  }
+
+  if (howToUi_.visible && howToUi_.sprite != nullptr) {
+    howToUi_.sprite->Draw();
   }
 
   // 各アイコンの右下にプラスマーク（＋）を描画
