@@ -130,7 +130,11 @@ PixelShaderOutput main(VertexShaderOutput input)
 
             // Spot cone（方向衰減）
                 float cosTheta = dot(lightDir, normalize(-L.direction));
-                float spotFactor = saturate(cosTheta / cos(L.angle));
+                float spotFactor;
+                if (L.extra0 == 1)
+                    spotFactor = smoothstep(cos(L.angle), 1.0f, cosTheta);
+                else
+                    spotFactor = saturate(cosTheta / cos(L.angle));
 
                 lightColor = L.color * L.intensity * atten * spotFactor;
             }

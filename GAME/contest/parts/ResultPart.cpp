@@ -103,7 +103,11 @@ void ResultPart::Draw() {
 
 		// ランク（星の中央 900, 360）
 		font_->RenderText(scoreResult_.overallRank,
-			{ 900.0f, 360.0f }, 96.0f,
+			{ 900.0f, 292.0f }, 112.0f,
+			BitmapFont::Align::Center, 5.0f, { 0.0f,0.0f,0.0f,1.0f });
+
+		font_->RenderText(scoreResult_.overallRank,
+			{ 900.0f, 300.0f }, 96.0f,
 			BitmapFont::Align::Center, 4.0f, rankColor);
 
 		// ニックネーム（左上基準 64, 128）

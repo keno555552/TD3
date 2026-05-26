@@ -179,6 +179,8 @@
     <ClCompile Include="GAME\contest\parts\ResultPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ShowOffPart.cpp" />
     <ClCompile Include="GAME\contest\parts\TrophyPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\RankingPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\AdvicePart.cpp" />
     <ClCompile Include="GAME\contest\ui\StarChart.cpp" />
     <ClCompile Include="GAME\font\BitmapFont.cpp" />
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp">
@@ -445,6 +447,8 @@
     <ClInclude Include="GAME\contest\parts\ResultPart.h" />
     <ClInclude Include="GAME\contest\parts\ShowOffPart.h" />
     <ClInclude Include="GAME\contest\parts\TrophyPart.h" />
+    <ClInclude Include="GAME\contest\parts\RankingPart.h" />
+    <ClInclude Include="GAME\contest\parts\AdvicePart.h" />
     <ClInclude Include="GAME\contest\ui\StarChart.h" />
     <ClInclude Include="GAME\font\BitmapFont.h" />
     <ClInclude Include="GAME\effect\Perfect_Particle.h">
