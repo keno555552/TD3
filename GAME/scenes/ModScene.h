@@ -220,6 +220,10 @@ private:
   // マウスがリセットボタンの上にあるかどうか
   bool isHoverReset_ = false;
 
+  // 操作方法UI
+  UiIconButton howToUi_{};
+  int howToTextureHandle_ = 0;
+
   // UIの部位追加ボタンと削除ボタンのテクスチャハンドル
   int addLeftArmTextureHandle_ = 0;
   int addRightArmTextureHandle_ = 0;
@@ -233,11 +237,9 @@ private:
   int plusTextureHandle_ = 0;
   std::unique_ptr<SimpleSprite> plusSprite_;
 
-  // お題画像・フレーム用
+  // お題画像用
   int promptTextureHandle_ = 0;
   std::unique_ptr<SimpleSprite> promptSprite_;
-  int frameTextureHandle_ = 0;
-  std::unique_ptr<SimpleSprite> frameSprite_;
 
   // 背景モデル用
   std::unique_ptr<Object> stageObject_;
