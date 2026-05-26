@@ -32,8 +32,8 @@ enum class ContestPhase {
   Judging, /// 審査
   Result,  /// 結果
   Ranking, /// 総合ランキング
+  Advice,  /// アドバイス
   Trophy,  /// トロフィー・選択
-
 };
 
 struct SceneObject {
@@ -54,6 +54,7 @@ public:
 private:
   // ライト
   Light *light1_ = nullptr;
+  Light* spotlight_ = nullptr;
 
   // カメラ
   Camera *camera_ = nullptr;
@@ -106,10 +107,13 @@ private:
 
   int audienceChairsMidModelHandle_ = 0;
   std::vector<SceneObject> audienceChairsMid_;
+  std::vector<SceneObject> audienceModelsMid_;
 
   int audienceChairsSideModelHandle_ = 0;
   std::vector<SceneObject> audienceChairsRightSide_;
   std::vector<SceneObject> audienceChairsLeftSide_;
+  std::vector<SceneObject> audienceModelsRightSide_;
+  std::vector<SceneObject> audienceModelsLeftSide_;
 
   // 複数モデルの初期化
   void SetupSceneObject(SceneObject &obj, int modelHandle, const Vector3 &pos,
