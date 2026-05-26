@@ -18,16 +18,29 @@ ContestScene::ContestScene(kEngine* system) {
 	light1_->color = { 1.0f, 1.0f, 1.0f };
 	light1_->intensity = 0.2f;
 	system_->AddLight(light1_);
+	
+	judgesSpotLight_ = new Light;
+	judgesSpotLight_->lightingType = LightingType::SpotLight;
+	judgesSpotLight_->position = { 0.0f,2.0f,0.15f };
+	judgesSpotLight_->direction = { 0.0f, -1.0f, 0.0f };
+	judgesSpotLight_->color = { 1.0f, 1.0f, 1.0f };
+	judgesSpotLight_->angle = 0.455f;
+	judgesSpotLight_->range = 100.0f;
+	judgesSpotLight_->intensity = 2.0f;
+	judgesSpotLight_->extra0 = 1;
+	system_->AddLight(judgesSpotLight_);
 
 	spotlight_ = new Light;
 	spotlight_->lightingType = LightingType::SpotLight;
-	spotlight_->position = { 0.0f,2.0f,-1.0f };
+	spotlight_->position = { 0.0f,2.0f,0.15f };
 	spotlight_->direction = { 0.0f, -1.0f, 0.0f };
 	spotlight_->color = { 1.0f, 1.0f, 1.0f };
-	spotlight_->angle = 3.14159f / 4.0f;
+	spotlight_->angle = 0.455f;
 	spotlight_->range = 100.0f;
 	spotlight_->intensity = 5.0f;
+	spotlight_->extra0 = 1;
 	system_->AddLight(spotlight_);
+
 	// カメラ
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
@@ -294,6 +307,7 @@ ContestScene::~ContestScene() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 	system_->RemoveLight(spotlight_);
+	system_->RemoveLight(judgesSpotLight_);
 	system_->RemoveLight(light1_);
 
 	ResourceManager::GetInstance()->CleanupUnusedMaterials();
@@ -341,6 +355,25 @@ void ContestScene::Draw() {
 
 	// ステージオブジェクト配置調整
 	ImGui::Begin("Stage Objects");
+
+	if (stage_.object) {
+		if (ImGui::TreeNode("judgesSpotLight")) {
+			ImGui::DragFloat3("Pos##judgesSpotLight",
+				&judgesSpotLight_->position.x,
+				0.1f);
+			ImGui::DragFloat3("Rot##judgesSpotLight",
+				&judgesSpotLight_->direction.x, 0.01f);
+			ImGui::DragFloat3("Scale##judgesSpotLight",
+				&judgesSpotLight_->color.x, 0.01f);
+			ImGui::DragFloat("intensity##judgesSpotLight",
+				&judgesSpotLight_->intensity, 0.01f);
+			ImGui::DragFloat("angle##judgesSpotLight",
+				&judgesSpotLight_->angle, 0.01f);
+			ImGui::DragFloat("range##judgesSpotLight",
+				&judgesSpotLight_->range, 0.01f);
+			ImGui::TreePop();
+		}
+	}
 
 	if (stage_.object) {
 		if (ImGui::TreeNode("spotLight")) {

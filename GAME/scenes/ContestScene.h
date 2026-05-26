@@ -55,6 +55,7 @@ private:
   // ライト
   Light *light1_ = nullptr;
   Light* spotlight_ = nullptr;
+  Light* judgesSpotLight_ = nullptr;
 
   // カメラ
   Camera *camera_ = nullptr;
