@@ -411,6 +411,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp" />
     <ClCompile Include="GAME\effect\ModPartParticle.cpp" />
     <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
+    <ClCompile Include="GAME\effect\DustParticle.cpp" />
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
@@ -673,6 +674,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\effect\Perfect_Particle.h" />
     <ClInclude Include="GAME\effect\ModPartParticle.h" />
     <ClInclude Include="GAME\effect\ConfettiParticle.h" />
+    <ClInclude Include="GAME\effect\DustParticle.h" />
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />

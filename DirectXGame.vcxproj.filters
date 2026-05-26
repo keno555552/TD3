@@ -188,6 +188,9 @@
       <Filter>GAME\effect</Filter>
     </ClCompile>
     <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
+    <ClCompile Include="GAME\effect\DustParticle.cpp">
+      <Filter>GAME\effect</Filter>
+    </ClCompile>
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -451,6 +454,9 @@
       <Filter>GAME\effect</Filter>
     </ClInclude>
     <ClInclude Include="GAME\effect\ConfettiParticle.h" />
+    <ClInclude Include="GAME\effect\DustParticle.h">
+      <Filter>GAME\effect</Filter>
+    </ClInclude>
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
   </ItemGroup>
   <ItemGroup>
