@@ -1,4 +1,10 @@
 #include "TitleScene.h"
+#include "Data/Render/CPUData/ObjectData.h"
+#include "kEngine.h"
+#include "kEngine/GameObject/Particle/Particle.h"
+#include "GAME/effect/DustParticle.h"
+#include <memory>
+
 #include "TravelScene.h"
 #include "ModScene.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
@@ -46,7 +52,9 @@ TitleScene::TitleScene(kEngine* system) {
 	// タイトル用カメラ（デフォルト位置）で描画するので元の transform に戻す
 	titleTextObject_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
 	titleTextObject_->mainPosition.transform.rotate = { 3.1415f / 2.0f ,0.0f, 0.0f };
-	titleTextObject_->mainPosition.transform.scale = { 1.0f,1.0f,1.0f };
+	titleTextObject_->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+
+	dust_ = std::make_unique<DustParticle>(system_);
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 550.0f }, 400.0f, 80.0f);
@@ -130,6 +138,7 @@ TitleScene::~TitleScene() {
 	titleNpcManager_.reset();
 	titleNpcPlayer_.reset();
 	titleNpcDummyData_.reset();
+	dust_.reset();
 
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
@@ -220,13 +229,208 @@ void TitleScene::ResetTitleNpc(int index) {
 
 void TitleScene::Update() {
 	system_->SetCamera(usingCamera_);
+	const float dt = system_->GetDeltaTime();
+
+	// ロゴのステート遷移
+	float safeDt = (dt > 0.1f) ? 0.1f : dt;
+	logoAnimTimer_ += safeDt;
+	logoStateTimer_ += safeDt;
+	
+	// デバッグ機能：手動で発作を引き起こす
+#ifdef _DEBUG
+	if (system_->GetTriggerOn(DIK_2)) {
+		currentLogoState_ = LogoAnimState::DropStamp;
+		logoStateTimer_ = 0.0f;
+		logoNextStateDuration_ = 2.5f;
+		for(int i=0; i<4; ++i) hasSpawnedDustArray_[i] = false;
+	}
+	if (system_->GetTriggerOn(DIK_3)) {
+		currentLogoState_ = LogoAnimState::Awakening;
+		logoStateTimer_ = 0.0f;
+		logoNextStateDuration_ = 2.5f;
+		hasSpawnedDust_ = false;
+	}
+	if (system_->GetTriggerOn(DIK_4)) {
+		currentLogoState_ = LogoAnimState::SpinJump;
+		logoStateTimer_ = 0.0f;
+		logoNextStateDuration_ = 2.5f;
+	}
+#endif
+
+	if (logoStateTimer_ >= logoNextStateDuration_) {
+		logoStateTimer_ = 0.0f;
+		if (currentLogoState_ == LogoAnimState::Wave) {
+			int r = rand() % 3;
+			if (r == 0) {
+				currentLogoState_ = LogoAnimState::DropStamp;
+				for(int i=0; i<4; ++i) hasSpawnedDustArray_[i] = false;
+			}
+			else if (r == 1) {
+				currentLogoState_ = LogoAnimState::Awakening;
+				hasSpawnedDust_ = false;
+			}
+			else currentLogoState_ = LogoAnimState::SpinJump;
+			
+			logoNextStateDuration_ = 3.0f;
+		} else {
+			currentLogoState_ = LogoAnimState::Wave;
+			// 平常時（ウェーブ）は10秒〜20秒と長くし、発作をレアにする
+			logoNextStateDuration_ = 10.0f + (rand() % 100) * 0.1f;
+		}
+	}
+
+	if (titleTextObject_) {
+		// 基本姿勢を一度リセット
+		titleTextObject_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
+		titleTextObject_->mainPosition.transform.rotate = { 3.1415f / 2.0f, 0.0f, 0.0f };
+		titleTextObject_->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+
+		for (auto& part : titleTextObject_->objectParts_) {
+			int partIndex = static_cast<int>(&part - &titleTextObject_->objectParts_[0]);
+			
+			// Blender側で全文字を原点(0,0,0)に重ねて出力したため、プログラム側で横に並べる
+			// 0.8f の数値を変更すると、文字と文字の隙間（カーニング）を調整できます
+			float initialX = (partIndex - 1.5f) * 0.8f;
+			
+			part.transform.translate = { initialX, 0.0f, 0.0f };
+			part.transform.rotate = { 0.0f, 0.0f, 0.0f };
+			part.transform.scale = { 1.0f, 1.0f, 1.0f };
+			// テクスチャの模様を横に4倍に引き伸ばし、色の幅を広くする
+			part.materialConfig->uvScale = { 0.25f, 1.0f, 1.0f };
+			
+			// 文字の順番(partIndex)に合わせて横にズラし、4文字全体で1つの大きなグラデーションにする
+			float baseUvOffset = partIndex * 0.25f;
+
+			// テクスチャの模様が常時ゆっくり流れるようにUVをスクロールさせる
+			part.materialConfig->uvTranslate = { baseUvOffset + (logoAnimTimer_ * 0.05f), logoAnimTimer_ * -0.025f, 0.0f };
+			part.materialConfig->MakeUVMatrix();
+			part.materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+
+			int waveOrder = partIndex;
+
+			// ベースウェーブの計算
+			float baseY = std::sinf(logoAnimTimer_ * 4.0f - waveOrder * 0.6f) * 0.15f;
+			float baseRotZ = std::sinf(logoAnimTimer_ * 3.0f - waveOrder * 0.4f) * 0.05f;
+
+			if (currentLogoState_ == LogoAnimState::Wave) {
+				part.transform.translate = { initialX, baseY, 0.0f };
+				part.transform.rotate = { 0.0f, 0.0f, baseRotZ };
+			}
+			else if (currentLogoState_ == LogoAnimState::SpinJump) {
+				float jumpTime = logoStateTimer_ * 6.0f - waveOrder * 0.5f;
+				float jumpY = 0.0f;
+				float jumpRot = 0.0f;
+				
+				if (jumpTime > 0.0f && jumpTime < 3.1415f) {
+					jumpY = std::sinf(jumpTime) * 0.4f;
+					jumpRot = (jumpTime / 3.1415f) * (3.1415f * 2.0f);
+					part.transform.scale = { 1.0f - jumpY * 0.3f, 1.0f + jumpY * 0.6f, 1.0f };
+				}
+				
+				part.transform.translate = { initialX, baseY, -jumpY };
+				// 横回転（スピン）
+				part.transform.rotate = { 0.0f, 0.0f, baseRotZ + jumpRot };
+			}
+			else if (currentLogoState_ == LogoAnimState::DropStamp) {
+				float time = logoStateTimer_ * 4.0f - waveOrder * 0.6f; 
+				float dropZ = 0.0f;
+				
+				if (time > 0.0f && time < 3.1415f) {
+					float progress = time / 3.1415f; 
+					if (progress < 0.5f) {
+						// ふわっと画面内の上部へ持ち上がる
+						float t = progress / 0.5f;
+						dropZ = -2.5f * std::sinf(t * 3.1415f / 2.0f); 
+					} else if (progress < 0.6f) {
+						// 空中で一瞬静止してタメる
+						dropZ = -2.5f;
+					} else if (progress < 0.7f) {
+						// ドスンと一気に急降下
+						float t = (progress - 0.6f) / 0.1f;
+						dropZ = -2.5f * (1.0f - t);
+						
+						// 着地の瞬間に個別の砂埃を出す
+						if (t >= 0.9f && partIndex >= 0 && partIndex < 4 && !hasSpawnedDustArray_[partIndex]) {
+							hasSpawnedDustArray_[partIndex] = true;
+							// Y=-0.35f が文字の接地する足元の底面
+							if (dust_) dust_->Spawn({ initialX, -0.35f, baseY });
+						}
+					} else {
+						// 着地後のバウンド
+						float bounceT = (progress - 0.7f) / 0.3f;
+						dropZ = -0.5f * std::sinf(bounceT * 3.1415f * 2.0f) * (1.0f - bounceT);
+						if (dropZ > 0.0f) dropZ = 0.0f; 
+						
+						// フレーム落ちで落下中に出なかった場合は確実に出す
+						if (partIndex >= 0 && partIndex < 4 && !hasSpawnedDustArray_[partIndex]) {
+							hasSpawnedDustArray_[partIndex] = true;
+							if (dust_) dust_->Spawn({ initialX, -0.35f, baseY });
+						}
+					}
+				}
+				
+				part.transform.translate = { initialX, baseY, dropZ };
+				part.transform.rotate = { 0.0f, 0.0f, baseRotZ };
+			}
+			else if (currentLogoState_ == LogoAnimState::Awakening) {
+				float progress = logoStateTimer_ / 2.0f; // 2秒間の演出
+				float floatZ = 0.0f;
+				float tiltX = 0.0f;
+				float shakeX = 0.0f;
+				float shakeY = 0.0f;
+				
+				if (progress >= 0.0f && progress < 1.0f) {
+					if (progress < 0.95f) { // 浮上にかける時間をさらに長く
+						// ゆっくり少し浮上（画面外に行かないように）
+						float t = progress / 0.95f;
+						floatZ = -1.5f * std::sinf(t * 3.1415f / 2.0f); // 高さを抑える
+						tiltX = 0.0f; 
+						
+						// 震える
+						shakeX = ((rand() % 100) / 100.0f - 0.5f) * 0.15f * t;
+						shakeY = ((rand() % 100) / 100.0f - 0.5f) * 0.15f * t;
+						
+					} else {
+						// 0.95〜1.0で一気に元の位置に叩きつける（超高速落下）
+						float t = (progress - 0.95f) / 0.05f; // 0~1
+						floatZ = -1.5f * (1.0f - t);
+						tiltX = 0.0f;
+						
+						// 着地した瞬間に砂埃を出す（全文字同時に1回だけ）
+						if (partIndex == 0 && !hasSpawnedDust_) {
+							hasSpawnedDust_ = true;
+							for (int i = 0; i < 4; ++i) {
+								float x = (i - 1.5f) * 0.8f; // 各文字の位置
+								// 足元のY座標は -0.35f 付近
+								if (dust_) dust_->Spawn({ x, -0.35f, baseY }); 
+							}
+						}
+					}
+				} else {
+					part.materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 1.0f };
+					
+					// フレーム落ちで落下中に出なかった場合は確実に出す
+					if (partIndex == 0 && !hasSpawnedDust_) {
+						hasSpawnedDust_ = true;
+						for (int i = 0; i < 4; ++i) {
+							float x = (i - 1.5f) * 0.8f; 
+							if (dust_) dust_->Spawn({ x, -0.35f, baseY }); 
+						}
+					}
+				}
+				part.transform.translate = { initialX + shakeX, baseY + shakeY, floatZ };
+				part.transform.rotate = { tiltX, 0.0f, baseRotZ };
+			}
+
+			partIndex++;
+		}
+	}
 
 	nextButton_->Update();
 
 	//===============================
 	// 背景NPC更新（ループ管理）
 	//===============================
-	const float dt = system_->GetDeltaTime();
 	if (titleNpcManager_) {
 		titleNpcManager_->UpdateNpcRunners(dt, kNpcLoopLimitX, usingCamera_);
 
@@ -263,7 +467,11 @@ void TitleScene::Draw() {
 		// タイトルロゴはデフォルト正面カメラで描画
 		system_->SetCamera(titleCamera_);
 		titleTextObject_->Update(titleCamera_);
+		if (dust_) dust_->Update(titleCamera_);
+		
 		titleTextObject_->Draw();
+		if (dust_) dust_->Draw();
+		
 		system_->SetCamera(usingCamera_); // NPC カメラに戻す
 	}
 
