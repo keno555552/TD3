@@ -313,7 +313,8 @@ ContestScene::~ContestScene() {
 	ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
 	delete light1_;
-
+	delete judgesSpotLight_;
+	delete spotlight_;
 	delete userDataManager_;
 	userDataManager_ = nullptr;
 }
