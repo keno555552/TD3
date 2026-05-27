@@ -1,6 +1,8 @@
 #include "ConfettiParticle.h"
 #include <cmath>
 
+const int MAX_CONFETTI = 60; // オブジェクトプールの上限数
+
 ConfettiParticle::ConfettiParticle(kEngine *system) : Particle(system) {
   createTimer.Init0(defaultParticleInterval_, system_->GetTimeManager());
 
@@ -11,22 +13,54 @@ ConfettiParticle::ConfettiParticle(kEngine *system) : Particle(system) {
   commonMaterialConfig->useModelTexture = false;
   commonMaterialConfig->textureHandle = defaultTextureHandle_;
   commonMaterialConfig->textureColor = Vector4(1.0f, 1.0f, 1.0f, 1.0f);
+
+  // 【オブジェクトプールの事前生成】
+  // 最初からMAX_CONFETTI個のメモリを確保しておき、ゲーム中は一切newを行わない
+  for (int i = 0; i < MAX_CONFETTI; ++i) {
+    Particle::AddObject();
+    auto &p = particleObjectList_.back();
+    p->isAlive = false;
+
+    p->part->CreateModelData(defaultModelHandle_);
+    if (!p->part->objectParts_.empty()) {
+        *p->part->objectParts_[0].materialConfig = *commonMaterialConfig;
+        p->part->objectParts_[0].materialConfig->useModelTexture = false;
+    }
+    p->part->isBillboard_ = false;
+
+    ConfettiData cdata;
+    confettiDataList_.push_back(cdata);
+  }
 }
 
 ConfettiParticle::~ConfettiParticle() {}
 
 void ConfettiParticle::Update(Camera *camera) {
+  // 基底クラスの Particle::Update を呼ぶと、isAlive=falseのものを削除(erase/delete)してしまうため、
+  // ここで自前でUpdateと寿命管理を行う。
   UpdateConfetti();
   DeleteConfetti();
-  Particle::Update(camera);
+
+  for (auto &p : particleObjectList_) {
+      if (p->isAlive && p->part) {
+          p->part->Update(camera);
+      }
+  }
 }
 
-void ConfettiParticle::Draw() { Particle::Draw(); }
+void ConfettiParticle::Draw() {
+  // 生きているものだけを描画する
+  for (auto& obj : particleObjectList_) {
+      if (obj->isAlive && obj->part) {
+          obj->part->Draw();
+      }
+  }
+}
 
 void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
   SetRootPos(pos);
 
-  int spawnCount = 40; // 紙吹雪の数
+  int spawnCount = 12; // 紙吹雪の数（重さ軽減のため40から削減）
   float life = 2.0f; // 寿命（長く残す）
   Vector3 baseScale = {2.5f * scaleMultiplier, 2.5f * scaleMultiplier, 2.5f * scaleMultiplier}; // UIスケールに負けないように大きく
 
@@ -40,18 +74,20 @@ void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
       {1.0f, 0.6f, 0.2f, 1.0f}  // オレンジ
   };
 
-  for (int i = 0; i < spawnCount; i++) {
-    Particle::AddObject();
-    auto &p = particleObjectList_.back();
+  int spawned = 0;
 
-    p->part->CreateModelData(defaultModelHandle_);
+  // プールから死んでいるオブジェクトを探して再利用する
+  for (size_t i = 0; i < particleObjectList_.size() && spawned < spawnCount; ++i) {
+    auto &p = particleObjectList_[i];
+    if (p->isAlive) continue;
+
+    // 復活
+    p->isAlive = true;
+
     if (!p->part->objectParts_.empty()) {
-        *p->part->objectParts_[0].materialConfig = *commonMaterialConfig;
-        p->part->objectParts_[0].materialConfig->useModelTexture = false;
-        
-        // ランダムな色を選択
         int colorIdx = randomMaker_->randomInt(0, 5);
         p->part->objectParts_[0].materialConfig->textureColor = colors[colorIdx];
+        p->part->objectParts_[0].materialConfig->textureColor.w = 1.0f; // アルファリセット
     }
 
     p->part->mainPosition.transform = CreateDefaultTransform();
@@ -76,9 +112,6 @@ void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
                                              baseScale.y * scaleJitter,
                                              baseScale.z * scaleJitter};
 
-    // 紙吹雪なのでビルボードはオフにし、回転をそのまま見せる
-    p->part->isBillboard_ = false;
-
     // 初速（横の散らばりを抑える）
     float vx = randomMaker_->randomFloat(-10.0f * spread, 10.0f * spread);
     float vy = randomMaker_->randomFloat(15.0f, 35.0f); // 上への勢いはキープ
@@ -87,8 +120,8 @@ void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
 
     p->lifeTimeTimer.Init0(life + randomMaker_->randomFloat(-0.5f, 0.5f), system_->GetTimeManager());
 
-    // ConfettiDataの追加
-    ConfettiData cdata;
+    // ConfettiDataの初期化
+    auto &cdata = confettiDataList_[i];
     cdata.baseVelocity = p->velocity;
     cdata.phaseX = randomMaker_->randomFloat(0.0f, 6.28f);
     cdata.phaseZ = randomMaker_->randomFloat(0.0f, 6.28f);
@@ -97,7 +130,8 @@ void ConfettiParticle::Spawn(const Vector3 &pos, float scaleMultiplier) {
     cdata.rotSpeedX = randomMaker_->randomFloat(-5.0f, 5.0f);
     cdata.rotSpeedY = randomMaker_->randomFloat(-5.0f, 5.0f);
     cdata.rotSpeedZ = randomMaker_->randomFloat(-5.0f, 5.0f);
-    confettiDataList_.push_back(cdata);
+
+    spawned++;
   }
 }
 
@@ -124,9 +158,10 @@ void ConfettiParticle::UpdateConfetti() {
     auto &p = particleObjectList_[i];
     if (!p->isAlive) continue;
 
-    // リストの不整合防止（念のため）
-    if (i >= confettiDataList_.size()) break;
     auto &cdata = confettiDataList_[i];
+
+    // 物理移動（Translate）の更新をここで行う
+    p->part->mainPosition.transform.translate += p->velocity * deltaTime;
 
     // 重力（下方向への加速度）
     p->velocity.y -= 30.0f * deltaTime; // 重力強め
@@ -158,17 +193,13 @@ void ConfettiParticle::UpdateConfetti() {
 }
 
 void ConfettiParticle::DeleteConfetti() {
-  // 削除処理はParticleクラス自体がリストから要素を削除してしまうと
-  // confettiDataList_ とのインデックスがずれるため、
-  // ここでは isAlive を false にするだけに留めます。
-  // （本来的にはイテレータを使って両方同時にeraseするのが正しいですが、
-  // ParticleのUpdate内で消される可能性があるためです。
-  // ただTD3のParticleは ClearAll でまとめて消す運用が多そうなので、
-  // このシーンのワンショット用途なら isAlive を操作するだけで十分です。）
   for (size_t i = 0; i < particleObjectList_.size(); ++i) {
     auto &p = particleObjectList_[i];
-    if (p->lifeTimeTimer.parameter_ >= p->lifeTimeTimer.maxTime_) {
-      p->isAlive = false;
+    if (p->isAlive) {
+      p->lifeTimeTimer.ToMix(); // タイマーを進める
+      if (p->lifeTimeTimer.parameter_ >= p->lifeTimeTimer.maxTime_) {
+        p->isAlive = false; // 寿命が尽きたら非アクティブ化してプールに戻す
+      }
     }
   }
 }

@@ -316,6 +316,7 @@ private:
   float kickFeedbackTimer_ = 0.0f;
   float aKeyFlashTimer_ = 0.0f;
   float dKeyFlashTimer_ = 0.0f;
+  float badParticleTimer_ = 0.0f;
 
   std::unique_ptr<class Perfect_Particle> perfectParticle_;
 

@@ -303,10 +303,10 @@ void PromptScene::Draw() {
   themeButton_->Render();
 
   if (promptBoard_ != nullptr && promptBoard_->IsStopAnimationFinished()) {
-    font_.RenderText("改造スタート", {640.0f, 620.0f}, 48.0f,
+    font_.RenderText("改造スタート！", {640.0f, 620.0f}, 48.0f,
                      BitmapFont::Align::Center, 5, {1.0f, 1.0f, 0.0f, 1.0f});
   } else {
-    font_.RenderText("お題をきめろ", {640.0f, 620.0f}, 48.0f,
+    font_.RenderText("お題発表！", {640.0f, 620.0f}, 48.0f,
                      BitmapFont::Align::Center, 5, {1.0f, 1.0f, 0.0f, 1.0f});
   }
 
