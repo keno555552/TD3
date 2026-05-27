@@ -451,6 +451,21 @@
     <ClInclude Include="GAME\contest\parts\AdvicePart.h" />
     <ClInclude Include="GAME\contest\ui\StarChart.h" />
     <ClInclude Include="GAME\font\BitmapFont.h" />
+    <ClInclude Include="GAME\scenes\ModScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\PromptScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\SplashScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\TitleScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\TravelScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
     <ClInclude Include="GAME\effect\Perfect_Particle.h">
       <Filter>GAME\effect</Filter>
     </ClInclude>

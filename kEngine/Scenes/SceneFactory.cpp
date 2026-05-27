@@ -1,5 +1,10 @@
 #include "SceneFactory.h"
 #include "Logger.h"
+#include "../../GAME/scenes/TravelScene.h"
+#include "../../GAME/scenes/PromptScene.h"
+#include "../../GAME/scenes/ContestScene.h"
+#include "../../GAME/scenes/ModScene.h"
+#include "../../GAME/scenes/SplashScene.h"
 
 SceneFactory::SceneFactory(kEngine* system)
 	: system_(system) {
@@ -7,6 +12,7 @@ SceneFactory::SceneFactory(kEngine* system)
 	sceneRegistry_["EFFECT2"] = [this]() { return std::make_unique <Effect2>(system_); };
 	sceneRegistry_["CGHK2"] = [this]() { return	std::make_unique <SceneCGHK2>(system_); };
 	sceneRegistry_["TITLE"] = [this]() { return	std::make_unique <TitleScene>(system_); };
+	sceneRegistry_["SPLASH"] = [this]() { return std::make_unique <SplashScene>(system_); };
 	sceneRegistry_["PROMPT"] = [this]() { return std::make_unique <PromptScene>(system_); };
 	sceneRegistry_["MOD"] = [this]() { return std::make_unique <ModScene>(system_); };
 	sceneRegistry_["TRAVEL"] = [this]() { return std::make_unique <TravelScene>(system_); };
