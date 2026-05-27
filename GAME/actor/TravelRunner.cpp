@@ -617,6 +617,10 @@ void TravelRunner::SavePreviousFrameState() {
 
 void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
+  if (badParticleTimer_ > 0.0f) {
+    badParticleTimer_ -= system_->GetDeltaTime();
+  }
+
   bool bothInput = leftNowInput && rightNowInput;
 
   kickFeedbackType_ = KickFeedbackType::None;
@@ -998,14 +1002,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
 
-  // 少ししか戻していない蹴りはほぼ無意味にする
-  const float minKickReady = 0.35f;
-
-  float normalizedKickReady = std::clamp(
-      (kickReadyRatio - minKickReady) / (1.0f - minKickReady), 0.0f, 1.0f);
-
-  // 二乗で弱い蹴りをさらに弱くする
-  float kickReadyPower = normalizedKickReady * normalizedKickReady;
+  // 足が戻っていない状態の威力を「1 (0.01)」、完全に戻りきった状態を「100 (1.0)」とする
+  float kickReadyPower = 0.01f + 0.99f * (kickReadyRatio * kickReadyRatio);
 
   // 姿勢が悪いほど蹴りの力が地面に乗らない
   float postureKickScale = 1.0f - badPosture * 0.55f;
@@ -1038,7 +1036,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float tiltImpulse = 0.0f;
 
     if (!startStepTrigger && isGrounded_) {
-      if (landTimer_ <= perfectTimingEnd) {
+      // 足の戻り（タメ）が十分でない場合は強制的にBadにする
+      bool hasEnoughReady = (kickReadyRatio >= 0.70f);
+
+      if (hasEnoughReady && landTimer_ <= perfectTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Perfect;
         kickFeedbackTimer_ = 0.18f;
         perfectStreak_++;
@@ -1049,7 +1050,7 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
           Logger::Log("KICK : PERFECT");
         }
 
-      } else if (landTimer_ <= bestTimingEnd) {
+      } else if (hasEnoughReady && landTimer_ <= bestTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Good;
         kickFeedbackTimer_ = 0.12f;
         perfectStreak_ = 0;
@@ -1065,7 +1066,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         perfectStreak_ = 0;
 
         if (isPlayer_) {
-          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
+          if (badParticleTimer_ <= 0.0f) {
+            perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
+            badParticleTimer_ = 0.1f;
+          }
           Logger::Log("KICK : BAD");
         }
       }

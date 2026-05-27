@@ -1436,6 +1436,7 @@ void TravelScene::UpdateSceneTransition() {
       system_->GetTriggerOn(DIK_RETURN)) {
     fade_.StartFadeOut();
     isStartTransition_ = true;
+    nextOutcome_ = SceneOutcome::RETRY;
   }
 
 #endif
