@@ -336,4 +336,12 @@ private:
 
 private:
   kEngine *system_ = nullptr;
+
+  // $O(1)$ search cache for part instances to avoid $O(N^2)$ traversal
+  std::unordered_map<int, const ModPartInstanceData *> instanceMap_;
+  void RefreshInstanceMap();
+
+  // Object pooling to prevent FPS drops on preset change
+  std::unordered_map<ModBodyPart, std::vector<Object*>> unusedObjectPool_;
+  std::unordered_map<int, ModBodyPart> lastPartTypes_;
 };
