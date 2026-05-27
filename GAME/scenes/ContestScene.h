@@ -28,12 +28,13 @@
 /// コンテストの進行フェーズ
 /// </summary>
 enum class ContestPhase {
-  ShowOff, /// お披露目
-  Judging, /// 審査
-  Result,  /// 結果
-  Ranking, /// 総合ランキング
-  Advice,  /// アドバイス
-  Trophy,  /// トロフィー・選択
+  ShowOff,  /// お披露目
+  Judging,  /// 審査
+  Result,   /// 結果
+  Suspense, /// 誰が選ばれる？演出
+  Ranking,  /// 総合ランキング
+  Advice,   /// アドバイス
+  Trophy,   /// トロフィー・選択
 };
 
 struct SceneObject {
@@ -56,6 +57,7 @@ private:
   Light *light1_ = nullptr;
   Light* spotlight_ = nullptr;
   Light* judgesSpotLight_ = nullptr;
+  Light* npcSpotlights_[2] = { nullptr, nullptr };
 
   // カメラ
   Camera *camera_ = nullptr;
