@@ -5,9 +5,17 @@ std::unique_ptr <SceneManager> SceneManager::sceneManager_ = nullptr;
 
 void SceneManager::Initialize(kEngine* system) {
 	system_ = system;
+	sceneFlow_.insert(std::make_pair("TITLE", "TRAVEL"));
+	sceneFlow_.insert(std::make_pair("TRAVEL", "PROMPT"));
+	sceneFlow_.insert(std::make_pair("PROMPT", "CONTEST"));
+	sceneFlow_.insert(std::make_pair("CONTEST", "MOD"));
+	sceneFlow_.insert(std::make_pair("MOD", "TRAVEL"));
+
+	sceneFlow_.insert(std::make_pair("SPLASH", "TITLE"));
+
 	sceneFactory_ = std::make_unique<SceneFactory>(system);
 	//sceneUsingNameHandle_ = "CGHK2";
-	sceneUsingNameHandle_ = "TITLE";
+	sceneUsingNameHandle_ = "SPLASH";
 
 	defaultMenu_ = std::make_unique <DefaultMenu>(system_);
 
@@ -105,9 +113,11 @@ void SceneManager::Update() {
 
 	SceneChanger();
 
-	 defaultMenu_->Updata();
+	if (sceneUsingNameHandle_ != "SPLASH") {
+		defaultMenu_->Updata();
+	}
 
-	if (!defaultMenu_->GetIsPause()) {
+	if (!defaultMenu_->GetIsPause() || sceneUsingNameHandle_ == "SPLASH") {
 		if (sceneUsing_ != nullptr) {
 			sceneUsing_->Update();
 		}
@@ -121,23 +131,25 @@ void SceneManager::Render() {
 	} else {
 	}
 
-	 defaultMenu_->Draw();
+	if (sceneUsingNameHandle_ != "SPLASH") {
+		defaultMenu_->Draw();
 
-	if (pauseSprite_) {
-		if (sceneUsing_ != nullptr) {
-			float alpha = 1.0f - sceneUsing_->GetFadeAlpha();
-			
-			if (defaultMenu_ && defaultMenu_->GetIsPause()) {
-				alpha = 0.0f;
-			}
+		if (pauseSprite_) {
+			if (sceneUsing_ != nullptr) {
+				float alpha = 1.0f - sceneUsing_->GetFadeAlpha();
+				
+				if (defaultMenu_ && defaultMenu_->GetIsPause()) {
+					alpha = 0.0f;
+				}
 
-			pauseSprite_->objectParts_[0].materialConfig->textureColor.w = alpha;
+				pauseSprite_->objectParts_[0].materialConfig->textureColor.w = alpha;
 
-			if (alpha > 0.0f) {
+				if (alpha > 0.0f) {
+					pauseSprite_->Draw();
+				}
+			} else {
 				pauseSprite_->Draw();
 			}
-		} else {
-			pauseSprite_->Draw();
 		}
 	}
 

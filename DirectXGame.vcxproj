@@ -278,6 +278,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="GAME\scenes\ModScene.cpp" />
     <ClCompile Include="GAME\scenes\PromptScene.cpp" />
+    <ClCompile Include="GAME\scenes\SplashScene.cpp" />
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
@@ -463,6 +464,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="GAME\scenes\ModScene.h" />
     <ClInclude Include="GAME\scenes\PromptScene.h" />
+    <ClInclude Include="GAME\scenes\SplashScene.h" />
     <ClInclude Include="GAME\scenes\TitleScene.h" />
     <ClInclude Include="GAME\scenes\TravelScene.h" />
     <ClInclude Include="GAME\score\ScoreCalculator.h" />
