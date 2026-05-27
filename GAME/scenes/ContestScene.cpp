@@ -5,6 +5,7 @@
 #include "GAME/contest/parts/TrophyPart.h"
 #include "GAME/contest/parts/RankingPart.h"
 #include "GAME/contest/parts/AdvicePart.h"
+#include "GAME/contest/parts/SuspensePart.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <algorithm>
 #include <cmath>
@@ -21,7 +22,7 @@ ContestScene::ContestScene(kEngine* system) {
 	
 	judgesSpotLight_ = new Light;
 	judgesSpotLight_->lightingType = LightingType::SpotLight;
-	judgesSpotLight_->position = { 0.0f,2.0f,0.15f };
+	judgesSpotLight_->position = { 0.0f,2.0f,-1.65f };
 	judgesSpotLight_->direction = { 0.0f, -1.0f, 0.0f };
 	judgesSpotLight_->color = { 1.0f, 1.0f, 1.0f };
 	judgesSpotLight_->angle = 0.455f;
@@ -236,6 +237,18 @@ ContestScene::ContestScene(kEngine* system) {
 			npcBodyActors_[i].SetAutoGroundEnabled(true);
 			npcBodyActors_[i].BuildFromCustomizeData(*npcData);
 
+			// NPC用スポットライト
+			npcSpotlights_[i] = new Light;
+			npcSpotlights_[i]->lightingType = LightingType::SpotLight;
+			npcSpotlights_[i]->position = { npcX, 2.0f, 0.15f };
+			npcSpotlights_[i]->direction = { 0.0f, -1.0f, 0.0f };
+			npcSpotlights_[i]->color = { 1.0f, 1.0f, 1.0f };
+			npcSpotlights_[i]->angle = 0.455f;
+			npcSpotlights_[i]->range = 100.0f;
+			npcSpotlights_[i]->intensity = 5.0f;
+			npcSpotlights_[i]->extra0 = 1;
+			system_->AddLight(npcSpotlights_[i]);
+
 			// スコア計算
 			if (theme != nullptr) {
 				std::vector<JudgeData> judgeList;
@@ -308,6 +321,11 @@ ContestScene::~ContestScene() {
 	system_->DestroyCamera(debugCamera_);
 	system_->RemoveLight(spotlight_);
 	system_->RemoveLight(judgesSpotLight_);
+	for (int i = 0; i < 2; ++i) {
+		if (npcSpotlights_[i]) {
+			system_->RemoveLight(npcSpotlights_[i]);
+		}
+	}
 	system_->RemoveLight(light1_);
 
 	ResourceManager::GetInstance()->CleanupUnusedMaterials();
@@ -315,6 +333,10 @@ ContestScene::~ContestScene() {
 	delete light1_;
 	delete judgesSpotLight_;
 	delete spotlight_;
+	for (int i = 0; i < 2; ++i) {
+		delete npcSpotlights_[i];
+		npcSpotlights_[i] = nullptr;
+	}
 	delete userDataManager_;
 	userDataManager_ = nullptr;
 }
@@ -391,6 +413,21 @@ void ContestScene::Draw() {
 				&spotlight_->angle, 0.01f);
 			ImGui::DragFloat("range##spotLight",
 				&spotlight_->range, 0.01f);
+			ImGui::TreePop();
+		}
+	}
+
+	for (int i = 0; i < 2; ++i) {
+		if (!npcSpotlights_[i]) continue;
+		char label[32];
+		snprintf(label, sizeof(label), "npcSpotLight %d", i);
+		if (ImGui::TreeNode(label)) {
+			ImGui::DragFloat3("Pos", &npcSpotlights_[i]->position.x, 0.1f);
+			ImGui::DragFloat3("Dir", &npcSpotlights_[i]->direction.x, 0.01f);
+			ImGui::DragFloat3("Color", &npcSpotlights_[i]->color.x, 0.01f);
+			ImGui::DragFloat("intensity", &npcSpotlights_[i]->intensity, 0.01f);
+			ImGui::DragFloat("angle", &npcSpotlights_[i]->angle, 0.01f);
+			ImGui::DragFloat("range", &npcSpotlights_[i]->range, 0.01f);
 			ImGui::TreePop();
 		}
 	}
@@ -608,7 +645,7 @@ void ContestScene::Draw() {
 	ImGui::Begin("Scene");
 	ImGui::Text("ContestScene");
 
-	const char* phaseNames[] = { "ShowOff", "Judging", "Result", "Trophy" };
+	const char* phaseNames[] = { "ShowOff", "Judging", "Result", "Suspense", "Ranking", "Advice", "Trophy" };
 	ImGui::Text("Phase: %s", phaseNames[static_cast<int>(phase_)]);
 	ImGui::End();
 #endif
@@ -712,6 +749,9 @@ void ContestScene::AdvancePhase() {
 		phase_ = ContestPhase::Result;
 		break;
 	case ContestPhase::Result:
+		phase_ = ContestPhase::Suspense;
+		break;
+	case ContestPhase::Suspense:
 		phase_ = ContestPhase::Ranking;
 		break;
 	case ContestPhase::Ranking:
@@ -742,6 +782,32 @@ std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
 	case ContestPhase::Result:
 		return std::make_unique<ResultPart>(system_, &bitmapFont_, scoreResult_,
 			earnedNickname_);
+
+	case ContestPhase::Suspense: {
+		// 3つのスポットライト：プレイヤー、NPC0、NPC1
+		Light* lights[3] = { spotlight_, npcSpotlights_[0], npcSpotlights_[1] };
+		// 対応する人物のワールド位置（プレイヤー x=0, NPC0 x=-1.0, NPC1 x=+1.0）
+		Vector3 targets[3] = {
+			{ 0.0f, 0.15f, -0.2f },
+			{ -1.0f, 0.15f, -0.2f },
+			{ 1.0f, 0.15f, -0.2f },
+		};
+		// rank==1 の全エントリをインデックス化（同率1位対応）
+		std::vector<int> winners;
+		if (!contestRanking_.empty()) {
+			int topRank = contestRanking_[0].rank;
+			for (const auto& e : contestRanking_) {
+				if (e.rank != topRank) break;
+				int idx = -1;
+				if (e.name == "あなた" || e.name == "YOU") idx = 0;
+				else if (e.name == "ライバル 1") idx = 1;
+				else if (e.name == "ライバル 2") idx = 2;
+				if (idx >= 0) winners.push_back(idx);
+			}
+		}
+		if (winners.empty()) winners.push_back(0);
+		return std::make_unique<SuspensePart>(system_, &bitmapFont_, lights, targets, winners);
+	}
 
 	case ContestPhase::Ranking:
 		return std::make_unique<RankingPart>(system_, &bitmapFont_, contestRanking_);
