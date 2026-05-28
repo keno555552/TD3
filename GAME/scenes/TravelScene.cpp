@@ -416,6 +416,17 @@ TravelScene::TravelScene(kEngine *system) {
   heartbeatSoundHandle_ =
       system_->SoundLoadSE("GAME/resources/sounds/心臓の鼓動1.mp3");
 
+  doorOpenSoundHandle_ =
+      system_->SoundLoadSE("GAME/resources/sounds/門を開ける.mp3");
+  balloonPopSoundHandle_ =
+      system_->SoundLoadSE("GAME/resources/sounds/Balloon-Pop01-2(Dry).mp3");
+
+  bgmSoundHandle_ =
+      system_->SoundLoadSE("GAME/resources/sounds/Tailshaft.mp3");
+  if (bgmSoundHandle_ != -1) {
+    system_->SoundPlayBGM(bgmSoundHandle_, 0.3f);
+  }
+
   vignetteTextureHandle_ =
       system_->LoadTexture("GAME/resources/texture/vignette.png");
   if (vignetteTextureHandle_ == -1) {
@@ -489,6 +500,15 @@ TravelScene::~TravelScene() {
 
   if (heartbeatSoundHandle_ != -1) {
     system_->SoundStop(heartbeatSoundHandle_);
+  }
+  if (doorOpenSoundHandle_ != -1) {
+    system_->SoundStop(doorOpenSoundHandle_);
+  }
+  if (balloonPopSoundHandle_ != -1) {
+    system_->SoundStop(balloonPopSoundHandle_);
+  }
+  if (bgmSoundHandle_ != -1) {
+    system_->SoundStop(bgmSoundHandle_);
   }
 
   bitmapFont.Cleanup();
@@ -769,6 +789,12 @@ void TravelScene::Update() {
 
   if (isClearAnimPlaying_) {
     clearAnimTimer_ += system_->GetDeltaTime();
+    if (!isDoorSoundPlayed_ && clearAnimTimer_ >= clearAnimDuration_ * 0.30f) {
+      isDoorSoundPlayed_ = true;
+      if (doorOpenSoundHandle_ != -1) {
+        system_->SoundPlaySE(doorOpenSoundHandle_, 1.0f);
+      }
+    }
   }
 }
 
@@ -1576,18 +1602,28 @@ void TravelScene::UpdateRaceFinishState() {
     if (confettiParticle_) {
       confettiParticle_->Spawn(
           {player_->GetLaneX(), 10.0f, player_->GetMoveX()}, 0.15f);
+      if (balloonPopSoundHandle_ != -1) {
+        system_->SoundPlaySE(balloonPopSoundHandle_, 1.0f);
+      }
     }
 
     if (playerFinishRank_ <= qualifyCount_) {
       raceResultState_ = RaceResultState::Clear;
       isRaceFinished_ = true;
+      if (bgmSoundHandle_ != -1) {
+        system_->SoundSetVolume(bgmSoundHandle_, 0.1f);
+      }
       if (!isClearAnimPlaying_ && !isStartTransition_) {
         isClearAnimPlaying_ = true;
         clearAnimTimer_ = 0.0f;
+        isDoorSoundPlayed_ = false;
       }
     } else {
       raceResultState_ = RaceResultState::GameOver;
       isRaceFinished_ = true;
+      if (bgmSoundHandle_ != -1) {
+        system_->SoundSetVolume(bgmSoundHandle_, 0.1f);
+      }
       OpenFailureMenuTravel();
     }
     return;
@@ -1604,6 +1640,9 @@ void TravelScene::UpdateRaceFinishState() {
       if (confettiParticle_ && npc.runner) {
         confettiParticle_->Spawn(
             {npc.runner->GetLaneX(), 10.0f, npc.runner->GetMoveX()}, 0.15f);
+        if (balloonPopSoundHandle_ != -1) {
+          system_->SoundPlaySE(balloonPopSoundHandle_, 1.0f);
+        }
       }
 
       // プレイヤー到着前に枠が埋まったらゲームオーバー演出開始
@@ -1611,6 +1650,9 @@ void TravelScene::UpdateRaceFinishState() {
           !isGameOverAnimPlaying_) {
         raceResultState_ = RaceResultState::GameOver;
         isRaceFinished_ = true;
+        if (bgmSoundHandle_ != -1) {
+          system_->SoundSetVolume(bgmSoundHandle_, 0.1f);
+        }
         isGameOverAnimPlaying_ = true;
         gameOverAnimTimer_ = 0.0f;
 
