@@ -145,6 +145,9 @@ private:
   bool isDangerMode_ = false;
   float dangerAnimTimer_ = 0.0f;
   int heartbeatSoundHandle_ = -1;
+  int bgmSoundHandle_ = -1;
+  int doorOpenSoundHandle_ = -1;
+  int balloonPopSoundHandle_ = -1;
   bool debugDangerMode_ = false;
   bool wasPaused_ = false;
   std::unique_ptr<SimpleSprite> vignetteSprite_;
@@ -172,6 +175,7 @@ private:
 
   // クリア演出用アニメーション変数
   bool isClearAnimPlaying_ = false;
+  bool isDoorSoundPlayed_ = false;
   float clearAnimTimer_ = 0.0f;
   const float clearAnimDuration_ = 3.5f; // 少しスピーディに
 
