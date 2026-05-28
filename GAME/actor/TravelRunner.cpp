@@ -1466,7 +1466,9 @@ void TravelRunner::ApplyVisualState() {
             parentParamLength = parentIt2->second->param.length;
           }
           if (parentType == ModBodyPart::ChestBody ||
-              parentType == ModBodyPart::StomachBody) {
+              parentType == ModBodyPart::StomachBody ||
+              parentType == ModBodyPart::Head ||
+              parentType == ModBodyPart::Neck) {
             float parentScaleX = parentParamScaleX;
             float parentScaleY = parentParamScaleY * parentParamLength;
 
@@ -1747,10 +1749,6 @@ void TravelRunner::ApplyVisualState() {
       } else if (instance.partType == ModBodyPart::StomachBody) {
         rootR = GetControlPointRadius(ModControlPointRole::Waist);
         bendR = GetControlPointRadius(ModControlPointRole::Belly);
-      } else if (instance.partType == ModBodyPart::Head) {
-        rootR = GetControlPointRadius(ModControlPointRole::HeadCenter);
-        bendR = GetControlPointRadius(ModControlPointRole::UpperNeck);
-        endR = bendR;
       }
 
       float thicknessScale = 1.0f;
@@ -1842,8 +1840,7 @@ void TravelRunner::ApplyVisualState() {
           if (pInst.partType == ModBodyPart::LeftForeArm ||
               pInst.partType == ModBodyPart::RightForeArm ||
               pInst.partType == ModBodyPart::LeftShin ||
-              pInst.partType == ModBodyPart::RightShin ||
-              pInst.partType == ModBodyPart::Head) {
+              pInst.partType == ModBodyPart::RightShin) {
             pThicknessScale = (std::max)(pBendR, pEndR) / 0.1f;
           } else {
             pThicknessScale = (std::max)(pRootR, pBendR) / 0.1f;

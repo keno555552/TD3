@@ -37,7 +37,7 @@ private:
 
   std::unique_ptr<DustParticle> dust_;
   bool hasSpawnedDust_ = false;
-  bool hasSpawnedDustArray_[4] = {false, false, false, false};
+  bool hasSpawnedDustArray_[5] = {false, false, false, false, false};
 
   // 仮ライト
   Light *light1_ = nullptr;

@@ -242,7 +242,7 @@ void TitleScene::Update() {
 		currentLogoState_ = LogoAnimState::DropStamp;
 		logoStateTimer_ = 0.0f;
 		logoNextStateDuration_ = 2.5f;
-		for(int i=0; i<4; ++i) hasSpawnedDustArray_[i] = false;
+		for(int i=0; i<5; ++i) hasSpawnedDustArray_[i] = false;
 	}
 	if (system_->GetTriggerOn(DIK_3)) {
 		currentLogoState_ = LogoAnimState::Awakening;
@@ -263,7 +263,7 @@ void TitleScene::Update() {
 			int r = rand() % 3;
 			if (r == 0) {
 				currentLogoState_ = LogoAnimState::DropStamp;
-				for(int i=0; i<4; ++i) hasSpawnedDustArray_[i] = false;
+				for(int i=0; i<5; ++i) hasSpawnedDustArray_[i] = false;
 			}
 			else if (r == 1) {
 				currentLogoState_ = LogoAnimState::Awakening;
@@ -283,14 +283,14 @@ void TitleScene::Update() {
 		// 基本姿勢を一度リセット
 		titleTextObject_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
 		titleTextObject_->mainPosition.transform.rotate = { 3.1415f / 2.0f, 0.0f, 0.0f };
-		titleTextObject_->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+		titleTextObject_->mainPosition.transform.scale = { 0.9f, 0.9f, 0.9f };
 
 		for (auto& part : titleTextObject_->objectParts_) {
 			int partIndex = static_cast<int>(&part - &titleTextObject_->objectParts_[0]);
 			
 			// Blender側で全文字を原点(0,0,0)に重ねて出力したため、プログラム側で横に並べる
 			// 0.8f の数値を変更すると、文字と文字の隙間（カーニング）を調整できます
-			float initialX = (partIndex - 1.5f) * 0.8f;
+			float initialX = (partIndex - 2.0f) * 0.7f;
 			
 			part.transform.translate = { initialX, 0.0f, 0.0f };
 			part.transform.rotate = { 0.0f, 0.0f, 0.0f };
@@ -350,7 +350,7 @@ void TitleScene::Update() {
 						dropZ = -2.5f * (1.0f - t);
 						
 						// 着地の瞬間に個別の砂埃を出す
-						if (t >= 0.9f && partIndex >= 0 && partIndex < 4 && !hasSpawnedDustArray_[partIndex]) {
+						if (t >= 0.9f && partIndex >= 0 && partIndex < 5 && !hasSpawnedDustArray_[partIndex]) {
 							hasSpawnedDustArray_[partIndex] = true;
 							// Y=-0.35f が文字の接地する足元の底面
 							if (dust_) dust_->Spawn({ initialX, -0.35f, baseY });
@@ -362,7 +362,7 @@ void TitleScene::Update() {
 						if (dropZ > 0.0f) dropZ = 0.0f; 
 						
 						// フレーム落ちで落下中に出なかった場合は確実に出す
-						if (partIndex >= 0 && partIndex < 4 && !hasSpawnedDustArray_[partIndex]) {
+						if (partIndex >= 0 && partIndex < 5 && !hasSpawnedDustArray_[partIndex]) {
 							hasSpawnedDustArray_[partIndex] = true;
 							if (dust_) dust_->Spawn({ initialX, -0.35f, baseY });
 						}
@@ -399,8 +399,8 @@ void TitleScene::Update() {
 						// 着地した瞬間に砂埃を出す（全文字同時に1回だけ）
 						if (partIndex == 0 && !hasSpawnedDust_) {
 							hasSpawnedDust_ = true;
-							for (int i = 0; i < 4; ++i) {
-								float x = (i - 1.5f) * 0.8f; // 各文字の位置
+							for (int i = 0; i < 5; ++i) {
+								float x = (i - 2.0f) * 0.7f; // 各文字の位置
 								// 足元のY座標は -0.35f 付近
 								if (dust_) dust_->Spawn({ x, -0.35f, baseY }); 
 							}
@@ -412,8 +412,8 @@ void TitleScene::Update() {
 					// フレーム落ちで落下中に出なかった場合は確実に出す
 					if (partIndex == 0 && !hasSpawnedDust_) {
 						hasSpawnedDust_ = true;
-						for (int i = 0; i < 4; ++i) {
-							float x = (i - 1.5f) * 0.8f; 
+						for (int i = 0; i < 5; ++i) {
+							float x = (i - 2.0f) * 0.7f; 
 							if (dust_) dust_->Spawn({ x, -0.35f, baseY }); 
 						}
 					}
@@ -478,7 +478,7 @@ void TitleScene::Draw() {
 	nextButton_->Render();
 
 	font_.RenderText(
-		"進化する",
+		"進化する！",
 		{ 640.0f, 520.0f }, 48.0f,
 		BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
 
