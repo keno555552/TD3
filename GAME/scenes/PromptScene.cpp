@@ -141,7 +141,9 @@ PromptScene::~PromptScene() {
 }
 
 void PromptScene::Update() {
-  themeButton_->Update();
+  if (!fade_.IsBusy()) {
+    themeButton_->Update();
+  }
 
   CameraPart();
 
