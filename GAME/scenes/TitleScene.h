@@ -20,6 +20,24 @@ public:
 private:
   BitmapFont font_;
   std::unique_ptr<DetailButton> nextButton_;
+  std::unique_ptr<DetailButton> tutorialButton_;
+
+  std::unique_ptr<DetailButton> tutorialNextButton_;
+  std::unique_ptr<DetailButton> tutorialPrevButton_;
+  std::unique_ptr<DetailButton> tutorialCloseButton_;
+
+  bool isTutorialMode_ = false;
+  int tutorialPage_ = 0;
+  float tutorialAnimTimer_ = 0.0f;
+  float tutorialImageAnimTimer_ = 0.0f;
+  bool isTutorialClosing_ = false;
+  bool isTutorialSwitching_ = false;
+
+  std::unique_ptr<SimpleSprite> darkOverlay_;
+  std::unique_ptr<SimpleSprite> tutorialSprite1_;
+  std::unique_ptr<SimpleSprite> tutorialSprite2_;
+  int tutorialTex1_ = 0;
+  int tutorialTex2_ = 0;
 
   Object *titleTextObject_ = nullptr;
   int titleTextModelHandle_ = 0;

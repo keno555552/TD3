@@ -9,6 +9,7 @@
 #include "ModScene.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <random>
+#include <cmath>
 
 #ifdef _DEBUG
 #include "ImGuiManager.h"
@@ -58,6 +59,49 @@ TitleScene::TitleScene(kEngine* system) {
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 550.0f }, 400.0f, 80.0f);
+
+	tutorialButton_ = std::make_unique<DetailButton>(system);
+	tutorialButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+	tutorialNextButton_ = std::make_unique<DetailButton>(system);
+	tutorialNextButton_->SetButton({ 1180.0f, 680.0f }, 160.0f, 50.0f);
+
+	tutorialPrevButton_ = std::make_unique<DetailButton>(system);
+	tutorialPrevButton_->SetButton({ 980.0f, 680.0f }, 160.0f, 50.0f); // 右側に並べる
+
+	tutorialCloseButton_ = std::make_unique<DetailButton>(system);
+	tutorialCloseButton_->SetButton({ 1180.0f, 680.0f }, 160.0f, 50.0f);
+
+	// チュートリアル画像の読み込み
+	tutorialTex1_ = ResourceManager::GetInstance()->LoadCommonTexture("./GAME/resources/TitleScene/tutorial1.png");
+	tutorialTex2_ = ResourceManager::GetInstance()->LoadCommonTexture("./GAME/resources/TitleScene/tutorial2.png");
+
+	darkOverlay_ = std::make_unique<SimpleSprite>();
+	darkOverlay_->IntObject(system_);
+	darkOverlay_->CreateDefaultData();
+	darkOverlay_->objectParts_[0].materialConfig->textureHandle = system_->LoadTexture("kEngine/EngineAssets/TemplateResource/texture/white5x5.png");
+	darkOverlay_->mainPosition.transform.scale = { 2000.0f, 2000.0f, 1.0f };
+	darkOverlay_->mainPosition.transform.translate = { 0.0f, 0.0f, 0.0f };
+	darkOverlay_->objectParts_[0].materialConfig->useModelTexture = false;
+	darkOverlay_->objectParts_[0].materialConfig->textureColor = { 0.0f, 0.0f, 0.0f, 0.85f };
+
+	tutorialSprite1_ = std::make_unique<SimpleSprite>();
+	tutorialSprite1_->IntObject(system_);
+	tutorialSprite1_->CreateDefaultData();
+	tutorialSprite1_->objectParts_[0].materialConfig->textureHandle = tutorialTex1_;
+	tutorialSprite1_->objectParts_[0].materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 0.99f }; // 透過バケットに入れてZソートさせる
+	tutorialSprite1_->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+	auto meta1 = ResourceManager::GetInstance()->GetTextureMetaData(tutorialTex1_);
+	tutorialSprite1_->mainPosition.transform.translate = { 640.0f - static_cast<float>(meta1.width) / 2.0f, 360.0f - static_cast<float>(meta1.height) / 2.0f, 0.0f };
+
+	tutorialSprite2_ = std::make_unique<SimpleSprite>();
+	tutorialSprite2_->IntObject(system_);
+	tutorialSprite2_->CreateDefaultData();
+	tutorialSprite2_->objectParts_[0].materialConfig->textureHandle = tutorialTex2_;
+	tutorialSprite2_->objectParts_[0].materialConfig->textureColor = { 1.0f, 1.0f, 1.0f, 0.99f }; // 透過バケットに入れてZソートさせる
+	tutorialSprite2_->mainPosition.transform.scale = { 1.0f, 1.0f, 1.0f };
+	auto meta2 = ResourceManager::GetInstance()->GetTextureMetaData(tutorialTex2_);
+	tutorialSprite2_->mainPosition.transform.translate = { 640.0f - static_cast<float>(meta2.width) / 2.0f, 360.0f - static_cast<float>(meta2.height) / 2.0f, 0.0f };
 
 	font_.Initialize(system_);
 
@@ -233,8 +277,10 @@ void TitleScene::Update() {
 
 	// ロゴのステート遷移
 	float safeDt = (dt > 0.1f) ? 0.1f : dt;
-	logoAnimTimer_ += safeDt;
-	logoStateTimer_ += safeDt;
+	if (!isTutorialMode_) {
+		logoAnimTimer_ += safeDt;
+		logoStateTimer_ += safeDt;
+	}
 	
 	// デバッグ機能：手動で発作を引き起こす
 #ifdef _DEBUG
@@ -426,7 +472,112 @@ void TitleScene::Update() {
 		}
 	}
 
-	nextButton_->Update();
+	if (isTutorialMode_) {
+		const float kAnimTime = 0.25f;
+		
+		// 背景用タイマー
+		if (isTutorialClosing_) {
+			tutorialAnimTimer_ -= system_->GetDeltaTime();
+			if (tutorialAnimTimer_ <= 0.0f) {
+				tutorialAnimTimer_ = 0.0f;
+				isTutorialMode_ = false;
+				isTutorialClosing_ = false;
+			}
+		} else {
+			tutorialAnimTimer_ += system_->GetDeltaTime();
+			if (tutorialAnimTimer_ > kAnimTime) {
+				tutorialAnimTimer_ = kAnimTime;
+			}
+		}
+
+		// 画像の切り替え演出 (スケールアニメーション)
+		float imgT = 0.0f;
+		if (isTutorialSwitching_) {
+			// 切り替え時は一度縮んでから次の画像になって膨らむ
+			tutorialImageAnimTimer_ += dt * 3.0f;
+			if (tutorialImageAnimTimer_ >= 2.0f) {
+				isTutorialSwitching_ = false;
+				tutorialImageAnimTimer_ = 1.0f;
+			}
+			
+			if (tutorialImageAnimTimer_ < 1.0f) {
+				// 前の画像が縮む (1.0 -> 0.0)
+				imgT = 1.0f - tutorialImageAnimTimer_;
+			} else {
+				// 新しい画像が膨らむ (0.0 -> 1.0)
+				imgT = tutorialImageAnimTimer_ - 1.0f;
+				if (tutorialPage_ == 0) tutorialPage_ = 1; // ここで実際のページ切り替え
+			}
+		} else {
+			if (tutorialAnimTimer_ > 1.0f) {
+				imgT = std::clamp(tutorialAnimTimer_ - 1.0f, 0.0f, 1.0f);
+			} else {
+				imgT = tutorialAnimTimer_ / kAnimTime;
+			}
+		}
+
+		// ポップアップのイージング (EaseOutBack相当)
+		float scale = 0.0f;
+		if (imgT > 0.0f) {
+			const float c1 = 1.70158f;
+			const float c3 = c1 + 1.0f;
+			scale = 1.0f + c3 * std::powf(imgT - 1.0f, 3.0f) + c1 * std::powf(imgT - 1.0f, 2.0f);
+		}
+
+		tutorialSprite1_->mainPosition.transform.scale = { scale, scale, 1.0f };
+		tutorialSprite2_->mainPosition.transform.scale = { scale, scale, 1.0f };
+
+		auto meta1 = ResourceManager::GetInstance()->GetTextureMetaData(tutorialTex1_);
+		tutorialSprite1_->mainPosition.transform.translate = { 640.0f - static_cast<float>(meta1.width) * scale / 2.0f, 360.0f - static_cast<float>(meta1.height) * scale / 2.0f, 0.0f };
+
+		auto meta2 = ResourceManager::GetInstance()->GetTextureMetaData(tutorialTex2_);
+		tutorialSprite2_->mainPosition.transform.translate = { 640.0f - static_cast<float>(meta2.width) * scale / 2.0f, 360.0f - static_cast<float>(meta2.height) * scale / 2.0f, 0.0f };
+
+		// 背景のフェードイン
+		darkOverlay_->objectParts_[0].materialConfig->textureColor.w = 0.85f * (tutorialAnimTimer_ / kAnimTime);
+
+		darkOverlay_->Update(nullptr);
+		tutorialSprite1_->Update(nullptr);
+		tutorialSprite2_->Update(nullptr);
+
+		// マウスクリックかスペースキーでページ送り (アニメーション完了後のみ受付)
+		if (!fade_.IsBusy() && imgT >= 1.0f && !isTutorialClosing_ && !isTutorialSwitching_) {
+			if (tutorialPage_ == 0) {
+				tutorialNextButton_->Update();
+				if (system_->GetTriggerOn(DIK_SPACE) || tutorialNextButton_->GetIsPress()) {
+					isTutorialSwitching_ = true;
+					tutorialImageAnimTimer_ = 0.0f;
+				}
+			} else {
+				tutorialPrevButton_->Update();
+				tutorialCloseButton_->Update();
+				if (tutorialPrevButton_->GetIsPress()) {
+					tutorialPage_ = 0;
+					tutorialImageAnimTimer_ = 0.0f;
+					isTutorialSwitching_ = false;
+				} else if (system_->GetTriggerOn(DIK_SPACE) || tutorialCloseButton_->GetIsPress()) {
+					isTutorialClosing_ = true; // チュートリアル終了へ
+				}
+			}
+		}
+		return;
+	} else {
+		if (!fade_.IsBusy()) {
+			nextButton_->Update();
+			if (tutorialButton_) {
+				tutorialButton_->Update();
+			
+			if (tutorialButton_->GetIsPress()) {
+				isTutorialMode_ = true;
+				isTutorialClosing_ = false;
+				isTutorialSwitching_ = false;
+				tutorialAnimTimer_ = 0.0f;
+				tutorialImageAnimTimer_ = 0.0f;
+				tutorialPage_ = 0;
+			}
+		}
+		}
+	}
 
 	//===============================
 	// 背景NPC更新（ループ管理）
@@ -442,7 +593,7 @@ void TitleScene::Update() {
 	}
 
 	// スペースキーでお題発表シーンへ
-	if (!fade_.IsBusy() && (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsPress())) {
+	if (!isTutorialMode_ && !fade_.IsBusy() && (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsPress())) {
 		fade_.StartFadeOut();
 		isStartTransition_ = true;
 	}
@@ -476,11 +627,46 @@ void TitleScene::Draw() {
 	}
 
 	nextButton_->Render();
-
 	font_.RenderText(
-		"進化する！",
+		"進化しろ！",
 		{ 640.0f, 520.0f }, 48.0f,
 		BitmapFont::Align::Center, 5, { 1.0f,1.0f,0.0f,1.0f });
+
+	tutorialButton_->Render();
+	font_.RenderText(
+		"チュートリアル",
+		{ 640.0f, 620.0f }, 48.0f,
+		BitmapFont::Align::Center, 5, { 1.0f,1.0f,1.0f,1.0f });
+
+	if (isTutorialMode_) {
+		darkOverlay_->Draw();
+		if (tutorialPage_ == 0) tutorialSprite1_->Draw();
+		else if (tutorialPage_ == 1) tutorialSprite2_->Draw();
+
+		// アニメーション完了後のみボタンを表示
+		const float kAnimTime = 0.25f;
+		float imgT = 1.0f;
+		if (tutorialPage_ == 0 && !isTutorialSwitching_) {
+			imgT = tutorialAnimTimer_ / kAnimTime;
+		} else if (isTutorialClosing_) {
+			imgT = 1.0f - (tutorialAnimTimer_ / kAnimTime);
+		} else if (isTutorialSwitching_) {
+			imgT = tutorialImageAnimTimer_ / kAnimTime;
+		}
+
+		if (imgT >= 1.0f && !isTutorialClosing_ && !isTutorialSwitching_) {
+			if (tutorialPage_ == 0) {
+				tutorialNextButton_->Render();
+				font_.RenderText("次へ", { 1180.0f, 665.0f }, 28.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 1.0f, 1.0f });
+			} else {
+				tutorialPrevButton_->Render();
+				font_.RenderText("前へ", { 980.0f, 665.0f }, 28.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 1.0f, 1.0f });
+				
+				tutorialCloseButton_->Render();
+				font_.RenderText("とじる", { 1180.0f, 665.0f }, 28.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 1.0f, 1.0f });
+			}
+		}
+	}
 
 #ifdef USE_IMGUI
 	// 現在シーン表示

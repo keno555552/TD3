@@ -1178,7 +1178,7 @@ void TravelScene::Draw() {
     if (isTutorialMode_) {
       tutorialBgSprite_->Draw();
 
-      bitmapFont.RenderText("AキーとDキーを こうごに おして はしれ！",
+      bitmapFont.RenderText("AキーとDキーをタイミングよくおしてはしれ！",
                             {640.0f, 320.0f}, 48.0f, BitmapFont::Align::Center,
                             5.0f, {1.0f, 1.0f, 1.0f, 1.0f});
 
@@ -1685,9 +1685,11 @@ void TravelScene::UpdateFailureMenuInputTravel() {
   retryModButton_->mainPosition.transform.translate.y = 400.0f + yOffset;
   retryTravelButton_->mainPosition.transform.translate.y = 500.0f + yOffset;
 
-  promptButton_->Update();
-  retryModButton_->Update();
-  retryTravelButton_->Update();
+  if (!fade_.IsBusy()) {
+    promptButton_->Update();
+    retryModButton_->Update();
+    retryTravelButton_->Update();
+  }
 
   // Mouse hover overrides current selection
   const Vector2 mouse = system_->GetMousePosVector2();
