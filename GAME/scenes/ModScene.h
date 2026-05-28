@@ -74,6 +74,11 @@ public:
   void ResetForRetryFromFailure();
 
 private:
+  // サウンド
+  int catchSoundHandle_ = -1;
+  int connectSoundHandle_ = -1;
+  int deleteSoundHandle_ = -1;
+
   /// 操作点の情報をまとめる構造体
   struct TorsoControlPoint {
     ModControlPointRole role = ModControlPointRole::None; // 操作点の役割

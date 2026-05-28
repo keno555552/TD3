@@ -1100,6 +1100,11 @@ ModScene::ModScene(kEngine *system) {
       0.0f, 0.0f, 0.0f, 0.7f}; // 半透明の黒
 
   pendingFailureOutcome_ = SceneOutcome::NONE;
+
+  // SEロード
+  catchSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/キャッチ.mp3");
+  connectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/接続.mp3");
+  deleteSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/削除.mp3");
 }
 
 ModScene::~ModScene() {
@@ -5110,6 +5115,10 @@ void ModScene::ConfirmAssemblyDragPlacement() {
     modPartParticle_->Spawn(assemblyDrag_.snappedWorldPosition, ModPartParticleType::Add);
   }
 
+  if (connectSoundHandle_ != -1) {
+    system_->SoundPlaySE(connectSoundHandle_, 1.0f);
+  }
+
   SelectPart(rootPartId);
   assemblyDrag_.Clear();
 }
@@ -5245,6 +5254,10 @@ bool ModScene::TryBeginAssemblyDragFromMouseRay(const Ray &mouseRay) {
     assemblyDrag_.dragRootOffset = Subtract(rootWorld, hitPoint);
   } else {
     assemblyDrag_.dragRootOffset = {0.0f, 0.0f, 0.0f};
+  }
+
+  if (catchSoundHandle_ != -1) {
+    system_->SoundPlaySE(catchSoundHandle_, 1.0f);
   }
 
   return true;
@@ -7552,6 +7565,10 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
   }
   if (modPartParticle_) {
     modPartParticle_->Spawn(removePos, ModPartParticleType::Remove);
+  }
+
+  if (deleteSoundHandle_ != -1) {
+    system_->SoundPlaySE(deleteSoundHandle_, 1.0f);
   }
 
   assemblyDrag_.Clear();
