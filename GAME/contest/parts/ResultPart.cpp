@@ -40,6 +40,8 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+	drumrollEndHandle_ = system_->SoundLoadSE("GAME/resources/sounds/drumroll_end.mp3");
 }
 
 ResultPart::~ResultPart() {
@@ -58,6 +60,9 @@ void ResultPart::Update() {
 		switch (step_) {
 		case ResultStep::StarsAndChart:
 			step_ = ResultStep::RankAndNickname;
+			if (drumrollEndHandle_ != -1) {
+				system_->SoundPlaySE(drumrollEndHandle_, 1.0f);
+			}
 			break;
 		case ResultStep::RankAndNickname:
 			isFinished_ = true;
