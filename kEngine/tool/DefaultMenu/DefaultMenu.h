@@ -63,13 +63,10 @@ private:
 	/// =========== リソースハンドル ============///
 	int TH_menuBG_ = 0;
 
-	int	TH_menuPause = 0;
+	int	TH_menuTitle = 0;
 	int	TH_menuBGM = 0;
-	int	TH_menuBGM_NL = 0;
 	int	TH_menuMASTER = 0;
-	int	TH_menuMASTER_NL = 0;
 	int	TH_menuSE = 0;
-	int	TH_menuSE_NL = 0;
 
 	int	TH_menuClose = 0;
 	int	TH_menuClose_NL = 0;
@@ -90,13 +87,10 @@ private:
 	/// 背景スプライト+mainPosition
 	std::unique_ptr<SimpleSprite> sMenuBG_ = std::make_unique <SimpleSprite>();
 
-	std::unique_ptr<SimpleSprite> sMenuPause = std::make_unique <SimpleSprite>();
+	std::unique_ptr<SimpleSprite> sMenuTitle = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuBGM = std::make_unique <SimpleSprite>();
-	std::unique_ptr<SimpleSprite> sMenuBGM_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuMASTER = std::make_unique <SimpleSprite>();
-	std::unique_ptr<SimpleSprite> sMenuMASTER_NL = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuSE = std::make_unique <SimpleSprite>();
-	std::unique_ptr<SimpleSprite> sMenuSE_NL = std::make_unique <SimpleSprite>();
 
 	std::unique_ptr<SimpleSprite> sMenuClose = std::make_unique <SimpleSprite>();
 	std::unique_ptr<SimpleSprite> sMenuClose_NL = std::make_unique <SimpleSprite>();
@@ -156,7 +150,7 @@ private:
 	int selectedMenuIndex_ = (int)ButtonIndex::Close;
 	int lastSelectedMenuIndex_ = (int)ButtonIndex::Retry;
 
-	Vector4* buttonsOnColor_[6] = {};						// 借り
+	Vector4* buttonsOnColor_[3] = {};						// 借り
 
 	/// ============== 内部処理 ==============///
 

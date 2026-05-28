@@ -57,6 +57,9 @@ private:
   bool hasSpawnedDust_ = false;
   bool hasSpawnedDustArray_[5] = {false, false, false, false, false};
 
+  std::unique_ptr<Object> BGObject_;
+  int BGObjectHandle_ = 0;
+
   // 仮ライト
   Light *light1_ = nullptr;
 

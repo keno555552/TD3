@@ -44,6 +44,29 @@ TitleScene::TitleScene(kEngine* system) {
 	fade_.Initialize(system_);
 	fade_.StartFadeIn();
 
+	// 背景オブジェクト初期化
+	BGObjectHandle_ = system_->SetModelObj("GAME/resources/TitleScene/titleBG.obj");
+	BGObject_ = std::make_unique<Object>();
+	BGObject_->IntObject(system_);
+	BGObject_->CreateModelData(BGObjectHandle_);
+	BGObject_->mainPosition.transform = CreateDefaultTransform();
+	BGObject_->mainPosition.transform.translate.z = 200.0f;
+	
+	// 平面(Plane)の設定: カリングを回避するためにY軸で180度回転し、色を暗めに
+	BGObject_->objectParts_[0].transform.rotate.y = 3.14159265f;
+	BGObject_->objectParts_[0].materialConfig->enableLighting = false;
+	Vector4 bgColorPlane{ 10.0f, 40.0f, 100.0f, 255.0f }; // 彩度を上げたディープブルー
+	bgColorPlane.ColorBy1();
+	BGObject_->objectParts_[0].materialConfig->textureColor = bgColorPlane;
+	
+	// 模様(Starburst)の設定: 色を少し明るめの暗色に
+	BGObject_->objectParts_[1].materialConfig->enableLighting = false;
+	Vector4 bgColorStar{ 20.0f, 80.0f, 160.0f, 255.0f }; // 彩度を上げた鮮やかなブルー
+	bgColorStar.ColorBy1();
+	BGObject_->objectParts_[1].materialConfig->textureColor = bgColorStar;
+	
+	BGObject_->mainPosition.transform.scale = { 160.0f, 160.0f, 100.0f };
+
 	titleTextObject_ = new Object;
 
 	titleTextModelHandle_ = system_->SetModelObj("GAME/resources/TitleScene/TitleText.obj");
@@ -274,6 +297,14 @@ void TitleScene::ResetTitleNpc(int index) {
 void TitleScene::Update() {
 	system_->SetCamera(usingCamera_);
 	const float dt = system_->GetDeltaTime();
+
+	// -------------------------------
+	// Update Logic
+	// -------------------------------
+	if (BGObject_) {
+		BGObject_->objectParts_[1].transform.rotate.z -= 0.001f;
+		BGObject_->Update(titleCamera_);
+	}
 
 	// ロゴのステート遷移
 	float safeDt = (dt > 0.1f) ? 0.1f : dt;
@@ -608,6 +639,11 @@ void TitleScene::Update() {
 }
 
 void TitleScene::Draw() {
+	if (BGObject_) {
+		system_->SetCamera(titleCamera_);
+		BGObject_->Draw();
+		system_->SetCamera(usingCamera_);
+	}
 
 	// 背景NPC（先に描画）
 	if (titleNpcManager_) {
