@@ -46,12 +46,18 @@ private:
 	State state_ = State::Suspense;
 	float timer_ = 0.0f;
 	float revealTimer_ = 0.0f;
-	float revealDuration_ = 0.6f;
+	float revealDuration_ = 2.5f;
 	float afterRevealHold_ = 1.0f;
 	float afterRevealTimer_ = 0.0f;
 
 	std::unique_ptr<DetailButton> drawButton_;
 	PartCameraTransform cameraTransform_;
+
+	// サウンド
+	int drumrollHandle_ = -1;
+	int heartbeatHandle_ = -1;
+	int spotlightSeHandle_ = -1;
+	int cheersHandle_ = -1;
 
 	static Vector3 NormalizeSafe(const Vector3& v);
 	static Vector3 HsvToRgb(float h, float s, float v);

@@ -63,6 +63,12 @@ ContestScene::ContestScene(kEngine* system) {
 	fade_.Initialize(system_);
 	fade_.StartFadeIn();
 
+	// 観客SEループ再生開始（Judging遷移時に停止）
+	audienceSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/Audience.mp3");
+	if (audienceSoundHandle_ != -1) {
+		system_->SoundPlayBGM(audienceSoundHandle_, 0.6f);
+	}
+
 	float objectScale = 0.2f;
 	float PI = 3.14159265f;
 
@@ -315,6 +321,9 @@ ContestScene::ContestScene(kEngine* system) {
 }
 
 ContestScene::~ContestScene() {
+	if (audienceSoundHandle_ != -1) {
+		system_->SoundStop(audienceSoundHandle_);
+	}
 	currentPart_.reset();
 	bitmapFont_.Cleanup();
 	system_->DestroyCamera(camera_);
@@ -744,6 +753,11 @@ void ContestScene::AdvancePhase() {
 	switch (phase_) {
 	case ContestPhase::ShowOff:
 		phase_ = ContestPhase::Judging;
+		// 観客SE停止
+		if (!audienceStopped_ && audienceSoundHandle_ != -1) {
+			system_->SoundStop(audienceSoundHandle_);
+			audienceStopped_ = true;
+		}
 		break;
 	case ContestPhase::Judging:
 		phase_ = ContestPhase::Result;

@@ -150,6 +150,10 @@ private:
   // フォント
   BitmapFont bitmapFont_;
 
+  // サウンド
+  int audienceSoundHandle_ = -1;
+  bool audienceStopped_ = false;
+
   // 審査員コメント
   JudgeCommentTable judgeCommentTable_{};
   std::vector<JudgeCommentResult> judgeCommentResults_;

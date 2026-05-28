@@ -26,10 +26,24 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 
 	drawButton_ = std::make_unique<DetailButton>(system);
 	drawButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+	// サウンドロード
+	drumrollHandle_ = system_->SoundLoadSE("GAME/resources/sounds/drumroll.wav");
+	heartbeatHandle_ = system_->SoundLoadSE("GAME/resources/sounds/心臓の鼓動1.mp3");
+	spotlightSeHandle_ = system_->SoundLoadSE("GAME/resources/sounds/SpotLight.mp3");
+	cheersHandle_ = system_->SoundLoadSE("GAME/resources/sounds/Cheers.mp3");
+
+	// Suspense開始でドラムロール
+	if (drumrollHandle_ != -1) {
+		system_->SoundPlayBGM(drumrollHandle_, 0.8f);
+	}
 }
 
 SuspensePart::~SuspensePart() {
-	// 決定後の状態は次パートにそのまま引き継ぐので復元しない
+	// 決定後のライト状態は次パートに引き継ぐので復元しない
+	// 鳴りっぱなしを防ぐためループ系SEは停止
+	if (drumrollHandle_ != -1) system_->SoundStop(drumrollHandle_);
+	if (heartbeatHandle_ != -1) system_->SoundStop(heartbeatHandle_);
 }
 
 void SuspensePart::Update() {
@@ -65,6 +79,9 @@ void SuspensePart::Update() {
 					revealStartDir_[i] = lights_[i]->direction;
 				}
 			}
+			// ドラムロール停止 → 心臓の鼓動ループ開始
+			if (drumrollHandle_ != -1) system_->SoundStop(drumrollHandle_);
+			if (heartbeatHandle_ != -1) system_->SoundPlayBGM(heartbeatHandle_, 0.9f);
 		}
 		return;
 	}
@@ -125,6 +142,10 @@ void SuspensePart::Update() {
 		if (t >= 1.0f) {
 			state_ = State::Done;
 			afterRevealTimer_ = 0.0f;
+			// 心臓の鼓動停止 → スポットライトSE+歓声SE
+			if (heartbeatHandle_ != -1) system_->SoundStop(heartbeatHandle_);
+			if (spotlightSeHandle_ != -1) system_->SoundPlaySE(spotlightSeHandle_, 1.0f);
+			if (cheersHandle_ != -1) system_->SoundPlaySE(cheersHandle_, 1.0f);
 		}
 		return;
 	}
