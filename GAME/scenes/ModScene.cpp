@@ -1930,9 +1930,12 @@ void ModScene::LoadCustomizeData() {
 
         modBodies_[id].SetParam(instance.param);
 
-        if (assembly_.FindNode(id) != nullptr) {
-          assembly_.SetPartLocalTranslate(id,
-                                          instance.localTransform.translate);
+        const PartNode *node = assembly_.FindNode(id);
+        if (node != nullptr) {
+          // 親が変わっている場合は古いローカルオフセットを適用せず、再接続時の新しいデフォルト値を維持する
+          if (instance.parentId == node->parentId) {
+            assembly_.SetPartLocalTranslate(id, instance.localTransform.translate);
+          }
         }
 
         found = true;
