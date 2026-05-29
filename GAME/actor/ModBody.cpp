@@ -1197,10 +1197,6 @@ Vector3 ModBody::ConvertExternalPointToThisObjectLocal(
     return externalOwnerLocalPoint;
   }
 
-  if (target->mainPosition.parentPart == nullptr) {
-    return externalOwnerLocalPoint;
-  }
-
   const Vector3 childLocalOrigin = target->mainPosition.transform.translate;
   const Vector3 offsetInParent =
       Subtract(externalOwnerLocalPoint, childLocalOrigin);

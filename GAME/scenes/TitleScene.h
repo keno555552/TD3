@@ -28,6 +28,7 @@ private:
 
   bool isTutorialMode_ = false;
   int tutorialPage_ = 0;
+  int nextTutorialPage_ = 0;
   float tutorialAnimTimer_ = 0.0f;
   float tutorialImageAnimTimer_ = 0.0f;
   bool isTutorialClosing_ = false;
@@ -73,6 +74,8 @@ private:
   Fade fade_;
   float GetFadeAlpha() const override { return fade_.GetAlpha(); }
   bool isStartTransition_ = false;
+
+  int bgmSoundHandle_ = -1;
 
   // 背景NPC演出
   std::unique_ptr<TravelRunner> titleNpcPlayer_;

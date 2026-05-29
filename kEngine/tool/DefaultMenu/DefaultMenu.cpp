@@ -192,6 +192,38 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 	sMenuVolumeBarS->followObject_ = sMenuBG_.get();
 	sMenuVolumeBarS->Update(nullptr);
 
+	Vector4 BGColor = {140.0f, 140.0f, 140.0f, 255.0f};
+        BGColor.ColorBy1();
+        sMenuBG_->objectParts_[0].materialConfig->textureColor = BGColor;
+
+        Vector4 wordColor = {103.0f, 103.0f, 103.0f, 255.0f};
+        wordColor.ColorBy1();
+        sMenuTitle->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuBGM->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuMASTER->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuSE->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuClose_NL->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuBack_NL->objectParts_[0].materialConfig->textureColor = wordColor;
+        sMenuRetry_NL->objectParts_[0].materialConfig->textureColor = wordColor;
+
+        Vector4 buttonColor = {88.0f, 88.0f, 88.0f, 255.0f};
+        buttonColor.ColorBy1();
+        sMenuButtonM_NL->objectParts_[0].materialConfig->textureColor =
+            buttonColor;
+        sMenuButtonB_NL->objectParts_[0].materialConfig->textureColor =
+            buttonColor;
+        sMenuButtonS_NL->objectParts_[0].materialConfig->textureColor =
+            buttonColor;
+
+        Vector4 volumeBarColor = {154.0f, 154.0f, 154.0f, 255.0f};
+        volumeBarColor.ColorBy1();
+        sMenuVolumeBarM->objectParts_[0].materialConfig->textureColor =
+            volumeBarColor;
+        sMenuVolumeBarB->objectParts_[0].materialConfig->textureColor =
+            volumeBarColor;
+        sMenuVolumeBarS->objectParts_[0].materialConfig->textureColor =
+            volumeBarColor;
+
 	/// ================== ボタン ==================///
 
 	bMenuClose = std::make_unique<Button>(system_);
