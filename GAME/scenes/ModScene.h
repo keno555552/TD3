@@ -76,6 +76,7 @@ public:
 private:
   // サウンド
   int catchSoundHandle_ = -1;
+  int bgmSoundHandle_ = -1;
   int connectSoundHandle_ = -1;
   int deleteSoundHandle_ = -1;
   int notificationSoundHandle_ = -1;
