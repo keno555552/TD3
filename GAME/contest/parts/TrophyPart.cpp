@@ -5,7 +5,7 @@
 TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
 	: IContestPart(system, font) 
 {
-	cameraTransform_ = { { 0.0f, 1.2f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.0f, 0.9f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
 
 	nextThemeButton_ = std::make_unique<DetailButton>(system);
 	nextThemeButton_->SetButton({ 640.0f, 180.0f }, 400.0f, 80.0f);
