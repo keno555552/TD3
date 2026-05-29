@@ -78,6 +78,7 @@ private:
   int catchSoundHandle_ = -1;
   int connectSoundHandle_ = -1;
   int deleteSoundHandle_ = -1;
+  int notificationSoundHandle_ = -1;
 
   /// 操作点の情報をまとめる構造体
   struct TorsoControlPoint {
@@ -909,11 +910,16 @@ private:
   };
 
   struct StartNotification {
-    std::string text;
+    int npcIndex;
+    bool isGoal;
     float timer;
     float duration;
 
     float startY;
+
+    // スプライトを通知ごとに保持
+    std::shared_ptr<SimpleSprite> rivalSprite;
+    std::shared_ptr<SimpleSprite> textSprite;
   };
 
   enum class RetryChoiceMod { BackToPrompt = 0, RetryMod, Count };
@@ -928,6 +934,11 @@ private:
   std::vector<NpcModProgress> npcProgress_;
   std::vector<StartNotification> notifications_;
 
+  // 通知用テクスチャ
+  std::array<int, 4> notifyRivalTexHandles_{};
+  int notifyStartTexHandle_ = 0;
+  int notifyGoalTexHandle_ = 0;
+
   RetryChoiceMod selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
   SceneOutcome pendingFailureOutcome_ = SceneOutcome::NONE;
 
@@ -937,7 +948,7 @@ private:
 
   void InitializeNpcModProgress();
   void UpdateNpcProgress();
-  void AddStartNotification(const std::string &text);
+  void AddStartNotification(int npcIndex, bool isGoal);
   void UpdateNotifications();
   void DrawStartNotifications();
 
