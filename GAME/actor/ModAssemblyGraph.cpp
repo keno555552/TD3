@@ -836,13 +836,13 @@ Vector3 ModAssemblyGraph::MakeDefaultAttachLocal(ModBodyPart parentPart,
     // 胴体がない場合に暫定的に頭に接続される際のオフセット
     switch (childPart) {
     case ModBodyPart::LeftUpperArm:
-      return {-0.5f, -0.5f, 0.0f};
+      return {-0.25f, -0.2f, 0.0f};
     case ModBodyPart::RightUpperArm:
-      return {0.5f, -0.5f, 0.0f};
+      return {0.25f, -0.2f, 0.0f};
     case ModBodyPart::LeftThigh:
-      return {-0.35f, -1.5f, 0.0f};
+      return {-0.25f, -0.3f, 0.0f};
     case ModBodyPart::RightThigh:
-      return {0.35f, -1.5f, 0.0f};
+      return {0.25f, -0.3f, 0.0f};
     default:
       break;
     }
