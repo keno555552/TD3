@@ -756,6 +756,12 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
               root.z - std::sin(angleX) * length};
     };
 
+    auto RotateX = [](const Vector3 &v, float angle) -> Vector3 {
+      float c = std::cos(angle);
+      float s = std::sin(angle);
+      return {v.x, v.y * c - v.z * s, v.y * s + v.z * c};
+    };
+
     const float thighSwingScale = 0.70f;
 
     //==============================
@@ -792,7 +798,7 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float leftThighAngleZ = std::atan2(leftThighDir.x, -leftThighDir.y);
     float leftThighBaseX = -std::asin(std::clamp(leftThighDir.z, -1.0f, 1.0f));
     float leftThighAnimX = -leftLegBend_ * thighSwingScale;
-    float leftThighAngleX = leftThighBaseX + leftThighAnimX;
+    float leftThighAngleX = leftThighBaseX + leftThighAnimX + bodyTilt_;
 
     Vector3 leftShinVec = Sub(leftLegEndLocal, leftLegBendLocal);
     float leftShinLength = Length(leftShinVec);
@@ -811,9 +817,9 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
     float leftShinAnimX = leftThighSwing * 0.35f + leftKneeFold * 0.6f;
-    float leftShinAngleX = leftShinBaseX + leftShinAnimX;
+    float leftShinAngleX = leftShinBaseX + leftShinAnimX + bodyTilt_;
 
-    Vector3 leftThighRoot = leftHipAnchorLocal;
+    Vector3 leftThighRoot = RotateX(leftHipAnchorLocal, -bodyTilt_);
     Vector3 leftShinRoot = BuildAnimatedChildRoot(
         leftThighRoot, leftThighAngleZ, leftThighAngleX, leftThighLength);
     Vector3 leftFootPos = BuildAnimatedChildRoot(
@@ -837,7 +843,7 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float rightThighBaseX =
         -std::asin(std::clamp(rightThighDir.z, -1.0f, 1.0f));
     float rightThighAnimX = -rightLegBend_ * thighSwingScale;
-    float rightThighAngleX = rightThighBaseX + rightThighAnimX;
+    float rightThighAngleX = rightThighBaseX + rightThighAnimX + bodyTilt_;
 
     Vector3 rightShinVec = Sub(rightLegEndLocal, rightLegBendLocal);
     float rightShinLength = Length(rightShinVec);
@@ -856,9 +862,9 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                          (legRecoverAngle_ - legKickAngle_),
                                      0.0f, 1.0f);
     float rightShinAnimX = rightThighSwing * 0.35f + rightKneeFold * 0.6f;
-    float rightShinAngleX = rightShinBaseX + rightShinAnimX;
+    float rightShinAngleX = rightShinBaseX + rightShinAnimX + bodyTilt_;
 
-    Vector3 rightThighRoot = rightHipAnchorLocal;
+    Vector3 rightThighRoot = RotateX(rightHipAnchorLocal, -bodyTilt_);
     Vector3 rightShinRoot = BuildAnimatedChildRoot(
         rightThighRoot, rightThighAngleZ, rightThighAngleX, rightThighLength);
     Vector3 rightFootPos = BuildAnimatedChildRoot(
