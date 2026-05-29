@@ -8,7 +8,7 @@
 #include "SceneManager.h"
 #include <ctime>
 
-const char kWindowTitle[] = "進化しろ";
+const char kWindowTitle[] = "進化しろ！";
 
 const int32_t kWindowWidth = 1280;
 const int32_t kWindowHeight = 720;

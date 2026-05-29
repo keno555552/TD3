@@ -44,6 +44,12 @@ TitleScene::TitleScene(kEngine* system) {
 	fade_.Initialize(system_);
 	fade_.StartFadeIn();
 
+	// BGMの再生
+	bgmSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/TitleScene_BGM.mp3");
+	if (bgmSoundHandle_ != -1) {
+		system_->SoundPlayBGM(bgmSoundHandle_, 0.5f);
+	}
+
 	// 背景オブジェクト初期化
 	BGObjectHandle_ = system_->SetModelObj("GAME/resources/TitleScene/titleBG.obj");
 	BGObject_ = std::make_unique<Object>();
@@ -213,6 +219,10 @@ TitleScene::~TitleScene() {
 	system_->RemoveLight(light1_);
 	delete titleTextObject_;
 	delete light1_;
+
+	if (bgmSoundHandle_ != -1) {
+		system_->SoundStop(bgmSoundHandle_);
+	}
 }
 
 void TitleScene::ResetTitleNpcBody(int index) {
@@ -537,7 +547,7 @@ void TitleScene::Update() {
 			} else {
 				// 新しい画像が膨らむ (0.0 -> 1.0)
 				imgT = tutorialImageAnimTimer_ - 1.0f;
-				if (tutorialPage_ == 0) tutorialPage_ = 1; // ここで実際のページ切り替え
+				tutorialPage_ = nextTutorialPage_; // ここで実際のページ切り替え
 			}
 		} else {
 			if (tutorialAnimTimer_ > 1.0f) {
@@ -578,14 +588,15 @@ void TitleScene::Update() {
 				if (system_->GetTriggerOn(DIK_SPACE) || tutorialNextButton_->GetIsPress()) {
 					isTutorialSwitching_ = true;
 					tutorialImageAnimTimer_ = 0.0f;
+					nextTutorialPage_ = 1;
 				}
 			} else {
 				tutorialPrevButton_->Update();
 				tutorialCloseButton_->Update();
 				if (tutorialPrevButton_->GetIsPress()) {
-					tutorialPage_ = 0;
+					isTutorialSwitching_ = true;
 					tutorialImageAnimTimer_ = 0.0f;
-					isTutorialSwitching_ = false;
+					nextTutorialPage_ = 0;
 				} else if (system_->GetTriggerOn(DIK_SPACE) || tutorialCloseButton_->GetIsPress()) {
 					isTutorialClosing_ = true; // チュートリアル終了へ
 				}
