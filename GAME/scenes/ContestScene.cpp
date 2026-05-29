@@ -8,6 +8,7 @@
 #include "GAME/contest/parts/SuspensePart.h"
 #include "GAME/actor/ModCustomizeDataStore.h"
 #include <algorithm>
+
 #include <cmath>
 
 ContestScene::ContestScene(kEngine* system) {
@@ -218,6 +219,7 @@ ContestScene::ContestScene(kEngine* system) {
 		customizedBodyActor_.SetActorScale({ 0.03f, 0.03f, 0.03f });
 				customizedBodyActor_.SetActorRotate({ 0.0f, PI, 0.0f });
 		customizedBodyActor_.SetActorTranslate({ 0.0f, 0.0f, -0.2f });
+    customizedBodyActor_.SetActorRotate({0.0f, PI, 0.0f});
 
 		// ステージ床の高さに合わせる
 		customizedBodyActor_.SetGroundY(0.18f);
