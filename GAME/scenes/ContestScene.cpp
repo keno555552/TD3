@@ -216,10 +216,11 @@ ContestScene::ContestScene(kEngine* system) {
 	//プレイヤーのモデルを再構築
 	if (playerData != nullptr) {
 		customizedBodyActor_.SetActorScale({ 0.03f, 0.03f, 0.03f });
+				customizedBodyActor_.SetActorRotate({ 0.0f, PI, 0.0f });
 		customizedBodyActor_.SetActorTranslate({ 0.0f, 0.0f, -0.2f });
 
 		// ステージ床の高さに合わせる
-		customizedBodyActor_.SetGroundY(0.15f);
+		customizedBodyActor_.SetGroundY(0.18f);
 
 		// 足首ではなく足裏っぽく少し上げ下げしたいときの微調整
 		customizedBodyActor_.SetGroundOffsetY(0.02f);
@@ -234,11 +235,12 @@ ContestScene::ContestScene(kEngine* system) {
 		if (npcData != nullptr) {
 			npcBodyActors_[i].Initialize(system_);
 			npcBodyActors_[i].SetActorScale({ 0.03f, 0.03f, 0.03f });
+			npcBodyActors_[i].SetActorRotate({ 0.0f, PI, 0.0f });
 
 			// 配置を左右に散らす
 			float npcX = (i == 0) ? -1.0f : 1.0f; // プレイヤーは 0.0f とする
 			npcBodyActors_[i].SetActorTranslate({ npcX, 0.0f, -0.2f });
-			npcBodyActors_[i].SetGroundY(0.15f);
+			npcBodyActors_[i].SetGroundY(0.18f);
 			npcBodyActors_[i].SetGroundOffsetY(0.02f);
 			npcBodyActors_[i].SetAutoGroundEnabled(true);
 			npcBodyActors_[i].BuildFromCustomizeData(*npcData);
