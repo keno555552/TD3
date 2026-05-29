@@ -20,11 +20,11 @@ TitleScene::TitleScene(kEngine* system) {
 	ModScene::ResetTutorialFlag();
 
 	// 最低限のライト
-	light1_ = new Light;
+	light1_ = std::make_unique<Light>();
 	light1_->direction = { -0.5f, -1.0f, -0.3f };
 	light1_->color = { 1.0f, 1.0f, 1.0f };
 	light1_->intensity = 1.0f;
-	system_->AddLight(light1_);
+	system_->AddLight(light1_.get());
 
 	// 最低限のカメラ
 	debugCamera_ = system_->CreateDebugCamera();
@@ -32,9 +32,9 @@ TitleScene::TitleScene(kEngine* system) {
 	titleCamera_ = system_->CreateCamera(); // タイトルロゴ用（デフォルト位置）
 
 	// TravelScene と同じ横視点（NPC が左→右に流れる構図）
-	camera_->SetTranslate({ 48.0f, 5.0f, 5.0f });
-	camera_->SetDefaultTransform(camera_->GetTransform());
-	camera_->SetRotation({ 0.0f, -1.57f, 0.0f });
+	camera_.lock().get()->SetTranslate({ 48.0f, 5.0f, 5.0f });
+	camera_.lock().get()->SetDefaultTransform(camera_.lock()->GetTransform());
+	camera_.lock().get()->SetRotation({ 0.0f, -1.57f, 0.0f });
 
 	usingCamera_ = camera_;
 	system_->SetCamera(usingCamera_);
@@ -143,9 +143,8 @@ TitleScene::~TitleScene() {
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
 	system_->DestroyCamera(titleCamera_);
-	system_->RemoveLight(light1_);
+	system_->RemoveLight(light1_.get());
 	delete titleTextObject_;
-	delete light1_;
 }
 
 void TitleScene::ResetTitleNpcBody(int index) {
@@ -432,7 +431,7 @@ void TitleScene::Update() {
 	// 背景NPC更新（ループ管理）
 	//===============================
 	if (titleNpcManager_) {
-		titleNpcManager_->UpdateNpcRunners(dt, kNpcLoopLimitX, usingCamera_);
+		titleNpcManager_->UpdateNpcRunners(dt, kNpcLoopLimitX, usingCamera_.lock().get());
 
 		for (int i = 0; i < static_cast<int>(titleNpcManager_->npcRunners_.size()); ++i) {
 			if (titleNpcManager_->npcRunners_[i].finished) {
@@ -448,7 +447,7 @@ void TitleScene::Update() {
 	}
 
 	// フェード更新
-	fade_.Update(usingCamera_);
+	fade_.Update(usingCamera_.lock().get());
 
 	// フェード終了後にシーン移行
 	if (isStartTransition_ && fade_.IsFinished()) {
@@ -460,14 +459,14 @@ void TitleScene::Draw() {
 
 	// 背景NPC（先に描画）
 	if (titleNpcManager_) {
-		titleNpcManager_->DrawNpcs(kNpcLoopLimitX, true, usingCamera_);
+		titleNpcManager_->DrawNpcs(kNpcLoopLimitX, true, usingCamera_.lock().get());
 	}
 
 	if (titleTextObject_) {
 		// タイトルロゴはデフォルト正面カメラで描画
 		system_->SetCamera(titleCamera_);
-		titleTextObject_->Update(titleCamera_);
-		if (dust_) dust_->Update(titleCamera_);
+		titleTextObject_->Update(titleCamera_.lock().get());
+		if (dust_) dust_->Update(titleCamera_.lock().get());
 		
 		titleTextObject_->Draw();
 		if (dust_) dust_->Draw();

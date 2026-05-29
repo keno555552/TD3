@@ -2,20 +2,12 @@
 
 std::unique_ptr <SceneManager> SceneManager::sceneManager_ = nullptr;
 
-
 void SceneManager::Initialize(kEngine* system) {
 	system_ = system;
-	sceneFlow_.insert(std::make_pair("TITLE", "TRAVEL"));
-	sceneFlow_.insert(std::make_pair("TRAVEL", "PROMPT"));
-	sceneFlow_.insert(std::make_pair("PROMPT", "CONTEST"));
-	sceneFlow_.insert(std::make_pair("CONTEST", "MOD"));
-	sceneFlow_.insert(std::make_pair("MOD", "TRAVEL"));
-
-	sceneFlow_.insert(std::make_pair("SPLASH", "TITLE"));
 
 	sceneFactory_ = std::make_unique<SceneFactory>(system);
 	//sceneUsingNameHandle_ = "CGHK2";
-	sceneUsingNameHandle_ = "SPLASH";
+	sceneUsingNameHandle_ = "TITLE";
 
 	defaultMenu_ = std::make_unique <DefaultMenu>(system_);
 
@@ -42,86 +34,85 @@ void SceneManager::Finalize() {
 
 SceneManager& SceneManager::GetInstance() {
 	if (!sceneManager_) {
-		sceneManager_.reset(new SceneManager);
+		sceneManager_ = std::make_unique<SceneManager>(ConstructorKey());
 	}
 	return *sceneManager_;
 }
 
 void SceneManager::SceneChanger() {
 
-  if (sceneUsing_) {
-    bool isSceneChange = false;
+	if (sceneUsing_) {
 
-    switch (sceneUsing_->GetOutcome()) {
+		/// ステージが変わるかどうかのフラグ
+		bool isSceneChange = false;
 
-    case SceneOutcome::NEXT: {
-      auto targetScene = sceneFlow_.find(sceneUsingNameHandle_);
-      if (targetScene != sceneFlow_.end()) {
-        sceneUsingNameHandle_ = targetScene->second;
-        isSceneChange = true;
-      } else {
-        Logger::Log(
-            "[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " +
-            sceneUsingNameHandle_);
-      }
-    } break;
+		/// シーンの結果を取得
+		SceneOutcome outcome = sceneUsing_->GetOutcome();
 
-    case SceneOutcome::RETRY:
-      isSceneChange = true;
-      break;
+		/// 戻りがない場合シーン転移しないのでreturn
+		if (outcome == SceneOutcome::NONE)return;
 
-    case SceneOutcome::RETRY_MOD:
-      sceneUsingNameHandle_ = "MOD";
-      isSceneChange = true;
-      break;
+		/// まずはシーンがマップに存在するかを確認する
+		auto targetFlow = sceneFlow_.find(sceneUsingNameHandle_);
+		if (targetFlow == sceneFlow_.end()) {
 
-    case SceneOutcome::RETURN:
-      isSceneChange = true;
-      sceneUsingNameHandle_ = "TITLE";
-      break;
+			/// もし見つからなかった場合、エラーログを出力する
+			Logger::Log("[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " + sceneUsingNameHandle_);
 
-    case SceneOutcome::RETURN_PROMPT:
-      isSceneChange = true;
-      sceneUsingNameHandle_ = "PROMPT";
-      break;
+		} else {
 
-    case SceneOutcome::EXIT:
-      kEngine::EndGame();
-      break;
-    }
+			/// もし見つかった場合、シーンの結果がマップに存在するかを確認する
+			auto targetScene = targetFlow->second.find(outcome);
+			if (targetScene == targetFlow->second.end()) {
 
-    if (defaultMenu_->IsBack()) {
-      isSceneChange = true;
-      sceneUsingNameHandle_ = "TITLE";
-    }
+				/// 同じく見つからなかった場合
+				Logger::Log("[kError] SM :: SceneChanger: Scene not found in sceneFlow_: " + sceneUsingNameHandle_);
 
-    if (defaultMenu_->IsRetry()) {
-      isSceneChange = true;
-    }
+			} else {
 
-    if (!isSceneChange) {
-      return;
-    }
-  }
+				/// 見つかった場合、次のシーンに遷移するためのフラグを立てる
+				sceneUsingNameHandle_ = targetScene->second;
+				isSceneChange = true;
+			}
+		}
 
-  // 新しいシーンを生成する前に、必ず現在のシーンを破棄する
-  sceneUsing_.reset();
-  sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
+		/// デフォルトメニューによって流れを上書きする
+		if (defaultMenu_->IsBack()) {
+			isSceneChange = true;
+			sceneUsingNameHandle_ = "TITLE";
+		}
+		if (defaultMenu_->IsRetry()) {
+			isSceneChange = true;
+		}
+
+		/// EXITが押されたらゲーム終了
+		if (outcome == SceneOutcome::EXIT) {
+			kEngine::EndGame();
+			return;
+		}
+
+		if (!isSceneChange)return;
+
+		sceneUsing_.reset();
+	}
+
+	sceneUsing_ = sceneFactory_->CreateScene(sceneUsingNameHandle_);
 }
+
 
 void SceneManager::Update() {
 
+
 	SceneChanger();
 
-	if (sceneUsingNameHandle_ != "SPLASH") {
-		defaultMenu_->Updata();
-	}
+	//defaultMenu_->Update();
 
-	if (!defaultMenu_->GetIsPause() || sceneUsingNameHandle_ == "SPLASH") {
+	if (!defaultMenu_->GetIsPause()) {
 		if (sceneUsing_ != nullptr) {
 			sceneUsing_->Update();
 		}
 	}
+
 }
 
 void SceneManager::Render() {
@@ -137,7 +128,7 @@ void SceneManager::Render() {
 		if (pauseSprite_) {
 			if (sceneUsing_ != nullptr) {
 				float alpha = 1.0f - sceneUsing_->GetFadeAlpha();
-				
+
 				if (defaultMenu_ && defaultMenu_->GetIsPause()) {
 					alpha = 0.0f;
 				}
@@ -152,11 +143,11 @@ void SceneManager::Render() {
 			}
 		}
 	}
-
 #ifdef USE_IMGUI
 	ImGuiPart();
 #endif
 }
+
 
 void SceneManager::ClearStage() {
 	for (auto& ptr : stage) {
@@ -168,35 +159,35 @@ void SceneManager::ClearStage() {
 #ifdef USE_IMGUI
 void SceneManager::ImGuiPart() {
 	{
-		float fps = system_->GetFPS();
-		float fps1s = system_->GetFPSPerSecond();
-		float deltaTime = system_->GetDeltaTime();
-		ImGui::Begin("FPS");
-		ImGui::InputFloat("FPS", &fps);
-		ImGui::InputFloat("FPS_1s", &fps1s);
-		ImGui::InputFloat("deltaTime", &deltaTime);
-		ImGui::End();
+		//float fps = system_->GetFPS();
+		//float fps1s = system_->GetFPSPerSecond();
+		//float deltaTime = system_->GetDeltaTime();
+		//ImGui::Begin("FPS");
+		//ImGui::InputFloat("FPS", &fps);
+		//ImGui::InputFloat("FPS_1s", &fps1s);
+		//ImGui::InputFloat("deltaTime", &deltaTime);
+		//ImGui::End();
 	}
 	{
-		ImGui::Begin("MenuTest");
-		if (defaultMenu_->isClicked()) {
-			ImGui::Text("IsClicked: True");
-		} else {
-			ImGui::Text("IsClicked: False");
-		}
-
-		if (defaultMenu_->IsRetry()) {
-			ImGui::Text("IsRetry: True");
-		} else {
-			ImGui::Text("IsRetry: False");
-		}
-
-		if (defaultMenu_->IsBack()) {
-			ImGui::Text("IsBack: True");
-		} else {
-			ImGui::Text("IsBack: False");
-		}
-		ImGui::End();
+		//ImGui::Begin("MenuTest");
+		//if (defaultMenu_->isClicked()) {
+		//	ImGui::Text("IsClicked: True");
+		//} else {
+		//	ImGui::Text("IsClicked: False");
+		//}
+		//
+		//if (defaultMenu_->IsRetry()) {
+		//	ImGui::Text("IsRetry: True");
+		//} else {
+		//	ImGui::Text("IsRetry: False");
+		//}
+		//
+		//if (defaultMenu_->IsBack()) {
+		//	ImGui::Text("IsBack: True");
+		//} else {
+		//	ImGui::Text("IsBack: False");
+		//}
+		//ImGui::End();
 	}
 }
 #endif

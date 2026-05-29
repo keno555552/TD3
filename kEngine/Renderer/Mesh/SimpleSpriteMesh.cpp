@@ -69,12 +69,18 @@ ID3D12Resource* SimpleSpriteMesh::CreateVertexResource_(ID3D12Device* device) {
 
 	Mapping();
 
+	vertexResource_->SetName("SimpleSpriteVertexResource");
+
 	return vertexResource_->GetResource().Get();
 }
 
 void SimpleSpriteMesh::Mapping() {
 	VertexData* vertexDataSprite = nullptr;
-	vertexResource_->GetResource()->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	HRESULT hr = vertexResource_->GetResource()->Map(0, nullptr, reinterpret_cast<void**>(&vertexDataSprite));
+	if (FAILED(hr) || !vertexDataSprite) { 
+		Logger::Log("Failed to map vertex resource in SimpleSpriteMesh::Mapping");
+		return;
+	}
 	// 四点定義
 	vertexDataSprite[(int)CornerName::TOP_LEFT].position = { conerData.coner[(int)CornerName::BOTTOM_LEFT].x, conerData.coner[(int)CornerName::BOTTOM_LEFT].y, 0.0f, 1.0f };
 	vertexDataSprite[(int)CornerName::TOP_LEFT].texcoord = { Texcoord[(int)CornerName::BOTTOM_LEFT].x, Texcoord[(int)CornerName::BOTTOM_LEFT].y };
@@ -88,6 +94,7 @@ void SimpleSpriteMesh::Mapping() {
 	vertexDataSprite[(int)CornerName::TOP_RIGHT].position = { conerData.coner[(int)CornerName::BOTTOM_RIGHT].x, conerData.coner[(int)CornerName::BOTTOM_RIGHT].y, 0.0f, 1.0f };
 	vertexDataSprite[(int)CornerName::TOP_RIGHT].texcoord = { Texcoord[(int)CornerName::BOTTOM_RIGHT].x, Texcoord[(int)CornerName::BOTTOM_RIGHT].y };
 	vertexDataSprite[(int)CornerName::TOP_RIGHT].normal = { 0.0f, 0.0f, -1.0f };
+
 	vertexResource_->GetResource()->Unmap(0, nullptr);
 }
 
@@ -113,6 +120,9 @@ ID3D12Resource* SimpleSpriteMesh::CreateIndexResource_(ID3D12Device* device) {
 	indexDataSprite[4] = (int)CornerName::BOTTOM_RIGHT;
 	indexDataSprite[5] = (int)CornerName::TOP_RIGHT;
 	indexResource_->GetResource()->Unmap(0, nullptr);
+
+	indexResource_->SetName("SimpleSpriteIndexResource");
+
 	return indexResource_->GetResource().Get();
 }
 

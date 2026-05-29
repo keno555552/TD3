@@ -2,14 +2,17 @@
 #include <vector>
 #include "MathsIncluder.h"
 #include <memory>
-#include "Transform.h"
-#include "TransformationMatrix.h"
+#include <string>
+#include "LinearAlgebra/Transform.h"
+#include "LinearAlgebra/TransformationMatrix.h"
 #include "MaterialConfig.h"
 #include "Data/Render/CPUData/ObjectData.h"
 #include "Data/Render/CPUData/CornerData.h"
 
 struct SpritePart
 {
+	std::string name{};
+
 	///================= デイタ保存 =================///
 	Transform transform = CreateDefaultTransform();
 

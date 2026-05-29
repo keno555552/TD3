@@ -14,7 +14,7 @@ class SrvManager;
 class ImGuiManager {
 public:
     static bool HandleMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam);
-    static void Initialize(DirectXController* dxComm, SrvManager* srvManager);
+    static void Initialize(DirectXController* dxComm);
     static void BeginFrame();
     static void EndFrame(ID3D12GraphicsCommandList* commandList);
     static void Shutdown();

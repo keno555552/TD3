@@ -14,13 +14,13 @@ ContestScene::ContestScene(kEngine* system) {
 	system_ = system;
 
 	// ライト
-	light1_ = new Light;
+	light1_ = std::make_unique<Light>();
 	light1_->direction = { -0.5f, -1.0f, -0.3f };
 	light1_->color = { 1.0f, 1.0f, 1.0f };
 	light1_->intensity = 0.2f;
-	system_->AddLight(light1_);
+	system_->AddLight(light1_.get());
 	
-	judgesSpotLight_ = new Light;
+	judgesSpotLight_ = std::make_unique<Light>();
 	judgesSpotLight_->lightingType = LightingType::SpotLight;
 	judgesSpotLight_->position = { 0.0f,2.0f,-1.65f };
 	judgesSpotLight_->direction = { 0.0f, -1.0f, 0.0f };
@@ -29,9 +29,9 @@ ContestScene::ContestScene(kEngine* system) {
 	judgesSpotLight_->range = 100.0f;
 	judgesSpotLight_->intensity = 2.0f;
 	judgesSpotLight_->extra0 = 1;
-	system_->AddLight(judgesSpotLight_);
+	system_->AddLight(judgesSpotLight_.get());
 
-	spotlight_ = new Light;
+	spotlight_ = std::make_unique<Light>();
 	spotlight_->lightingType = LightingType::SpotLight;
 	spotlight_->position = { 0.0f,2.0f,0.15f };
 	spotlight_->direction = { 0.0f, -1.0f, 0.0f };
@@ -40,13 +40,13 @@ ContestScene::ContestScene(kEngine* system) {
 	spotlight_->range = 100.0f;
 	spotlight_->intensity = 5.0f;
 	spotlight_->extra0 = 1;
-	system_->AddLight(spotlight_);
+	system_->AddLight(spotlight_.get());
 
 	// カメラ
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
-	camera_->SetTranslate({ 0.0f, 3.5f, -13.0f });
-	camera_->SetRotation({ 0.15f, 0.0f, 0.0f });
+	camera_.lock()->SetTranslate({ 0.0f, 3.5f, -13.0f });
+	camera_.lock()->SetRotation({ 0.15f, 0.0f, 0.0f });
 	usingCamera_ = camera_;
 	system_->SetCamera(usingCamera_);
 
@@ -238,7 +238,7 @@ ContestScene::ContestScene(kEngine* system) {
 			npcBodyActors_[i].BuildFromCustomizeData(*npcData);
 
 			// NPC用スポットライト
-			npcSpotlights_[i] = new Light;
+			npcSpotlights_[i] = std::make_unique<Light>();
 			npcSpotlights_[i]->lightingType = LightingType::SpotLight;
 			npcSpotlights_[i]->position = { npcX, 2.0f, 0.15f };
 			npcSpotlights_[i]->direction = { 0.0f, -1.0f, 0.0f };
@@ -247,7 +247,7 @@ ContestScene::ContestScene(kEngine* system) {
 			npcSpotlights_[i]->range = 100.0f;
 			npcSpotlights_[i]->intensity = 5.0f;
 			npcSpotlights_[i]->extra0 = 1;
-			system_->AddLight(npcSpotlights_[i]);
+			system_->AddLight(npcSpotlights_[i].get());
 
 			// スコア計算
 			if (theme != nullptr) {
@@ -319,24 +319,17 @@ ContestScene::~ContestScene() {
 	bitmapFont_.Cleanup();
 	system_->DestroyCamera(camera_);
 	system_->DestroyCamera(debugCamera_);
-	system_->RemoveLight(spotlight_);
-	system_->RemoveLight(judgesSpotLight_);
+	system_->RemoveLight(spotlight_.get());
+	system_->RemoveLight(judgesSpotLight_.get());
 	for (int i = 0; i < 2; ++i) {
 		if (npcSpotlights_[i]) {
-			system_->RemoveLight(npcSpotlights_[i]);
+			system_->RemoveLight(npcSpotlights_[i].get());
 		}
 	}
-	system_->RemoveLight(light1_);
+	system_->RemoveLight(light1_.get());
 
 	ResourceManager::GetInstance()->CleanupUnusedMaterials();
 
-	delete light1_;
-	delete judgesSpotLight_;
-	delete spotlight_;
-	for (int i = 0; i < 2; ++i) {
-		delete npcSpotlights_[i];
-		npcSpotlights_[i] = nullptr;
-	}
 	delete userDataManager_;
 	userDataManager_ = nullptr;
 }
@@ -362,7 +355,7 @@ void ContestScene::Update() {
 	}
 
 	// フェード更新
-	fade_.Update(usingCamera_);
+	fade_.Update(usingCamera_.lock().get());
 
 	// フェード終了後にシーン移行
 	if (isStartTransition_ && fade_.IsFinished()) {
@@ -628,14 +621,14 @@ void ContestScene::Draw() {
 #ifdef USE_IMGUI
 	ImGui::Begin("Camera Control");
 	ImGui::Checkbox("Use Debug Camera", &useDebugCamera_);
-	if (usingCamera_) {
+	if (!usingCamera_.expired()) {
 		ImGui::Text("Pos: %.1f, %.1f, %.1f",
-			usingCamera_->GetTransform().translate.x,
-			usingCamera_->GetTransform().translate.y,
-			usingCamera_->GetTransform().translate.z);
-		ImGui::Text("Rot: %.2f, %.2f, %.2f", usingCamera_->GetTransform().rotate.x,
-			usingCamera_->GetTransform().rotate.y,
-			usingCamera_->GetTransform().rotate.z);
+			usingCamera_.lock()->GetTransform().translate.x,
+			usingCamera_.lock()->GetTransform().translate.y,
+			usingCamera_.lock()->GetTransform().translate.z);
+		ImGui::Text("Rot: %.2f, %.2f, %.2f", usingCamera_.lock()->GetTransform().rotate.x,
+			usingCamera_.lock()->GetTransform().rotate.y,
+			usingCamera_.lock()->GetTransform().rotate.z);
 	}
 	ImGui::End();
 #endif
@@ -651,68 +644,68 @@ void ContestScene::Draw() {
 #endif
 
 	if (contestVenue_.object) {
-		contestVenue_.object->Update(usingCamera_);
+		contestVenue_.object->Update(nullptr);
 		contestVenue_.object->Draw();
 	}
 
 	if (stage_.object) {
-		stage_.object->Update(usingCamera_);
+		stage_.object->Update(nullptr);
 		stage_.object->Draw();
 	}
 
 	if (backScreen_.object) {
-		backScreen_.object->Update(usingCamera_);
+		backScreen_.object->Update(nullptr);
 		backScreen_.object->Draw();
 	}
 
 	for (auto& rightScreen : rightSideScreens_) {
 		if (rightScreen.object) {
-			rightScreen.object->Update(usingCamera_);
+			rightScreen.object->Update(nullptr);
 			rightScreen.object->Draw();
 		}
 	}
 
 	for (auto& leftScreen : leftSideScreens_) {
 		if (leftScreen.object) {
-			leftScreen.object->Update(usingCamera_);
+			leftScreen.object->Update(nullptr);
 			leftScreen.object->Draw();
 		}
 	}
 
 	if (floor_.object) {
-		floor_.object->Update(usingCamera_);
+		floor_.object->Update(nullptr);
 		floor_.object->Draw();
 	}
 
 	for (auto& judge : judges_) {
 		if (judge.object) {
-			judge.object->Update(usingCamera_);
+			judge.object->Update(nullptr);
 			judge.object->Draw();
 		}
 	}
 
 	if (judgesStage_.object) {
-		judgesStage_.object->Update(usingCamera_);
+		judgesStage_.object->Update(nullptr);
 		judgesStage_.object->Draw();
 	}
 
 	if (judgesDesk_.object) {
-		judgesDesk_.object->Update(usingCamera_);
+		judgesDesk_.object->Update(nullptr);
 		judgesDesk_.object->Draw();
 	}
 
 	for (auto& chair : judgesChairs_) {
 		if (chair.object) {
-			chair.object->Update(usingCamera_);
+			chair.object->Update(nullptr);
 			chair.object->Draw();
 		}
 	}
 
-	customizedBodyActor_.UpdateAndDraw(usingCamera_);
+	customizedBodyActor_.UpdateAndDraw(usingCamera_.lock().get());
 
 	for (int i = 0; i < 2; ++i) {
 		if (npcScoreCalculated_[i]) {
-			npcBodyActors_[i].UpdateAndDraw(usingCamera_);
+			npcBodyActors_[i].UpdateAndDraw(usingCamera_.lock().get());
 		}
 	}
 
@@ -785,7 +778,7 @@ std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
 
 	case ContestPhase::Suspense: {
 		// 3つのスポットライト：プレイヤー、NPC0、NPC1
-		Light* lights[3] = { spotlight_, npcSpotlights_[0], npcSpotlights_[1] };
+		Light* lights[3] = { spotlight_.get(), npcSpotlights_[0].get(), npcSpotlights_[1].get() };
 		// 対応する人物のワールド位置（プレイヤー x=0, NPC0 x=-1.0, NPC1 x=+1.0）
 		Vector3 targets[3] = {
 			{ 0.0f, 0.15f, -0.2f },
@@ -858,7 +851,7 @@ void ContestScene::HandleTrophyChoice() {
 void ContestScene::CameraPart() {
 	if (useDebugCamera_) {
 		usingCamera_ = debugCamera_;
-		debugCamera_->MouseControlUpdate();
+		debugCamera_.lock()->MouseControlUpdate();
 	} else {
 
 		if (currentPart_) {
@@ -906,8 +899,8 @@ void ContestScene::CameraPart() {
 					(cameraTarget_.rotation.z - cameraCurrent_.rotation.z) * t;
 			}
 
-			camera_->SetTranslate(cameraCurrent_.position);
-			camera_->SetRotation(cameraCurrent_.rotation);
+			camera_.lock()->SetTranslate(cameraCurrent_.position);
+			camera_.lock()->SetRotation(cameraCurrent_.rotation);
 
 			usingCamera_ = camera_;
 		}

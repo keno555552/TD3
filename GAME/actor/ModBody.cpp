@@ -561,10 +561,12 @@ void ModBody::CacheBaseTransforms(Object *target) {
         if (group != nullptr && group->GetModelNum() > 0) {
           Model *model = group->GetModel(0);
           if (model != nullptr) {
-            ModelData modelData = model->GetModelData();
+              std::shared_ptr <ModelData> modelData = model->GetModelData();
+
+			  int rootNodeIndex = modelData.get()->rootNodeList[0];
             autoCalculatedCapsule_ =
                 ModCapsuleUtil::CalculateMinimalCapsuleFromVertices(
-                    modelData.vertices, modelData.rootNode.localMatrix);
+                    modelData.get()->meshDataList[0].vertices, modelData.get()->nodeList[rootNodeIndex].localMatrix);
           }
         }
       }

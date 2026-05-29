@@ -1,6 +1,6 @@
 #pragma once
 #include "DirectXCore.h"
-#include "SrvManager/SrvManager.h"
+#include "DescriptorManager/SrvManager/SrvManager.h"
 #include "BasicResource.h"
 #include "externals/DirectXTex/DirectXTex.h"
 //#include "WinAPI.h"
@@ -10,15 +10,26 @@
 #include <unordered_map>
 #include "config.h"
 
+#include "Vector4.h"
+
 class TextureManager
 {
 public:
 	/// シングルトン取得
 	static TextureManager* GetInstance();
-	~TextureManager() = default;
+
+	class ConstructorKey {
+	private:
+		/// からのみ生成・破棄可能
+		friend class TextureManager;
+		friend class kEngine;
+		ConstructorKey() {}
+	};
+
+	explicit TextureManager(ConstructorKey) {};
 
 	/// 初期化
-	void Initialize(DirectXCore* core, SrvManager* srvManager);
+	void Initialize(DirectXCore* core);
 	/// シングルトン解放
 	void Finalize();
 	/// 
@@ -37,7 +48,6 @@ public:
 	/// <param name="filePath">テクスチャファイルのパス</param>
 	/// <returns>テキスチャハンドル</returns>
 	int LoadModelTexture(const std::string& filePath);
-
 
 	/// <summary>
 	/// 
@@ -66,6 +76,9 @@ public:
 
 	void EndUploadingTexture();
 
+private:
+	friend struct std::default_delete<TextureManager>;
+	~TextureManager() = default;
 private:
 
 	/// すべきのテクスチャハンドル

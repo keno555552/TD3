@@ -40,13 +40,13 @@ private:
   bool hasSpawnedDustArray_[4] = {false, false, false, false};
 
   // 仮ライト
-  Light *light1_ = nullptr;
+  std::unique_ptr<Light> light1_;
 
   // カメラ
-  Camera *camera_ = nullptr;
-  DebugCamera *debugCamera_ = nullptr;
-  Camera *usingCamera_ = nullptr;
-  Camera *titleCamera_ = nullptr; // タイトルロゴ用
+  std::weak_ptr<Camera> camera_;
+  std::weak_ptr<DebugCamera> debugCamera_;
+  std::weak_ptr<Camera> usingCamera_;
+  std::weak_ptr<Camera> titleCamera_; // タイトルロゴ用
 
   // フェード
   Fade fade_;

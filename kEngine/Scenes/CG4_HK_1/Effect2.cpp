@@ -5,7 +5,7 @@ Effect2::Effect2(kEngine* system) {
 	system_ = system;
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
-	camera_->Move(Vector3(0.0f, 0.5f, -10.0f));
+	camera_.lock()->Move(Vector3(0.0f, 0.5f, -10.0f));
 
 	/// =========== リソースロード ============///
 	skydomeModelHandle_ = system_->SetModelObj("resources/TemplateResource/object/skydome/skydome.obj");
@@ -40,9 +40,9 @@ void Effect2::Update() {
 	CameraPart();
 
 	/// Skydome更新
-	skydome_->Update(usingCamera_);
+	skydome_->Update();
 
-	plane_->Update(usingCamera_);
+	plane_->Update();
 
 
 	if (isWind_) {
@@ -51,7 +51,7 @@ void Effect2::Update() {
 			obj->mainPosition.transform.translate.x -= 3 * system_->GetDeltaTime();
 		}
 	}
-	ball_->Update(usingCamera_);
+	ball_->Update(usingCamera_.lock().get());
 
 
 
@@ -84,7 +84,7 @@ void Effect2::Draw() {
 void Effect2::CameraPart() {
 	if (useDebugCamera) {
 		usingCamera_ = debugCamera_;
-		debugCamera_->MouseControlUpdate();
+		debugCamera_.lock()->MouseControlUpdate();
 	} else {
 		usingCamera_ = camera_;
 	}

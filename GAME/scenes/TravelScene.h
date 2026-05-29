@@ -44,14 +44,14 @@ private:
 private:
   /*ライト
   ------------------------------*/
-  Light *light1_ = nullptr;
+  std::unique_ptr<Light> light1_;
 
   /* カメラ
   ------------------------------*/
-  Camera *camera_ = nullptr;
-  DebugCamera *debugCamera_ = nullptr;
-  Camera *usingCamera_ = nullptr;
-  Camera *loupeCamera_ = nullptr;
+  std::weak_ptr<Camera> camera_;
+  std::weak_ptr<DebugCamera> debugCamera_;
+  std::weak_ptr<Camera> usingCamera_;
+  std::weak_ptr<Camera> loupeCamera_;
 
   bool useDebugCamera_ = false;
 

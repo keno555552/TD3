@@ -1,8 +1,9 @@
 #pragma once
+#include <memory>
 #include "Transform.h"
 #include "TransformationMatrix.h"
 #include "MathsIncluder.h"
-#include "CrashData/Ray.h"
+#include "Data/Geometry/Shape/Line/Ray.h"
 #include "config.h"
 
 
@@ -12,11 +13,19 @@ class CameraManager;
 class DebugCamera;
 class Camera {
 public:
+	/// PassKeyでCameraManagerからのみ生成可能
+	class ConstructorKey {
+	private:
+		/// CameraManagerからのみ生成・破棄可能
+		friend class CameraManager;
+		friend class DebugCamera;
+		ConstructorKey() {}
+	};
 
-	/// CameraManagerからのみ生成・破棄可能
-	friend class CameraManager;
-	friend class DebugCamera;
+	explicit Camera(ConstructorKey);
+	~Camera() = default;
 
+public:
 	/// 更新
 	virtual void Update();
 
@@ -31,7 +40,6 @@ public:
 	/// 平行移動
 	void Move(Vector3 speed);
 	void Rotate(Vector3 Theta);
-
 
 	/// セットカメラ
 	void SetRotation(Vector3 rotate);
@@ -53,23 +61,17 @@ public:
 	Transform GetDefaultTransform() const { return defaultTransform_; }
 
 	/// カメラツール
-	bool isObjectFaceCamera(const Vector3& objectForward,const Vector3& objectPos, const float& thresholdDegree = 90.0f);
+	bool isObjectFaceCamera(const Vector3& objectForward, const Vector3& objectPos, const float& thresholdDegree = 90.0f);
 	Ray ScreenPointToRay(const Vector2& screenPos);
 
-	void ResetCamera(); 
-
-private:
-	/// =============　将来カメラは必ずエンジン側で管理されるべき ============= ///
-	Camera();
-	virtual ~Camera() = default;
-
+	void ResetCamera();
 
 protected:
 
 	/// 水平方向視野角
 	float fovY_;
 	/// アスペクト比
-	float aspect_ ;
+	float aspect_;
 	/// ニアクリップ距離
 	float nearClip_;
 	/// ファークリップ距離

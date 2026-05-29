@@ -2,27 +2,40 @@
 #include "DirectXController.h"
 #include "inputCore.h"
 #include "soundManager.h"
-#include "SrvManager/SrvManager.h"
-#include "drawEngine/drawEngine.h"
-#include "TransformationMatrix.h"
-#include "Vector2.h"
+#include "DescriptorManager/SrvManager/SrvManager.h"
+#include "DescriptorManager/RtvManager/RtvManager.h"
+#include "DescriptorManager/DsvManager/DsvManager.h"
+#include "LinearAlgebra/TransformationMatrix.h"
+#include "LinearAlgebra/Vector2.h"
 #include "Data/Render/CPUData/materialconfig.h"
+#include "Tool/EffectSystem/ParticleSystem/ParticleInstance.h"
 #include "TimeManager/TimeManager.h"
+#include "AnimationSystem/AnimationManager.h"
 #include "DrawData/DrawDataCollector.h"
 #include "CameraManager/CameraManager.h"
+#include "drawEngine/drawEngine.h"
 
 #ifdef USE_IMGUI
 #include "ImGuiManager.h"
 #endif // USE_IMGUI
+
+#ifdef _DEBUG
+#include "DebugDraw.h"
+#endif
+
+#include <CPUData/DebugLine.h>
+
 #include <string>
 #include "Data/Render/CPUData/ObjectData.h"
 #include "Data/Render/CPUData/SpriteData.h"
 //#include "InstanceManager.h"
+#include "Tool/EffectSystem/EffectManager.h"
 #include "Resource/ResourceManager.h"
 #include "Resource/TextureManager.h"
 #include "LightManager/LightManager.h"
 #include "GPUData/DirectionalLightGPU.h"
 #include "Camera/Camera.h"
+#include <CPUData/RenderCommand.h>
 
 
 class kEngine
@@ -53,28 +66,53 @@ public:
 #pragma region 描画システム
 
 	/// VVVV====== SpriteData/ObjectData描画,今上使えない ======VVVV///
+	void DrawDebugLine(DebugLine* debugLine);
 	void Draw2D(SpriteData* spriteData);
 	void Draw3D(ObjectData* objectData);
+	void DrawParticle(std::vector<ObjectData>& objectList, std::vector<ParticleInstance>& instance);
 
 	int GetModelTextureHandle(int modelHandle, int part);
 
+	const Model* GetModel(int modelHandle, int partHandle);
 	int GetMutiModelNum(int modelHandle);
 	int SetModelObj(std::string path);
+
+	/// EngineModel関連
+	int CreateEngineModel(SphereBuildMaterial& buildMaterial);
+	int CreateEngineModel(CylinderBuildMaterial& buildMaterial);
+	void ChangeEngineModel(SphereBuildMaterial& buildMaterial, int modelHandle, int meshHandle = -1);
+	void ChangeEngineModel(CylinderBuildMaterial& buildMaterial, int modelHandle, int meshHandle = -1);
+
+	/// Modelに必要なものルードを準備する
+	void CreateModelRoot(ObjectData* objectData);
+	void ClearModelRoot(ObjectData* objectData);
 
 	void AddLight(Light* light);
 	void RemoveLight(Light* light);
 
+	void SetPostProcessChain(const std::vector<PostProcessType>& chain);
+	void ChangeRenderCommand(RenderCommand& renderCommand);
 
-	DebugCamera* CreateDebugCamera();
-	Camera* CreateCamera();
-	void DestroyCamera(Camera* camera);
-	void SetCamera(Camera* camera);
+	std::weak_ptr <DebugCamera> CreateDebugCamera();
+	std::weak_ptr <Camera> CreateCamera();
+	void DestroyCamera(std::weak_ptr<Camera> camera);
+	void SetCamera(std::weak_ptr<Camera> camera);
 	void ResetToDefaultCamera();
 
 	int commonTextureHandleReader(int handle);
 	int commonModelHandleReader(int handle);
 
 	int LoadTexture(const std::string& filePath);
+
+#pragma endregion
+
+#pragma region アニメーションシステム
+
+	std::vector<int> LoadAnimation(const std::string& filePath);
+
+	void AnimationUnitSetTime(int unitHandle, float time);
+
+	void AnimationTakeControlObject(int unitHandle, Object* object);
 
 #pragma endregion
 
@@ -174,22 +212,26 @@ public:
 	float GetTimerTimeScale_() const;
 	float GetTimerScaledDeltaTime_() const;
 
-
 #pragma endregion
 
 #pragma region システムインターフェース
 
 	DirectXController* GetDirectXController();
 	SrvManager* GetSrvManager();
+	RtvManager* GetRtvManager();
+	DsvManager* GetDsvManager();
 	ResourceManager* GetResourceManager() const;
 	TextureManager* GetTextureManager() const;
 	LightManager* GetLightManager() const;
 	CameraManager* GetCameraManager() const;
+	AnimationManager* GetAnimationManager() const;
 	DrawDataCollector* GetDrawDataCollector() const;
 	DrawEngine* GetDrawEngine() const;
+
 	SoundManager* GetSoundManager() const;
 	InputCore* GetInputManager() const;
 	TimeManager* GetTimeManager()const;
+	EffectManager* GetEffectManager() const;
 
 #pragma endregion
 
@@ -197,11 +239,14 @@ private:
 	/// ============ コアシステム ============///
 	std::unique_ptr <DirectXController> dxComm = nullptr;
 
+	/// ========= アニメーション関連 =========///
+
+	std::unique_ptr <AnimationManager> animationManager{};
 
 	/// ============ 描画関連 ============///
 
 	/// 資源管理
-	std::unique_ptr <SrvManager> srvManager{};
+	///SrvManager* srvManager{};
 	///ResourceManager* resourceManager{};					/// シングルトン
 	///TextureManager* textureManager{};					/// シングルトン
 
@@ -217,6 +262,7 @@ private:
 
 	/// 描画ロジック
 	std::unique_ptr <DrawEngine> drawEngine{};
+	std::unique_ptr<PostProcessRunner> postProcessRunner_{};
 
 	/// ============ 入力関連 ============///
 	std::unique_ptr <InputCore> inputManager{};
@@ -226,6 +272,9 @@ private:
 
 	/// ============ 時間関連 ============///
 	std::unique_ptr <TimeManager> timeManager{};
+
+	/// ============ Effect関連 ============///
+	std::unique_ptr <EffectManager> effectManager{};
 
 	/// =========== ゲーム継続関連 ===========///
 	static bool isGameOn_;

@@ -12,7 +12,7 @@ void DustParticle::Spawn(const Vector3& pos) {
 	// 1. アニメ調の土煙（複数の球が急速に膨らみ、空中で縮んで消えることで、1つの雲のように見せる）
 	for (int i = 0; i < 15; ++i) {
 		AddObject();
-		auto* p = particleObjectList_.back();
+		auto& p = particleObjectList_.back();
 		
 		p->direction.translate = pos;
 		p->scaleSpeed = 1.0f; // Smoke flag
@@ -48,7 +48,7 @@ void DustParticle::Spawn(const Vector3& pos) {
 	// 2. 物理デブリ（飛び散る土くれ）
 	for (int i = 0; i < 8; ++i) {
 		AddObject();
-		auto* p = particleObjectList_.back();
+		auto& p = particleObjectList_.back();
 		
 		p->direction.translate = pos;
 		p->scaleSpeed = 2.0f; // Debris flag
@@ -77,11 +77,10 @@ void DustParticle::Spawn(const Vector3& pos) {
 
 void DustParticle::Update(Camera* camera) {
 	for (auto it = particleObjectList_.begin(); it != particleObjectList_.end();) {
-		auto* p = *it;
+		auto& p = *it;
 		p->lifeTimeTimer.ToMix();
 		if (p->lifeTimeTimer.GetIsMax()) {
 			delete p->part;
-			delete p;
 			it = particleObjectList_.erase(it);
 			continue;
 		}
@@ -157,7 +156,7 @@ void DustParticle::Update(Camera* camera) {
 }
 
 void DustParticle::Draw() {
-	for (auto* p : particleObjectList_) {
+	for (const auto& p : particleObjectList_) {
 		p->part->Draw();
 	}
 }

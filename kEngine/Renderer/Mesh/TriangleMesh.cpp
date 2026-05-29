@@ -53,5 +53,7 @@ ID3D12Resource* TriangleMesh::CreateVertexResource_(ID3D12Device* device) {
 
 	SetVertexNum(6);
 
+	vertexResource_->SetName("TriangleVertexResource");
+
 	return vertexResource_->GetResource().Get();
 }

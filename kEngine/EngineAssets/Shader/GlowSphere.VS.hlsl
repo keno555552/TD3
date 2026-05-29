@@ -1,3 +1,19 @@
+///////////////////////////////
+//////////Not Ready////////////
+///////////////////////////////
+
+struct TransformationMatrix
+{
+    float4x4 WVP;
+    float4x4 world;
+    float4x4 worldInverseTranspose;
+};
+StructuredBuffer<TransformationMatrix> gTransformationMatrices : register(t0);
+
+cbuffer InstanceOffset : register(b1)
+{
+    uint instanceOffset;
+}
 
 struct GlowVSInput
 {
@@ -20,7 +36,8 @@ GlowVSOutput main(GlowVSInput input, uint instanceId : SV_InstanceID)
     GlowVSOutput output;
     output.position = mul(float4(input.position, 1.0f), transform.WVP);
     output.worldPosition = mul(float4(input.position, 1.0f), transform.world).xyz;
-    output.normal = normalize(mul(input.normal, (float3x3) transform.worldInversTranspose));
+    output.normal = normalize(mul(input.normal, (float3x3) transform.worldInverseTranspose));
 
     return output;
 }
+

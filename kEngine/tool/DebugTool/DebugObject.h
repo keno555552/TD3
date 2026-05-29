@@ -9,7 +9,7 @@ public:
 	DebugObject(kEngine* kEngine);
 	~DebugObject();
 
-	void Update(Camera* camera) override;
+	void Update(Camera* camera = 0) override;
 	void Draw() override;
 
 	void SetFollowObject(ObjectPart* followObject);

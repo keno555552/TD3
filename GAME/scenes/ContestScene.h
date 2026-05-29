@@ -54,15 +54,15 @@ public:
 
 private:
   // ライト
-  Light *light1_ = nullptr;
-  Light* spotlight_ = nullptr;
-  Light* judgesSpotLight_ = nullptr;
-  Light* npcSpotlights_[2] = { nullptr, nullptr };
+  std::unique_ptr<Light> light1_;
+  std::unique_ptr<Light> spotlight_;
+  std::unique_ptr<Light> judgesSpotLight_;
+  std::unique_ptr<Light> npcSpotlights_[2];
 
   // カメラ
-  Camera *camera_ = nullptr;
-  DebugCamera *debugCamera_ = nullptr;
-  Camera *usingCamera_ = nullptr;
+  std::weak_ptr<Camera> camera_;
+  std::weak_ptr<DebugCamera> debugCamera_;
+  std::weak_ptr<Camera> usingCamera_;
   bool useDebugCamera_ = false;
 
   // カメラ補間

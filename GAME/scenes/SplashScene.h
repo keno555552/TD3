@@ -21,6 +21,6 @@ private:
 	const float kDisplayDuration_ = 3.0f; // 3 seconds before auto-fade
 	bool isFadingOut_ = false;
 
-	Camera* camera_ = nullptr;
-	Light* dummyLight_ = nullptr;
+	std::weak_ptr<Camera> camera_;
+	std::unique_ptr<Light> dummyLight_;
 };

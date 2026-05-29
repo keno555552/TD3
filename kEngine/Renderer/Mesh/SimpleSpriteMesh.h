@@ -12,6 +12,13 @@ public:
 	void SetSize(Vector2 RBpos);
 	void SetSize(CornerData corner);
 	void SetAnchor(Vector2 RBpos, Vector2 anchorPoint);
+
+	/// <summary>
+	/// spriteのテクスチャーの一部を切り取るための関数
+	/// </summary>
+	/// <param name="textureSize">テキスチャ素材の大きさ</param>
+	/// <param name="cropLT">テキスチャ素材左上の位置(px)</param>
+	/// <param name="cropSize">テキスチャ素材をcropしたい大きさ(px)</param>
 	void SetTexcoord(Vector2 textureSize,Vector2 cropLT, Vector2 cropSize);
 	void ResetTexcoord();
 	ID3D12Resource* CreateVertexResource_(ID3D12Device* device)override;

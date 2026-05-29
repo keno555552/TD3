@@ -9,9 +9,9 @@ SplashScene::SplashScene(kEngine* system) {
 	system_->SetCamera(camera_);
 
 	// エンジンのバグ（ライトが0個だとクラッシュする）を回避するためのダミーライト
-	dummyLight_ = new Light();
+	dummyLight_ = std::make_unique<Light>();
 	dummyLight_->intensity = 0.0f; // 影響を与えないようにする
-	system_->AddLight(dummyLight_);
+	system_->AddLight(dummyLight_.get());
 
 	splashTextureHandle_ = system_->LoadTexture("GAME/resources/splash_controls.png");
 	
@@ -27,27 +27,26 @@ SplashScene::SplashScene(kEngine* system) {
 
 	splashSprite_->mainPosition.transform.translate = { 640.0f, 360.0f, 0.0f };
 	
-	splashSprite_->Update(camera_);
+	splashSprite_->Update(camera_.lock().get());
 
 	fade_.Initialize(system_);
 	fade_.StartFadeIn(0.02f);
 }
 
 SplashScene::~SplashScene() {
-	if (camera_) {
+	if (camera_.expired()) {
 		system_->DestroyCamera(camera_);
 	}
 	if (dummyLight_) {
-		system_->RemoveLight(dummyLight_);
-		delete dummyLight_;
+		system_->RemoveLight(dummyLight_.get());
 	}
 }
 
 void SplashScene::Update() {
 	if (splashSprite_) {
-		splashSprite_->Update(camera_);
+		splashSprite_->Update(camera_.lock().get());
 	}
-	fade_.Update(camera_);
+	fade_.Update(camera_.lock().get());
 
 	if (!isFadingOut_) {
 		float dt = system_->GetDeltaTime();

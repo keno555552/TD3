@@ -224,9 +224,10 @@ void Panel::Update() {
 
 void Panel::Render() {
 	DrawPanel(panelState_);
-#ifdef DEBUG
-	ImGuiPart();
-#endif // DEBUG
+
+#ifdef _DEBUG
+		ImGuiPart();
+#endif
 }
 
 void Panel::DrawPanel(int buttonStatic) {
@@ -280,7 +281,7 @@ void Panel::ClosePanel() {
 
 	float t = animationTimer_.linearity();
 
-	float scale = 0.8 + 0.2f * t;
+	float scale = 0.8f + 0.2f * t;
 
 	mainPosition.transform.scale.x = scale;
 	mainPosition.transform.scale.y = scale;

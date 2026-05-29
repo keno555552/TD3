@@ -92,6 +92,14 @@ Microsoft::WRL::ComPtr<ID3D12Resource> BasicResource::GetResource(int Index) {
 	return nullptr;
 }
 
+void BasicResource::SetName(const std::string name,const int Index) {
+	if (Index < 0) {
+		resource_.back()->SetName(std::wstring(name.begin(), name.end()).c_str());
+	} else {
+		resource_[Index]->SetName(std::wstring(name.begin(), name.end()).c_str());
+	}
+}
+
 void BasicResource::ClearResource() {
 	for (auto& r : resource_) {
 		r.Reset();

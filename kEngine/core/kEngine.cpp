@@ -12,26 +12,32 @@ void kEngine::Initialize(const char* kClientTitle, int kClientWidth, int kClient
 	dxComm = std::make_unique<DirectXController>();
 	dxComm->InitializeDrive(kClientTitle, kClientWidth, kClientHeight);
 
-	srvManager = std::make_unique<SrvManager>();
-	srvManager->Initialize(dxComm.get());
+	SrvManager::GetInstance()->Initialize(dxComm.get());
+	RtvManager::GetInstance()->Initialize(dxComm.get());
+	DsvManager::GetInstance()->Initialize(dxComm.get());
 
 #ifdef USE_IMGUI
-	ImGuiManager::Initialize(dxComm.get(), srvManager.get());
+	ImGuiManager::Initialize(dxComm.get());
 #endif
 
 	//instanceManager = std::make_unique < InstanceManager>();
-	TextureManager::GetInstance()->Initialize(dxComm.get(), srvManager.get());
+	TextureManager::GetInstance()->Initialize(dxComm.get());
 	ResourceManager::GetInstance()->Initialize(dxComm.get());
 
 	lightManager = std::make_unique<LightManager>();
+	lightManager->Initialize();
 	cameraManager = std::make_unique<CameraManager>();
+	cameraManager->Initialize();
+
+	animationManager = std::make_unique<AnimationManager>(this);
 
 	drawDataCollector = std::make_unique<DrawDataCollector>();
-	drawDataCollector->Initialize(cameraManager.get(), lightManager.get());
+	drawDataCollector->Initialize(cameraManager.get(), lightManager.get(), animationManager.get());
 
 
+	postProcessRunner_ = std::make_unique<PostProcessRunner>();
 	drawEngine = std::make_unique<DrawEngine>();
-	drawEngine->Initialize(dxComm.get(), srvManager.get(), ResourceManager::GetInstance(), drawDataCollector.get());
+	drawEngine->Initialize(dxComm.get(), drawDataCollector.get(), postProcessRunner_.get());
 
 	soundManager = std::make_unique<SoundManager>();
 	soundManager->Initialize();
@@ -40,6 +46,9 @@ void kEngine::Initialize(const char* kClientTitle, int kClientWidth, int kClient
 
 	inputManager = std::make_unique<InputCore>();
 	inputManager->Initialize(dxComm.get(), timeManager.get());
+	
+	effectManager = std::make_unique<EffectManager>();
+	effectManager->Initialize(this);
 
 }
 
@@ -58,9 +67,22 @@ void kEngine::Finalize() {
 
 	drawEngine->Finalize();
 	drawDataCollector->Finalize();
+	animationManager.reset();
 	cameraManager->Finalize();
 	lightManager->Finalize();
-	srvManager->Finalize();
+	effectManager->Finalize();
+
+	SrvManager::GetInstance()->Finalize();
+	SrvManager::Destroy();
+
+	RtvManager::GetInstance()->Finalize();
+	RtvManager::Destroy();
+
+	DsvManager::GetInstance()->Finalize();
+	DsvManager::Destroy();
+
+
+
 	dxComm->Finalize();
 }
 
@@ -70,14 +92,29 @@ void kEngine::StartFrame() {
 	inputManager->KeysUpdata();
 	timeManager->Update();
 	drawDataCollector->PreCollect();
+	drawEngine->PreDraw();
 }
 
 void kEngine::EndFrame() {
+
+#ifdef _DEBUG
+
+	///デバッグドロー描画
+	DebugDraw::DrawAll(this);
+	DebugDraw::Clear();
+
+#endif
+
+	effectManager->Update();
+	effectManager->Draw();
+
+	animationManager->Update();
 	drawDataCollector->EndCollect();
-	drawEngine->PreDraw();
+	/// AAA　それ以前はロジック処理、集めとかの前処理 AAA
 	drawEngine->CommitDraw();
-	dxComm->EndFrame();
 	drawEngine->EndDraw();
+	dxComm->EndFrame();
+
 }
 
 bool kEngine::ProcessMessage() {
@@ -86,20 +123,69 @@ bool kEngine::ProcessMessage() {
 
 #pragma endregion
 
+#pragma region アニメーションシステム
+
+
+std::vector<int> kEngine::LoadAnimation(const std::string& filePath) {
+	return animationManager->LoadAnimation(filePath);
+}
+
+void kEngine::AnimationUnitSetTime(int unitHandle, float time) {
+	animationManager->UnitSetTime(unitHandle, time);
+}
+
+void kEngine::AnimationTakeControlObject(int unitHandle, Object* object) {
+	animationManager->TakeControlObject(unitHandle, object);
+}
+
+#pragma endregion
+
 #pragma region 描画システム
 
+void kEngine::DrawDebugLine(DebugLine* debugLine) {
+
+	/// nullptrチェック
+	if (!debugLine) {
+		Logger::Log("kEngine::DrawDebugLine()にnullptrが渡されました。");
+		return;
+	}
+
+	drawDataCollector->CollectDebugLine(debugLine);
+
+}
+
 void kEngine::Draw2D(SpriteData* spriteData) {
-	//resourceManager->Collet2D(spriteData);
+
+	/// nullptrチェック
+	if (!spriteData) {
+		Logger::Log("kEngine::Draw2D()にnullptrが渡されました。");
+		return;
+	}
+
 	drawDataCollector->Collect2D(spriteData);
 }
 
 void kEngine::Draw3D(ObjectData* object) {
-	//resourceManager->Collet3D(object);
+
+	/// nullptrチェック
+	if (!object) {
+		Logger::Log("kEngine::Draw3D()にnullptrが渡されました。");
+		return;
+	} 
+
 	drawDataCollector->Collect3D(object);
+}
+
+void kEngine::DrawParticle(std::vector<ObjectData>& objectList, std::vector<ParticleInstance>& instance) {
+	drawDataCollector->CollectParticle(objectList, instance);
 }
 
 int kEngine::GetModelTextureHandle(int modelHandle, int part) {
 	return ResourceManager::GetInstance()->GetTextureHandleFromModelGroup(modelHandle, part);
+}
+
+const Model* kEngine::GetModel(int modelHandle, int partHandle) {
+	return ResourceManager::GetInstance()->modelGroupList_[modelHandle]->GetModel(partHandle);
 }
 
 int kEngine::GetMutiModelNum(int modelHandle) {
@@ -108,7 +194,45 @@ int kEngine::GetMutiModelNum(int modelHandle) {
 
 int kEngine::SetModelObj(std::string path) {
 	//return drawEngine->SetModel(path);
-	return ResourceManager::GetInstance()->LoadModel(path);
+	int modelHandle = ResourceManager::GetInstance()->LoadModel(path);
+	return modelHandle;
+}
+
+/// ----------------------------- EngineModel関連 ---------------------------- ///
+
+int kEngine::CreateEngineModel(SphereBuildMaterial& buildMaterial) {
+	return ResourceManager::GetInstance()->CreateEngineModel(buildMaterial);
+}
+
+int kEngine::CreateEngineModel(CylinderBuildMaterial& buildMaterial) {
+	return ResourceManager::GetInstance()->CreateEngineModel(buildMaterial);
+}
+
+void kEngine::ChangeEngineModel(SphereBuildMaterial& buildMaterial, int modelHandle, int meshHandle) {
+	ResourceManager::GetInstance()->UpdateEngineModel(buildMaterial, modelHandle, meshHandle);
+}
+
+void kEngine::ChangeEngineModel(CylinderBuildMaterial& buildMaterial, int modelHandle, int meshHandle) {
+	ResourceManager::GetInstance()->UpdateEngineModel(buildMaterial, modelHandle, meshHandle);
+}
+
+void kEngine::CreateModelRoot(ObjectData* objectData) {
+	int modelHandle = objectData->modelHandle_;
+	ModelGroup* modelGroup = ResourceManager::GetInstance()->modelGroupList_[modelHandle].get();
+	
+	int handleNum = -1;
+
+	if (modelGroup->HasSkinClusterData()) {
+		drawEngine->CreateSkinningBuffer(objectData);
+	}
+}
+
+void kEngine::ClearModelRoot(ObjectData* objectData) {
+
+	int modelHandle = objectData->modelHandle_;
+	drawEngine->ClearSkinningBuffer(objectData);
+
+
 }
 
 void kEngine::AddLight(Light* light) {
@@ -119,19 +243,27 @@ void kEngine::RemoveLight(Light* light) {
 	lightManager->RemoveLight(light);
 }
 
-DebugCamera* kEngine::CreateDebugCamera() {
+void kEngine::SetPostProcessChain(const std::vector<PostProcessType>& chain) {
+	postProcessRunner_->SetChain(chain);
+}
+
+void kEngine::ChangeRenderCommand(RenderCommand& renderCommand) {
+	postProcessRunner_->ChangeRenderCommand(renderCommand);
+}
+
+std::weak_ptr <DebugCamera> kEngine::CreateDebugCamera() {
 	return cameraManager->CreateDebugCamera(this);
 }
 
-Camera* kEngine::CreateCamera() {
+std::weak_ptr <Camera> kEngine::CreateCamera() {
 	return cameraManager->CreateCamera();
 }
 
-void kEngine::DestroyCamera(Camera* camera) {
+void kEngine::DestroyCamera(std::weak_ptr <Camera> camera) {
 	cameraManager->DestroyCamera(camera);
 }
 
-void kEngine::SetCamera(Camera* camera) {
+void kEngine::SetCamera(std::weak_ptr <Camera> camera) {
 	cameraManager->SetActiveCamera(camera);
 }
 
@@ -416,7 +548,15 @@ DirectXController* kEngine::GetDirectXController() {
 }
 
 SrvManager* kEngine::GetSrvManager() {
-	return srvManager.get();
+	return SrvManager::GetInstance();
+}
+
+RtvManager* kEngine::GetRtvManager() {
+	return RtvManager::GetInstance();
+}
+
+DsvManager* kEngine::GetDsvManager() {
+	return DsvManager::GetInstance();
 }
 
 ResourceManager* kEngine::GetResourceManager() const {
@@ -433,6 +573,10 @@ LightManager* kEngine::GetLightManager() const {
 
 CameraManager* kEngine::GetCameraManager() const {
 	return cameraManager.get();
+}
+
+AnimationManager* kEngine::GetAnimationManager() const {
+	return nullptr;
 }
 
 DrawDataCollector* kEngine::GetDrawDataCollector() const {
@@ -453,6 +597,10 @@ InputCore* kEngine::GetInputManager() const {
 
 TimeManager* kEngine::GetTimeManager() const {
 	return timeManager.get();
+}
+
+EffectManager* kEngine::GetEffectManager() const {
+	return effectManager.get();
 }
 
 #pragma endregion

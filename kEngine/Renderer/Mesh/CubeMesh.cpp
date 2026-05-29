@@ -2,6 +2,7 @@
 ID3D12Resource* CubeMesh::CreateVertexResource_(ID3D12Device* device) {
 	vertexResource_->CreateResourceClass_(device, sizeof(VertexData) * 24);
 
+
 	// 頂点リソースにデータを書き込む
 	VertexData* vertexData = nullptr;
 	// 書き込むためのアドレスを取得
@@ -78,6 +79,7 @@ ID3D12Resource* CubeMesh::CreateVertexResource_(ID3D12Device* device) {
 	}
 	vertexResource_->GetResource()->Unmap(0, nullptr);
 
+	vertexResource_->SetName("CubeVertexResource");
 
 	return vertexResource_->GetResource().Get();
 }
@@ -114,8 +116,9 @@ ID3D12Resource* CubeMesh::CreateIndexResource_(ID3D12Device* device) {
 		}
 	}
 	indexResource_->GetResource()->Unmap(0, nullptr);
-
 	SetVertexNum(36);
+
+	indexResource_->SetName("CubeIndexResource");
 
 	return indexResource_->GetResource().Get();
 }

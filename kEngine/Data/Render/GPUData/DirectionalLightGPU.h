@@ -1,6 +1,6 @@
 #pragma once
-#include "Vector4.h"
-#include "Vector3.h"
+#include "LinearAlgebra/Vector4.h"
+#include "LinearAlgebra/Vector3.h"
 
 struct DirectionalLightGPU
 {

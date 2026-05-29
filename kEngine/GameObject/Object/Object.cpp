@@ -1,4 +1,6 @@
 #include "Object.h"
+
+#include "kEngine.h"
 #include "Vector3.h"
 void Object::CreateDefaultData() {
 	modelHandle_ = 0;
@@ -12,8 +14,15 @@ void Object::CreateDefaultData() {
 	objectParts_.push_back(newObjectPart);
 }
 
+Object::~Object() {
+
+	system_->ClearModelRoot(this);
+
+}
+
 void Object::IntObject(kEngine* system) {
 	system_ = system;
+	ObjectData::ownerObject = this;
 }
 
 void Object::Update(Camera* camera) {
@@ -120,7 +129,6 @@ void Object::Update(Camera* camera) {
 	//}
 }
 
-
 void Object::Draw() {
 	system_->Draw3D(this);
 }
@@ -136,6 +144,10 @@ void Object::CreateModelData(int modelHandle) {
 
 	for (int i = 0; i < numOfPart; i++) {
 		ObjectPart newObjectPart;
+
+		auto modelData = system_->GetModel(modelHandle, i)->GetModelData().get();
+
+		newObjectPart.name = modelData->meshDataList[i].name;
 		newObjectPart.materialConfig = std::make_shared<MaterialConfig>();
 		InitMaterialConfig(newObjectPart.materialConfig.get());
 		newObjectPart.materialConfig->lightModelType = LightModelType::HalfLambert;
@@ -145,6 +157,9 @@ void Object::CreateModelData(int modelHandle) {
 		objectParts_.push_back(newObjectPart);
 	}
 
+	/// Modelに必要なものルードを準備する
+	// 今はskinning用な行列を生成だけ
+	system_->CreateModelRoot(this);
 }
 // �Փ˂����I�u�W�F�N�g�̃|�C���^�[��n��
 Object* Object::Collision(const std::vector<Object*>& obj)
@@ -187,12 +202,17 @@ AABB Object::GetAABB(const Object* obj) const
 void Object::CopyObject(Object* target) {
 	if (target == nullptr)return;
 	mainPosition = target->mainPosition;
+	modelHandle_ = target->modelHandle_;
+	isBillboard_ = target->isBillboard_;
+	ownerObject = target->ownerObject;
 	followObject_ = target->followObject_;
 	for (auto& ptr : target->objectParts_) {
 		CreateDefaultData();
+		objectParts_.back().name = ptr.name;
 		objectParts_.back().transform = ptr.transform;
 		objectParts_.back().materialConfig = ptr.materialConfig;
 		objectParts_.back().parentPart = ptr.parentPart;
+		objectParts_.back().forward = ptr.forward;
 	}
 }
 

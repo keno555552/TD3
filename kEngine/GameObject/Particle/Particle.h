@@ -45,7 +45,7 @@ protected:
 		Object* part{};
 		bool isAlive = true;
 	};
-	std::vector<ParticleData*> particleObjectList_{};
+	std::vector<std::unique_ptr<ParticleData>> particleObjectList_{};
 
 	/// ========= 共通変数 ==========///
 	kEngine* system_ = nullptr;				// 借り

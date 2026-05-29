@@ -2,6 +2,7 @@
 #include "Vector4.h"
 #include "Data/Render/CPUData/VertexData.h"
 #include "TransformationMatrix.h"
+#include "Renderer/Resource/BasicResource.h"
 
 
 Microsoft::WRL::ComPtr< ID3D12Resource> CreateWVPResource(ID3D12Device* device, size_t sizeInBytes) {

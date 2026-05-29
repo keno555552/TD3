@@ -6,6 +6,7 @@
 #include "GAME/actor/prompt/PromptData.h"
 #include "GAME/effect/ModPartParticle.h"
 #include "Math/Geometry/Collision/crashDecision.h"
+#include "Tool/Importer/Reader/ObjReader.h"
 #include <Windows.h>
 #include <algorithm>
 #include <cfloat>
@@ -883,7 +884,7 @@ ModelLocalBounds GetModelLocalBounds(ModBodyPart part) {
   ModelLocalBounds result{};
 
   const std::string path = ModelPath(part);
-  const std::vector<ModelData> models = LoadFileTop(path);
+  const ModelData models = ReadObj(path);
 
   float minX = FLT_MAX;
   float minY = FLT_MAX;
@@ -894,13 +895,15 @@ ModelLocalBounds GetModelLocalBounds(ModBodyPart part) {
 
   bool hasVertex = false;
 
-  for (const ModelData &model : models) {
-    for (const VertexData &vertex : model.vertices) {
+  int iterationCount = 0;
+  for (const auto &model : models.meshDataList) {
+    for (const auto &vertex : model.vertices) {
       const Vector4 &pos4 = vertex.position;
       const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
 
+	  int nodeId = models.rootNodeList[iterationCount];
       const Vector3 transformed =
-          TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+          TransformPointByMatrixLocal(models.nodeList[nodeId].localMatrix, localPos);
 
       minX = (std::min)(minX, transformed.x);
       minY = (std::min)(minY, transformed.y);
@@ -912,6 +915,7 @@ ModelLocalBounds GetModelLocalBounds(ModBodyPart part) {
 
       hasVertex = true;
     }
+    iterationCount++;
   }
 
   if (!hasVertex) {
@@ -1054,13 +1058,13 @@ ModScene::ModScene(kEngine *system) {
     cameraRotate.x = atan2f(-dir.y, horizontalLength);
     cameraRotate.z = 0.0f;
 
-    debugCamera_->SetTranslate(cameraPos);
-    debugCamera_->SetRotation(cameraRotate);
-    debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
+    debugCamera_.lock()->SetTranslate(cameraPos);
+    debugCamera_.lock()->SetRotation(cameraRotate);
+    debugCamera_.lock()->SetDefaultTransform(debugCamera_.lock()->GetTransform());
 
-    camera_->SetTranslate(cameraPos);
-    camera_->SetRotation(cameraRotate);
-    camera_->SetDefaultTransform(camera_->GetTransform());
+    camera_.lock()->SetTranslate(cameraPos);
+    camera_.lock()->SetRotation(cameraRotate);
+    camera_.lock()->SetDefaultTransform(camera_.lock()->GetTransform());
   }
 
   // フェードインを開始する
@@ -1135,7 +1139,7 @@ void ModScene::Update() {
       s_hasSeenModTutorial = true;
     }
     UpdateModObjects();
-    fade_.Update(usingCamera_);
+    fade_.Update(usingCamera_.lock().get());
     tutorialBgSprite_->Update(nullptr);
     return;
   }
@@ -1144,7 +1148,7 @@ void ModScene::Update() {
   if (isFailureMenuOpen_) {
     UpdateNotifications();
     UpdateFailureMenuInputMod();
-    fade_.Update(usingCamera_);
+    fade_.Update(usingCamera_.lock().get());
 
     if (isStartTransition_ && fade_.IsFinished()) {
       if (customizeData_ != nullptr) {
@@ -1169,7 +1173,7 @@ void ModScene::Update() {
       isStartTransition_ = true;
     }
 
-    fade_.Update(usingCamera_);
+    fade_.Update(usingCamera_.lock().get());
 
     if (isStartTransition_ && fade_.IsFinished()) {
       if (customizeData_ != nullptr) {
@@ -1226,11 +1230,11 @@ void ModScene::Update() {
   }
 
   // フェード演出を更新する
-  fade_.Update(usingCamera_);
+  fade_.Update(usingCamera_.lock().get());
 
   // パーティクル更新
   if (modPartParticle_) {
-    modPartParticle_->Update(usingCamera_);
+    modPartParticle_->Update(usingCamera_.lock().get());
   }
 
   // フェードアウト完了後に共有データを保存して次シーンへ進む
@@ -1523,7 +1527,7 @@ Vector3 ModScene::ComputeOrbitTarget() const {
 }
 
 void ModScene::UpdateOrbitCamera() {
-  if (debugCamera_ == nullptr || camera_ == nullptr) {
+  if (usingCamera_.expired() || camera_.expired()) {
     return;
   }
 
@@ -1567,7 +1571,7 @@ void ModScene::UpdateOrbitCamera() {
   // 「今のカメラ位置」から orbit パラメータを逆算する
   // --------------------------------
   if (!blockCameraInput && rightPressed && !wasRightPressed) {
-    Vector3 currentPos = debugCamera_->GetTransform().translate;
+    Vector3 currentPos = debugCamera_.lock()->GetTransform().translate;
     Vector3 offset = Subtract(currentPos, orbitTarget_);
 
     orbitDistance_ = Length(offset);
@@ -1645,11 +1649,11 @@ void ModScene::UpdateOrbitCamera() {
   cameraRotate.x = atan2f(-dir.y, horizontalLength);
   cameraRotate.z = 0.0f;
 
-  debugCamera_->SetTranslate(cameraPos);
-  debugCamera_->SetRotation(cameraRotate);
+  debugCamera_.lock()->SetTranslate(cameraPos);
+  debugCamera_.lock()->SetRotation(cameraRotate);
 
-  camera_->SetTranslate(cameraPos);
-  camera_->SetRotation(cameraRotate);
+  camera_.lock()->SetTranslate(cameraPos);
+  camera_.lock()->SetRotation(cameraRotate);
 
   wasRightPressed = rightPressed;
 }
@@ -2570,11 +2574,11 @@ void ModScene::UpdateControlPointEditing() {
   }
 #endif
 
-  if (usingCamera_ == nullptr) {
-    return;
+  if (usingCamera_.expired()) {
+      return;
   }
 
-  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+  Ray mouseRay = usingCamera_.lock()->ScreenPointToRay(system_->GetMousePosVector2());
 
   // 画面UI上では3D側の選択・ドラッグ開始をさせない
   if (!assemblyDrag_.isDragging && IsMouseOverAnyScreenUi()) {
@@ -2661,10 +2665,10 @@ void ModScene::UpdateControlPointEditing() {
 }
 
 bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
-  if (usingCamera_ == nullptr) {
-    return false;
-  }
-  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    if (usingCamera_.expired()) {
+        return false;
+    }
+  const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
 
   const int visiblePartId = selectedPartId_;
 
@@ -2730,7 +2734,7 @@ bool ModScene::PickControlPointFromMouseRay(const Ray &mouseRay) {
     dragControlPlanePoint_ = worldPos;
 
     // カメラからターゲットへ向く方向 = 画面の法線
-    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
     dragControlPlaneNormal_ =
         NormalizeSafeV(Subtract(worldPos, cameraPos), {0.0f, 0.0f, 1.0f});
 
@@ -3001,7 +3005,7 @@ void ModScene::UpdateControlPointGizmos() {
 
     EnsureControlPointGizmoCount(visibleCount);
 
-    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+    const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
     size_t gizmoIndex = 0;
 
     for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
@@ -3048,7 +3052,7 @@ void ModScene::UpdateControlPointGizmos() {
             MakeColor(0.35f, 0.9f, 1.0f, 1.0f);
       }
 
-      gizmo->Update(usingCamera_);
+      gizmo->Update(usingCamera_.lock().get());
       ++gizmoIndex;
     }
 
@@ -3085,7 +3089,7 @@ void ModScene::UpdateControlPointGizmos() {
 
   EnsureControlPointGizmoCount(visibleCount);
 
-  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+  const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
 
   size_t gizmoIndex = 0;
   for (size_t i = 0; i < points.size(); ++i) {
@@ -3129,7 +3133,7 @@ void ModScene::UpdateControlPointGizmos() {
           MakeColor(0.35f, 0.9f, 1.0f, 1.0f);
     }
 
-    gizmo->Update(usingCamera_);
+    gizmo->Update(usingCamera_.lock().get());
     ++gizmoIndex;
   }
 
@@ -3593,7 +3597,7 @@ ModScene::ResolveAttachedLocalTranslate(const PartNode &childNode) const {
 }
 
 void ModScene::UpdateControlPointWheelScaling() {
-  if (usingCamera_ == nullptr) {
+  if (usingCamera_.expired()) {
     return;
   }
 
@@ -3601,7 +3605,7 @@ void ModScene::UpdateControlPointWheelScaling() {
   if (system_->GetMouseIsPush(2)) {
     return;
   }
-  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+  const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
 
   const int wheelDelta = system_->GetMouseScrollOrigin();
   if (wheelDelta == 0) {
@@ -3638,7 +3642,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     return;
   }
 
-  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+  Ray mouseRay = usingCamera_.lock()->ScreenPointToRay(system_->GetMousePosVector2());
 
   // 胴体共有点
   if (IsTorsoVisiblePartId(visiblePartId)) {
@@ -4027,7 +4031,7 @@ bool ModScene::BuildPartPickBoxes(int partId,
 }
 
 bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
-  if (selectedControlPointIndex_ < 0 || usingCamera_ == nullptr) {
+  if (selectedControlPointIndex_ < 0 || usingCamera_.expired()) {
     return false;
   }
 
@@ -4081,11 +4085,11 @@ bool ModScene::IsMouseRayInsideSelectedControlMesh(const Ray &mouseRay) const {
 }
 
 bool ModScene::IsMouseRayOverSelectedGizmo(const Ray &mouseRay) const {
-  if (selectedPartId_ < 0 || usingCamera_ == nullptr) {
+  if (selectedPartId_ < 0 || usingCamera_.expired()) {
     return false;
   }
 
-  const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+  const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
 
   // 胴体共有点のチェック
   if (IsTorsoVisiblePartId(selectedPartId_)) {
@@ -4400,8 +4404,8 @@ void ModScene::BeginAssemblyDragFromPart(int pickedPartId) {
   const Vector3 rootWorld = GetAssemblyRootWorldPosition(rootPartId);
   assemblyDrag_.dragPlanePoint = rootWorld;
 
-  if (usingCamera_ != nullptr) {
-    const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+  if (!usingCamera_.expired()) {
+    const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
     assemblyDrag_.dragPlaneNormal =
         NormalizeSafeV(Subtract(rootWorld, cameraPos), {0.0f, 0.0f, 1.0f});
   } else {
@@ -4902,7 +4906,7 @@ void ModScene::UpdateAssemblyDragTest() {
   }
 #endif
 
-  if (usingCamera_ == nullptr) {
+  if (usingCamera_.expired()) {
     return;
   }
 
@@ -4918,7 +4922,7 @@ void ModScene::UpdateAssemblyDragTest() {
     return;
   }
 
-  Ray mouseRay = usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+  Ray mouseRay = usingCamera_.lock()->ScreenPointToRay(system_->GetMousePosVector2());
 
   UpdateAssemblyAttachCandidateFromMouseRay(mouseRay);
   ApplyAssemblyDragPreview();
@@ -5582,7 +5586,7 @@ void ModScene::UpdateModObjects() {
       }
     }
 
-    object->Update(usingCamera_);
+    object->Update(usingCamera_.lock().get());
   }
 
   ApplyAssemblyDragVisualFeedback();
@@ -5596,7 +5600,7 @@ void ModScene::UpdateModObjects() {
         continue;
       }
 
-      it->second->Update(usingCamera_);
+      it->second->Update(usingCamera_.lock().get());
     }
   }
 
@@ -6259,14 +6263,15 @@ float ModScene::GetModelLocalVisualRadius(ModBodyPart part) const {
   }
 
   const std::string path = ModelPath(part);
-  const std::vector<ModelData> models = LoadFileTop(path);
+  const ModelData models = ReadObj(path);
 
-  if (models.empty()) {
+  if (models.meshDataList.empty()) {
     modelLocalVisualRadiusCache_[key] = 0.10f;
     return 0.10f;
   }
 
-  const ModelData &model = models[0];
+  const auto& model = models.meshDataList[0];
+  int rootNodeId = models.rootNodeList[0];
 
   if (model.vertices.empty()) {
     modelLocalVisualRadiusCache_[key] = 0.10f;
@@ -6283,7 +6288,7 @@ float ModScene::GetModelLocalVisualRadius(ModBodyPart part) const {
     const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
 
     const Vector3 transformed =
-        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+        TransformPointByMatrixLocal(models.nodeList[rootNodeId].localMatrix, localPos);
 
     if (transformed.x < minX) {
       minX = transformed.x;
@@ -6318,14 +6323,14 @@ Vector2 ModScene::GetModelLocalVisualRadiusXZ(ModBodyPart part) const {
   }
 
   const std::string path = ModelPath(part);
-  const std::vector<ModelData> models = LoadFileTop(path);
+  const ModelData models = ReadObj(path);
 
-  if (models.empty()) {
+  if (models.meshDataList.empty()) {
     modelLocalVisualRadiusXZCache_[key] = {0.10f, 0.10f};
     return {0.10f, 0.10f};
   }
 
-  const ModelData &model = models[0];
+  const auto &model = models.meshDataList[0];
 
   if (model.vertices.empty()) {
     modelLocalVisualRadiusXZCache_[key] = {0.10f, 0.10f};
@@ -6341,8 +6346,9 @@ Vector2 ModScene::GetModelLocalVisualRadiusXZ(ModBodyPart part) const {
     const Vector4 &pos4 = model.vertices[i].position;
     const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
 
+	const int rootNodeId = models.rootNodeList[0];
     const Vector3 transformed =
-        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+        TransformPointByMatrixLocal(models.nodeList[rootNodeId].localMatrix, localPos);
 
     if (transformed.x < minX) {
       minX = transformed.x;
@@ -6404,14 +6410,14 @@ float ModScene::GetModelLocalVisualHalfHeight(ModBodyPart part) const {
   }
 
   const std::string path = ModelPath(part);
-  const std::vector<ModelData> models = LoadFileTop(path);
+  const ModelData& models = ReadObj(path);
 
-  if (models.empty()) {
+  if (models.meshDataList.empty()) {
     modelLocalVisualHalfHeightCache_[key] = 0.10f;
     return 0.10f;
   }
 
-  const ModelData &model = models[0];
+  const auto &model = models.meshDataList[0];
   if (model.vertices.empty()) {
     modelLocalVisualHalfHeightCache_[key] = 0.10f;
     return 0.10f;
@@ -6423,9 +6429,10 @@ float ModScene::GetModelLocalVisualHalfHeight(ModBodyPart part) const {
   for (size_t i = 0; i < model.vertices.size(); ++i) {
     const Vector4 &pos4 = model.vertices[i].position;
     const Vector3 localPos = {pos4.x, pos4.y, pos4.z};
-
+    
+	int rootNodeId = models.rootNodeList[i];
     const Vector3 transformed =
-        TransformPointByMatrixLocal(model.rootNode.localMatrix, localPos);
+        TransformPointByMatrixLocal(models.nodeList[rootNodeId].localMatrix, localPos);
 
     if (transformed.y < minY) {
       minY = transformed.y;
@@ -7172,14 +7179,14 @@ bool ModScene::TryHandleAddButtonInteraction() {
 
         // ドラッグ平面を胴体の深度に設定
         assemblyDrag_.dragPlanePoint = bodyWorldPos;
-        if (usingCamera_) {
-          const Vector3 cameraPos = usingCamera_->GetTransform().translate;
+        if (usingCamera_.expired()) {
+          const Vector3 cameraPos = usingCamera_.lock()->GetTransform().translate;
           assemblyDrag_.dragPlaneNormal =
               NormalizeSafeV(Subtract(cameraPos, bodyWorldPos), {0, 0, 1});
         }
 
         const Ray mouseRay =
-            usingCamera_->ScreenPointToRay(system_->GetMousePosVector2());
+            usingCamera_.lock()->ScreenPointToRay(system_->GetMousePosVector2());
         Vector3 hitPoint{};
         if (RayPlaneIntersection(mouseRay, assemblyDrag_.dragPlanePoint,
                                  assemblyDrag_.dragPlaneNormal, &hitPoint)) {
@@ -7569,7 +7576,7 @@ void ModScene::SyncAfterAssemblyChanged() {
 
 void ModScene::DrawPickBoxesDebug() {
 #ifdef USE_IMGUI
-  if (usingCamera_ == nullptr) {
+  if (usingCamera_.expired()) {
     return;
   }
 
@@ -7595,7 +7602,7 @@ void ModScene::DrawPickBoxesDebug() {
     }
 
     for (int bi = 0; bi < boxSet.count; ++bi) {
-      DrawSegmentBoxWire(drawList, usingCamera_, boxSet.segments[bi], color,
+      DrawSegmentBoxWire(drawList, usingCamera_.lock().get(), boxSet.segments[bi], color,
                          2.0f);
     }
   }

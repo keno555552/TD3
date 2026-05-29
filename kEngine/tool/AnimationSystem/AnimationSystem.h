@@ -11,7 +11,7 @@ public:
 
 
 private:
-	std::vector<KeyFrame> keyFrameList_{};
+	//std::vector<KeyFrame> keyFrameList_{};
 
 	float time_ = 0.0f;
 };

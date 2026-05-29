@@ -24,7 +24,7 @@
 #include <format>
 
 #include <vector>
-#include "Data/Render/Types/LightModelType.h"
+//#include "Data/Render/Types/LightModelType.h"
 #include "config.h"
 
 #include <dxgidebug.h>
@@ -33,23 +33,29 @@
 bool CheckXInputDeviceConnected();
 #pragma endregion
 
+
 #pragma region DirectXCommon
 
 class DirectXCore {
 public:
 	DirectXCore();
 
-	/// Getter
+	/// ===================================== Getter ==================================== ///
 	ID3D12Device* GetDevice() { return device.Get(); };
 	HWND GetHWND() { return winAPI_->GetHWND(); };
+	
+	/// Dsv,Rtv関連
 	ID3D12DescriptorHeap* GetDsvDescriptorHeap() { return dsvDescriptorHeap.Get(); };
 	ID3D12DescriptorHeap* GetRtvDescriptorHeap() { return rtvDescriptorHeap.Get(); };
 	uint32_t GetDescriptorSizeRTV();
 	uint32_t GetDescriptorSizeDSV();
-
 	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
 	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle(ID3D12DescriptorHeap* descriptorHeap, uint32_t descriptorSize, uint32_t index);
 
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferRTV();
+	ID3D12Resource* GetCurrentBackBufferResource();
+
+	/// Command関連
 	ID3D12GraphicsCommandList* GetCommandList() { return commandList.Get(); }
 	ID3D12CommandQueue* GetCommandQueue() { return commandQueue.Get(); }
 

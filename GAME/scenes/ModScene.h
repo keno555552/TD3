@@ -115,9 +115,9 @@ private:
 
   Light *light1_ = nullptr; // シーン内で使用するライト
 
-  Camera *camera_ = nullptr;           // 通常カメラ
-  DebugCamera *debugCamera_ = nullptr; // デバッグカメラ
-  Camera *usingCamera_ = nullptr;      // 現在使用中のカメラ
+  std::weak_ptr<Camera> camera_;           // 通常カメラ
+  std::weak_ptr<DebugCamera> debugCamera_; // デバッグカメラ
+  std::weak_ptr<Camera> usingCamera_;      // 現在使用中のカメラ
   bool useDebugCamera_ = true;         // デバッグカメラを使うかどうか
 
   // ==============================

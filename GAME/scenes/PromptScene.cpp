@@ -14,14 +14,14 @@ PromptScene::PromptScene(kEngine *system) {
   srand((unsigned int)time(NULL));
 
   // 全体を暗くするライト（方向ライト）
-  light1_ = new Light;
+  light1_ = std::make_unique<Light>();
   light1_->direction = {-0.0f, -1.0f, -0.3f};
   light1_->color = {1.0f, 1.0f, 1.0f};
   light1_->intensity = 0.0f; // 全体を暗くする
-  system_->AddLight(light1_);
+  system_->AddLight(light1_.get());
 
   // スポットライトの追加
-  spotLight_ = new Light;
+  spotLight_ = std::make_unique<Light>();
   spotLight_->lightingType = LightingType::SpotLight;
   spotLight_->position = {0.0f, 0.0f, 30.0f};
   spotLight_->direction = {0.0f, -0.1f, 1.0f};
@@ -29,7 +29,7 @@ PromptScene::PromptScene(kEngine *system) {
   spotLight_->range = 100.0f;
   spotLight_->intensity = 18.5f;
   spotLight_->color = {1.0f, 1.0f, 1.0f};
-  system_->AddLight(spotLight_);
+  system_->AddLight(spotLight_.get());
 
   // 背景の壁（ライトを受けるため）
   int backScreenModel =
@@ -44,9 +44,9 @@ PromptScene::PromptScene(kEngine *system) {
 
   // カメラ
   debugCamera_ = system_->CreateDebugCamera();
-  debugCamera_->SetFarClip(200.0f);
+  debugCamera_.lock()->SetFarClip(200.0f);
   camera_ = system_->CreateCamera();
-  camera_->SetFarClip(200.0f);
+  camera_.lock()->SetFarClip(200.0f);
   usingCamera_ = camera_;
 
   // 上部見出しUI画像の追加
@@ -58,7 +58,7 @@ PromptScene::PromptScene(kEngine *system) {
   titleSprite_->objectParts_[0].materialConfig->textureHandle = titleTex;
   titleSprite_->objectParts_[0].anchorPoint = {256.0f, 64.0f};
   titleSprite_->mainPosition.transform.translate = {640.0f, 150.0f, 0.0f};
-  system_->SetCamera(usingCamera_);
+  system_->SetCamera(usingCamera_.lock());
 
   // お題マネージャー生成・全お題読み込み
   themeManager_ = new ThemeManager("GAME/resources/themes/");
@@ -118,17 +118,17 @@ PromptScene::~PromptScene() {
 
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
-  system_->RemoveLight(light1_);
+  system_->RemoveLight(light1_.get());
 
-  system_->RemoveLight(spotLight_);
-  delete spotLight_;
+  system_->RemoveLight(spotLight_.get());
+  spotLight_.reset();
 
   delete backgroundWall_;
 
   delete titleSprite_;
 
   font_.Cleanup();
-  delete light1_;
+  light1_.reset();
 
   delete themeManager_;
   themeManager_ = nullptr;
@@ -150,7 +150,7 @@ void PromptScene::Update() {
   }
 
   if (promptBoard_ != nullptr) {
-    promptBoard_->Update(usingCamera_);
+    promptBoard_->Update(usingCamera_.lock().get());
   }
 
   // スポットライトの演出更新
@@ -179,15 +179,15 @@ void PromptScene::Update() {
   }
 
   if (backgroundWall_ != nullptr) {
-    backgroundWall_->Update(usingCamera_);
+    backgroundWall_->Update(usingCamera_.lock().get());
   }
 
   if (titleSprite_ != nullptr) {
-    titleSprite_->Update(usingCamera_);
+    titleSprite_->Update(usingCamera_.lock().get());
   }
 
   // フェード更新
-  fade_.Update(usingCamera_);
+  fade_.Update(usingCamera_.lock().get());
 
   if (isStartTransition_ && fade_.IsFinished()) {
     outcome_ = SceneOutcome::NEXT;
@@ -347,10 +347,10 @@ void PromptScene::Draw() {
 void PromptScene::CameraPart() {
   if (useDebugCamera_) {
     usingCamera_ = debugCamera_;
-    debugCamera_->MouseControlUpdate();
+    debugCamera_.lock()->MouseControlUpdate();
   } else {
     usingCamera_ = camera_;
   }
 
-  system_->SetCamera(usingCamera_);
+  system_->SetCamera(usingCamera_.lock());
 }

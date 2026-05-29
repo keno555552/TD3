@@ -1,4 +1,6 @@
 #pragma once
+#include <vector>
+#include <memory>
 #include "Camera/DebugCamera.h"
 
 class CameraManager {
@@ -8,16 +10,16 @@ public:
 	void Finalize();
 
 	/// カメラの生成
-    Camera* CreateCamera();
+	std::weak_ptr<Camera> CreateCamera();
 
 	/// デバッグカメラの生成
-    DebugCamera* CreateDebugCamera(kEngine* kEngine);
+	std::weak_ptr<DebugCamera> CreateDebugCamera(kEngine* kEngine);
 
 	/// カメラの破棄
-    void DestroyCamera(Camera* cam);
+    void DestroyCamera(std::weak_ptr<Camera> cam);
 
 	/// アクティブカメラの設定
-    void SetActiveCamera(Camera* cam = nullptr);
+	void SetActiveCamera(std::weak_ptr<Camera> cam = std::weak_ptr<Camera>());
 
 	/// リセットアクティブカメラ
 	void ResetActiveCamera();
@@ -26,7 +28,9 @@ public:
     Camera* GetActiveCamera() const;
 
 private:
-    Camera* defaultCamera_ = nullptr;
+	std::shared_ptr<Camera> defaultCamera_;
+	std::vector<std::shared_ptr<Camera>> cameraList_;
+	std::vector<std::shared_ptr<DebugCamera>> debugCameraList_;
     Camera* activeCamera_ = nullptr;
 };
 

@@ -2,21 +2,29 @@
 #include <vector>
 #include "MathsIncluder.h"
 #include <memory>
-#include "Transform.h"
-#include "TransformationMatrix.h"
+#include <string>
+#include "LinearAlgebra/Transform.h"
+#include "LinearAlgebra/TransformationMatrix.h"
 #include "MaterialConfig.h"
 
 class drawEngine;
 class DrawDataCollector;
 class ResourceManager;
 class AnimationUnit;
+class Object;
 class ObjectPart {
 public:
 
 	friend class drawEngine;
+	friend class DrawEngine;
 	friend class DrawDataCollector;
 	friend class ResourceManager;
 	friend class AnimationUnit;
+	friend class ObjectData;
+
+	/// ============== 雑用データ ============== ///
+
+	std::string name{};
 
 	/// ============= 基本変換情報 ============= ///
 
@@ -37,7 +45,13 @@ public:
 	/// ========== エンジン側用データ =========== ///
 
 private:
+	/// 描画のときに、DrawDataCollectorのどこにこskinningMatrixを入れるどころのハンドル
+	int wellHandle = -1;
+
+	/// 計算用のワールド行列 
 	TransformationMatrix transformationMatrix{};
+
+	/// アンカーポイントを考慮したワールド行列
 	Matrix4x4 worldAnchorPointMatrix{};
 
 };
@@ -54,6 +68,8 @@ public:
 	bool isDelete_ = false;
 
 	bool isBillboard_ = false;
+
+	Object* ownerObject = nullptr;	// ObjectDataをObject(皮)のポインタを持つと色々便利になるからやる
 
 	ObjectPart* followObject_ = nullptr;
 };

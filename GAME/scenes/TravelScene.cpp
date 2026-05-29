@@ -52,11 +52,11 @@ TravelScene::TravelScene(kEngine *system) {
   //===============================
   // ライト
   //===============================
-  light1_ = new Light;
+  light1_ = std::make_unique<Light>();
   light1_->direction = {0.3f, -1.0f, 0.5f};
   light1_->color = {1.0f, 1.0f, 1.0f};
   light1_->intensity = 1.0f;
-  system_->AddLight(light1_);
+  system_->AddLight(light1_.get());
 
   //===============================
   // カメラ
@@ -66,14 +66,14 @@ TravelScene::TravelScene(kEngine *system) {
   loupeCamera_ = system_->CreateCamera();
 
   // デバッグカメラ初期位置
-  debugCamera_->SetTranslate({48.0f, 5.0f, 0.0f});
-  debugCamera_->SetDefaultTransform(debugCamera_->GetTransform());
-  debugCamera_->SetRotation({0.0f, -1.57f, 0.0f});
+  debugCamera_.lock()->SetTranslate({48.0f, 5.0f, 0.0f});
+  debugCamera_.lock()->SetDefaultTransform(debugCamera_.lock()->GetTransform());
+  debugCamera_.lock()->SetRotation({0.0f, -1.57f, 0.0f});
 
   // 通常カメラ初期位置
-  camera_->SetTranslate({48.0f, 5.0f, 0.0f});
-  camera_->SetDefaultTransform(camera_->GetTransform());
-  camera_->SetRotation({0.0f, -1.57f, 0.0f});
+  camera_.lock()->SetTranslate({48.0f, 5.0f, 0.0f});
+  camera_.lock()->SetDefaultTransform(camera_.lock()->GetTransform());
+  camera_.lock()->SetRotation({0.0f, -1.57f, 0.0f});
 
   usingCamera_ = camera_;
   system_->SetCamera(usingCamera_);
@@ -464,7 +464,7 @@ TravelScene::TravelScene(kEngine *system) {
     player_->ResolveVisualGroundPenetration();
   }
   player_->ApplyVisualState();
-  npcManager_->UpdateNpcRunners(0.0f, goalX_, usingCamera_);
+  npcManager_->UpdateNpcRunners(0.0f, goalX_, usingCamera_.lock().get());
 }
 
 TravelScene::~TravelScene() {
@@ -483,9 +483,9 @@ TravelScene::~TravelScene() {
     }
   }
 
-  system_->RemoveLight(light1_);
+  system_->RemoveLight(light1_.get());
 
-  delete light1_;
+  light1_.reset();
 
   if (heartbeatSoundHandle_ != -1) {
     system_->SoundStop(heartbeatSoundHandle_);
@@ -529,7 +529,7 @@ void TravelScene::Update() {
       isTutorialMode_ = false;
       s_hasSeenTravelTutorial = true;
     }
-    fade_.Update(usingCamera_);
+    fade_.Update(usingCamera_.lock().get());
     tutorialBgSprite_->Update(nullptr);
     return;
   }
@@ -559,8 +559,8 @@ void TravelScene::Update() {
   //===============================
   if (isFailureMenuOpen_) {
     UpdateFailureMenuInputTravel();
-    player_->UpdateParticle(camera_);
-    fade_.Update(usingCamera_);
+    player_->UpdateParticle(camera_.lock().get());
+    fade_.Update(usingCamera_.lock().get());
     return;
   }
 
@@ -602,7 +602,7 @@ void TravelScene::Update() {
   }
 
   if (!isGameOverAnimPlaying_) {
-    npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_);
+    npcManager_->UpdateNpcRunners(deltaTime, goalX_, usingCamera_.lock().get());
   }
 
   //==============================
@@ -663,8 +663,8 @@ void TravelScene::Update() {
 
   if (skydome_) {
     skydome_->mainPosition.transform.translate =
-        usingCamera_->GetTransform().translate;
-    skydome_->Update(usingCamera_);
+        usingCamera_.lock()->GetTransform().translate;
+    skydome_->Update(usingCamera_.lock().get());
   }
 
   // ルーペの更新
@@ -676,7 +676,7 @@ void TravelScene::Update() {
                            player_->GetMoveX()};
     Vector3 headWorld = playerWorld;
     headWorld.y += 5.0f; // 少し頭上を基準に
-    Vector2 screenPos = usingCamera_->GetObjectScreenPos(headWorld);
+    Vector2 screenPos = usingCamera_.lock()->GetObjectScreenPos(headWorld);
 
     // ルーペが出るタイミングがまだ早い問題の修正（完全に画面外はるか上に消えてからにする）
     if (screenPos.y < -300.0f) {
@@ -712,15 +712,15 @@ void TravelScene::Update() {
       // プレイヤーをもう少し上に表示させる（カメラをさらに下に下げる）
       camPos.y -= 4.0f;
 
-      loupeCamera_->SetTranslate(camPos);
-      loupeCamera_->SetRotation({0.0f, -1.57f, 0.0f});
+      loupeCamera_.lock()->SetTranslate(camPos);
+      loupeCamera_.lock()->SetRotation({0.0f, -1.57f, 0.0f});
 
       // スカイドームに遮蔽されてプレイヤーが描画されない問題の根本解決
-      loupeCamera_->SetNearClip(camDistance * 0.5f);
-      loupeCamera_->SetFarClip(camDistance * 2.0f +
+      loupeCamera_.lock()->SetNearClip(camDistance * 0.5f);
+      loupeCamera_.lock()->SetFarClip(camDistance * 2.0f +
                                100.0f); // 背景用円盤が入るようにFarを少し延長
 
-      loupeCamera_->Update();
+      loupeCamera_.lock()->Update();
 
       // 背景円盤の更新（カメラの正面奥ではなく、ルーペ枠の中心に重なるようにパース補正して配置）
       float bgDepth = camDistance + 50.0f;
@@ -742,13 +742,13 @@ void TravelScene::Update() {
       // 円盤にするためX軸スケールを潰す。少し小さめ(0.95倍)にして枠から出ないようにする
       loupeBgObj_->mainPosition.transform.scale = {0.05f, bgRadius * 0.95f,
                                                    bgRadius * 0.95f};
-      loupeBgObj_->Update(loupeCamera_);
+      loupeBgObj_->Update(loupeCamera_.lock().get());
     }
   }
 
-  player_->UpdateParticle(camera_);
+  player_->UpdateParticle(camera_.lock().get());
   if (confettiParticle_) {
-    confettiParticle_->Update(camera_);
+    confettiParticle_->Update(camera_.lock().get());
   }
 
   UpdateSceneTransition();
@@ -789,15 +789,15 @@ void TravelScene::Draw() {
   if (isLoupeActive_) {
     system_->SetCamera(loupeCamera_);
     loupeBgObj_->Draw();
-    player_->DrawModObjects(loupeCamera_);
+    player_->DrawModObjects(loupeCamera_.lock().get());
     system_->SetCamera(usingCamera_);
   }
 
   if (showBaseModel_) {
-    player_->DrawModObjects(usingCamera_);
+    player_->DrawModObjects(usingCamera_.lock().get());
   }
 
-  npcManager_->DrawNpcs(goalX_, showNpcModel_, camera_);
+  npcManager_->DrawNpcs(goalX_, showNpcModel_, camera_.lock().get());
 
   if (skydome_) {
     skydome_->Draw();
@@ -1203,7 +1203,7 @@ void TravelScene::Draw() {
 void TravelScene::CameraPart() {
   if (useDebugCamera_) {
     usingCamera_ = debugCamera_;
-    debugCamera_->MouseControlUpdate();
+    debugCamera_.lock()->MouseControlUpdate();
   } else {
     usingCamera_ = camera_;
 
@@ -1238,7 +1238,7 @@ void TravelScene::CameraPart() {
       camPos.y = cameraStartPos_.y + (endCamPos.y - cameraStartPos_.y) * ease;
       camPos.z = cameraStartPos_.z + (endCamPos.z - cameraStartPos_.z) * ease;
 
-      camera_->SetRotation({0.0f, -1.57f, 0.0f});
+      camera_.lock()->SetRotation({0.0f, -1.57f, 0.0f});
     } else if (isClearAnimPlaying_) {
       // 演出進行度 (0.0 ～ 1.0)
       float progress =
@@ -1280,7 +1280,7 @@ void TravelScene::CameraPart() {
         // 元の横向き(-1.57f)から、扉を注視する角度へ滑らかに回転させる
         float targetRotY = std::atan2(-camPos.x, doorZ - camPos.z);
         float rotY = -1.57f + (targetRotY - (-1.57f)) * ease;
-        camera_->SetRotation({-0.08f, rotY, 0.0f});
+        camera_.lock()->SetRotation({-0.08f, rotY, 0.0f});
 
         if (leftDoor_ && rightDoor_) {
           leftDoor_->mainPosition.transform.rotate.y = 0.0f;
@@ -1295,7 +1295,7 @@ void TravelScene::CameraPart() {
         camPos.x = waitCamX;
         camPos.y = waitCamY;
         camPos.z = waitCamZ + creepDist * ease;
-        camera_->SetRotation({-0.08f, 0.0f, 0.0f}); // ほんの少し上を向く
+        camera_.lock()->SetRotation({-0.08f, 0.0f, 0.0f}); // ほんの少し上を向く
 
         if (leftDoor_ && rightDoor_) {
           // 奥に向かって（+Z方向へ）開くように符号を修正
@@ -1312,7 +1312,7 @@ void TravelScene::CameraPart() {
         camPos.x = waitCamX + (endCamX - waitCamX) * ease;
         camPos.y = waitCamY + (endCamY - waitCamY) * ease;
         camPos.z = startZ + (endCamZ - startZ) * ease;
-        camera_->SetRotation({-0.08f, 0.0f, 0.0f});
+        camera_.lock()->SetRotation({-0.08f, 0.0f, 0.0f});
 
         if (leftDoor_ && rightDoor_) {
           leftDoor_->mainPosition.transform.rotate.y = -1.57f;
@@ -1337,10 +1337,10 @@ void TravelScene::CameraPart() {
 
     } else if (!isGameOverAnimPlaying_) {
       // 向き（横から見る）
-      camera_->SetRotation({0.0f, -1.57f, 0.0f});
+      camera_.lock()->SetRotation({0.0f, -1.57f, 0.0f});
     }
 
-    camera_->SetTranslate(camPos);
+    camera_.lock()->SetTranslate(camPos);
   }
 
   system_->SetCamera(usingCamera_);
@@ -1444,7 +1444,7 @@ void TravelScene::UpdateSceneTransition() {
   //================================
   // フェード更新
   //================================
-  fade_.Update(usingCamera_);
+  fade_.Update(usingCamera_.lock().get());
 
   //================================
   // フェード終了後シーン遷移
@@ -1560,7 +1560,7 @@ void TravelScene::UpdateRaceFinishState() {
                         player_->GetMoveX()};
       failureNpcHeight_ = player_->GetCharacterHeight();
     }
-    cameraStartPos_ = usingCamera_->GetTransform().translate;
+    cameraStartPos_ = usingCamera_.lock()->GetTransform().translate;
     return;
   }
 #endif
@@ -1619,7 +1619,7 @@ void TravelScene::UpdateRaceFinishState() {
                           npc.runner->GetMoveY() + npc.runner->GetVisualLiftY(),
                           npc.runner->GetMoveX()};
         failureNpcHeight_ = npc.runner->GetCharacterHeight();
-        cameraStartPos_ = usingCamera_->GetTransform().translate;
+        cameraStartPos_ = usingCamera_.lock()->GetTransform().translate;
       }
     }
   }

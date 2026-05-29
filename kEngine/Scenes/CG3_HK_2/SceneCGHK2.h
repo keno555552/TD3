@@ -17,7 +17,7 @@ public:
 
 	void Update() override;
 	void Draw() override;
-	
+
 private:
 	kEngine* system_ = nullptr;				// 借り
 
@@ -31,11 +31,11 @@ private:
 
 	/// ============== カメラ関連 ==============///
 	/// ステージカメラ(mainカメラ)
-	Camera* camera_ = nullptr;
+	std::weak_ptr<Camera> camera_;
 	/// デバックカメラ
-	DebugCamera* debugCamera_ = nullptr;
+	std::weak_ptr<DebugCamera>debugCamera_;
 	/// 今使っているカメラ
-	Camera* usingCamera_ = nullptr;			// 借り用
+	std::weak_ptr<Camera>usingCamera_;
 
 	/// =========== リソースハンドル ============///
 	/// モデルハンドル

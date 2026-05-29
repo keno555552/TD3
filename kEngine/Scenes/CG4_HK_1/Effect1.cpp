@@ -5,8 +5,8 @@ Effect1::Effect1(kEngine* system) {
 	system_ = system;
 	debugCamera_ = system_->CreateDebugCamera();
 	camera_ = system_->CreateCamera();
-	camera_->Move(Vector3(-2.736f, -4.474f, -27.334f));
-	camera_->Rotate(Vector3(-0.324f, 0.228f, 0.0f));
+	camera_.lock()->Move(Vector3(-2.736f, -4.474f, -27.334f));
+	camera_.lock()->Rotate(Vector3(-0.324f, 0.228f, 0.0f));
 
 	/// =========== リソースロード ============///
 	skydomeModelHandle_ = system_->SetModelObj("resources/TemplateResource/object/skydome/skydome.obj");
@@ -44,10 +44,10 @@ void Effect1::Update() {
 	CameraPart();
 
 	/// Skydome更新
-	skydome_->Update(usingCamera_);
+	skydome_->Update();
 
 	for (auto& ptr : plane_) {
-		ptr->Update(usingCamera_);
+		ptr->Update();
 	}
 
 
@@ -79,14 +79,14 @@ void Effect1::CameraPart() {
 	} else {
 		usingCamera_ = camera_;
 	}
-	usingCamera_->Update();
+	usingCamera_.lock()->Update();
 }
 
 #ifdef USE_IMGUI
 void Effect1::ImguiPart() {
 
-	Vector3 CameraPosition = usingCamera_->GetTransform().translate;
-	Vector3 CameraRotation = usingCamera_->GetTransform().rotate;
+	Vector3 CameraPosition = usingCamera_.lock()->GetTransform().translate;
+	Vector3 CameraRotation = usingCamera_.lock()->GetTransform().rotate;
 	
 	ImGui::Begin("DebugCamera");
 	ImGui::Checkbox("isUse", &useDebugCamera);
@@ -94,7 +94,7 @@ void Effect1::ImguiPart() {
 	ImGui::SliderFloat3("CameraRotate", &CameraRotation.x , -1.0f, 1.0f);
 	ImGui::End();
 
-	usingCamera_->SetCamera(Transform{ Vector3(1.0f,1.0f,1.0f),CameraRotation,CameraPosition });
+	//usingCamera_->SetCamera(Transform{ Vector3(1.0f,1.0f,1.0f),CameraRotation,CameraPosition });
 
 	{
 		ImGui::Begin("SpherePos");

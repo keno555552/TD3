@@ -120,7 +120,6 @@ void LightManager::ConvertSpotLight(SpotLight* light) {
 	lightGPU.color = light->color;
 	lightGPU.direction = light->direction;
 	lightGPU.intensity = light->ableLight ? light->intensity : 0;
-	lightGPU.extra0 = light->extra0;
 	lightGPUList_.push_back(lightGPU);
 }
 

@@ -5,7 +5,7 @@
 #define M_PI 3.14159265358979323846f
 
 #include "Camera/camera.h"
-#include "CrashData/crashIncluder.h"
+#include "Data/Geometry/Shape/crashIncluder.h"
 
 
 /// <summary>
@@ -123,22 +123,22 @@ void crashBorder(float* x, float* y, float w, float h, int lx, int rx, int ty);
 /// <returns>isHit</returns>
 bool crashDecision(const Sphere& s1, const Sphere& s2);
 
-///// <summary>
-///// Ball(Sphere) & Plane Hit Decision
-///// </summary>
-///// <param name="s1">Sphere</param>
-///// <param name="s2">Plane</param>
-///// <returns>isHit</returns>
-//bool crashDecision(const Sphere& s1, const Plane& s2);
-//
-///// <summary>
-///// Segment & Plane Hit Decision
-///// </summary>
-///// <param name="s1">Segment</param>
-///// <param name="s2">Plane</param>
-///// <returns>isHit</returns>
-//bool crashDecision(const Segment& segment, const Plane& plane);
-//
+/// <summary>
+/// Ball(Sphere) & Plane Hit Decision
+/// </summary>
+/// <param name="s1">Sphere</param>
+/// <param name="s2">Plane</param>
+/// <returns>isHit</returns>
+bool crashDecision(const Sphere& s1, const Plane& s2);
+
+/// <summary>
+/// Segment & Plane Hit Decision
+/// </summary>
+/// <param name="s1">Segment</param>
+/// <param name="s2">Plane</param>
+/// <returns>isHit</returns>
+bool crashDecision(const Segment& segment, const Plane& plane);
+
 ///// <summary>
 ///// Segment & Triangle Hit Decision
 ///// </summary>
@@ -146,23 +146,23 @@ bool crashDecision(const Sphere& s1, const Sphere& s2);
 ///// <param name="s2">Triangle</param>
 ///// <returns>isHit</returns>
 //bool crashDecision(const Segment& segment, const Triangle& triangle);
-//
-///// <summary>
-///// AABB & AABB Hit Decision
-///// </summary>
-///// <param name="s1">AABB1</param>
-///// <param name="s2">AABB2</param>
-///// <returns>isHit</returns>
-//bool crashDecision(const AABB& aabb1, const AABB& aabb2);
-//
-///// <summary>
-///// AABB & Sphere Hit Decision
-///// </summary>
-///// <param name="s1">AABB</param>
-///// <param name="s2">Sphere</param>
-///// <returns>isHit</returns>
-//bool crashDecision(const AABB& aabb1, const Sphere& sphere);
-//
+
+/// <summary>
+/// AABB & AABB Hit Decision
+/// </summary>
+/// <param name="s1">AABB1</param>
+/// <param name="s2">AABB2</param>
+/// <returns>isHit</returns>
+bool crashDecision(const AABB& aabb1, const AABB& aabb2);
+
+/// <summary>
+/// AABB & Sphere Hit Decision
+/// </summary>
+/// <param name="s1">AABB</param>
+/// <param name="s2">Sphere</param>
+/// <returns>isHit</returns>
+bool crashDecision(const AABB& aabb1, const Sphere& sphere);
+
 /// <summary>
 /// AABB & Segment Hit Decision
 /// </summary>

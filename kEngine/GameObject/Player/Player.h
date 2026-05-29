@@ -34,7 +34,7 @@ class Player :public Object
 public:
 	Player(kEngine* system, const Vector3& position = Vector3{ 0,0,0 });
 
-	void Update(Camera* camera) override;
+	void Update(Camera* camera = 0) override;
 
 private:
 

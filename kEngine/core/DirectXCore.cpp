@@ -1,5 +1,12 @@
 #include "DirectXCore.h"
 
+#include <fstream>
+#include <iomanip>
+#include <ctime>
+#include <dbghelp.h>
+
+#pragma comment(lib, "dbghelp.lib")
+
 #include <cassert>
 #pragma comment(lib,"d3d12.lib")
 #pragma comment(lib,"dxgi.lib")
@@ -35,8 +42,7 @@ bool CheckXInputDeviceConnected() {
 
 #pragma region DirectXCommon
 
-DirectXCore::DirectXCore() {
-}
+DirectXCore::DirectXCore() {}
 
 uint32_t DirectXCore::GetDescriptorSizeRTV() {
 	return device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
@@ -57,6 +63,16 @@ D3D12_GPU_DESCRIPTOR_HANDLE DirectXCore::GetGPUDescriptorHandle(ID3D12Descriptor
 	D3D12_GPU_DESCRIPTOR_HANDLE handleGPU = descriptorHeap->GetGPUDescriptorHandleForHeapStart();
 	handleGPU.ptr += (descriptorSize * index);
 	return handleGPU;
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DirectXCore::GetCurrentBackBufferRTV() {
+	UINT index = SwapChain->GetCurrentBackBufferIndex();
+	return rtvHandles[index];
+}
+
+ID3D12Resource* DirectXCore::GetCurrentBackBufferResource() {
+	UINT index = SwapChain->GetCurrentBackBufferIndex();
+	return swapChainResources[index].Get();
 }
 
 bool DirectXCore::isDirectInputCreated() {
@@ -170,8 +186,7 @@ ID3D12Device* DirectXCore::CreateDevice(IDXGIAdapter4* adapter) {
 	return device;
 }
 
-void DirectXCore::InitializeGameInput() {
-}
+void DirectXCore::InitializeGameInput() {}
 
 //void DirectXBase::InitializeGameInput() {
 //	HRESULT GetCurrentReading(
@@ -366,6 +381,105 @@ void DirectXCore::CreateFence() {
 	assert(fenceEvent != nullptr);
 }
 
+static const char* TranslateExceptionCode(DWORD code) {
+	switch (code) {
+	case EXCEPTION_ACCESS_VIOLATION:         return "Access Violation (無效記憶體讀寫)";
+	case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:    return "Array Bounds Exceeded (陣列越界)";
+	case EXCEPTION_INT_DIVIDE_BY_ZERO:       return "Divide by Zero (除以 0)";
+	case EXCEPTION_STACK_OVERFLOW:           return "Stack Overflow (堆疊溢位)";
+	default:                                 return "Unknown Exception";
+	}
+}
+
+static void WriteCallstack(std::ofstream& log, CONTEXT* ctx) {
+	HANDLE process = GetCurrentProcess();
+	HANDLE thread = GetCurrentThread();
+
+	SymSetOptions(SYMOPT_LOAD_LINES | SYMOPT_UNDNAME);
+	SymInitialize(process, NULL, TRUE);
+
+	STACKFRAME64 frame{};
+	frame.AddrPC.Offset = ctx->Rip;
+	frame.AddrPC.Mode = AddrModeFlat;
+	frame.AddrFrame.Offset = ctx->Rbp;
+	frame.AddrFrame.Mode = AddrModeFlat;
+	frame.AddrStack.Offset = ctx->Rsp;
+	frame.AddrStack.Mode = AddrModeFlat;
+
+	log << "\nCallstack:\n";
+
+	for (int i = 0; i < 32; i++) {
+		if (!StackWalk64(
+			IMAGE_FILE_MACHINE_AMD64,
+			process,
+			thread,
+			&frame,
+			ctx,
+			NULL,
+			SymFunctionTableAccess64,
+			SymGetModuleBase64,
+			NULL)) {
+			break;
+		}
+
+		DWORD64 addr = frame.AddrPC.Offset;
+		if (addr == 0)
+			break;
+
+		log << "  0x" << std::hex << addr;
+
+		char buffer[sizeof(SYMBOL_INFO) + MAX_SYM_NAME];
+		PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+		symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+		symbol->MaxNameLen = MAX_SYM_NAME;
+
+		DWORD64 displacement = 0;
+		if (SymFromAddr(process, addr, &displacement, symbol)) {
+			log << "  " << symbol->Name;
+		}
+
+		log << "\n";
+	}
+
+	SymCleanup(process);
+}
+
+
+static LONG WINAPI CrashHandler(EXCEPTION_POINTERS* info) {
+	std::ofstream log("CrashLog.txt");
+
+	// 時間戳記
+	std::time_t t = std::time(nullptr);
+	tm local{};
+	localtime_s(&local, &t);
+
+	log << "=== Crash Detected ===\n";
+	log << "Time: "
+		<< (local.tm_year + 1900) << "-"
+		<< std::setw(2) << std::setfill('0') << (local.tm_mon + 1) << "-"
+		<< std::setw(2) << std::setfill('0') << local.tm_mday << " "
+		<< std::setw(2) << std::setfill('0') << local.tm_hour << ":"
+		<< std::setw(2) << std::setfill('0') << local.tm_min << ":"
+		<< std::setw(2) << std::setfill('0') << local.tm_sec << "\n\n";
+
+	// 錯誤碼
+	DWORD code = info->ExceptionRecord->ExceptionCode;
+	log << "Exception Code: 0x" << std::hex << code << "\n";
+	log << "Meaning: " << TranslateExceptionCode(code) << "\n\n";
+
+	// 崩在哪
+	log << "Exception Address: 0x" << info->ExceptionRecord->ExceptionAddress << "\n";
+
+	// Thread ID
+	log << "Thread ID: " << GetCurrentThreadId() << "\n";
+
+	// Callstack
+	WriteCallstack(log, info->ContextRecord);
+
+	log.close();
+	return EXCEPTION_EXECUTE_HANDLER;
+}
+
 void DirectXCore::InitializeDrive(const char* kClientTitle, int kClientWidth, int kClientHeight) {
 #ifdef _DEBUG
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)))) {
@@ -375,6 +489,8 @@ void DirectXCore::InitializeDrive(const char* kClientTitle, int kClientWidth, in
 		debugController->SetEnableGPUBasedValidation(TRUE);
 	}
 #endif
+
+	SetUnhandledExceptionFilter(CrashHandler);
 
 	/// WindowAPI、windowを作る
 	winAPI_ = std::make_unique<WinAPI>();

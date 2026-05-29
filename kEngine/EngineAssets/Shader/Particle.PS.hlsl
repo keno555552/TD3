@@ -15,6 +15,8 @@
 #include "./LightingLambert/BlinnPhongReflection.hlsl"
 #endif
 
+
+
 struct Material
 {
     float4 color;
@@ -27,6 +29,8 @@ struct Material
     float shininess;
     float intensity;
     float heightScale;
+    
+    float reflectiveStrength;
 };
 
 struct LightGPU
@@ -64,6 +68,9 @@ cbuffer LightCountCB : register(b2)
 // Resources
 Texture2D<float4> gTexture : register(t0);
 StructuredBuffer<LightGPU> gLights : register(t1);
+
+// 環形マップ
+TextureCube<float4> gEnvironmentTexture : register(t2);
 
 // Resources
 SamplerState gSampler : register(s0);
@@ -130,11 +137,7 @@ PixelShaderOutput main(VertexShaderOutput input)
 
             // Spot cone（方向衰減）
                 float cosTheta = dot(lightDir, normalize(-L.direction));
-                float spotFactor;
-                if (L.extra0 == 1)
-                    spotFactor = smoothstep(cos(L.angle), 1.0f, cosTheta);
-                else
-                    spotFactor = saturate(cosTheta / cos(L.angle));
+                float spotFactor = saturate(cosTheta / cos(L.angle));
 
                 lightColor = L.color * L.intensity * atten * spotFactor;
             }
@@ -192,6 +195,19 @@ PixelShaderOutput main(VertexShaderOutput input)
         
         float3 finalColor = gMaterial.color.rgb * textureColor.rgb * lightFactor;
        
+        
+#if defined(USE_ENVIRONMENT_REFLECTION)
+        float3 cameraToPosition = normalize(input.worldPosition - gCamera.position);
+        float3 reflectedVector = normalize(reflect(cameraToPosition, normalize(input.normal)));
+        float3 environmentColor = gEnvironmentTexture.Sample(gSampler, reflectedVector).rgb;
+
+        // 反射強度（你可以調整）
+        float envStrength = 0.3;
+ 
+        // 混合
+        finalColor += environmentColor * gMaterial.reflectiveStrength;
+#endif
+        
         output.color.rgb = finalColor;
         output.color.a = gMaterial.color.a * textureColor.a;
     }

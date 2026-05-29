@@ -1,7 +1,7 @@
 #pragma once
-#include "Vector4.h"
-#include "Vector3.h"
-#include "Vector2.h"
+#include "LinearAlgebra/Vector4.h"
+#include "LinearAlgebra/Vector3.h"
+#include "LinearAlgebra/Vector2.h"
 
 struct VertexData
 {

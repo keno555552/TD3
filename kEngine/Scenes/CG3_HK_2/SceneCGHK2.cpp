@@ -140,19 +140,19 @@ void SceneCGHK2::Update() {
 	CameraPart();
 
 	/// Skydome更新
-	skydome_->Update(usingCamera_);
+	skydome_->Update();
 
 	/// player更新
-	player_->Update(usingCamera_);
+	player_->Update();
 
-	sprite_->Update(usingCamera_);
+	sprite_->Update();
 
 	debugObject_->SetShowCenterPoint(isShowCenterPoint);
 	debugObject_->SetShowNumber(isShowCenterNumber);
 	debugObject_->UpdateShowNumber(textNumber);
-	debugObject_->Update(usingCamera_);
+	debugObject_->Update();
 
-	ground_->Update(usingCamera_);
+	ground_->Update();
 
 
 	if (system_->GetTriggerOn(DIK_0)) {
@@ -195,7 +195,7 @@ void SceneCGHK2::Draw() {
 void SceneCGHK2::CameraPart() {
 	if (useDebugCamera) {
 		usingCamera_ = debugCamera_;
-		debugCamera_->MouseControlUpdate();
+		debugCamera_.lock()->MouseControlUpdate();
 	} else {
 		//Transform cameraTransform = CreateDefaultTransform();
 		//cameraTransform.translate.x = player_->mainPosition.transform.translate.x;

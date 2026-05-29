@@ -2,6 +2,7 @@
 #include "DirectXCore.h"
 #include <vector>
 #include <wrl.h>
+#include <string>
 
 ID3D12Resource* CreateResource(ID3D12Device* device, size_t sizeInBytes);
 
@@ -13,6 +14,7 @@ public:
 	Microsoft::WRL::ComPtr<ID3D12Resource> CreateResourceClass_(ID3D12Device* device, size_t sizeInBytes);
 	Microsoft::WRL::ComPtr<ID3D12Resource> SaveResource_(Microsoft::WRL::ComPtr<ID3D12Resource> resource);
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetResource(int Index = -1);
+	void SetName(const std::string name,const int Index = -1);
 	int GetResourceCounter() { return resourceCounter; }
 	void ClearResource();
 

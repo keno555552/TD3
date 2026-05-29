@@ -24,6 +24,9 @@ public:
 	/// Resourceを取得する
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetVertexResource() { return vertexResource_->GetResource(); };
 	Microsoft::WRL::ComPtr<ID3D12Resource> GetIndexResource_() { return indexResource_->GetResource(); };
+	BasicResource* GetVertexBasicResource() { return vertexResource_.get(); }
+	BasicResource* GetIndexBasicResource(){return indexResource_.get(); }
+
 	D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView() { return vertexBufferView; }
 	D3D12_INDEX_BUFFER_VIEW GetIndexBufferView() { return indexBufferView; }
 	int GetVertexNum() { return vertexNum_; }

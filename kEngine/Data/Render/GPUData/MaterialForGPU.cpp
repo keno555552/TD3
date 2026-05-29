@@ -10,6 +10,10 @@ bool MaterialForGPU::operator==(const MaterialForGPU target) {
 	if (shininess != target.shininess)return false;
 	if (intensity != target.intensity)return false;
 	if (heightScale != target.heightScale)return false;
+
+	if (reflectiveStrength != target.reflectiveStrength)return false;
+
+
 	return true;
 }
 bool MaterialForGPU::operator!=(const MaterialForGPU target) {
@@ -25,4 +29,6 @@ void MaterialForGPU::inputMaterialConfig(MaterialConfig target) {
 	shininess = target.shininess;
 	intensity = target.intensity;
 	heightScale = target.heightScale;
+	reflectiveStrength = target.reflectiveStrength;
 }
+

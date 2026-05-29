@@ -1,5 +1,6 @@
 #include "GAME/actor/ModCustomizedBodyActor.h"
 #include "GAME/actor/ModBodyCustomizeDataUtil.h"
+#include "kEngine.h"
 
 namespace {
 

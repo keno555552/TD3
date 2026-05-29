@@ -97,7 +97,7 @@ ThemeData* ThemeManager::SelectRandom() {
 	// 乱数で選出
 	static std::random_device rd;
 	static std::mt19937 gen(rd());
-	std::uniform_int_distribution<> dis(0, candidates.size() - 1);
+	std::uniform_int_distribution<> dis(0, (int)candidates.size() - 1);
 	currentIndex_ = candidates[dis(gen)];
 
 	// セーブファイルに記録

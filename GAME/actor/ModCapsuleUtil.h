@@ -1,6 +1,6 @@
 #pragma once
-#include "kEngine/Math/Vector3.h"
-#include "kEngine/Math/Matrix4x4.h"
+#include "Vector3.h"
+#include "Matrix4x4.h"
 #include <vector>
 
 struct VertexData;

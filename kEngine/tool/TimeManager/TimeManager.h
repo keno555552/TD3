@@ -69,40 +69,45 @@ public:
 	void ResetM();
 
 	/// <summary>
+	/// timerを-1にする
+	/// </summary>
+	void TimerONOff(bool isOn);
+
+	/// <summary>
 	/// Timerをマクスにすると止まる
 	/// </summary>
-	void ToMix();
+	bool ToMix();
 
 	/// <summary>
 	/// Timerをマクスにすると0になって、止まる。1以上になると動く
 	/// </summary>
-	void ToMixZero();
+	bool ToMixZero();
 
 	/// <summary>
 	/// Timerを0にすると止まる
 	/// </summary>
-	void ToZero();
+	bool ToZero();
 
 	/// <summary>
 	/// Timerを0にするとマクスになって、止まる。Mix - 1以下になると動く
 	/// </summary>
-	void ToZeroMix();
+	bool ToZeroMix();
 
 	/// <summary>
 	/// 無休Upタイマー
 	/// </summary>
-	void foreverUp();
+	bool foreverUp();
 
 	/// <summary>
 	/// 無休Downタイマー
 	/// </summary>
-	void foreverDown();
+	bool foreverDown();
 
 	/// <summary>
 	/// アニメーション用の無休タイマー、1秒12フレームで int形数字を出力
 	/// </summary>
 	/// <returns></returns>
-	void AnimationF();
+	bool AnimationF();
 
 	/// <summary>
 	/// アニメーション用のタイマー、秒を12フレームの形で int形数字を出力
@@ -214,6 +219,8 @@ public:
 	/// <returns>0から1までの変化値</returns>
 	float easyOutBack(float r);
 
+	float step(float a, float b);
+
 	bool GetIsMax() const;
 
 	bool GetIsZero() const;
@@ -231,6 +238,8 @@ public:
 	float maxTime_;
 	/// scaleに影響されるか
 	bool isInfluenceByTimeScale_ = false;
+	/// On/off
+	bool isTimerRun_ = true;
 
 private:
 
@@ -247,9 +256,7 @@ private:
 /// </summary>
 /// <param name="a">始まりの数値</param>
 /// <param name="b">最後の数値</param>
-/// <param name="c">clockの変数</param>
 /// <param name="t">clockの最大時間</param>
-/// <param name="r">変動率[1.0f以上]</param>
 /// <returns>aからbまで今どれくらい進んでる値</returns>
 float linearity(float a, float b, float t);
 
@@ -284,7 +291,7 @@ float easyOut(float a, float b, float t, float r);
 /// <param name="t">clockの最大時間</param>
 /// <param name="r">変動率[1.0f以上]</param>
 /// <returns>aからbまで今どれくらい進んでる値</returns>
-float easyInOut(int a, int b, int c, int t, float r);
+float easyInOut(int a, int b, float time, float r);
 
 /// <summary>
 /// Timerに連れてAからBまで変動、一回後ろに行って、早く最後のどころに行く
@@ -295,7 +302,7 @@ float easyInOut(int a, int b, int c, int t, float r);
 /// <param name="t">clockの最大時間</param>
 /// <param name="r">変動率[1.0f以上]</param>
 /// <returns>aからbまで今どれくらい進んでる値</returns>
-float easyInBack(int a, int b, int c, int t, float r);
+float easyInBack(int a, int b, float time, float r);
 
 /// <summary>
 /// Timerに連れてAからBまで変動、最後のどころに着いた後止めず、一定距離後戻る
@@ -306,7 +313,9 @@ float easyInBack(int a, int b, int c, int t, float r);
 /// <param name="t">clockの最大時間</param>
 /// <param name="r">変動率[1.0f以上]</param>
 /// <returns>aからbまで今どれくらい進んでる値</returns>
-float easyOutBack(int a, int b, int c, int t, float r);
+float easyOutBack(int a, int b, float time, float r);
+
+float step(float a, float b, float t);
 
 float smootherstep(float t);
 

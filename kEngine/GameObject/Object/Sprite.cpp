@@ -84,3 +84,26 @@ Vector3 SimpleSprite::TransTransform(Vector2 Pos) {
 float SimpleSprite::TransLayerDepth(int layer) {
 	return layer * layerDepth_Sprite;
 }
+
+void SimpleSprite::CopySprite(SimpleSprite* target) {
+	if (target == nullptr)return;
+	mainPosition = target->mainPosition;
+	modelHandle_ = target->modelHandle_;
+	followObject_ = target->followObject_;
+	for (auto& ptr : target->objectParts_) {
+		CreateDefaultData();
+		objectParts_.back().name = ptr.name;
+		objectParts_.back().transform = ptr.transform;
+
+		objectParts_.back().anchorPoint = ptr.anchorPoint;
+		objectParts_.back().worldAnchorPoint = ptr.worldAnchorPoint;
+
+		objectParts_.back().conerData = ptr.conerData;
+
+		objectParts_.back().cropLT = ptr.cropLT;
+		objectParts_.back().cropSize = ptr.cropSize;
+
+		objectParts_.back().materialConfig = ptr.materialConfig;
+		objectParts_.back().parentPart = ptr.parentPart;
+	}
+}

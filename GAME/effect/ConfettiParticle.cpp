@@ -142,8 +142,6 @@ void ConfettiParticle::ClearAll() {
         delete p->part;
         p->part = nullptr;
       }
-      delete p;
-      p = nullptr;
     }
   }
   particleObjectList_.clear();

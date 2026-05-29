@@ -122,9 +122,7 @@ void ModPartParticle::ClearAll() {
         delete p->part;
         p->part = nullptr;
       }
-
-      delete p;
-      p = nullptr;
+      p.reset();
     }
   }
 

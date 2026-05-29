@@ -1,4 +1,5 @@
 #include "DirectXController.h"
+#include "Renderer/Resource/TextureManager.h"
 #include <pplwin.h>
 #include <cassert>
 
@@ -75,11 +76,7 @@ void DirectXController::EndFrame() {
 	// 画面に描く処理はすべて終わり、画面に映すので、状態を遷移
 	// 今回はRenderTargetからPresentにする
 	barrier.Transition.pResource = swapChainResources[backBufferIndex].Get();
-
-
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 	// TransitionBarrierを張る
 	commandList->ResourceBarrier(1, &barrier);
@@ -113,6 +110,7 @@ void DirectXController::EndFrame() {
 		WaitForSingleObject(fenceEvent, INFINITE);
 	}
 
+	TextureManager::GetInstance()->EndUploadingTexture();
 
 	// 次のフレーム用のコマンドリストを準備
 	hr = commandAllocator->Reset(); // 重置命令分配器，為下一幀準備

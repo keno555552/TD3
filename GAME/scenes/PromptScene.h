@@ -24,12 +24,12 @@ private:
 
 private:
 	// 仮ライト
-	Light* light1_ = nullptr;
+	std::unique_ptr<Light> light1_;
 
 	// カメラ
-	Camera* camera_ = nullptr;
-	DebugCamera* debugCamera_ = nullptr;
-	Camera* usingCamera_ = nullptr;
+	std::weak_ptr<Camera> camera_;
+	std::weak_ptr<DebugCamera> debugCamera_;
+	std::weak_ptr<Camera> usingCamera_;
 
 	bool useDebugCamera_ = false;
 
@@ -37,7 +37,7 @@ private:
 	Fade fade_;
 	float GetFadeAlpha() const override { return fade_.GetAlpha(); }
 
-	Light* spotLight_ = nullptr;
+	std::unique_ptr<Light> spotLight_;
 	float spotLightTimer_ = 0.0f;
 
 	Object* backgroundWall_ = nullptr;

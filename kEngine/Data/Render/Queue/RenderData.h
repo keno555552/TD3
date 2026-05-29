@@ -2,6 +2,7 @@
 #include "TransformationMatrix.h"
 #include "Mesh/VertexResource.h"
 #include "Data/Render/GPUData/MaterialForGPU.h"
+#include "Renderer/PSOManager/PSOKeys.h"
 using MaterialID = int;
 
 struct RenderData
@@ -9,7 +10,7 @@ struct RenderData
     MeshBuffer* mesh;
     MaterialID materialID;
     TransformationMatrix transformData;
-    uint32_t psoID;
+    PSOKey psoKey;
     uint32_t subMeshIndex;
 
 	bool CheckSame(const RenderData target);

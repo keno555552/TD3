@@ -1,12 +1,13 @@
 #include "ImGuiManager.h"
 #include "DirectXController.h"
-#include "SrvManager/SrvManager.h"
+#include "DescriptorManager/SrvManager/SrvManager.h"
 
 bool ImGuiManager::HandleMessage(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam) {
     return ImGui_ImplWin32_WndProcHandler(hwnd, msg, wparam, lparam);
 }
 
-void ImGuiManager::Initialize(DirectXController* dxComm, SrvManager* srvManager) {
+void ImGuiManager::Initialize(DirectXController* dxComm) {
+	SrvManager* srvManager = SrvManager::GetInstance();
     uint32_t srvIndex = srvManager->Allocate();
     dxComm->GetCommandQueue();
 

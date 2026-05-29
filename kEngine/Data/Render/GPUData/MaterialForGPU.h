@@ -18,10 +18,13 @@ struct MaterialForGPU
 	float intensity;
 	float heightScale;
 
-	float extra[5];
+	float reflectiveStrength;
+
+	//float extra[4];
 
 	bool operator==(const MaterialForGPU target);
 	bool operator!=(const MaterialForGPU target);
 	void inputMaterialConfig(MaterialConfig target);
+
 };
 

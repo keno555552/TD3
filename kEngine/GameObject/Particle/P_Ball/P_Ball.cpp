@@ -91,7 +91,7 @@ void P_Ball::CreateBall() {
 
 void P_Ball::UpdateBall() {
 
-	for (auto object : particleObjectList_) {
+	for (auto& object : particleObjectList_) {
 		float T = object->lifeTimeTimer.parameter_ / object->lifeTimeTimer.maxTime_;
 		object->part->objectParts_[0].materialConfig->textureColor.w = 1.0f - T;
 	}
@@ -99,16 +99,15 @@ void P_Ball::UpdateBall() {
 }
 
 void P_Ball::DeleteBall() {
-	for (auto it : particleObjectList_) {
-		ParticleData* fd = it;
+	for (auto& it : particleObjectList_) {
 		bool dead = false;
-		if (fd->lifeTimeTimer.parameter_ >= fd->lifeTimeTimer.maxTime_)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.x > anchorPart_.transform.translate.x + effectArea_.x / 2.0f)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.x < anchorPart_.transform.translate.x - effectArea_.x / 2.0f)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.y > anchorPart_.transform.translate.y + effectArea_.y / 2.0f)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.y < anchorPart_.transform.translate.y - effectArea_.y / 2.0f)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.z > anchorPart_.transform.translate.z + effectArea_.z / 2.0f)fd->isAlive = false; continue;
-		if (fd->part->mainPosition.transform.translate.z < anchorPart_.transform.translate.z - effectArea_.z / 2.0f)fd->isAlive = false; continue;
+		if (it->lifeTimeTimer.parameter_ >= it->lifeTimeTimer.maxTime_)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.x > anchorPart_.transform.translate.x + effectArea_.x / 2.0f)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.x < anchorPart_.transform.translate.x - effectArea_.x / 2.0f)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.y > anchorPart_.transform.translate.y + effectArea_.y / 2.0f)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.y < anchorPart_.transform.translate.y - effectArea_.y / 2.0f)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.z > anchorPart_.transform.translate.z + effectArea_.z / 2.0f)it->isAlive = false; continue;
+		if (it->part->mainPosition.transform.translate.z < anchorPart_.transform.translate.z - effectArea_.z / 2.0f)it->isAlive = false; continue;
 	}
 }
 

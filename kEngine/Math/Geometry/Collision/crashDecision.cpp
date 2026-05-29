@@ -173,38 +173,39 @@ bool crashDecision(const Sphere& s1, const Sphere& s2) {
 	return false;
 }
 
-//bool crashDecision(const Sphere& s1, const Plane& s2) {
-//	Sphere ss1 = s1;
-//	Plane ss2 = s2;
-//	float distance = Dot(ss1.center, ss2.normal) - ss2.distance;
-//	if (distance < ss1.radius && distance >= 0) {
-//		return true;
-//	}
-//	if (distance > -ss1.radius && distance < 0) {
-//		return true;
-//	}
-//	return false;
-//}
-//
-//bool crashDecision(const Segment& segment, const Plane& plane) {
-//	/// まずは内積を求める
-//	float dot = Dot(plane.normal, segment.diff);
-//
-//	/// 平行してるかをチェック
-//	if (dot == 0.0f) {
-//		return false;
-//	}
-//
-//	/// tを求める
-//	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
-//
-//	/// tの値と線の種類によって衝突してるかを判断する
-//	if (t >= 0 && t <= 1) {
-//		return true;
-//	}
-//	return false;
-//}
-//
+bool crashDecision(const Sphere& s1, const Plane& s2) {
+	Sphere ss1 = s1;
+	Plane ss2 = s2;
+	float distance = Dot(ss1.center, ss2.normal) - ss2.distance;
+	if (distance < ss1.radius && distance >= 0) {
+		return true;
+	}
+	if (distance > -ss1.radius && distance < 0) {
+		return true;
+	}
+	return false;
+}
+
+
+bool crashDecision(const Segment& segment, const Plane& plane) {
+	/// まずは内積を求める
+	float dot = Dot(plane.normal, segment.diff);
+
+	/// 平行してるかをチェック
+	if (dot == 0.0f) {
+		return false;
+	}
+
+	/// tを求める
+	float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
+
+	/// tの値と線の種類によって衝突してるかを判断する
+	if (t >= 0 && t <= 1) {
+		return true;
+	}
+	return false;
+}
+
 //bool crashDecision(const Segment& segment, const Triangle& triangle) {
 //	Vector3 tp1 = triangle.vertex[0];
 //	Vector3 tp2 = triangle.vertex[1];
@@ -242,28 +243,28 @@ bool crashDecision(const Sphere& s1, const Sphere& s2) {
 //	return false;
 //}
 //
-//bool crashDecision(const AABB& a, const AABB& b) {
-//	if ((a.min.x <= b.max.x && a.max.x >= b.min.x) &&
-//		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
-//		(a.min.z <= b.max.z && a.max.z >= b.min.z)) {
-//		return true;
-//	}
-//	return false;
-//}
-//
-//bool crashDecision(const AABB& a, const Sphere& sphere) {
-//	Vector3 closestPoint{ std::clamp(sphere.center.x, a.min.x,a.max.x),
-//						  std::clamp(sphere.center.y, a.min.y,a.max.y) ,
-//						  std::clamp(sphere.center.z, a.min.z,a.max.z) };
-//
-//	float distance = Length(closestPoint - sphere.center);
-//
-//	if (distance <= sphere.radius) {
-//		return true;
-//	}
-//	return false;
-//}
-//
+bool crashDecision(const AABB& a, const AABB& b) {
+	if ((a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+		(a.min.z <= b.max.z && a.max.z >= b.min.z)) {
+		return true;
+	}
+	return false;
+}
+
+bool crashDecision(const AABB& a, const Sphere& sphere) {
+	Vector3 closestPoint{ std::clamp(sphere.center.x, a.min.x,a.max.x),
+						  std::clamp(sphere.center.y, a.min.y,a.max.y) ,
+						  std::clamp(sphere.center.z, a.min.z,a.max.z) };
+
+	float distance = Length(closestPoint - sphere.center);
+
+	if (distance <= sphere.radius) {
+		return true;
+	}
+	return false;
+}
+
 bool crashDecision(const AABB& a, const Segment& segment) {
 	float tNearX, tFarX, tNearY, tFarY, tNearZ, tFarZ;
 

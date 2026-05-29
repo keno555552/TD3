@@ -31,12 +31,12 @@ Microsoft::WRL::ComPtr <IDxcBlob> Shader_compile::CompileShader(// Compilerす�
 	const std::wstring& filePath,
 	// Compilerに使用するProfile
 	const wchar_t* profile,
-	LightModelType modelType
+	PSOKey& psoKeys
 ) {
 	/// ここの中身をこの後書いていく
 	/// 1.hlslファイルを読む
 	// これからシェーダーをコンパイルする旨をログに出す
-	Logger::Log(ConvertString::SwitchStdStringWstring(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
+	//Logger::Log(ConvertString::SwitchStdStringWstring(std::format(L"Begin CompileShader, path:{}, profile:{}\n", filePath, profile)));
 	// hlslファイルを読む
 	Microsoft::WRL::ComPtr <IDxcBlobEncoding> shaderSource{};
 	HRESULT hr = dxcUtils->LoadFile(filePath.c_str(), nullptr, shaderSource.GetAddressOf());
@@ -50,7 +50,13 @@ Microsoft::WRL::ComPtr <IDxcBlob> Shader_compile::CompileShader(// Compilerす�
 
 	/// 2.Compileする
 	// 実際にShaderをコンパイルする
-	Microsoft::WRL::ComPtr <IDxcResult> shaderResult = BuildAndCompileShader(filePath, profile, modelType, hr, shaderSourceBuffer);
+	Microsoft::WRL::ComPtr <IDxcResult> shaderResult = BuildAndCompileShader(
+		filePath,
+		profile,
+		hr,
+		shaderSourceBuffer,
+		psoKeys
+	);
 
 	/// 3.警告・エラーがでていないか確認する
 	// 警告・エラーが出てたらログに出して止める
@@ -75,11 +81,20 @@ Microsoft::WRL::ComPtr <IDxcBlob> Shader_compile::CompileShader(// Compilerす�
 }
 
 
-Microsoft::WRL::ComPtr<IDxcResult> Shader_compile::BuildAndCompileShader(const std::wstring& filePath, const wchar_t* profile, LightModelType modelType, HRESULT& hr, DxcBuffer& shaderSourceBuffer) {
+Microsoft::WRL::ComPtr<IDxcResult> Shader_compile::BuildAndCompileShader(
+	const std::wstring& filePath,
+	const wchar_t* profile,
+	HRESULT& hr,
+	DxcBuffer& shaderSourceBuffer,
+	PSOKey& psoKeys
+) {
 
 	Microsoft::WRL::ComPtr<IDxcResult> shaderResult{};
+	
+	arguments_.clear();
+	storage_.clear();
 
-	std::vector<LPCWSTR> arguments = {
+	arguments_ = {
 		filePath.c_str(),			// コンパイル対象のhlslファイル名
 		L"-E", L"main",				// エントリーポイントの指定。基本的にmain以外にはしない
 		L"-T", profile,				// ShaderProfileの設定
@@ -89,24 +104,27 @@ Microsoft::WRL::ComPtr<IDxcResult> Shader_compile::BuildAndCompileShader(const s
 	};
 
 	// 光照モデル設定
-	if (modelType == LightModelType::Lambert) {
-		arguments.push_back(L"-D");
-		arguments.push_back(L"LIGHT_MODEL_LAMBERT=1");
-	} else if (modelType == LightModelType::HalfLambert) {
-		arguments.push_back(L"-D");
-		arguments.push_back(L"LIGHT_MODEL_HALF=1");
-	} else if (modelType == LightModelType::PhongReflection) {
-		arguments.push_back(L"-D");
-		arguments.push_back(L"LIGHT_MODEL_PHONG=1");
-	} else if (modelType == LightModelType::BlinnPhongReflection) {
-		arguments.push_back(L"-D");
-		arguments.push_back(L"LIGHT_MODEL_BLINN_PHONG=1");
+	if (psoKeys.lightModelType == LightModelType::Lambert) {
+		AddDefine("LIGHT_MODEL_LAMBERT", "1");
+	} else if (psoKeys.lightModelType == LightModelType::HalfLambert) {
+		AddDefine("LIGHT_MODEL_HALF", "1");
+	} else if (psoKeys.lightModelType == LightModelType::PhongReflection) {
+		AddDefine("LIGHT_MODEL_PHONG", "1");
+	} else if (psoKeys.lightModelType == LightModelType::BlinnPhongReflection) {
+		AddDefine("LIGHT_MODEL_BLINN_PHONG", "1");
+	}
+
+	/// FeatureFlagsを摘出
+	bool environmentReflectionFlag = (psoKeys.featureMask & (uint64_t)FeatureFlags::EnvReflection) != 0;
+
+	if (environmentReflectionFlag) {
+		AddDefine("USE_ENVIRONMENT_REFLECTION", "1");
 	}
 
 	hr = dxcCompiler->Compile(
 		&shaderSourceBuffer, // 読み込んだファイル
-		arguments.data(), // コンパイルオプション
-		static_cast<uint32_t>(arguments.size()), // コンパイルオプションの数
+		arguments_.data(), // コンパイルオプション
+		static_cast<uint32_t>(arguments_.size()), // コンパイルオプションの数
 		includeHandler.Get(), // includeが含まれた諸々
 		IID_PPV_ARGS(shaderResult.GetAddressOf()) // コンパイル結果
 	);
@@ -117,4 +135,15 @@ Microsoft::WRL::ComPtr<IDxcResult> Shader_compile::BuildAndCompileShader(const s
 	return shaderResult;
 }
 
+void Shader_compile::AddDefine(
+	const std::string& name,
+	const std::string& value
+) {
+	std::wstring w = L"-D"
+		+ std::wstring(name.begin(), name.end())
+		+ L"="
+		+ std::wstring(value.begin(), value.end());
 
+	storage_.push_back(w);
+	arguments_.push_back(storage_.back().c_str());
+}

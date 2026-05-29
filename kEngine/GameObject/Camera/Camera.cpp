@@ -2,13 +2,16 @@
 #include "Logger.h"
 
 Transform CameraDefaultTransform() {
-	return { { 1.0f, 1.0f, 1.0f },   // scale
-			{ 0.0f, 0.0f, 0.0f },   // rotate
-			{ 0.0f, 0.0f, -5.0f } // translate
-	};
+
+	Transform defaultTransform;
+	defaultTransform.scale = { 1.0f, 1.0f, 1.0f };
+	defaultTransform.rotate = { 0.0f, 0.0f, 0.0f };
+	defaultTransform.translate = { 0.0f, 0.0f, -5.0f };
+
+	return defaultTransform;
 }
 
-Camera::Camera()
+Camera::Camera(ConstructorKey)
 	:fovY_(0.45f)
 	, aspect_(float(config::GetClientWidth()) / float(config::GetClientHeight()))
 	, nearClip_(0.1f)
