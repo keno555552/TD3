@@ -2150,15 +2150,8 @@ const char *TravelRunner::GetLowestBodyPartName(LowestBodyPart part) const {
 }
 
 bool TravelRunner::HasRequiredParts() const {
-  Object *chestBody = GetStandardPart(ModBodyPart::ChestBody);
-  Object *stomachBody = GetStandardPart(ModBodyPart::StomachBody);
   Object *neck = GetStandardPart(ModBodyPart::Neck);
   Object *head = GetStandardPart(ModBodyPart::Head);
-
-  Object *leftUpperArm = GetStandardPart(ModBodyPart::LeftUpperArm);
-  Object *leftForeArm = GetStandardPart(ModBodyPart::LeftForeArm);
-  Object *rightUpperArm = GetStandardPart(ModBodyPart::RightUpperArm);
-  Object *rightForeArm = GetStandardPart(ModBodyPart::RightForeArm);
 
   Object *leftThigh = GetStandardPart(ModBodyPart::LeftThigh);
   Object *leftShin = GetStandardPart(ModBodyPart::LeftShin);
@@ -2166,9 +2159,7 @@ bool TravelRunner::HasRequiredParts() const {
   Object *rightShin = GetStandardPart(ModBodyPart::RightShin);
 
   // nullチェック
-  if (chestBody == nullptr || neck == nullptr || head == nullptr ||
-      leftUpperArm == nullptr || leftForeArm == nullptr ||
-      rightUpperArm == nullptr || rightForeArm == nullptr ||
+  if (neck == nullptr || head == nullptr ||
       leftThigh == nullptr || leftShin == nullptr || rightThigh == nullptr ||
       rightShin == nullptr) {
     return false;
