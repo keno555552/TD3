@@ -81,6 +81,7 @@ private:
   int connectSoundHandle_ = -1;
   int deleteSoundHandle_ = -1;
   int notificationSoundHandle_ = -1;
+  int warningSoundHandle_ = -1;
 
   /// 操作点の情報をまとめる構造体
   struct TorsoControlPoint {
@@ -217,6 +218,11 @@ private:
   UiIconButton trashButton_{};
   // マウスが削除ボタンの上にあるかどうか
   bool isHoverTrash_ = false;
+
+  // シェイクと警告表示用の変数
+  float shakeTimer_ = 0.0f;
+  float warningTimer_ = 0.0f;
+  std::string warningMessage_ = "";
 
   // UIの次シーンボタン
   std::unique_ptr<DetailButton> nextSceneButton_;
