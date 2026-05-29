@@ -226,9 +226,10 @@ private:
 
   TravelTuning tuning_;
   bool useCustomizeMove_ = true;
-
   bool requireReleaseAfterLandLeft_ = false;
   bool requireReleaseAfterLandRight_ = false;
+  float leftRawHoldTime_ = 0.0f;
+  float rightRawHoldTime_ = 0.0f;
 
   float leftLegReturnScale_ = 1.0f;
   float rightLegReturnScale_ = 1.0f;
@@ -240,6 +241,9 @@ private:
 
   float gaitTiltTarget_ = 0.0f;
   float landTimer_ = 999.0f;
+
+  float visualLowestYOffset_ = 0.0f;
+  bool hasVisualLowestYOffset_ = false;
 
   float headSizeScale_ = 1.0f;
 
@@ -311,7 +315,7 @@ private:
   };
   CharacterFeatures features_;
 
-  enum class KickFeedbackType { None, Perfect, Good, Bad };
+  enum class KickFeedbackType { None, Perfect, Good, Bad, Late };
   KickFeedbackType kickFeedbackType_ = KickFeedbackType::None;
   float kickFeedbackTimer_ = 0.0f;
   float aKeyFlashTimer_ = 0.0f;

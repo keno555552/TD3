@@ -96,7 +96,7 @@ TitleScene::TitleScene(kEngine* system) {
 	tutorialCloseButton_->SetButton({ 1180.0f, 680.0f }, 160.0f, 50.0f);
 
 	// チュートリアル画像の読み込み
-	tutorialTex1_ = ResourceManager::GetInstance()->LoadCommonTexture("./GAME/resources/TitleScene/tutorial1.png");
+	tutorialTex1_ = ResourceManager::GetInstance()->LoadCommonTexture("./GAME/resources/TitleScene/tutorial.png");
 	tutorialTex2_ = ResourceManager::GetInstance()->LoadCommonTexture("./GAME/resources/TitleScene/tutorial2.png");
 
 	darkOverlay_ = std::make_unique<SimpleSprite>();

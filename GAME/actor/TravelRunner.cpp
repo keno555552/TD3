@@ -65,10 +65,17 @@ void TravelRunner::UpdateHoldState(bool leftNowInput, bool rightNowInput,
     rightHoldTime_ = 0.0f;
   }
 
-  if (!leftNowInput) {
+  if (leftNowInput) {
+    leftRawHoldTime_ += deltaTime;
+  } else {
+    leftRawHoldTime_ = 0.0f;
     requireReleaseAfterLandLeft_ = false;
   }
-  if (!rightNowInput) {
+
+  if (rightNowInput) {
+    rightRawHoldTime_ += deltaTime;
+  } else {
+    rightRawHoldTime_ = 0.0f;
     requireReleaseAfterLandRight_ = false;
   }
 }
@@ -1008,8 +1015,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
 
-  // 足が戻っていない状態の威力を「1 (0.01)」、完全に戻りきった状態を「100 (1.0)」とする
-  float kickReadyPower = 0.01f + 0.99f * (kickReadyRatio * kickReadyRatio);
+  // 足が戻っていない状態の威力を「1% (0.01)」から「35% (0.35)」に引き上げ、完全にスカらないようにする
+  float kickReadyPower = 0.35f + 0.65f * (kickReadyRatio * kickReadyRatio);
 
   // 姿勢が悪いほど蹴りの力が地面に乗らない
   float postureKickScale = 1.0f - badPosture * 0.55f;
@@ -1045,28 +1052,12 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       // 足の戻り（タメ）が十分でない場合は強制的にBadにする
       bool hasEnoughReady = (kickReadyRatio >= 0.70f);
 
-      if (hasEnoughReady && landTimer_ <= perfectTimingEnd) {
-        kickFeedbackType_ = KickFeedbackType::Perfect;
-        kickFeedbackTimer_ = 0.18f;
-        perfectStreak_++;
+      // 先行入力（インプットバッファ）によって発動したキックかどうかを判定
+      // 押した瞬間の rawHoldTime は deltaTime 程度になるため、それより長ければ「着地前に押されていた」と判断する
+      float dt = system_->GetDeltaTime();
+      bool isBuffered = useLeftPush ? (leftRawHoldTime_ > dt * 1.5f) : (rightRawHoldTime_ > dt * 1.5f);
 
-        if (isPlayer_) {
-          perfectParticle_->Spawn({0.0f, 0.0f, moveX_},
-                                  KickEffectType::Perfect);
-          Logger::Log("KICK : PERFECT");
-        }
-
-      } else if (hasEnoughReady && landTimer_ <= bestTimingEnd) {
-        kickFeedbackType_ = KickFeedbackType::Good;
-        kickFeedbackTimer_ = 0.12f;
-        perfectStreak_ = 0;
-
-        if (isPlayer_) {
-          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Good);
-          Logger::Log("KICK : GOOD");
-        }
-
-      } else {
+      if (!hasEnoughReady) {
         kickFeedbackType_ = KickFeedbackType::Bad;
 
         perfectStreak_ = 0;
@@ -1078,6 +1069,35 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
           }
           Logger::Log("KICK : BAD");
         }
+      } else if (landTimer_ <= perfectTimingEnd && !isBuffered) {
+        // 本当にジャストタイミングで押した場合のみ Perfect
+        kickFeedbackType_ = KickFeedbackType::Perfect;
+        kickFeedbackTimer_ = 0.18f;
+        perfectStreak_++;
+
+        if (isPlayer_) {
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_},
+                                  KickEffectType::Perfect);
+          Logger::Log("KICK : PERFECT");
+        }
+
+      } else if (landTimer_ <= bestTimingEnd || (landTimer_ <= perfectTimingEnd && isBuffered)) {
+        // 少し遅れた場合、または先行入力で最速発動した場合は Good
+        kickFeedbackType_ = KickFeedbackType::Good;
+        kickFeedbackTimer_ = 0.12f;
+        perfectStreak_ = 0;
+
+        if (isPlayer_) {
+          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Good);
+          Logger::Log("KICK : GOOD");
+        }
+
+      } else {
+        // 足の戻りは十分だが、着地からのタイミングが遅れた場合
+        // ペナルティとして Late を与え、威力を少し落とす（0.9倍）
+        kickFeedbackType_ = KickFeedbackType::Late;
+        perfectStreak_ = 0;
+        Logger::Log("KICK : LATE");
       }
     }
 
@@ -1089,6 +1109,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       timingBonus = 1.00f;
     } else if (kickFeedbackType_ == KickFeedbackType::Bad) {
       timingBonus = 0.85f;
+    } else if (kickFeedbackType_ == KickFeedbackType::Late) {
+      timingBonus = 0.90f;
     }
 
     totalPush *= timingBonus;
@@ -1408,8 +1430,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     leftHoldTime_ = 0.0f;
     rightHoldTime_ = 0.0f;
 
-    requireReleaseAfterLandLeft_ = leftNowInput;
-    requireReleaseAfterLandRight_ = rightNowInput;
+    // 着地時に0.15秒以上ボタンを押しっぱなしだった場合のみ、再押しを要求する
+    // （着地直前に入力された「先行入力」はそのまま受け付けてキックさせる）
+    requireReleaseAfterLandLeft_ = (leftRawHoldTime_ > 0.15f);
+    requireReleaseAfterLandRight_ = (rightRawHoldTime_ > 0.15f);
   }
 
   bodyStretch_ *= 0.90f;
