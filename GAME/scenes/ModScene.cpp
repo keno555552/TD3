@@ -1120,6 +1120,12 @@ ModScene::ModScene(kEngine *system) {
   notifyRivalTexHandles_[1] = system_->LoadTexture("GAME/resources/ModScene/notification/rival2.png");
   notifyRivalTexHandles_[2] = system_->LoadTexture("GAME/resources/ModScene/notification/rival3.png");
   notifyRivalTexHandles_[3] = system_->LoadTexture("GAME/resources/ModScene/notification/rival4.png");
+
+  promptButton_ = std::make_unique<DetailButton>(system_);
+  promptButton_->SetButton({640.0f, 340.0f}, 500.0f, 86.0f);
+
+  retryModButton_ = std::make_unique<DetailButton>(system_);
+  retryModButton_->SetButton({640.0f, 460.0f}, 500.0f, 86.0f);
 }
 
 ModScene::~ModScene() {
@@ -6586,7 +6592,7 @@ void ModScene::UpdateNpcProgress() {
         if (!npc.goalNotified) {
           npc.goalNotified = true;
           npcGoalCountInMod_++;
-          AddStartNotification(i, true);
+          AddStartNotification(static_cast<int>(i), true);
         }
       }
 
@@ -6601,7 +6607,7 @@ void ModScene::UpdateNpcProgress() {
       npc.hasStartedMoving = true;
       npc.moveElapsedTime = 0.0f;
 
-      AddStartNotification(i, false);
+      AddStartNotification(static_cast<int>(i), false);
     }
   }
 
@@ -6896,6 +6902,11 @@ void ModScene::UpdateFailureMenuInputMod() {
     return;
   }
 
+  if (!fade_.IsBusy()) {
+    promptButton_->Update();
+    retryModButton_->Update();
+  }
+
   const float dt = system_->GetDeltaTime();
   if (failureMenuInputCooldown_ > 0.0f) {
     failureMenuInputCooldown_ -= dt;
@@ -6906,27 +6917,14 @@ void ModScene::UpdateFailureMenuInputMod() {
 
   const Vector2 mouse = system_->GetMousePosVector2();
 
-  struct MenuRect {
-    Vector2 center;
-    Vector2 size;
-  };
-
-  const MenuRect promptRect{{640.0f, 330.0f}, {420.0f, 64.0f}};
-  const MenuRect retryRect{{640.0f, 410.0f}, {420.0f, 64.0f}};
-
-  auto IsInside = [](const Vector2 &p, const MenuRect &r) -> bool {
-    const float left = r.center.x - r.size.x * 0.5f;
-    const float right = r.center.x + r.size.x * 0.5f;
-    const float top = r.center.y - r.size.y * 0.5f;
-    const float bottom = r.center.y + r.size.y * 0.5f;
-    return p.x >= left && p.x <= right && p.y >= top && p.y <= bottom;
-  };
-
-  if (IsInside(mouse, promptRect)) {
+  if (promptButton_->GetIsSelect(mouse, 1, 1)) {
     selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
-  } else if (IsInside(mouse, retryRect)) {
+  } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
     selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
   }
+
+  promptButton_->ForceSelectState(selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt);
+  retryModButton_->ForceSelectState(selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod);
 
   if (failureMenuInputCooldown_ <= 0.0f) {
     if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
@@ -6943,11 +6941,10 @@ void ModScene::UpdateFailureMenuInputMod() {
       failureMenuInputCooldown_ = 0.12f;
     }
 
-    const bool mouseClicked = IsMouseLeftTriggeredNow();
     const bool keyConfirm =
         system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
 
-    if (mouseClicked || keyConfirm) {
+    if (promptButton_->GetIsClicked() || retryModButton_->GetIsClicked() || keyConfirm) {
       DecideFailureMenuMod();
     }
   }
@@ -6957,6 +6954,20 @@ void ModScene::DrawFailureMenuMod() {
   if (!isFailureMenuOpen_) {
     return;
   }
+
+  const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+  const Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+  const Vector4 pressColorBtn = {0.16f, 0.20f, 0.26f, 1.0f};
+
+  promptButton_->SetNormalColor(normalColorBtn);
+  promptButton_->SetSelectColor(selectColorBtn);
+  promptButton_->SetPressColor(pressColorBtn);
+  promptButton_->Render();
+
+  retryModButton_->SetNormalColor(normalColorBtn);
+  retryModButton_->SetSelectColor(selectColorBtn);
+  retryModButton_->SetPressColor(pressColorBtn);
+  retryModButton_->Render();
 
   const Vector4 normalColor = {1.0f, 1.0f, 1.0f, 1.0f};
   const Vector4 selectedColor = {1.0f, 1.0f, 0.2f, 1.0f};
@@ -6970,12 +6981,12 @@ void ModScene::DrawFailureMenuMod() {
   const bool retrySelected =
       selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod;
 
-  bitmapFont_.RenderText("おだいにもどる", {640.0f, 330.0f},
+  bitmapFont_.RenderText("おだいにもどる", {640.0f, 340.0f - 22.0f},
                          promptSelected ? 44.0f : 36.0f,
                          BitmapFont::Align::Center, 5.0f,
                          promptSelected ? selectedColor : normalColor);
 
-  bitmapFont_.RenderText("かいぞうにもどる", {640.0f, 410.0f},
+  bitmapFont_.RenderText("かいぞうにもどる", {640.0f, 460.0f - 22.0f},
                          retrySelected ? 44.0f : 36.0f,
                          BitmapFont::Align::Center, 5.0f,
                          retrySelected ? selectedColor : normalColor);
@@ -6985,6 +6996,13 @@ void ModScene::CheckModFailureState() {
   if (isModFailed_) {
     return;
   }
+
+#ifdef _DEBUG
+  if (system_->GetTriggerOn(DIK_N)) {
+    OpenFailureMenuMod();
+    return;
+  }
+#endif
 
   if (npcGoalCountInMod_ >= modFailureGoalCount_) {
     OpenFailureMenuMod();
@@ -7146,13 +7164,11 @@ void ModScene::InitializeScreenUi() {
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
-  SetupUiSprite(resetButton_, {1050.0f, 640.0f}, {100.0f, 100.0f},
-                uiFrameTextureHandle_);
-  resetButton_.label = "リセット";
+  resetButton_ = std::make_unique<DetailButton>(system_);
+  resetButton_->SetButton({1050.0f, 640.0f}, 100.0f, 100.0f);
 
-  SetupUiSprite(nextSceneButton_, {1200.0f, 640.0f}, {100.0f, 100.0f},
-                uiFrameTextureHandle_);
-  nextSceneButton_.label = "つぎへ";
+  nextSceneButton_ = std::make_unique<DetailButton>(system_);
+  nextSceneButton_->SetButton({1200.0f, 640.0f}, 100.0f, 100.0f);
 
   howToTextureHandle_ =
       system_->LoadTexture("GAME/resources/ModScene/howTo.png");
@@ -7297,14 +7313,14 @@ bool ModScene::TryHandleAddButtonInteraction() {
     }
   }
 
-  if (IsPointInUiButton(mouse, resetButton_)) {
+  if (resetButton_ && resetButton_->GetIsClicked()) {
     ResetToDefaultHumanoid();
     UpdateModObjects();
     SyncCustomizeDataFromScene();
     return true;
   }
 
-  if (IsPointInUiButton(mouse, nextSceneButton_)) {
+  if (nextSceneButton_ && nextSceneButton_->GetIsClicked()) {
     if (!fade_.IsBusy()) {
       fade_.StartFadeOut();
       isStartTransition_ = true;
@@ -7377,11 +7393,11 @@ bool ModScene::IsMouseOverAnyScreenUi() const {
     return true;
   }
 
-  if (IsPointInUiButton(mouse, resetButton_)) {
+  if (resetButton_ && resetButton_->GetIsSelect(mouse, 1, 1)) {
     return true;
   }
 
-  if (IsPointInUiButton(mouse, nextSceneButton_)) {
+  if (nextSceneButton_ && nextSceneButton_->GetIsSelect(mouse, 1, 1)) {
     return true;
   }
 
@@ -7403,15 +7419,16 @@ void ModScene::UpdateScreenUi() {
   }
 
   UpdateUiSpriteTransform(trashButton_);
-  UpdateUiSpriteTransform(resetButton_);
-  UpdateUiSpriteTransform(nextSceneButton_);
   UpdateUiSpriteTransform(howToUi_);
 
+  if (resetButton_) {
+    resetButton_->Update();
+  }
+  if (nextSceneButton_) {
+    nextSceneButton_->Update();
+  }
+
   isHoverTrash_ = assemblyDrag_.isDragging && IsMouseOverTrashArea();
-  isHoverReset_ =
-      IsPointInUiButton(system_->GetMousePosVector2(), resetButton_);
-  isHoverNextScene_ =
-      IsPointInUiButton(system_->GetMousePosVector2(), nextSceneButton_);
 
   for (size_t i = 0; i < addButtons_.size(); ++i) {
     if (addButtons_[i].sprite == nullptr ||
@@ -7436,25 +7453,6 @@ void ModScene::UpdateScreenUi() {
                           : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
   }
 
-  if (resetButton_.sprite != nullptr &&
-      !resetButton_.sprite->objectParts_.empty()) {
-    Vector4 &color =
-        resetButton_.sprite->objectParts_[0].materialConfig->textureColor;
-    color = isHoverReset_ ? MakeColor(1.0f, 0.8f, 0.45f, 1.0f)
-                          : MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
-  }
-
-  if (nextSceneButton_.sprite != nullptr &&
-      !nextSceneButton_.sprite->objectParts_.empty()) {
-    Vector4 &color =
-        nextSceneButton_.sprite->objectParts_[0].materialConfig->textureColor;
-
-    if (isHoverNextScene_) {
-      color = MakeColor(1.0f, 0.95f, 0.55f, 1.0f);
-    } else {
-      color = MakeColor(1.0f, 1.0f, 1.0f, 1.0f);
-    }
-  }
 }
 
 void ModScene::DrawScreenUi() {
@@ -7472,12 +7470,24 @@ void ModScene::DrawScreenUi() {
     trashButton_.sprite->Draw();
   }
 
-  if (resetButton_.visible && resetButton_.sprite != nullptr) {
-    resetButton_.sprite->Draw();
+  if (resetButton_) {
+    const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+    const Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+    const Vector4 pressColorBtn = {0.16f, 0.20f, 0.26f, 1.0f};
+    resetButton_->SetNormalColor(normalColorBtn);
+    resetButton_->SetSelectColor(selectColorBtn);
+    resetButton_->SetPressColor(pressColorBtn);
+    resetButton_->Render();
   }
 
-  if (nextSceneButton_.visible && nextSceneButton_.sprite != nullptr) {
-    nextSceneButton_.sprite->Draw();
+  if (nextSceneButton_) {
+    const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+    const Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+    const Vector4 pressColorBtn = {0.16f, 0.20f, 0.26f, 1.0f};
+    nextSceneButton_->SetNormalColor(normalColorBtn);
+    nextSceneButton_->SetSelectColor(selectColorBtn);
+    nextSceneButton_->SetPressColor(pressColorBtn);
+    nextSceneButton_->Render();
   }
 
   if (howToUi_.visible && howToUi_.sprite != nullptr) {
@@ -7519,22 +7529,24 @@ void ModScene::DrawScreenUi() {
                            {1.0f, 1.0f, 1.0f, 1.0f});
   }
 
-  if (resetButton_.visible) {
-    Vector4 textColor = isHoverReset_ ? Vector4{1.0f, 0.8f, 0.45f, 1.0f}
-                                      : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+  if (resetButton_) {
+    Vector4 textColor = resetButton_->GetIsSelect(system_->GetMousePosVector2(), 1, 1)
+                            ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                            : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
 
     bitmapFont_.RenderText(
-        "リセット", {resetButton_.center.x, resetButton_.center.y - 10.0f},
+        "リセット", {1050.0f, 640.0f - 10.0f},
         24.0f, BitmapFont::Align::Center, 5.0f, textColor);
   }
 
-  if (nextSceneButton_.visible) {
-    Vector4 textColor = isHoverNextScene_ ? Vector4{1.0f, 0.95f, 0.55f, 1.0f}
-                                          : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+  if (nextSceneButton_) {
+    Vector4 textColor = nextSceneButton_->GetIsSelect(system_->GetMousePosVector2(), 1, 1)
+                            ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                            : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
 
     bitmapFont_.RenderText(
         "つぎへ",
-        {nextSceneButton_.center.x, nextSceneButton_.center.y - 12.0f}, 28.0f,
+        {1200.0f, 640.0f - 12.0f}, 28.0f,
         BitmapFont::Align::Center, 5.0f, textColor);
   }
 
