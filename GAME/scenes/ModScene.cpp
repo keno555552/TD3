@@ -6593,7 +6593,7 @@ void ModScene::AddStartNotification(int npcIndex, bool isGoal) {
   notification.isGoal = isGoal;
   notification.timer = 0.0f;
   notification.duration = 1.5f;
-  notification.startY = 80.0f;
+  notification.startY = 300.0f;
 
   if (npcIndex >= 0 && npcIndex < 4) {
     notification.rivalSprite = std::make_shared<SimpleSprite>();
@@ -6706,7 +6706,7 @@ void ModScene::DrawStartNotifications() {
         notification.rivalSprite->objectParts_[0].materialConfig->textureColor = {1.0f, 1.0f, 1.0f, alpha};
         // エンジンのバッチングによるテクスチャ上書きを回避するため、Z座標をわずかにずらす
         notification.rivalSprite->mainPosition.transform.translate = {x, y, i * -0.01f - 0.01f};
-        notification.rivalSprite->mainPosition.transform.scale = {0.8f, 0.8f, 1.0f};
+        notification.rivalSprite->mainPosition.transform.scale = {0.6f, 0.6f, 1.0f};
         notification.rivalSprite->Update(nullptr);
         notification.rivalSprite->Draw();
       }
@@ -6714,8 +6714,8 @@ void ModScene::DrawStartNotifications() {
       // 状態テキスト画像描画 (アイコンの右側に配置)
       if (notification.textSprite) {
         notification.textSprite->objectParts_[0].materialConfig->textureColor = {1.0f, 1.0f, 1.0f, alpha};
-        notification.textSprite->mainPosition.transform.translate = {x + 220.0f, y, i * -0.01f - 0.01f}; // 横の間隔とZ座標
-        notification.textSprite->mainPosition.transform.scale = {0.8f, 0.8f, 1.0f};
+        notification.textSprite->mainPosition.transform.translate = {x + 150.0f, y, i * -0.01f - 0.01f}; // 横の間隔とZ座標
+        notification.textSprite->mainPosition.transform.scale = {0.6f, 0.6f, 1.0f};
         notification.textSprite->Update(nullptr);
         notification.textSprite->Draw();
       }
@@ -7120,11 +7120,11 @@ void ModScene::InitializeScreenUi() {
     plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 
-  SetupUiSprite(trashButton_, {100.0f,580.0f}, {84.0f, 84.0f},
+  SetupUiSprite(trashButton_, {1200.0f,490.0f}, {100.0f, 100.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
-  SetupUiSprite(resetButton_, {1040.0f, 640.0f}, {140.0f, 52.0f},
+  SetupUiSprite(resetButton_, {1050.0f, 640.0f}, {100.0f, 100.0f},
                 uiFrameTextureHandle_);
   resetButton_.label = "リセット";
 
@@ -7134,7 +7134,7 @@ void ModScene::InitializeScreenUi() {
 
   howToTextureHandle_ =
       system_->LoadTexture("GAME/resources/ModScene/howTo.png");
-  SetupUiSprite(howToUi_, {1120.0f, 340.0f}, {200.0f, 200.0f},
+  SetupUiSprite(howToUi_, {160.0f, 540.0f}, {200.0f, 200.0f},
                 howToTextureHandle_);
 
   // パラメータ計算用ランナー初期化
