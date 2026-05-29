@@ -448,6 +448,14 @@ void ModCustomizedBodyActor::ClearRuntimeObjects() {
 }
 
 void ModCustomizedBodyActor::SyncObjectsWithAssembly() {
+  // 破棄時にダングリングポインタが発生しないように、事前に参照をクリアする
+  for (auto &pair : modObjects_) {
+    if (pair.second != nullptr) {
+      pair.second->followObject_ = nullptr;
+      pair.second->mainPosition.parentPart = nullptr;
+    }
+  }
+
   orderedPartIds_ = assembly_.GetNodeIdsSorted();
 
   for (std::unordered_map<int, std::unique_ptr<Object>>::iterator it =

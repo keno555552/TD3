@@ -1770,6 +1770,14 @@ void ModScene::SetupInitialLayout() {
 }
 
 void ModScene::SyncObjectsWithAssembly() {
+  // 破棄時にダングリングポインタが発生しないように、事前に参照をクリアする
+  for (auto &pair : modObjects_) {
+    if (pair.second != nullptr) {
+      pair.second->followObject_ = nullptr;
+      pair.second->mainPosition.parentPart = nullptr;
+    }
+  }
+
   // 現在の構造から部位ID一覧を更新する
   orderedPartIds_ = assembly_.GetNodeIdsSorted();
 
