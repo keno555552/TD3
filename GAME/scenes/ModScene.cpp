@@ -1123,6 +1123,10 @@ ModScene::ModScene(kEngine *system) {
 }
 
 ModScene::~ModScene() {
+  if (outcome_ == SceneOutcome::NONE || outcome_ == SceneOutcome::RETRY) {
+    ModCustomizeDataStore::SetSharedCustomizeData(*ModCustomizeDataStore::CreateDefaultCustomizeData());
+  }
+
   // 作成したカメラを破棄する
   system_->DestroyCamera(camera_);
   system_->DestroyCamera(debugCamera_);
