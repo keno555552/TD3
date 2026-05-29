@@ -263,9 +263,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\audience\AudienceManager.cpp" />
     <ClCompile Include="GAME\contest\parts\JudgingPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ResultPart.cpp" />
-    <ClCompile Include="GAME\contest\parts\RankingPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ShowOffPart.cpp" />
     <ClCompile Include="GAME\contest\parts\TrophyPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\RankingPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\AdvicePart.cpp" />
+    <ClCompile Include="GAME\contest\parts\SuspensePart.cpp" />
     <ClCompile Include="GAME\contest\ui\StarChart.cpp" />
     <ClCompile Include="GAME\effect\Fade.cpp" />
     <ClCompile Include="GAME\font\BitmapFont.cpp" />
@@ -277,6 +279,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\scenes\ContestScene.cpp" />
     <ClCompile Include="GAME\scenes\ModScene.cpp" />
     <ClCompile Include="GAME\scenes\PromptScene.cpp" />
+    <ClCompile Include="GAME\scenes\SplashScene.cpp" />
     <ClCompile Include="GAME\scenes\TitleScene.cpp" />
     <ClCompile Include="GAME\scenes\TravelScene.cpp" />
     <ClCompile Include="GAME\score\ScoreCalculator.cpp" />
@@ -411,6 +414,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp" />
     <ClCompile Include="GAME\effect\ModPartParticle.cpp" />
     <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
+    <ClCompile Include="GAME\effect\DustParticle.cpp" />
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
     <ClCompile Include="ResourceLoader.cpp" />
     <ClCompile Include="kEngine\Scenes\BaseSceneFactory.cpp" />
@@ -443,9 +447,11 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\contest\parts\IContestPart.h" />
     <ClInclude Include="GAME\contest\parts\JudgingPart.h" />
     <ClInclude Include="GAME\contest\parts\ResultPart.h" />
-    <ClInclude Include="GAME\contest\parts\RankingPart.h" />
     <ClInclude Include="GAME\contest\parts\ShowOffPart.h" />
     <ClInclude Include="GAME\contest\parts\TrophyPart.h" />
+    <ClInclude Include="GAME\contest\parts\RankingPart.h" />
+    <ClInclude Include="GAME\contest\parts\AdvicePart.h" />
+    <ClInclude Include="GAME\contest\parts\SuspensePart.h" />
     <ClInclude Include="GAME\contest\ui\StarChart.h" />
     <ClInclude Include="GAME\effect\Fade.h" />
     <ClInclude Include="GAME\font\BitmapFont.h" />
@@ -460,6 +466,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\scenes\ContestScene.h" />
     <ClInclude Include="GAME\scenes\ModScene.h" />
     <ClInclude Include="GAME\scenes\PromptScene.h" />
+    <ClInclude Include="GAME\scenes\SplashScene.h" />
     <ClInclude Include="GAME\scenes\TitleScene.h" />
     <ClInclude Include="GAME\scenes\TravelScene.h" />
     <ClInclude Include="GAME\score\ScoreCalculator.h" />
@@ -673,6 +680,7 @@ copy "$(WindowsSdkDir)bin\$(TargetPlatformVersion)\x64\dxil.dll" "$(TargetDir)dx
     <ClInclude Include="GAME\effect\Perfect_Particle.h" />
     <ClInclude Include="GAME\effect\ModPartParticle.h" />
     <ClInclude Include="GAME\effect\ConfettiParticle.h" />
+    <ClInclude Include="GAME\effect\DustParticle.h" />
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
     <ClInclude Include="ResourceLoader.h" />
     <ClInclude Include="kEngine\Scenes\BaseSceneFactory.h" />

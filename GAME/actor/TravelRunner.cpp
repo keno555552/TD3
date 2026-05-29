@@ -21,6 +21,11 @@ TravelRunner::~TravelRunner() {
     if (pair.second)
       delete pair.second;
   }
+  for (auto &poolPair : unusedObjectPool_) {
+    for (Object* obj : poolPair.second) {
+      if (obj) delete obj;
+    }
+  }
 }
 
 void TravelRunner::Initialize(float startX) {
@@ -221,6 +226,7 @@ void TravelRunner::LoadCustomizeData() {
   if (customizeData_ == nullptr) {
     return;
   }
+  RefreshInstanceMap();
 
   // ModScene から引き継いだ残り時間を復元する
   /*timeLimit_ = customizeData_->timeLimit_;
@@ -258,10 +264,9 @@ void TravelRunner::ApplyCustomizeToMovementParam() {
   auto GetPartParam = [&](ModBodyPart partType) -> ModBodyPartParam {
     int partId = -1;
     if (GetFirstPartTypePartId(partType, partId)) {
-      for (const auto &inst : customizeData_->partInstances) {
-        if (inst.partId == partId)
-          return inst.param;
-      }
+      auto it = instanceMap_.find(partId);
+      if (it != instanceMap_.end())
+        return it->second->param;
     }
     ModBodyPartParam empty{};
     empty.scale = {1.0f, 1.0f, 1.0f};
@@ -611,6 +616,10 @@ void TravelRunner::SavePreviousFrameState() {
 }
 
 void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
+
+  if (badParticleTimer_ > 0.0f) {
+    badParticleTimer_ -= system_->GetDeltaTime();
+  }
 
   bool bothInput = leftNowInput && rightNowInput;
 
@@ -993,14 +1002,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
                                         (legRecoverAngle_ - legKickAngle_),
                                     0.0f, 1.0f);
 
-  // 少ししか戻していない蹴りはほぼ無意味にする
-  const float minKickReady = 0.35f;
-
-  float normalizedKickReady = std::clamp(
-      (kickReadyRatio - minKickReady) / (1.0f - minKickReady), 0.0f, 1.0f);
-
-  // 二乗で弱い蹴りをさらに弱くする
-  float kickReadyPower = normalizedKickReady * normalizedKickReady;
+  // 足が戻っていない状態の威力を「1 (0.01)」、完全に戻りきった状態を「100 (1.0)」とする
+  float kickReadyPower = 0.01f + 0.99f * (kickReadyRatio * kickReadyRatio);
 
   // 姿勢が悪いほど蹴りの力が地面に乗らない
   float postureKickScale = 1.0f - badPosture * 0.55f;
@@ -1033,7 +1036,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float tiltImpulse = 0.0f;
 
     if (!startStepTrigger && isGrounded_) {
-      if (landTimer_ <= perfectTimingEnd) {
+      // 足の戻り（タメ）が十分でない場合は強制的にBadにする
+      bool hasEnoughReady = (kickReadyRatio >= 0.70f);
+
+      if (hasEnoughReady && landTimer_ <= perfectTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Perfect;
         kickFeedbackTimer_ = 0.18f;
         perfectStreak_++;
@@ -1044,7 +1050,7 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
           Logger::Log("KICK : PERFECT");
         }
 
-      } else if (landTimer_ <= bestTimingEnd) {
+      } else if (hasEnoughReady && landTimer_ <= bestTimingEnd) {
         kickFeedbackType_ = KickFeedbackType::Good;
         kickFeedbackTimer_ = 0.12f;
         perfectStreak_ = 0;
@@ -1060,7 +1066,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
         perfectStreak_ = 0;
 
         if (isPlayer_) {
-          perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
+          if (badParticleTimer_ <= 0.0f) {
+            perfectParticle_->Spawn({0.0f, 0.0f, moveX_}, KickEffectType::Bad);
+            badParticleTimer_ = 0.1f;
+          }
           Logger::Log("KICK : BAD");
         }
       }
@@ -1448,18 +1457,18 @@ void TravelRunner::ApplyVisualState() {
           float parentParamScaleZ = 1.0f;
           float parentParamLength = 1.0f;
 
-          for (const auto &pInst : customizeData_->partInstances) {
-            if (pInst.partId == instance.parentId) {
-              parentType = pInst.partType;
-              parentParamScaleX = pInst.param.scale.x;
-              parentParamScaleY = pInst.param.scale.y;
-              parentParamScaleZ = pInst.param.scale.z;
-              parentParamLength = pInst.param.length;
-              break;
-            }
+          auto parentIt2 = instanceMap_.find(instance.parentId);
+          if (parentIt2 != instanceMap_.end()) {
+            parentType = parentIt2->second->partType;
+            parentParamScaleX = parentIt2->second->param.scale.x;
+            parentParamScaleY = parentIt2->second->param.scale.y;
+            parentParamScaleZ = parentIt2->second->param.scale.z;
+            parentParamLength = parentIt2->second->param.length;
           }
           if (parentType == ModBodyPart::ChestBody ||
-              parentType == ModBodyPart::StomachBody) {
+              parentType == ModBodyPart::StomachBody ||
+              parentType == ModBodyPart::Head ||
+              parentType == ModBodyPart::Neck) {
             float parentScaleX = parentParamScaleX;
             float parentScaleY = parentParamScaleY * parentParamLength;
 
@@ -1516,11 +1525,9 @@ void TravelRunner::ApplyVisualState() {
 
     ModBodyPart parentType = ModBodyPart::Count;
     if (instance.parentId >= 0) {
-      for (const auto &pInst : customizeData_->partInstances) {
-        if (pInst.partId == instance.parentId) {
-          parentType = pInst.partType;
-          break;
-        }
+      auto pIt = instanceMap_.find(instance.parentId);
+      if (pIt != instanceMap_.end()) {
+        parentType = pIt->second->partType;
       }
 
       bool isStandardJoint = false;
@@ -1540,11 +1547,9 @@ void TravelRunner::ApplyVisualState() {
         if (parentIt != allPartObjects_.end() && parentIt->second != nullptr) {
           if (!parentIt->second->objectParts_.empty()) {
             float parentScaleY = 1.0f;
-            for (const auto &pInst : customizeData_->partInstances) {
-              if (pInst.partId == instance.parentId) {
-                parentScaleY = pInst.param.scale.y * pInst.param.length;
-                break;
-              }
+            auto pIt2 = instanceMap_.find(instance.parentId);
+            if (pIt2 != instanceMap_.end()) {
+              parentScaleY = pIt2->second->param.scale.y * pIt2->second->param.length;
             }
             float parentDefaultLength = 1.0f;
             switch (parentType) {
@@ -1592,11 +1597,9 @@ void TravelRunner::ApplyVisualState() {
       float parentAbsX = 0.0f, parentAbsZ = 0.0f;
       if (instance.parentId >= 0) {
         ModBodyPart parentType = ModBodyPart::Count;
-        for (const auto &pInst : customizeData_->partInstances) {
-          if (pInst.partId == instance.parentId) {
-            parentType = pInst.partType;
-            break;
-          }
+        auto pIt3 = instanceMap_.find(instance.parentId);
+        if (pIt3 != instanceMap_.end()) {
+          parentType = pIt3->second->partType;
         }
         if (parentType != ModBodyPart::ChestBody &&
             parentType != ModBodyPart::StomachBody) {
@@ -1664,12 +1667,11 @@ void TravelRunner::ApplyVisualState() {
     case ModBodyPart::StomachBody: {
       bool parentIsTorso = false;
       if (instance.parentId >= 0) {
-        for (const auto &pInst : customizeData_->partInstances) {
-          if (pInst.partId == instance.parentId &&
-              (pInst.partType == ModBodyPart::ChestBody ||
-               pInst.partType == ModBodyPart::StomachBody)) {
+        auto pIt4 = instanceMap_.find(instance.parentId);
+        if (pIt4 != instanceMap_.end()) {
+          if (pIt4->second->partType == ModBodyPart::ChestBody ||
+              pIt4->second->partType == ModBodyPart::StomachBody) {
             parentIsTorso = true;
-            break;
           }
         }
       }
@@ -1747,10 +1749,6 @@ void TravelRunner::ApplyVisualState() {
       } else if (instance.partType == ModBodyPart::StomachBody) {
         rootR = GetControlPointRadius(ModControlPointRole::Waist);
         bendR = GetControlPointRadius(ModControlPointRole::Belly);
-      } else if (instance.partType == ModBodyPart::Head) {
-        rootR = GetControlPointRadius(ModControlPointRole::HeadCenter);
-        bendR = GetControlPointRadius(ModControlPointRole::UpperNeck);
-        endR = bendR;
       }
 
       float thicknessScale = 1.0f;
@@ -1819,69 +1817,67 @@ void TravelRunner::ApplyVisualState() {
 
       Vector3 parentScale = {1.0f, 1.0f, 1.0f};
       if (instance.parentId >= 0) {
-        for (const auto &pInst : customizeData_->partInstances) {
-          if (pInst.partId == instance.parentId) {
-            float pThicknessScale = 1.0f;
-            float pRootR = 0.1f, pBendR = 0.1f, pEndR = 0.1f;
-            if (pInst.partType == ModBodyPart::ChestBody) {
-              pRootR = GetControlPointRadius(ModControlPointRole::Chest);
-              pBendR = GetControlPointRadius(ModControlPointRole::Belly);
-            } else if (pInst.partType == ModBodyPart::StomachBody) {
-              pRootR = GetControlPointRadius(ModControlPointRole::Waist);
-              pBendR = GetControlPointRadius(ModControlPointRole::Belly);
-            } else if (pInst.partType == ModBodyPart::Head) {
-              pRootR = GetControlPointRadius(ModControlPointRole::HeadCenter);
-              pBendR = GetControlPointRadius(ModControlPointRole::UpperNeck);
-              pEndR = pBendR;
-            } else {
-              pRootR = GetSnapshotRadius(pInst.partType, 1);
-              pBendR = GetSnapshotRadius(pInst.partType, 2);
-              pEndR = GetSnapshotRadius(pInst.partType, 3);
-            }
-            if (pInst.partType == ModBodyPart::LeftForeArm ||
-                pInst.partType == ModBodyPart::RightForeArm ||
-                pInst.partType == ModBodyPart::LeftShin ||
-                pInst.partType == ModBodyPart::RightShin ||
-                pInst.partType == ModBodyPart::Head) {
-              pThicknessScale = (std::max)(pBendR, pEndR) / 0.1f;
-            } else {
-              pThicknessScale = (std::max)(pRootR, pBendR) / 0.1f;
-            }
-
-            float pFinalScaleY =
-                pInst.param.scale.y * pInst.param.length * 1.0f;
-            float pOriginalSegLength =
-                GetSnapshotSegmentLength(pInst.partType, pInst.parentId);
-            if (pOriginalSegLength > 0.0001f) {
-              float pDefaultSegLength = 1.0f;
-              if (pInst.partType == ModBodyPart::ChestBody)
-                pDefaultSegLength = 1.2796f;
-              else if (pInst.partType == ModBodyPart::StomachBody)
-                pDefaultSegLength = 1.6880f;
-              else if (pInst.partType == ModBodyPart::LeftUpperArm ||
-                       pInst.partType == ModBodyPart::RightUpperArm)
-                pDefaultSegLength = 0.3462f;
-              else if (pInst.partType == ModBodyPart::LeftThigh ||
-                       pInst.partType == ModBodyPart::RightThigh)
-                pDefaultSegLength = 1.6790f;
-              else if (pInst.partType == ModBodyPart::Neck)
-                pDefaultSegLength = 1.08f;
-              else if (pInst.partType == ModBodyPart::LeftForeArm ||
-                       pInst.partType == ModBodyPart::RightForeArm)
-                pDefaultSegLength = 2.14f;
-              else if (pInst.partType == ModBodyPart::LeftShin ||
-                       pInst.partType == ModBodyPart::RightShin)
-                pDefaultSegLength = 1.57f;
-              else if (pInst.partType == ModBodyPart::Head)
-                pDefaultSegLength = 2.62f;
-              if (pDefaultSegLength > 0.0001f) {
-                pFinalScaleY *= (pOriginalSegLength / pDefaultSegLength);
-              }
-            }
-            parentScale = {pInst.param.scale.x * pThicknessScale, pFinalScaleY,
-                           pInst.param.scale.z * pThicknessScale};
-            break;
+        auto pIt5 = instanceMap_.find(instance.parentId);
+        if (pIt5 != instanceMap_.end()) {
+          const auto &pInst = *(pIt5->second);
+          float pThicknessScale = 1.0f;
+          float pRootR = 0.1f, pBendR = 0.1f, pEndR = 0.1f;
+          if (pInst.partType == ModBodyPart::ChestBody) {
+            pRootR = GetControlPointRadius(ModControlPointRole::Chest);
+            pBendR = GetControlPointRadius(ModControlPointRole::Belly);
+          } else if (pInst.partType == ModBodyPart::StomachBody) {
+            pRootR = GetControlPointRadius(ModControlPointRole::Waist);
+            pBendR = GetControlPointRadius(ModControlPointRole::Belly);
+          } else if (pInst.partType == ModBodyPart::Head) {
+            pRootR = GetControlPointRadius(ModControlPointRole::HeadCenter);
+            pBendR = GetControlPointRadius(ModControlPointRole::UpperNeck);
+            pEndR = pBendR;
+          } else {
+            pRootR = GetSnapshotRadius(pInst.partType, 1);
+            pBendR = GetSnapshotRadius(pInst.partType, 2);
+            pEndR = GetSnapshotRadius(pInst.partType, 3);
           }
+          if (pInst.partType == ModBodyPart::LeftForeArm ||
+              pInst.partType == ModBodyPart::RightForeArm ||
+              pInst.partType == ModBodyPart::LeftShin ||
+              pInst.partType == ModBodyPart::RightShin) {
+            pThicknessScale = (std::max)(pBendR, pEndR) / 0.1f;
+          } else {
+            pThicknessScale = (std::max)(pRootR, pBendR) / 0.1f;
+          }
+
+          float pFinalScaleY =
+              pInst.param.scale.y * pInst.param.length * 1.0f;
+          float pOriginalSegLength =
+              GetSnapshotSegmentLength(pInst.partType, pInst.parentId);
+          if (pOriginalSegLength > 0.0001f) {
+            float pDefaultSegLength = 1.0f;
+            if (pInst.partType == ModBodyPart::ChestBody)
+              pDefaultSegLength = 1.2796f;
+            else if (pInst.partType == ModBodyPart::StomachBody)
+              pDefaultSegLength = 1.6880f;
+            else if (pInst.partType == ModBodyPart::LeftUpperArm ||
+                     pInst.partType == ModBodyPart::RightUpperArm)
+              pDefaultSegLength = 0.3462f;
+            else if (pInst.partType == ModBodyPart::LeftThigh ||
+                     pInst.partType == ModBodyPart::RightThigh)
+              pDefaultSegLength = 1.6790f;
+            else if (pInst.partType == ModBodyPart::Neck)
+              pDefaultSegLength = 1.08f;
+            else if (pInst.partType == ModBodyPart::LeftForeArm ||
+                     pInst.partType == ModBodyPart::RightForeArm)
+              pDefaultSegLength = 2.14f;
+            else if (pInst.partType == ModBodyPart::LeftShin ||
+                     pInst.partType == ModBodyPart::RightShin)
+              pDefaultSegLength = 1.57f;
+            else if (pInst.partType == ModBodyPart::Head)
+              pDefaultSegLength = 2.62f;
+            if (pDefaultSegLength > 0.0001f) {
+              pFinalScaleY *= (pOriginalSegLength / pDefaultSegLength);
+            }
+          }
+          parentScale = {pInst.param.scale.x * pThicknessScale, pFinalScaleY,
+                         pInst.param.scale.z * pThicknessScale};
         }
       }
 
@@ -2440,11 +2436,10 @@ bool TravelRunner::GetPartInstanceParentId(int partId, int &outParentId) const {
     return false;
   }
 
-  for (const auto &instance : customizeData_->partInstances) {
-    if (instance.partId == partId) {
-      outParentId = instance.parentId;
-      return true;
-    }
+  auto it = instanceMap_.find(partId);
+  if (it != instanceMap_.end()) {
+    outParentId = it->second->parentId;
+    return true;
   }
 
   return false;
@@ -2490,11 +2485,10 @@ bool TravelRunner::GetPartInstanceLocalTranslate(int partId,
     return false;
   }
 
-  for (const auto &instance : customizeData_->partInstances) {
-    if (instance.partId == partId) {
-      outLocal = instance.localTransform.translate;
-      return true;
-    }
+  auto it = instanceMap_.find(partId);
+  if (it != instanceMap_.end()) {
+    outLocal = it->second->localTransform.translate;
+    return true;
   }
 
   return false;
@@ -2506,12 +2500,9 @@ bool TravelRunner::GetPartInstanceLocalRotate(int partId,
     return false;
   }
 
-  for (const auto &instance : customizeData_->partInstances) {
-    if (instance.partId != partId) {
-      continue;
-    }
-
-    outRotate = instance.localTransform.rotate;
+  auto it = instanceMap_.find(partId);
+  if (it != instanceMap_.end()) {
+    outRotate = it->second->localTransform.rotate;
     return true;
   }
 
@@ -2560,19 +2551,15 @@ int TravelRunner::GetExtraSnapshotOwnerId(ModBodyPart partType, int partId,
   if (customizeData_ != nullptr) {
     int currentParentId = parentId;
     while (currentParentId >= 0) {
-      bool found = false;
-      for (const auto &instance : customizeData_->partInstances) {
-        if (instance.partId == currentParentId) {
-          if (instance.partType == targetOwnerPart) {
-            return currentParentId;
-          }
-          currentParentId = instance.parentId;
-          found = true;
-          break;
+      auto it = instanceMap_.find(currentParentId);
+      if (it != instanceMap_.end()) {
+        if (it->second->partType == targetOwnerPart) {
+          return currentParentId;
         }
-      }
-      if (!found)
+        currentParentId = it->second->parentId;
+      } else {
         break;
+      }
     }
   }
 
@@ -2700,12 +2687,22 @@ float TravelRunner::ComputeExtraAnimAngleX(ModBodyPart partType) const {
 
 void TravelRunner::BuildAllVisualParts() {
   for (auto &pair : allPartObjects_) {
-    if (pair.second)
-      delete pair.second;
+    if (pair.second) {
+      auto it = lastPartTypes_.find(pair.first);
+      if (it != lastPartTypes_.end()) {
+        unusedObjectPool_[it->second].push_back(pair.second);
+      } else {
+        delete pair.second;
+      }
+    }
   }
   allPartObjects_.clear();
+  lastPartTypes_.clear();
+
   if (customizeData_ == nullptr)
     return;
+  RefreshInstanceMap();
+
   auto GetModelPath = [](ModBodyPart partType) -> const char * {
     switch (partType) {
     case ModBodyPart::ChestBody:
@@ -2736,19 +2733,30 @@ void TravelRunner::BuildAllVisualParts() {
       return nullptr;
     }
   };
+
   for (const auto &instance : customizeData_->partInstances) {
     const char *modelPath = GetModelPath(instance.partType);
     if (modelPath == nullptr)
       continue;
-    const int modelHandle = system_->SetModelObj(modelPath);
-    Object *obj = new Object;
-    obj->IntObject(system_);
-    obj->CreateModelData(modelHandle);
+
+    Object *obj = nullptr;
+    auto &pool = unusedObjectPool_[instance.partType];
+    if (!pool.empty()) {
+      obj = pool.back();
+      pool.pop_back();
+    } else {
+      const int modelHandle = system_->SetModelObj(modelPath);
+      obj = new Object;
+      obj->IntObject(system_);
+      obj->CreateModelData(modelHandle);
+    }
+
     obj->mainPosition.transform = CreateDefaultTransform();
     if (!obj->objectParts_.empty()) {
       obj->objectParts_[0].transform = CreateDefaultTransform();
     }
     allPartObjects_[instance.partId] = obj;
+    lastPartTypes_[instance.partId] = instance.partType;
   }
   for (const auto &instance : customizeData_->partInstances) {
     auto it = allPartObjects_.find(instance.partId);
@@ -3083,4 +3091,13 @@ Object *TravelRunner::GetStandardPart(ModBodyPart partType) const {
       return it->second;
   }
   return nullptr;
+}
+
+void TravelRunner::RefreshInstanceMap() {
+  instanceMap_.clear();
+  if (customizeData_ != nullptr) {
+    for (const auto &inst : customizeData_->partInstances) {
+      instanceMap_[inst.partId] = &inst;
+    }
+  }
 }

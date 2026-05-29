@@ -23,4 +23,6 @@ public:
 	float intensity;
 
 	bool ableLight;
+
+	int extra0 = 0;
 };

@@ -179,6 +179,9 @@
     <ClCompile Include="GAME\contest\parts\ResultPart.cpp" />
     <ClCompile Include="GAME\contest\parts\ShowOffPart.cpp" />
     <ClCompile Include="GAME\contest\parts\TrophyPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\RankingPart.cpp" />
+    <ClCompile Include="GAME\contest\parts\AdvicePart.cpp" />
+    <ClCompile Include="GAME\contest\parts\SuspensePart.cpp" />
     <ClCompile Include="GAME\contest\ui\StarChart.cpp" />
     <ClCompile Include="GAME\font\BitmapFont.cpp" />
     <ClCompile Include="GAME\effect\Perfect_Particle.cpp">
@@ -188,6 +191,9 @@
       <Filter>GAME\effect</Filter>
     </ClCompile>
     <ClCompile Include="GAME\effect\ConfettiParticle.cpp" />
+    <ClCompile Include="GAME\effect\DustParticle.cpp">
+      <Filter>GAME\effect</Filter>
+    </ClCompile>
     <ClCompile Include="GAME\actor\ModCustomizedBodyActor.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -442,8 +448,26 @@
     <ClInclude Include="GAME\contest\parts\ResultPart.h" />
     <ClInclude Include="GAME\contest\parts\ShowOffPart.h" />
     <ClInclude Include="GAME\contest\parts\TrophyPart.h" />
+    <ClInclude Include="GAME\contest\parts\RankingPart.h" />
+    <ClInclude Include="GAME\contest\parts\AdvicePart.h" />
+    <ClInclude Include="GAME\contest\parts\SuspensePart.h" />
     <ClInclude Include="GAME\contest\ui\StarChart.h" />
     <ClInclude Include="GAME\font\BitmapFont.h" />
+    <ClInclude Include="GAME\scenes\ModScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\PromptScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\SplashScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\TitleScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
+    <ClInclude Include="GAME\scenes\TravelScene.h">
+      <Filter>GAME\scenes</Filter>
+    </ClInclude>
     <ClInclude Include="GAME\effect\Perfect_Particle.h">
       <Filter>GAME\effect</Filter>
     </ClInclude>
@@ -451,6 +475,9 @@
       <Filter>GAME\effect</Filter>
     </ClInclude>
     <ClInclude Include="GAME\effect\ConfettiParticle.h" />
+    <ClInclude Include="GAME\effect\DustParticle.h">
+      <Filter>GAME\effect</Filter>
+    </ClInclude>
     <ClInclude Include="GAME\actor\ModCustomizedBodyActor.h" />
   </ItemGroup>
   <ItemGroup>

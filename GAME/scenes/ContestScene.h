@@ -28,12 +28,13 @@
 /// コンテストの進行フェーズ
 /// </summary>
 enum class ContestPhase {
-  ShowOff, /// お披露目
-  Judging, /// 審査
-  Result,  /// 結果
-  Ranking, /// 総合ランキング
-  Trophy,  /// トロフィー・選択
-
+  ShowOff,  /// お披露目
+  Judging,  /// 審査
+  Result,   /// 結果
+  Suspense, /// 誰が選ばれる？演出
+  Ranking,  /// 総合ランキング
+  Advice,   /// アドバイス
+  Trophy,   /// トロフィー・選択
 };
 
 struct SceneObject {
@@ -54,6 +55,9 @@ public:
 private:
   // ライト
   Light *light1_ = nullptr;
+  Light* spotlight_ = nullptr;
+  Light* judgesSpotLight_ = nullptr;
+  Light* npcSpotlights_[2] = { nullptr, nullptr };
 
   // カメラ
   Camera *camera_ = nullptr;
@@ -106,10 +110,13 @@ private:
 
   int audienceChairsMidModelHandle_ = 0;
   std::vector<SceneObject> audienceChairsMid_;
+  std::vector<SceneObject> audienceModelsMid_;
 
   int audienceChairsSideModelHandle_ = 0;
   std::vector<SceneObject> audienceChairsRightSide_;
   std::vector<SceneObject> audienceChairsLeftSide_;
+  std::vector<SceneObject> audienceModelsRightSide_;
+  std::vector<SceneObject> audienceModelsLeftSide_;
 
   // 複数モデルの初期化
   void SetupSceneObject(SceneObject &obj, int modelHandle, const Vector3 &pos,
@@ -142,6 +149,10 @@ private:
 
   // フォント
   BitmapFont bitmapFont_;
+
+  // サウンド
+  int audienceSoundHandle_ = -1;
+  bool audienceStopped_ = false;
 
   // 審査員コメント
   JudgeCommentTable judgeCommentTable_{};
