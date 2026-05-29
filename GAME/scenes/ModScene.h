@@ -9,6 +9,7 @@
 #include "GAME/actor/ModAttachCandidate.h"
 #include "GAME/actor/ModBody.h"
 #include "GAME/font/BitmapFont.h"
+#include "GAME/Object/DetailButton/DetailButton.h"
 #include "GameObject/Object/Sprite.h"
 #include "Object/Object.h"
 #include <array>
@@ -218,14 +219,10 @@ private:
   bool isHoverTrash_ = false;
 
   // UIの次シーンボタン
-  UiIconButton nextSceneButton_{};
-  // マウスが次シーンボタンの上にあるかどうか
-  bool isHoverNextScene_ = false;
+  std::unique_ptr<DetailButton> nextSceneButton_;
 
   // UIのリセットボタン
-  UiIconButton resetButton_{};
-  // マウスがリセットボタンの上にあるかどうか
-  bool isHoverReset_ = false;
+  std::unique_ptr<DetailButton> resetButton_;
 
   // 操作方法UI
   UiIconButton howToUi_{};
@@ -942,6 +939,9 @@ private:
 
   RetryChoiceMod selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
   SceneOutcome pendingFailureOutcome_ = SceneOutcome::NONE;
+
+  std::unique_ptr<DetailButton> promptButton_;
+  std::unique_ptr<DetailButton> retryModButton_;
 
   float failureMenuInputCooldown_ = 0.0f;
 

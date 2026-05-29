@@ -19,6 +19,7 @@ TitleScene::TitleScene(kEngine* system) {
 
 	TravelScene::ResetTutorialFlag();
 	ModScene::ResetTutorialFlag();
+	ModCustomizeDataStore::SetSharedCustomizeData(*ModCustomizeDataStore::CreateDefaultCustomizeData());
 
 	// 最低限のライト
 	light1_ = new Light;
