@@ -1029,7 +1029,10 @@ void ModCustomizedBodyActor::ApplyModBodies() {
       if (torsoPoints[i].role == ModControlPointRole::Chest ||
           torsoPoints[i].role == ModControlPointRole::Belly ||
           torsoPoints[i].role == ModControlPointRole::Waist) {
-        torsoSharedPoints_.push_back(torsoPoints[i]);
+        
+        ModControlPoint pt = torsoPoints[i];
+        pt.localPosition = Add(pt.localPosition, actorTransform_.translate);
+        torsoSharedPoints_.push_back(pt);
       }
     }
   }
