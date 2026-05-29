@@ -8,7 +8,7 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	const std::vector<int>& winnerIndices)
 	: IContestPart(system, font), winnerIndices_(winnerIndices) {
 
-	cameraTransform_ = { { 0.0f, 1.2f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
+	cameraTransform_ = { { 0.0f, 0.9f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
 
 	for (int i = 0; i < 3; ++i) {
 		lights_[i] = lights[i];
