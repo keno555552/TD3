@@ -2,6 +2,7 @@
 #include "kEngine.h"
 #include "GAME/font/BitmapFont.h"
 #include <cmath>
+#include <random>
 
 SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	Light* lights[3], const Vector3 targetPositions[3],
@@ -22,6 +23,30 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	}
 	for (int w : winnerIndices_) {
 		if (w >= 0 && w < 3) isWinner_[w] = true;
+	}
+
+	// 演出パターンをランダム抽選し、Feint用の非当選キャラを決定
+	{
+		std::random_device rd;
+		std::mt19937 gen(rd());
+		std::uniform_int_distribution<int> distPattern(0, 2);
+		revealPattern_ = static_cast<RevealPattern>(distPattern(gen));
+
+		// 非当選インデックスを集めて1つ選ぶ
+		std::vector<int> nonWinners;
+		for (int i = 0; i < 3; ++i) {
+			if (!isWinner_[i]) nonWinners.push_back(i);
+		}
+		if (!nonWinners.empty()) {
+			std::uniform_int_distribution<int> distDecoy(0, static_cast<int>(nonWinners.size()) - 1);
+			decoyIdx_ = nonWinners[distDecoy(gen)];
+		} else {
+			// 全員当選など非当選者がいない場合はFeint不可 → Slowに劣化
+			decoyIdx_ = -1;
+			if (revealPattern_ == RevealPattern::Feint) {
+				revealPattern_ = RevealPattern::Slow;
+			}
+		}
 	}
 
 	drawButton_ = std::make_unique<DetailButton>(system);
@@ -54,15 +79,9 @@ void SuspensePart::Update() {
 
 		// 各ライトの向きをXZ軸で揺らす（位置は不変）
 		// 各ライトに位相オフセットを与え個別に揺れさせる
-		const float swayAmp = 0.45f;
-		const float swayFreq = 2.2f;
 		for (int i = 0; i < 3; ++i) {
 			if (!lights_[i]) continue;
-			float phase = static_cast<float>(i) * 1.7f;
-			float sx = std::sin(timer_ * swayFreq + phase) * swayAmp;
-			float sz = std::cos(timer_ * swayFreq * 0.9f + phase * 1.3f) * swayAmp;
-			Vector3 dir = { sx, -1.0f, sz };
-			lights_[i]->direction = NormalizeSafe(dir);
+			lights_[i]->direction = SwayDir(i);
 
 			// 色を HSV で巡回（ライトごとに位相をずらす）
 			float hue = std::fmod(timer_ * 0.35f + static_cast<float>(i) * 0.33f, 1.0f);
@@ -114,13 +133,44 @@ void SuspensePart::Update() {
 
 			if (aimIdx >= 0) {
 				Vector3 lp = lights_[i]->position;
-				Vector3 tp = targetPositions_[aimIdx];
-				Vector3 toTarget = NormalizeSafe({ tp.x - lp.x, tp.y - lp.y, tp.z - lp.z });
-				Vector3 cur = {
-					revealStartDir_[i].x + (toTarget.x - revealStartDir_[i].x) * t,
-					revealStartDir_[i].y + (toTarget.y - revealStartDir_[i].y) * t,
-					revealStartDir_[i].z + (toTarget.z - revealStartDir_[i].z) * t,
-				};
+				Vector3 toWinner = AimDir(lp, targetPositions_[aimIdx]);
+				Vector3 start = revealStartDir_[i];
+
+				Vector3 cur;
+				switch (revealPattern_) {
+				case RevealPattern::Slow:
+				default:
+					// 全区間ゆっくり当選者へ（従来）
+					cur = LerpDir(start, toWinner, t);
+					break;
+
+				case RevealPattern::Snap:
+					// snapStart_ までは揺らし続けて待ち、以降で一気に当選者へ
+					if (t < snapStart_) {
+						cur = SwayDir(i);
+					} else {
+						float st = (t - snapStart_) / (1.0f - snapStart_);
+						cur = LerpDir(SwayDir(i), toWinner, st);
+					}
+					break;
+
+				case RevealPattern::Feint: {
+					// 一旦非当選者へ向かい、溜めてからパッと当選者へ
+					Vector3 toDecoy = (decoyIdx_ >= 0)
+						? AimDir(lp, targetPositions_[decoyIdx_])
+						: toWinner;
+					if (t < feintAimEnd_) {
+						cur = LerpDir(start, toDecoy, t / feintAimEnd_);
+					} else if (t < feintHoldEnd_) {
+						cur = toDecoy;
+					} else {
+						float ft = (t - feintHoldEnd_) / (1.0f - feintHoldEnd_);
+						cur = LerpDir(toDecoy, toWinner, ft);
+					}
+					break;
+				}
+				}
+
 				lights_[i]->direction = NormalizeSafe(cur);
 			}
 
@@ -182,6 +232,25 @@ Vector3 SuspensePart::NormalizeSafe(const Vector3& v) {
 	float len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 	if (len < 1e-6f) return { 0.0f, -1.0f, 0.0f };
 	return { v.x / len, v.y / len, v.z / len };
+}
+
+Vector3 SuspensePart::SwayDir(int i) const {
+	float phase = static_cast<float>(i) * 1.7f;
+	float sx = std::sin(timer_ * swayFreq_ + phase) * swayAmp_;
+	float sz = std::cos(timer_ * swayFreq_ * 0.9f + phase * 1.3f) * swayAmp_;
+	return NormalizeSafe({ sx, -1.0f, sz });
+}
+
+Vector3 SuspensePart::AimDir(const Vector3& pos, const Vector3& target) {
+	return NormalizeSafe({ target.x - pos.x, target.y - pos.y, target.z - pos.z });
+}
+
+Vector3 SuspensePart::LerpDir(const Vector3& a, const Vector3& b, float t) {
+	return {
+		a.x + (b.x - a.x) * t,
+		a.y + (b.y - a.y) * t,
+		a.z + (b.z - a.z) * t,
+	};
 }
 
 Vector3 SuspensePart::HsvToRgb(float h, float s, float v) {

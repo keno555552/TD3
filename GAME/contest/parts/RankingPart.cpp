@@ -3,6 +3,29 @@
 #include "GAME/font/BitmapFont.h"
 #include <algorithm>
 
+namespace {
+// 黒アウトライン付きテキスト描画。
+// 同じサイズの黒を周囲8方向に少しずつズラして先に描き、その上に本来の色を重ねる。
+// 各文字の送り幅は同一なので文字ごとにきれいに揃った縁取りになる。
+// （深度関数がLESS_EQUALなので、後から同レイヤーで描く本体が黒の上に乗る）
+void RenderTextOutlined(BitmapFont* font, const std::string& text,
+    Vector2 position, float heightPx, BitmapFont::Align align,
+    float layer, Vector4 color) {
+    const float d = heightPx * 0.05f; // 縁の太さ（オフセット量）
+    const Vector4 black = { 0.0f, 0.0f, 0.0f, 1.0f };
+    const Vector2 offsets[8] = {
+        { -d, -d }, { 0.0f, -d }, { d, -d },
+        { -d, 0.0f },             { d, 0.0f },
+        { -d,  d }, { 0.0f,  d }, { d,  d },
+    };
+    for (const auto& o : offsets) {
+        font->RenderText(text, { position.x + o.x, position.y + o.y },
+            heightPx, align, layer, black);
+    }
+    font->RenderText(text, position, heightPx, align, layer, color);
+}
+} // namespace
+
 RankingPart::RankingPart(kEngine* system, BitmapFont* font,
     const std::vector<ContestRankEntry>& entries)
     : IContestPart(system, font), entries_(entries) {
@@ -24,7 +47,7 @@ void RankingPart::Update() {
 }
 
 void RankingPart::Draw() {
-    font_->RenderText("Final Ranking", { 640.0f, 100.0f }, 64.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 0.0f, 1.0f });
+    RenderTextOutlined(font_, "Final Ranking", { 640.0f, 100.0f }, 64.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 0.0f, 1.0f });
 
     float startY = 250.0f;
     float stepY = 100.0f;
@@ -40,11 +63,11 @@ void RankingPart::Draw() {
         std::string rankStr = std::to_string(entry.rank) + "位: ";
         std::string text = rankStr + entry.name + " / ランク " + entry.overallRank + " / ★ " + std::to_string(entry.totalStars);
 
-        font_->RenderText(text, { 640.0f, startY + i * stepY }, 48.0f, BitmapFont::Align::Center, 5, color);
+        RenderTextOutlined(font_, text, { 640.0f, startY + i * stepY }, 48.0f, BitmapFont::Align::Center, 5, color);
     }
 
     nextButton_->Render();
-    font_->RenderText("To Next", { 640.0f, 620.0f }, 48.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 0.0f, 1.0f });
+    RenderTextOutlined(font_, "To Next", { 640.0f, 620.0f }, 48.0f, BitmapFont::Align::Center, 5, { 1.0f, 1.0f, 0.0f, 1.0f });
 
 #ifdef USE_IMGUI
     ImGui::Begin("Contest - Ranking");
