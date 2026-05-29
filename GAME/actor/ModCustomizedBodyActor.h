@@ -72,6 +72,7 @@ private:
   bool IsRootPartNode(const PartNode &node) const;
   bool TryGetFootEndWorldPosition(int partId, Vector3 &outWorld) const;
   bool TryGetFootEndContactWorldY(int partId, float &outContactY) const;
+  bool TryGetFootEndContactWorldY(const ModBody& body, Object* object, float& outContactY) const;
   float ComputeLowestFootWorldY() const;
   void ApplyGroundingToRootParts();
 

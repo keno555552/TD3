@@ -416,6 +416,13 @@ public:
   float GetVisualSegmentRadius(ModControlPointRole startRole,
                                ModControlPointRole endRole) const;
 
+  /// <summary>
+  /// 実際のメッシュから自動計算されたカプセルを取得する
+  /// </summary>
+  const ModCapsule &GetAutoCalculatedCapsule() const {
+    return autoCalculatedCapsule_;
+  }
+
   static void RequestResetOnNextModSceneEntry();
   static bool ConsumeResetOnNextModSceneEntry();
 
@@ -489,6 +496,7 @@ private:
   void PushPointToMinimumDistance(int fixedIndex, int movableIndex,
                                   float extraMargin);
 
+public:
   /// <summary>
   /// 部位ローカルの操作点位置を、Objectの親子transformを加味してワールド位置へ変換する
   /// </summary>

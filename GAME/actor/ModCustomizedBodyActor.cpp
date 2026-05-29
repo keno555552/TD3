@@ -1,5 +1,6 @@
 #include "GAME/actor/ModCustomizedBodyActor.h"
 #include "GAME/actor/ModBodyCustomizeDataUtil.h"
+#include "GAME/actor/ModObjectUtil.h"
 
 namespace {
 
@@ -120,11 +121,9 @@ void ModCustomizedBodyActor::UpdateAndDraw(Camera *camera) {
     return;
   }
 
-  ApplyAssemblyToSceneHierarchy();
-  ApplyModBodies();
-
   if (autoGroundEnabled_) {
     SnapToGround();
+  } else {
     ApplyAssemblyToSceneHierarchy();
     ApplyModBodies();
   }
@@ -200,32 +199,89 @@ bool ModCustomizedBodyActor::TryGetFootEndContactWorldY(
     return false;
   }
 
-  int sampleIndex = body.FindControlPointIndex(ModControlPointRole::End);
-  if (sampleIndex < 0) {
-    sampleIndex = body.FindControlPointIndex(ModControlPointRole::Bend);
-    if (sampleIndex < 0) {
-      return false;
-    }
-  }
+  return TryGetFootEndContactWorldY(body, const_cast<Object*>(object), outContactY);
+}
 
-  const std::vector<ModControlPoint> &points = body.GetControlPoints();
-  if (static_cast<size_t>(sampleIndex) >= points.size()) {
+bool ModCustomizedBodyActor::TryGetFootEndContactWorldY(const ModBody& body,
+                                                        Object* object,
+                                                        float& outContactY) const {
+  if (object == nullptr || object->objectParts_.empty()) {
     return false;
   }
 
-  const Vector3 sampleWorld = body.GetControlPointWorldPosition(
-      object, static_cast<size_t>(sampleIndex));
+  // 接地に関わるパーツ以外は無視
+  const ModBodyPart part = body.GetPart();
+  if (part != ModBodyPart::LeftShin && part != ModBodyPart::RightShin &&
+      part != ModBodyPart::LeftThigh && part != ModBodyPart::RightThigh) {
+    return false;
+  }
+
+  const std::vector<ModControlPoint>& points = body.GetControlPoints();
+  int sampleIndex = body.FindControlPointIndex(ModControlPointRole::End);
+  if (sampleIndex < 0) {
+    sampleIndex = body.FindControlPointIndex(ModControlPointRole::Root);
+  }
+  if (sampleIndex < 0 || static_cast<size_t>(sampleIndex) >= points.size()) {
+    return false;
+  }
+
+  // 1. デフォルトの操作点 (End) から計算した最下点
+  Vector3 visualLocalPoint = points[static_cast<size_t>(sampleIndex)].localPosition;
+  if (!body.HasOwnControlPoints()) {
+    visualLocalPoint.x *= object->objectParts_[0].transform.scale.x;
+    visualLocalPoint.y *= object->objectParts_[0].transform.scale.y;
+    visualLocalPoint.z *= object->objectParts_[0].transform.scale.z;
+  }
+  const Vector3 sampleWorld = ModObjectUtil::TransformLocalPointToWorld(object, visualLocalPoint);
 
   float contactRadius = points[static_cast<size_t>(sampleIndex)].radius;
-
-  // 見た目半径が取れる部位はそちらを優先
   const float visualRadius = body.GetVisualSegmentRadius(
       ModControlPointRole::Bend, ModControlPointRole::End);
   if (visualRadius > 0.0001f) {
     contactRadius = visualRadius;
   }
+  contactRadius *= actorTransform_.scale.y;
 
   outContactY = sampleWorld.y - contactRadius;
+
+  // 2. 実際のメッシュから自動計算されたカプセルの最下点（こちらの方が精度が高く、分厚い靴なども考慮される）
+  if (body.GetAutoCalculatedCapsule().radius > 0.0001f) {
+    const ModCapsule& cap = body.GetAutoCalculatedCapsule();
+    
+    // カプセルの両端をスケールしてからワールド空間へ変換
+    Vector3 scaledStart = cap.start;
+    Vector3 scaledEnd = cap.end;
+    float scaledRadius = cap.radius;
+    
+    if (!body.HasOwnControlPoints()) {
+      scaledStart.x *= object->objectParts_[0].transform.scale.x;
+      scaledStart.y *= object->objectParts_[0].transform.scale.y;
+      scaledStart.z *= object->objectParts_[0].transform.scale.z;
+      
+      scaledEnd.x *= object->objectParts_[0].transform.scale.x;
+      scaledEnd.y *= object->objectParts_[0].transform.scale.y;
+      scaledEnd.z *= object->objectParts_[0].transform.scale.z;
+      
+      scaledRadius *= (std::max)((std::max)(object->objectParts_[0].transform.scale.x, object->objectParts_[0].transform.scale.y), object->objectParts_[0].transform.scale.z);
+    }
+    
+    Vector3 worldStart = ModObjectUtil::TransformLocalPointToWorld(object, scaledStart);
+    Vector3 worldEnd = ModObjectUtil::TransformLocalPointToWorld(object, scaledEnd);
+    
+    // ワールド空間での半径を算出
+    Vector3 radiusLocal = {0.0f, scaledRadius, 0.0f};
+    Vector3 originWorld = ModObjectUtil::TransformLocalPointToWorld(object, {0.0f, 0.0f, 0.0f});
+    Vector3 radiusWorld = ModObjectUtil::TransformLocalPointToWorld(object, radiusLocal);
+    float worldRadius = Length(Subtract(radiusWorld, originWorld));
+
+    float meshLowestWorldY = std::min(worldStart.y, worldEnd.y) - worldRadius;
+    
+    // メッシュの方が下に出っ張っている場合、そちらを採用
+    if (meshLowestWorldY < outContactY) {
+      outContactY = meshLowestWorldY;
+    }
+  }
+
   return true;
 }
 
@@ -276,17 +332,16 @@ void ModCustomizedBodyActor::ApplyGroundingToRootParts() {
   const float deltaY = (groundY_ + groundOffsetY_) - lowestFootY;
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
-    const int id = orderedPartIds_[i];
-    const PartNode *node = assembly_.FindNode(id);
-    if (node == nullptr || !IsRootPartNode(*node)) {
+    int partId = orderedPartIds_[i];
+    if (assembly_.FindNode(partId)->parentId >= 0) {
       continue;
     }
 
-    if (modObjects_.count(id) == 0) {
+    if (modObjects_.count(partId) == 0) {
       continue;
     }
 
-    Object *object = modObjects_[id].get();
+    Object *object = modObjects_[partId].get();
     if (object == nullptr) {
       continue;
     }
