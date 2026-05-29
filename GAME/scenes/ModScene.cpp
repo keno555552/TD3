@@ -1106,6 +1106,7 @@ ModScene::ModScene(kEngine *system) {
   connectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/接続.mp3");
   deleteSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/削除.mp3");
   notificationSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/通知音.mp3");
+  warningSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/警告音.mp3");
 
   // BGMロード＆再生
   bgmSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/ModScene_BGM.mp3");
@@ -1688,6 +1689,13 @@ void ModScene::UpdateOrbitCamera() {
   const float horizontalLength = sqrtf(dir.x * dir.x + dir.z * dir.z);
   cameraRotate.x = atan2f(-dir.y, horizontalLength);
   cameraRotate.z = 0.0f;
+
+  if (shakeTimer_ > 0.0f) {
+    const float intensity = shakeTimer_ * 0.5f;
+    cameraPos.x += ((rand() % 100) / 100.0f - 0.5f) * intensity;
+    cameraPos.y += ((rand() % 100) / 100.0f - 0.5f) * intensity;
+    cameraPos.z += ((rand() % 100) / 100.0f - 0.5f) * intensity;
+  }
 
   debugCamera_->SetTranslate(cameraPos);
   debugCamera_->SetRotation(cameraRotate);
@@ -7413,6 +7421,16 @@ bool ModScene::IsMouseOverTrashArea() const {
 }
 
 void ModScene::UpdateScreenUi() {
+  const float dt = system_->GetDeltaTime();
+  if (shakeTimer_ > 0.0f) {
+    shakeTimer_ -= dt;
+    if (shakeTimer_ < 0.0f) shakeTimer_ = 0.0f;
+  }
+  if (warningTimer_ > 0.0f) {
+    warningTimer_ -= dt;
+    if (warningTimer_ < 0.0f) warningTimer_ = 0.0f;
+  }
+
   if (promptSprite_ != nullptr) {
     promptSprite_->Update(nullptr);
   }
@@ -7623,6 +7641,14 @@ void ModScene::DrawScreenUi() {
           }
       }
   }
+
+  // 警告文の描画
+  if (warningTimer_ > 0.0f) {
+    const float alpha = (std::min)(1.0f, warningTimer_ * 2.0f);
+    const Vector4 warningColor = {1.0f, 0.2f, 0.2f, alpha};
+    bitmapFont_.RenderText(warningMessage_, {640.0f, 360.0f}, 32.0f,
+                           BitmapFont::Align::Center, 5.0f, warningColor);
+  }
 }
 
 bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
@@ -7650,6 +7676,12 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
   // 先に Clear しない
   Vector3 removePos = GetPartWorldPosition(deleteTargetId);
   if (!assembly_.RemovePart(deleteTargetId)) {
+    shakeTimer_ = 0.5f; // 0.5秒間カメラを揺らす
+    warningTimer_ = 2.0f; // 2.0秒間警告を表示する
+    warningMessage_ = "あたまは1つ以上、あしは2セット以上必要です！";
+    if (warningSoundHandle_ != -1) {
+      system_->SoundPlaySE(warningSoundHandle_, 1.0f);
+    }
     CancelAssemblyDragPlacement();
     return false;
   }
