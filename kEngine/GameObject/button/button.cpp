@@ -112,6 +112,9 @@ void Button::Update() {
 
 	// 點擊事件（只維持一幀）
 	isClick_ = (triggerOn && hover);
+	if (isClick_ && click1_ != -1) {
+		system_->SoundPlaySE(click1_);
+	}
 
 	// 記錄是否曾經按下
 	if (triggerOn && hover) {
@@ -127,6 +130,9 @@ void Button::Update() {
 	if (triggerOff) {
 		if(wasPressed_) {
 			isRelease_ = true;
+			if (hover && click2_ != -1) {
+				system_->SoundPlaySE(click2_);
+			}
 		}
 		isPress_ = false;
 		wasPressed_ = false;

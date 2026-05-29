@@ -166,6 +166,8 @@ private:
 
 	/// Sound関連
 	float BarTuneVolume(Vector2 mousePos, float startX, float endX);
+	int clickSE_ = -1;
+	int clackSE_ = -1;
 
 	/// ============ Test =============///
 

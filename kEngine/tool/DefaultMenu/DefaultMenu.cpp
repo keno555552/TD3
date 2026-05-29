@@ -225,13 +225,15 @@ DefaultMenu::DefaultMenu(kEngine* system) {
             volumeBarColor;
 
 	/// ================== ボタン ==================///
+	clickSE_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/click.wav");
+	clackSE_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/clack.wav");
 
 	bMenuClose = std::make_unique<Button>(system_);
 	bMenuClose->Init(
 		{ 70.5f, 23.0f , 0.0f },
 		141.0f, 46.0f,
 		-1, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuClose->SetFollowObject(sMenuClose.get());
 
 	bMenuRetry = std::make_unique<Button>(system_);
@@ -239,7 +241,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 		{ 119.5f, 23.0f , 0.0f },
 		239.0f, 46.0f,
 		-1, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuRetry->SetFollowObject(sMenuRetry.get());
 
 	bMenuBack = std::make_unique<Button>(system_);
@@ -247,7 +249,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 		{ 96.5f, 23.5f , 0.0f },
 		193.0f, 47.0f,
 		TH_menuRetry, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuBack->SetFollowObject(sMenuBack.get());
 
 	bMenuBGM = std::make_unique<Button>(system_);
@@ -255,7 +257,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 		{ 16.5f, 16.5f , 0.0f },
 		33.0f, 33.0f,
 		-1, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuBGM->SetFollowObject(sMenuButtonB.get());
 
 	bMenuMASTER = std::make_unique<Button>(system_);
@@ -263,7 +265,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 		{ 16.5f, 16.5f , 0.0f },
 		33.0f, 33.0f,
 		-1, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuMASTER->SetFollowObject(sMenuButtonM.get());
 
 	bMenuSE = std::make_unique<Button>(system_);
@@ -271,7 +273,7 @@ DefaultMenu::DefaultMenu(kEngine* system) {
 		{ 16.5f, 16.5f , 0.0f },
 		33.0f, 33.0f,
 		-1, -1, -1, -1,
-		0, 0);
+		clickSE_, clackSE_);
 	bMenuSE->SetFollowObject(sMenuButtonS.get());
 
 

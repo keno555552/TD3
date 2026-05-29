@@ -14,6 +14,11 @@ DetailButton::DetailButton(kEngine* system) {
 	texture_[7] = system_->LoadTexture("./GAME/resources/texture/button/8.png");
 	texture_[8] = system_->LoadTexture("./GAME/resources/texture/button/9.png");
 
+	/// サントハンドルを保存
+	se_click_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/click.wav");
+	se_clickR_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/clack.wav");
+	se_lock_ = system_->SoundLoadSE("./kEngine/EngineAssets/sound/du.wav");
+
 	/// デフォルトサイズ
 	spriteDefaultSize_[0] = { 33.0f,38.0f };
 	spriteDefaultSize_[1] = { 10.0f,38.0f };
@@ -65,6 +70,10 @@ void DetailButton::LoadTexture(kEngine* system) {
 	system->LoadTexture("./GAME/resources/texture/button/7.png");
 	system->LoadTexture("./GAME/resources/texture/button/8.png");
 	system->LoadTexture("./GAME/resources/texture/button/9.png");
+
+	system->SoundLoadSE("./kEngine/EngineAssets/sound/click.wav");
+	system->SoundLoadSE("./kEngine/EngineAssets/sound/clack.wav");
+	system->SoundLoadSE("./kEngine/EngineAssets/sound/du.wav");
 }
 
 void DetailButton::SetWidth(float width) {
@@ -200,23 +209,25 @@ void DetailButton::Update() {
 	bool triggerOn = system_->GetMouseTriggerOn(0);
 	bool triggerOff = system_->GetMouseTriggerOff(0);
 
-	// 點擊事件（只維持一幀）
+	// クリック（1fだけ維持）
 	isClicked_ = (triggerOn && hover);
+	if(isClicked_) system_->SoundPlaySE((buttonState_ == LOCK) ? se_lock_ : se_click_);
 
-	// 記錄是否曾經按下
+	// クリックした状態を保持（放すまで）
 	if (triggerOn && hover) {
 		wasPressed_ = true;
 	}
 
-	// 放開事件（只在曾經按下後才觸發）
+	// リリース（押したことある時だけ回る）
 	if (wasPressed_ && triggerOff) {
-		isRelease_ = true;
-		wasPressed_ = false; // 重置
+		if(hover) isRelease_ = true;
+		wasPressed_ = false; // リセット
+		if(buttonState_ != LOCK)system_->SoundPlaySE(se_clickR_);
 	} else {
 		isRelease_ = false;
 	}
 
-	// 狀態機
+	// 状態切り替え
 	if (buttonState_ != LOCK) {
 
 		if (hover) {
@@ -230,16 +241,6 @@ void DetailButton::Update() {
 		}
 	}
 
-}
-
-void DetailButton::ForceSelectState(bool isSelected) {
-	if (buttonState_ != LOCK && buttonState_ != PRESS) {
-		if (isSelected) {
-			buttonState_ = SELECT;
-		} else {
-			buttonState_ = NORMAL;
-		}
-	}
 }
 
 void DetailButton::Render() {

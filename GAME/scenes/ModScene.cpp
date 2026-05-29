@@ -1107,6 +1107,12 @@ ModScene::ModScene(kEngine *system) {
   deleteSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/削除.mp3");
   notificationSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/通知音.mp3");
 
+  // BGMロード＆再生
+  bgmSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/ModScene_BGM.mp3");
+  if (bgmSoundHandle_ != -1) {
+    system_->SoundPlayBGM(bgmSoundHandle_, 0.5f);
+  }
+
   // 通知用テクスチャロード
   notifyStartTexHandle_ = system_->LoadTexture("GAME/resources/ModScene/notification/start.png");
   notifyGoalTexHandle_ = system_->LoadTexture("GAME/resources/ModScene/notification/goal.png");
@@ -1127,6 +1133,10 @@ ModScene::~ModScene() {
 
   if (notificationSoundHandle_ != -1) {
     system_->SoundStop(notificationSoundHandle_);
+  }
+  
+  if (bgmSoundHandle_ != -1) {
+    system_->SoundStop(bgmSoundHandle_);
   }
 
   // 使用していないマテリアルをクリーンアップする

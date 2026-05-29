@@ -21,8 +21,12 @@ public:
 
 	void SetWidth(float width);
 	void SetHeight(float height);
-	void SetIsLock(bool isLock) { buttonState_ = LOCK; }
-	void ForceSelectState(bool isSelected);
+	void SetIsLock(bool isLock) { buttonState_ =(isLock) ?  LOCK : NORMAL; }
+	void ForceSelectState(bool isSelect) { 
+		if (buttonState_ != LOCK && buttonState_ != PRESS) {
+			buttonState_ = isSelect ? SELECT : NORMAL; 
+		}
+	}
 
 	void SetNormalColor(Vector4 color) { setColor_[NORMAL] = color; }
 	void SetPressColor(Vector4 color) { setColor_[PRESS] = color; }
@@ -72,6 +76,11 @@ private:
 	
 	/// ================== テクスチャーハンドル ================== ///
 	int texture_[9];
+
+	/// ================== サントハンドル =================== ///
+	int se_click_{};
+	int se_clickR_{};
+	int se_lock_{};
 
 	/// =================== デフォルトサイズ =================== ///
 	Vector2 buttonDefaultSize_ = { 76.0f,86.0f };
