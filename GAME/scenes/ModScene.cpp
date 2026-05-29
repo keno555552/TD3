@@ -1105,6 +1105,15 @@ ModScene::ModScene(kEngine *system) {
   catchSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/キャッチ.mp3");
   connectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/接続.mp3");
   deleteSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/削除.mp3");
+  notificationSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/通知音.mp3");
+
+  // 通知用テクスチャロード
+  notifyStartTexHandle_ = system_->LoadTexture("GAME/resources/ModScene/notification/start.png");
+  notifyGoalTexHandle_ = system_->LoadTexture("GAME/resources/ModScene/notification/goal.png");
+  notifyRivalTexHandles_[0] = system_->LoadTexture("GAME/resources/ModScene/notification/rival1.png");
+  notifyRivalTexHandles_[1] = system_->LoadTexture("GAME/resources/ModScene/notification/rival2.png");
+  notifyRivalTexHandles_[2] = system_->LoadTexture("GAME/resources/ModScene/notification/rival3.png");
+  notifyRivalTexHandles_[3] = system_->LoadTexture("GAME/resources/ModScene/notification/rival4.png");
 }
 
 ModScene::~ModScene() {
@@ -1115,6 +1124,10 @@ ModScene::~ModScene() {
   // 登録したライトを解除して解放する
   system_->RemoveLight(light1_);
   delete light1_;
+
+  if (notificationSoundHandle_ != -1) {
+    system_->SoundStop(notificationSoundHandle_);
+  }
 
   // 使用していないマテリアルをクリーンアップする
   ResourceManager::GetInstance()->CleanupUnusedMaterials();
@@ -1517,6 +1530,12 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     Vector3 center = {(minBounds.x + maxBounds.x) * 0.5f,
                       (minBounds.y + maxBounds.y) * 0.5f,
                       (minBounds.z + maxBounds.z) * 0.5f};
+
+    // 全体表示時（何も選択していない時）は、上部のUIとお題のテキストが被らないよう
+    // 注視点を少し上（+1.5f程度）にずらし、モデル自体を画面下寄りに表示する
+    if (selectedPartId_ < 0) {
+      center.y += 1.5f;
+    }
 
     // 何も選択していない（全体表示）の時は、注視点が低くなりすぎないよう
     // 計算された中心点の高さをそのまま使う（原点フォールバックをしない）
@@ -6545,7 +6564,7 @@ void ModScene::UpdateNpcProgress() {
         if (!npc.goalNotified) {
           npc.goalNotified = true;
           npcGoalCountInMod_++;
-          AddStartNotification(npc.name + "がゴール！");
+          AddStartNotification(i, true);
         }
       }
 
@@ -6560,7 +6579,7 @@ void ModScene::UpdateNpcProgress() {
       npc.hasStartedMoving = true;
       npc.moveElapsedTime = 0.0f;
 
-      AddStartNotification(npc.name + "がスタート！");
+      AddStartNotification(i, false);
     }
   }
 
@@ -6568,14 +6587,31 @@ void ModScene::UpdateNpcProgress() {
   UpdateNotifications();
 }
 
-void ModScene::AddStartNotification(const std::string &text) {
+void ModScene::AddStartNotification(int npcIndex, bool isGoal) {
   StartNotification notification{};
-  notification.text = text;
+  notification.npcIndex = npcIndex;
+  notification.isGoal = isGoal;
   notification.timer = 0.0f;
   notification.duration = 1.5f;
   notification.startY = 80.0f;
 
+  if (npcIndex >= 0 && npcIndex < 4) {
+    notification.rivalSprite = std::make_shared<SimpleSprite>();
+    notification.rivalSprite->IntObject(system_);
+    notification.rivalSprite->CreateDefaultData();
+    notification.rivalSprite->objectParts_[0].materialConfig->textureHandle = notifyRivalTexHandles_[npcIndex];
+  }
+
+  notification.textSprite = std::make_shared<SimpleSprite>();
+  notification.textSprite->IntObject(system_);
+  notification.textSprite->CreateDefaultData();
+  notification.textSprite->objectParts_[0].materialConfig->textureHandle = isGoal ? notifyGoalTexHandle_ : notifyStartTexHandle_;
+
   notifications_.push_back(notification);
+
+  if (notificationSoundHandle_ != -1) {
+    system_->SoundPlaySE(notificationSoundHandle_, 1.0f);
+  }
 }
 
 void ModScene::UpdateNotifications() {
@@ -6648,7 +6684,6 @@ void ModScene::DrawStartNotifications() {
   }
 
   const float baseX = 900.0f;
-  const float fontSize = 32.0f;
   const float fallDistance = 80.0f;
 
   for (size_t i = 0; i < notifications_.size(); ++i) {
@@ -6661,12 +6696,30 @@ void ModScene::DrawStartNotifications() {
     t = std::clamp(t, 0.0f, 1.0f);
 
     float x = baseX;
-    float y = notification.startY + fallDistance * t;
+    // 複数の通知が重ならないよう Y 座標にオフセット (i * 100.0f) を設ける
+    float y = notification.startY + fallDistance * t + (i * 100.0f);
     float alpha = 1.0f - t;
 
-    bitmapFont_.RenderText(notification.text, {x, y}, fontSize,
-                           BitmapFont::Align::Left, 5.0f,
-                           {1.0f, 1.0f, 1.0f, alpha});
+    if (notification.npcIndex >= 0 && notification.npcIndex < 4) {
+      // アイコン描画
+      if (notification.rivalSprite) {
+        notification.rivalSprite->objectParts_[0].materialConfig->textureColor = {1.0f, 1.0f, 1.0f, alpha};
+        // エンジンのバッチングによるテクスチャ上書きを回避するため、Z座標をわずかにずらす
+        notification.rivalSprite->mainPosition.transform.translate = {x, y, i * -0.01f - 0.01f};
+        notification.rivalSprite->mainPosition.transform.scale = {0.8f, 0.8f, 1.0f};
+        notification.rivalSprite->Update(nullptr);
+        notification.rivalSprite->Draw();
+      }
+
+      // 状態テキスト画像描画 (アイコンの右側に配置)
+      if (notification.textSprite) {
+        notification.textSprite->objectParts_[0].materialConfig->textureColor = {1.0f, 1.0f, 1.0f, alpha};
+        notification.textSprite->mainPosition.transform.translate = {x + 220.0f, y, i * -0.01f - 0.01f}; // 横の間隔とZ座標
+        notification.textSprite->mainPosition.transform.scale = {0.8f, 0.8f, 1.0f};
+        notification.textSprite->Update(nullptr);
+        notification.textSprite->Draw();
+      }
+    }
   }
 }
 
@@ -7081,7 +7134,7 @@ void ModScene::InitializeScreenUi() {
 
   howToTextureHandle_ =
       system_->LoadTexture("GAME/resources/ModScene/howTo.png");
-  SetupUiSprite(howToUi_, {1120.0f, 340.0f}, {300.0f, 300.0f},
+  SetupUiSprite(howToUi_, {1120.0f, 340.0f}, {200.0f, 200.0f},
                 howToTextureHandle_);
 
   // パラメータ計算用ランナー初期化
@@ -7800,11 +7853,12 @@ float ModScene::ComputeIdealOrbitDistance() const {
       }
     } else {
       // 何も選択されていない時（全体表示）：近すぎるのを解消するため、倍率を 5.5f に設定
-      idealDistance = requiredRadius * 5.5f;
+      // 画面上部のお題テキストとかぶらないようにさらに引くため 6.5f に変更
+      idealDistance = requiredRadius * 6.5f;
     }
 
-    // クランプの下限値も、全体時に近づきすぎないよう調整（未選択時は最低でも 20.0f 引く）
-    float minLimit = (selectedPartId_ >= 0) ? orbitMinDistance_ : 20.0f;
+    // クランプの下限値も、全体時に近づきすぎないよう調整（未選択時は最低でも 25.0f 引く）
+    float minLimit = (selectedPartId_ >= 0) ? orbitMinDistance_ : 25.0f;
     return (std::clamp)(idealDistance, minLimit, orbitMaxDistance_);
   }
 
