@@ -8104,12 +8104,117 @@ float ModScene::ComputeIdealOrbitDistance() const {
   return 15.0f; // 完全なフォールバック
 }
 
-void ModScene::PushHistory() {
-  // 現在地より未来の履歴があれば削除する
-  if (historyIndex_ >= 0 && historyIndex_ < static_cast<int>(historyStack_.size()) - 1) {
-    historyStack_.erase(historyStack_.begin() + historyIndex_ + 1, historyStack_.end());
+namespace {
+
+bool IsVector3Equal(const Vector3& a, const Vector3& b, float epsilon = 0.0001f) {
+  return std::abs(a.x - b.x) < epsilon &&
+         std::abs(a.y - b.y) < epsilon &&
+         std::abs(a.z - b.z) < epsilon;
+}
+
+bool IsTransformEqual(const Transform& a, const Transform& b) {
+  return IsVector3Equal(a.scale, b.scale) &&
+         IsVector3Equal(a.rotate, b.rotate) &&
+         IsVector3Equal(a.translate, b.translate);
+}
+
+bool IsConnectorNodeEqual(const ConnectorNode& a, const ConnectorNode& b) {
+  return a.id == b.id &&
+         a.role == b.role &&
+         a.side == b.side &&
+         IsVector3Equal(a.localPosition, b.localPosition);
+}
+
+bool IsPartNodeEqual(const PartNode& a, const PartNode& b) {
+  if (a.id != b.id || a.part != b.part || a.side != b.side ||
+      a.parentId != b.parentId || a.parentConnectorId != b.parentConnectorId ||
+      a.selfConnectorId != b.selfConnectorId || a.required != b.required) {
+    return false;
+  }
+  if (!IsTransformEqual(a.localTransform, b.localTransform)) return false;
+
+  if (a.connectors.size() != b.connectors.size()) return false;
+  for (size_t i = 0; i < a.connectors.size(); ++i) {
+    if (!IsConnectorNodeEqual(a.connectors[i], b.connectors[i])) return false;
+  }
+  return true;
+}
+
+bool IsAssemblyGraphEqual(const ModAssemblyGraph& a, const ModAssemblyGraph& b) {
+  const auto& aNodes = a.GetNodes();
+  const auto& bNodes = b.GetNodes();
+  if (aNodes.size() != bNodes.size()) return false;
+  for (const auto& [id, aNode] : aNodes) {
+    auto it = bNodes.find(id);
+    if (it == bNodes.end()) return false;
+    if (!IsPartNodeEqual(aNode, it->second)) return false;
+  }
+  return true;
+}
+
+bool IsPartParamEqual(const ModBodyPartParam& a, const ModBodyPartParam& b) {
+  return IsVector3Equal(a.scale, b.scale) &&
+         std::abs(a.length - b.length) < 0.0001f &&
+         a.count == b.count &&
+         a.enabled == b.enabled;
+}
+
+bool IsControlPointEqual(const ModControlPoint& a, const ModControlPoint& b) {
+  return a.role == b.role &&
+         IsVector3Equal(a.localPosition, b.localPosition) &&
+         std::abs(a.radius - b.radius) < 0.0001f &&
+         a.movable == b.movable &&
+         a.isConnectionPoint == b.isConnectionPoint &&
+         a.acceptsParent == b.acceptsParent &&
+         a.acceptsChild == b.acceptsChild;
+}
+
+bool IsControlPointVectorEqual(const std::vector<ModControlPoint>& a, const std::vector<ModControlPoint>& b) {
+  if (a.size() != b.size()) return false;
+  for (size_t i = 0; i < a.size(); ++i) {
+    if (!IsControlPointEqual(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+} // namespace
+
+bool ModScene::ModSceneStateSnapshot::operator==(const ModSceneStateSnapshot& b) const {
+  if (!IsAssemblyGraphEqual(this->assembly, b.assembly)) return false;
+
+  if (this->partParams.size() != b.partParams.size()) return false;
+  for (const auto& [id, param] : this->partParams) {
+    auto it = b.partParams.find(id);
+    if (it == b.partParams.end()) return false;
+    if (!IsPartParamEqual(param, it->second)) return false;
   }
 
+  if (this->controlPoints.size() != b.controlPoints.size()) return false;
+  for (const auto& [id, points] : this->controlPoints) {
+    auto it = b.controlPoints.find(id);
+    if (it == b.controlPoints.end()) return false;
+    if (!IsControlPointVectorEqual(points, it->second)) return false;
+  }
+
+  if (this->torsoControlPoints.size() != b.torsoControlPoints.size()) return false;
+  for (size_t i = 0; i < this->torsoControlPoints.size(); ++i) {
+    const auto& ptA = this->torsoControlPoints[i];
+    const auto& ptB = b.torsoControlPoints[i];
+    if (ptA.role != ptB.role ||
+        !IsVector3Equal(ptA.localPosition, ptB.localPosition) ||
+        std::abs(ptA.radius - ptB.radius) >= 0.0001f ||
+        ptA.movable != ptB.movable ||
+        ptA.isConnectionPoint != ptB.isConnectionPoint ||
+        ptA.acceptsParent != ptB.acceptsParent ||
+        ptA.acceptsChild != ptB.acceptsChild) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+void ModScene::PushHistory() {
   ModSceneStateSnapshot snapshot;
   snapshot.assembly = assembly_; // コピー
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -8120,6 +8225,18 @@ void ModScene::PushHistory() {
     }
   }
   snapshot.torsoControlPoints = torsoControlPoints_;
+
+  if (historyIndex_ >= 0 && historyIndex_ < static_cast<int>(historyStack_.size())) {
+    if (snapshot == historyStack_[historyIndex_]) {
+      // 変更がなければ保存しない
+      return;
+    }
+  }
+
+  // 現在地より未来の履歴があれば削除する
+  if (historyIndex_ >= 0 && historyIndex_ < static_cast<int>(historyStack_.size()) - 1) {
+    historyStack_.erase(historyStack_.begin() + historyIndex_ + 1, historyStack_.end());
+  }
 
   historyStack_.push_back(snapshot);
   
