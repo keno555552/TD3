@@ -691,15 +691,10 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     Vector3 rightLegBendLocal = {0.0f, -0.70f, 0.0f};
     Vector3 rightLegEndLocal = {0.0f, -1.40f, 0.0f};
 
-    int torsoAnchorOwnerId = -1;
     int leftThighOwnerId = -1;
     int rightThighOwnerId = -1;
 
     for (const auto &instance : customizeData_->partInstances) {
-      if (torsoAnchorOwnerId < 0 &&
-          instance.partType == ModBodyPart::ChestBody) {
-        torsoAnchorOwnerId = instance.partId;
-      }
       if (leftThighOwnerId < 0 && instance.partType == ModBodyPart::LeftThigh) {
         leftThighOwnerId = instance.partId;
       }
@@ -709,14 +704,43 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       }
     }
 
-    for (const auto &snap : customizeData_->controlPointSnapshots) {
-      if (snap.ownerPartId == torsoAnchorOwnerId) {
-        if (snap.role == ModControlPointRole::LeftHip) {
-          leftHipAnchorLocal = snap.localPosition;
-        } else if (snap.role == ModControlPointRole::RightHip) {
-          rightHipAnchorLocal = snap.localPosition;
+    auto getLegBaseAnchorLocal = [&](int thighPartId) -> Vector3 {
+      Vector3 pos = {0.0f, 0.0f, 0.0f};
+      if (thighPartId < 0) return pos;
+
+      for (const auto &snap : customizeData_->controlPointSnapshots) {
+        if (snap.ownerPartId == thighPartId && snap.role == ModControlPointRole::Root) {
+          pos = snap.localPosition;
+          break;
         }
       }
+
+      int currentId = thighPartId;
+      while (currentId >= 0) {
+        bool found = false;
+        for (const auto &inst : customizeData_->partInstances) {
+          if (inst.partId == currentId) {
+            pos.x += inst.resolvedLocalTranslate.x;
+            pos.y += inst.resolvedLocalTranslate.y;
+            pos.z += inst.resolvedLocalTranslate.z;
+            currentId = inst.parentId;
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;
+      }
+      return pos;
+    };
+
+    if (leftThighOwnerId >= 0) {
+      leftHipAnchorLocal = getLegBaseAnchorLocal(leftThighOwnerId);
+    }
+    if (rightThighOwnerId >= 0) {
+      rightHipAnchorLocal = getLegBaseAnchorLocal(rightThighOwnerId);
+    }
+
+    for (const auto &snap : customizeData_->controlPointSnapshots) {
 
       if (snap.ownerPartId == leftThighOwnerId) {
         if (snap.role == ModControlPointRole::Root) {
