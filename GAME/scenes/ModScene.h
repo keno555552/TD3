@@ -140,7 +140,7 @@ private:
   float orbitRotateSpeed_ = 0.01f;
   float orbitZoomSpeed_ = 0.8f;
   float orbitMinDistance_ = 2.5f;
-  float orbitMaxDistance_ = 40.0f;
+  float orbitMaxDistance_ = 80.0f;
   float manualOrbitZoomRatio_ = 1.0f;  // B案: ユーザーの手動ズーム倍率を保持する
 
   void UpdateOrbitCamera();
