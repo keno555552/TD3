@@ -997,7 +997,7 @@ ModScene::ModScene(kEngine *system) {
   stageObject_->mainPosition.transform = CreateDefaultTransform();
   stageObject_->mainPosition.transform.translate = {0.0f, -2.5f, 0.0f};
 
-  int studioModelHandle = system_->SetModelObj("GAME/resources/studio/studio.obj");
+  int studioModelHandle = system_->SetModelObj("GAME/resources/ModScene/studio/studio.obj");
   studioObject_ = std::make_unique<Object>();
   studioObject_->IntObject(system_);
   studioObject_->CreateModelData(studioModelHandle);
@@ -7195,7 +7195,10 @@ void ModScene::InitializeScreenUi() {
     plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 
-  SetupUiSprite(trashButton_, {890.0f, 640.0f}, {100.0f, 100.0f},
+  trashDetailButton_ = std::make_unique<DetailButton>(system_);
+  trashDetailButton_->SetButton({890.0f, 640.0f}, 120.0f, 100.0f);
+
+  SetupUiSprite(trashButton_, {890.0f, 640.0f - 10.0f}, {50.0f, 50.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
@@ -7529,6 +7532,21 @@ void ModScene::DrawScreenUi() {
     }
   }
 
+  if (trashDetailButton_) {
+    const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+    const Vector4 hoverColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+    if (isHoverTrash_) {
+      trashDetailButton_->SetNormalColor(hoverColorBtn);
+      trashDetailButton_->SetSelectColor(hoverColorBtn);
+      trashDetailButton_->SetPressColor(hoverColorBtn);
+    } else {
+      trashDetailButton_->SetNormalColor(normalColorBtn);
+      trashDetailButton_->SetSelectColor(normalColorBtn);
+      trashDetailButton_->SetPressColor(normalColorBtn);
+    }
+    trashDetailButton_->Render();
+  }
+
   if (trashButton_.visible && trashButton_.sprite != nullptr) {
     trashButton_.sprite->Draw();
   }
@@ -7617,13 +7635,10 @@ void ModScene::DrawScreenUi() {
   }
 
   if (trashButton_.visible) {
-    const float left = trashButton_.center.x - trashButton_.size.x * 0.5f;
-    const float top =
-        trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
-
-    bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
-                           BitmapFont::Align::Left, 5.0f,
-                           {1.0f, 1.0f, 1.0f, 1.0f});
+    Vector4 textColor = isHoverTrash_ ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                                      : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+    bitmapFont_.RenderText("ごみばこ", {890.0f, 640.0f + 25.0f}, 20.0f,
+                           BitmapFont::Align::Center, 5.0f, textColor);
   }
 
   if (resetButton_) {
@@ -8108,4 +8123,4 @@ void ModScene::RestoreFromSnapshot(const ModSceneStateSnapshot& snapshot) {
 
   // 全オブジェクトの更新と再構築
   UpdateModObjects();
-}
+}

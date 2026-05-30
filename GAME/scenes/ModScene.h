@@ -216,6 +216,7 @@ private:
 
   // UIの部位削除ボタン
   UiIconButton trashButton_{};
+  std::unique_ptr<DetailButton> trashDetailButton_;
   // マウスが削除ボタンの上にあるかどうか
   bool isHoverTrash_ = false;
 
