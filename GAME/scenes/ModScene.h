@@ -141,7 +141,7 @@ private:
   float orbitZoomSpeed_ = 0.8f;
   float orbitMinDistance_ = 2.5f;
   float orbitMaxDistance_ = 80.0f;
-  float manualOrbitZoomRatio_ = 1.0f;  // B案: ユーザーの手動ズーム倍率を保持する
+  float manualOrbitZoomRatio_ = 1.0f;  // ユーザーの手動ズーム倍率を保持する
 
   void UpdateOrbitCamera();
   Vector3 ComputeOrbitTarget() const;
@@ -1072,6 +1072,8 @@ private:
     std::unordered_map<int, ModBodyPartParam> partParams;
     std::unordered_map<int, std::vector<ModControlPoint>> controlPoints;
     std::vector<TorsoControlPoint> torsoControlPoints;
+
+    bool operator==(const ModSceneStateSnapshot& other) const;
   };
   std::vector<ModSceneStateSnapshot> historyStack_;
   int historyIndex_ = -1;
