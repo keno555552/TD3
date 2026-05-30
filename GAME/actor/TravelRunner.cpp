@@ -763,9 +763,12 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       }
     }
 
+    const float leftHipRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 1);
+    const float leftKneeRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 2);
     const float leftAnkleRadius = GetSnapshotRadius(ModBodyPart::LeftThigh, 3);
-    const float rightAnkleRadius =
-        GetSnapshotRadius(ModBodyPart::RightThigh, 3);
+    const float rightHipRadius = GetSnapshotRadius(ModBodyPart::RightThigh, 1);
+    const float rightKneeRadius = GetSnapshotRadius(ModBodyPart::RightThigh, 2);
+    const float rightAnkleRadius = GetSnapshotRadius(ModBodyPart::RightThigh, 3);
 
     // 実際の見た目配置に合わせた ankle 下端
     auto Sub = [](const Vector3 &a, const Vector3 &b) -> Vector3 {
@@ -856,7 +859,11 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     Vector3 leftFootPos = BuildAnimatedChildRoot(
         leftShinRoot, leftShinAngleZ, leftShinAngleX, leftShinLength);
 
-    const float leftFootBottomLocalY = leftFootPos.y - leftAnkleRadius;
+    const float leftFootBottomLocalY = std::min({
+        leftFootPos.y - leftAnkleRadius,
+        leftShinRoot.y - leftKneeRadius,
+        leftThighRoot.y - leftHipRadius
+    });
 
     //==============================
     // 右脚：アニメ後の足先位置
@@ -901,7 +908,11 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     Vector3 rightFootPos = BuildAnimatedChildRoot(
         rightShinRoot, rightShinAngleZ, rightShinAngleX, rightShinLength);
 
-    const float rightFootBottomLocalY = rightFootPos.y - rightAnkleRadius;
+    const float rightFootBottomLocalY = std::min({
+        rightFootPos.y - rightAnkleRadius,
+        rightShinRoot.y - rightKneeRadius,
+        rightThighRoot.y - rightHipRadius
+    });
 
     float predictedFirstLegsY =
         (std::min)(leftFootBottomLocalY, rightFootBottomLocalY);
