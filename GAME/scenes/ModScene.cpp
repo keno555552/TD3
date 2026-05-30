@@ -1170,6 +1170,16 @@ void ModScene::Update() {
   // 画面UIの状態を更新する
   UpdateScreenUi();
 
+  // ホイール拡縮履歴保存タイマーの更新
+  if (wheelScalingTimer_ > 0.0f) {
+    const float deltaTime = static_cast<float>(system_->GetDeltaTime());
+    wheelScalingTimer_ -= deltaTime;
+    if (wheelScalingTimer_ <= 0.0f) {
+      wheelScalingTimer_ = 0.0f;
+      PushHistory();
+    }
+  }
+
   //===============================
   // チュートリアル入力待ち
   //===============================
@@ -2700,6 +2710,8 @@ void ModScene::UpdateControlPointEditing() {
     // まず操作点を優先
     if (PickControlPointFromMouseRay(mouseRay)) {
       isDraggingControlPoint_ = true;
+      hasMovedControlPoint_ = false;
+      mouseTriggerPos_ = system_->GetMousePosVector2();
       return;
     }
 
@@ -2731,15 +2743,29 @@ void ModScene::UpdateControlPointEditing() {
 
   // 操作点ドラッグ中
   if (isDraggingControlPoint_ && IsMouseLeftPressedNow()) {
-    MoveSelectedControlPointFromMouseRay(mouseRay);
+    if (!hasMovedControlPoint_) {
+      const Vector2 currentPos = system_->GetMousePosVector2();
+      const float dx = currentPos.x - mouseTriggerPos_.x;
+      const float dy = currentPos.y - mouseTriggerPos_.y;
+      if (dx * dx + dy * dy > 8.0f * 8.0f) {
+        hasMovedControlPoint_ = true;
+      }
+    }
+
+    if (hasMovedControlPoint_) {
+      MoveSelectedControlPointFromMouseRay(mouseRay);
+    }
   }
 
   // 左ボタンを離したら各種ドラッグ・待機を終了
   if (IsMouseLeftReleasedNow()) {
     if (isDraggingControlPoint_) {
-      PushHistory();
+      if (hasMovedControlPoint_) {
+        PushHistory();
+      }
     }
     isDraggingControlPoint_ = false;
+    hasMovedControlPoint_ = false;
     isPendingAssemblyDrag_ = false;
   }
 }
@@ -3702,6 +3728,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     if (selectedControlPartId_ == -2) {
       ScaleTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
                              scaleFactor);
+      wheelScalingTimer_ = 0.5f;
       return;
     }
 
@@ -3709,6 +3736,7 @@ void ModScene::UpdateControlPointWheelScaling() {
         modBodies_.count(selectedControlPartId_) > 0) {
       modBodies_[selectedControlPartId_].ScaleControlPoint(
           static_cast<size_t>(selectedControlPointIndex_), scaleFactor);
+      wheelScalingTimer_ = 0.5f;
       return;
     }
   }
@@ -3766,6 +3794,7 @@ void ModScene::UpdateControlPointWheelScaling() {
       selectedPartId_ = visiblePartId;
       ScaleTorsoControlPoint(static_cast<size_t>(nearestPointIndex),
                              scaleFactor);
+      wheelScalingTimer_ = 0.5f;
     }
 
     return;
@@ -3829,6 +3858,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     selectedPartId_ = visiblePartId;
 
     body.ScaleControlPoint(static_cast<size_t>(nearestPointIndex), scaleFactor);
+    wheelScalingTimer_ = 0.5f;
   }
 }
 

@@ -201,6 +201,8 @@ private:
 
   ModAssemblyDragState assemblyDrag_; // 部位付け替えドラッグの状態管理
 
+  bool hasMovedControlPoint_ = false; // 操作点が実際に移動したか
+
   float assemblyAttachSearchRadius_ = 1.35f; // 接続有効範囲
   float assemblyAttachSnapRadius_ = 0.55f;   // 接続時スナップ距離
 
@@ -224,6 +226,9 @@ private:
   float shakeTimer_ = 0.0f;
   float warningTimer_ = 0.0f;
   std::string warningMessage_ = "";
+
+  // ホイール拡縮の履歴保存用タイマー
+  float wheelScalingTimer_ = 0.0f;
 
   // UIの次シーンボタン
   std::unique_ptr<DetailButton> nextSceneButton_;
