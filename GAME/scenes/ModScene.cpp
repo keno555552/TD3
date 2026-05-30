@@ -1585,6 +1585,12 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     return center;
   }
 
+  // ドラッグ中であり、かつすべてのパーツが除外された（例: 胴体ドラッグ時）場合、
+  // 現在の注視点を維持することで、カメラが土台に固定されたままになるようにする
+  if (assemblyDrag_.isDragging) {
+    return orbitTarget_;
+  }
+
   // 万が一操作点が一つも取れなかった場合の安全弁
   return {0.0f, 0.9f, 0.0f}; // 基準を少し高めに設定
 }
@@ -5066,16 +5072,17 @@ bool ModScene::IsPartInDraggingAssembly(int partId) const {
                          ModAssemblyType::Body);
 
   if (isBodyDrag) {
-    // 胴体ドラッグ時は、全胴体パーツのいずれかの下にあれば true
-    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
-    for (int id : allIds) {
-      const PartNode *node = assembly_.FindNode(id);
-      if (node != nullptr && ModAssemblyUtil::GetAssemblyType(node->part) ==
-                                 ModAssemblyType::Body) {
-        if (ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, id, partId)) {
-          return true;
-        }
+    // 胴体ドラッグ時は、対象パーツの祖先に「胴体パーツ」があればドラッグ対象とみなす。
+    int currentId = partId;
+    while (currentId >= 0) {
+      const PartNode *node = assembly_.FindNode(currentId);
+      if (node == nullptr) {
+        break;
       }
+      if (ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        return true;
+      }
+      currentId = node->parentId;
     }
     return false;
   }
@@ -8000,55 +8007,67 @@ float ModScene::ComputeIdealOrbitDistance() const {
   // 2. 未選択状態（selectedPartId_ == -1）の場合は、改造体全体のAABBを計測
   if (!hasPoints) {
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
-    bool torsoProcessed = false;
-    for (int pid : allIds) {
-      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
-        continue;
+    
+    auto calcBounds = [&](bool ignoreDragged) {
+      bool localHasPoints = false;
+      bool torsoProcessed = false;
+      for (int pid : allIds) {
+        if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+          continue;
 
-      // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
-      if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
-        continue;
+        // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
+        if (ignoreDragged && assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
+          continue;
 
-      if (IsTorsoVisiblePartId(pid)) {
-        if (!torsoProcessed) {
-          torsoProcessed = true;
-          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
-            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
-            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
-            float r = torsoControlPoints_[i].radius * 3.0f;
+        if (IsTorsoVisiblePartId(pid)) {
+          if (!torsoProcessed) {
+            torsoProcessed = true;
+            for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+              if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+              Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+              float r = torsoControlPoints_[i].radius * 3.0f;
 
-            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
-            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
-            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+              if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+              if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+              if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
 
-            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
-            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
-            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+              if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+              if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+              if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
 
-            hasPoints = true;
+              localHasPoints = true;
+            }
           }
+          continue;
         }
-        continue;
+
+        const Object *obj = modObjects_.at(pid).get();
+        const ModBody &body = modBodies_.at(pid);
+        const auto &points = body.GetControlPoints();
+
+        for (size_t i = 0; i < points.size(); ++i) {
+          Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+          float r = points[i].radius * 3.0f;
+
+          if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+          if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+          if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+          if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+          if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+          if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+          localHasPoints = true;
+        }
       }
+      return localHasPoints;
+    };
 
-      const Object *obj = modObjects_.at(pid).get();
-      const ModBody &body = modBodies_.at(pid);
-      const auto &points = body.GetControlPoints();
-
-      for (size_t i = 0; i < points.size(); ++i) {
-        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
-        float r = points[i].radius * 3.0f;
-
-        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
-        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
-        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
-
-        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
-        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
-        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
-
-        hasPoints = true;
-      }
+    hasPoints = calcBounds(true);
+    if (!hasPoints && assemblyDrag_.isDragging) {
+      // 全パーツがドラッグ中と判定された場合は、除外を無視して全身のAABBを計算する
+      // （ドラッグ中も全身のサイズは変わらないため、安定したズーム距離が得られる）
+      hasPoints = calcBounds(false);
     }
   }
 
