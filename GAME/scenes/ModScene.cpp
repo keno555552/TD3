@@ -1020,6 +1020,11 @@ ModScene::ModScene(kEngine *system) {
 
   EnsureValidSelection();
 
+  // ロード完了後の最終的な状態を初期履歴（インデックス0）として記録する
+  historyStack_.clear();
+  historyIndex_ = -1;
+  PushHistory();
+
   // 1. まず初期状態を「未選択（全体表示）」にする
   selectedPartId_ = -1;
 
@@ -1388,6 +1393,10 @@ void ModScene::CameraPart() {
 }
 
 void ModScene::ResetForRetryFromFailure() {
+  // 履歴クリア
+  historyStack_.clear();
+  historyIndex_ = -1;
+
   // 構造を初期人型へ戻す
   assembly_.InitializeDefaultHumanoid();
 
@@ -1417,6 +1426,9 @@ void ModScene::ResetForRetryFromFailure() {
     ModBody::NormalizeCustomizeData(*customizeData_);
     ModBody::SetSharedCustomizeData(*customizeData_);
   }
+
+  // 初期状態を履歴に保存
+  PushHistory();
 }
 
 Vector3 ModScene::ComputeOrbitTarget() const {
@@ -2347,6 +2359,9 @@ void ModScene::ResetToDefaultHumanoid() {
   EnsureValidSelection();
   UpdateModObjects();
   SyncCustomizeDataFromScene();
+  
+  // 履歴保存
+  PushHistory();
 }
 
 void ModScene::RestoreDefaultControlPointsFromSnapshots() {
@@ -2526,6 +2541,9 @@ void ModScene::DeleteSelectedPart() {
   SyncObjectsWithAssembly();
   EnsureValidSelection();
   ClearControlPointSelection();
+  
+  // 履歴保存
+  PushHistory();
 }
 
 void ModScene::ReattachSelectedPart() {
@@ -2718,6 +2736,9 @@ void ModScene::UpdateControlPointEditing() {
 
   // 左ボタンを離したら各種ドラッグ・待機を終了
   if (IsMouseLeftReleasedNow()) {
+    if (isDraggingControlPoint_) {
+      PushHistory();
+    }
     isDraggingControlPoint_ = false;
     isPendingAssemblyDrag_ = false;
   }
@@ -5179,6 +5200,9 @@ void ModScene::ConfirmAssemblyDragPlacement() {
 
   SelectPart(rootPartId);
   assemblyDrag_.Clear();
+
+  // 履歴保存
+  PushHistory();
 }
 
 void ModScene::ApplyAssemblyDragVisualFeedback() {
@@ -6631,8 +6655,8 @@ void ModScene::AddStartNotification(int npcIndex, bool isGoal) {
   notification.npcIndex = npcIndex;
   notification.isGoal = isGoal;
   notification.timer = 0.0f;
-  notification.duration = 1.5f;
-  notification.startY = 300.0f;
+  notification.duration = 2.5f;
+  notification.startY = 250.0f;
 
   if (npcIndex >= 0 && npcIndex < 4) {
     notification.rivalSprite = std::make_shared<SimpleSprite>();
@@ -7171,15 +7195,21 @@ void ModScene::InitializeScreenUi() {
     plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 
-  SetupUiSprite(trashButton_, {1200.0f,490.0f}, {100.0f, 100.0f},
+  SetupUiSprite(trashButton_, {890.0f, 640.0f}, {100.0f, 100.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
   resetButton_ = std::make_unique<DetailButton>(system_);
-  resetButton_->SetButton({1050.0f, 640.0f}, 100.0f, 100.0f);
+  resetButton_->SetButton({1050.0f, 640.0f}, 120.0f, 100.0f);
+
+  undoButton_ = std::make_unique<DetailButton>(system_);
+  undoButton_->SetButton({1050.0f, 520.0f}, 120.0f, 100.0f);
+
+  redoButton_ = std::make_unique<DetailButton>(system_);
+  redoButton_->SetButton({1210.0f, 520.0f}, 120.0f, 100.0f);
 
   nextSceneButton_ = std::make_unique<DetailButton>(system_);
-  nextSceneButton_->SetButton({1200.0f, 640.0f}, 100.0f, 100.0f);
+  nextSceneButton_->SetButton({1210.0f, 640.0f}, 120.0f, 100.0f);
 
   howToTextureHandle_ =
       system_->LoadTexture("GAME/resources/ModScene/howTo.png");
@@ -7324,14 +7354,14 @@ bool ModScene::TryHandleAddButtonInteraction() {
     }
   }
 
-  if (resetButton_ && resetButton_->GetIsClicked()) {
+  if ((resetButton_ && resetButton_->GetIsClicked()) || system_->GetTriggerOn(DIK_R)) {
     ResetToDefaultHumanoid();
     UpdateModObjects();
     SyncCustomizeDataFromScene();
     return true;
   }
 
-  if (nextSceneButton_ && nextSceneButton_->GetIsClicked()) {
+  if ((nextSceneButton_ && nextSceneButton_->GetIsClicked()) || system_->GetTriggerOn(DIK_SPACE)) {
     if (!fade_.IsBusy()) {
       fade_.StartFadeOut();
       isStartTransition_ = true;
@@ -7445,6 +7475,18 @@ void ModScene::UpdateScreenUi() {
   if (resetButton_) {
     resetButton_->Update();
   }
+  if (undoButton_) {
+    undoButton_->Update();
+    if (undoButton_->GetIsClicked() || system_->GetTriggerOn(DIK_Z)) {
+      Undo();
+    }
+  }
+  if (redoButton_) {
+    redoButton_->Update();
+    if (redoButton_->GetIsClicked() || system_->GetTriggerOn(DIK_C)) {
+      Redo();
+    }
+  }
   if (nextSceneButton_) {
     nextSceneButton_->Update();
   }
@@ -7511,6 +7553,40 @@ void ModScene::DrawScreenUi() {
     nextSceneButton_->Render();
   }
 
+  if (undoButton_) {
+    if (historyIndex_ > 0) {
+      const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+      const Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+      const Vector4 pressColorBtn = {0.16f, 0.20f, 0.26f, 1.0f};
+      undoButton_->SetNormalColor(normalColorBtn);
+      undoButton_->SetSelectColor(selectColorBtn);
+      undoButton_->SetPressColor(pressColorBtn);
+    } else {
+      const Vector4 disabledColorBtn = {0.15f, 0.15f, 0.15f, 1.0f};
+      undoButton_->SetNormalColor(disabledColorBtn);
+      undoButton_->SetSelectColor(disabledColorBtn);
+      undoButton_->SetPressColor(disabledColorBtn);
+    }
+    undoButton_->Render();
+  }
+
+  if (redoButton_) {
+    if (historyIndex_ < static_cast<int>(historyStack_.size()) - 1) {
+      const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+      const Vector4 selectColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+      const Vector4 pressColorBtn = {0.16f, 0.20f, 0.26f, 1.0f};
+      redoButton_->SetNormalColor(normalColorBtn);
+      redoButton_->SetSelectColor(selectColorBtn);
+      redoButton_->SetPressColor(pressColorBtn);
+    } else {
+      const Vector4 disabledColorBtn = {0.15f, 0.15f, 0.15f, 1.0f};
+      redoButton_->SetNormalColor(disabledColorBtn);
+      redoButton_->SetSelectColor(disabledColorBtn);
+      redoButton_->SetPressColor(disabledColorBtn);
+    }
+    redoButton_->Render();
+  }
+
   if (howToUi_.visible && howToUi_.sprite != nullptr) {
     howToUi_.sprite->Draw();
   }
@@ -7556,7 +7632,29 @@ void ModScene::DrawScreenUi() {
                             : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
 
     bitmapFont_.RenderText(
-        "リセット", {1050.0f, 640.0f - 10.0f},
+        "R:リセット", {1050.0f, 640.0f - 10.0f},
+        24.0f, BitmapFont::Align::Center, 5.0f, textColor);
+  }
+
+  if (undoButton_) {
+    Vector4 textColor = undoButton_->GetIsSelect(system_->GetMousePosVector2(), 1, 1)
+                            ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                            : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+    if (historyIndex_ <= 0) textColor = {0.5f, 0.5f, 0.5f, 1.0f};
+
+    bitmapFont_.RenderText(
+        "Z:もどる", {1050.0f, 520.0f - 10.0f},
+        24.0f, BitmapFont::Align::Center, 5.0f, textColor);
+  }
+
+  if (redoButton_) {
+    Vector4 textColor = redoButton_->GetIsSelect(system_->GetMousePosVector2(), 1, 1)
+                            ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                            : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+    if (historyIndex_ >= static_cast<int>(historyStack_.size()) - 1) textColor = {0.5f, 0.5f, 0.5f, 1.0f};
+
+    bitmapFont_.RenderText(
+        "C:すすむ", {1210.0f, 520.0f - 10.0f},
         24.0f, BitmapFont::Align::Center, 5.0f, textColor);
   }
 
@@ -7566,8 +7664,12 @@ void ModScene::DrawScreenUi() {
                             : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
 
     bitmapFont_.RenderText(
+        "SPACE",
+        {1210.0f, 640.0f - 24.0f}, 18.0f,
+        BitmapFont::Align::Center, 5.0f, textColor);
+    bitmapFont_.RenderText(
         "つぎへ",
-        {1200.0f, 640.0f - 12.0f}, 28.0f,
+        {1210.0f, 640.0f + 8.0f}, 24.0f,
         BitmapFont::Align::Center, 5.0f, textColor);
   }
 
@@ -7696,6 +7798,10 @@ bool ModScene::DeleteDraggingAssemblyByTrashDrop() {
   assemblyDrag_.Clear();
   selectedPartId_ = deleteTargetId;
   SyncAfterAssemblyChanged();
+
+  // 履歴保存
+  PushHistory();
+
   return true;
 }
 
@@ -7933,3 +8039,73 @@ float ModScene::ComputeIdealOrbitDistance() const {
 
   return 15.0f; // 完全なフォールバック
 }
+
+void ModScene::PushHistory() {
+  // 現在地より未来の履歴があれば削除する
+  if (historyIndex_ >= 0 && historyIndex_ < static_cast<int>(historyStack_.size()) - 1) {
+    historyStack_.erase(historyStack_.begin() + historyIndex_ + 1, historyStack_.end());
+  }
+
+  ModSceneStateSnapshot snapshot;
+  snapshot.assembly = assembly_; // コピー
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    int id = orderedPartIds_[i];
+    if (modBodies_.count(id) > 0) {
+      snapshot.partParams[id] = modBodies_[id].GetParam();
+      snapshot.controlPoints[id] = modBodies_[id].GetControlPoints();
+    }
+  }
+  snapshot.torsoControlPoints = torsoControlPoints_;
+
+  historyStack_.push_back(snapshot);
+  
+  // 最大30件
+  if (historyStack_.size() > 30) {
+    historyStack_.erase(historyStack_.begin());
+  } else {
+    historyIndex_++;
+  }
+}
+
+void ModScene::Undo() {
+  if (historyIndex_ > 0) {
+    historyIndex_--;
+    RestoreFromSnapshot(historyStack_[historyIndex_]);
+  }
+}
+
+void ModScene::Redo() {
+  if (historyIndex_ < static_cast<int>(historyStack_.size()) - 1) {
+    historyIndex_++;
+    RestoreFromSnapshot(historyStack_[historyIndex_]);
+  }
+}
+
+void ModScene::RestoreFromSnapshot(const ModSceneStateSnapshot& snapshot) {
+  assembly_ = snapshot.assembly;
+
+  // AssemblyGraphとObject一覧を同期
+  SyncObjectsWithAssembly();
+
+  // 各パーツのパラメータ（太さ・長さ等）と操作点を復元
+  for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
+    int id = orderedPartIds_[i];
+    if (snapshot.partParams.count(id) > 0) {
+      modBodies_[id].SetParam(snapshot.partParams.at(id));
+    }
+    if (snapshot.controlPoints.count(id) > 0) {
+      modBodies_[id].SetControlPoints(snapshot.controlPoints.at(id));
+    }
+  }
+  torsoControlPoints_ = snapshot.torsoControlPoints;
+
+  // 共有カスタマイズデータへの同期と選択状態のリセット
+  SyncCustomizeDataFromScene();
+  EnsureValidSelection();
+  ClearControlPointSelection();
+  reattachParentId_ = -1;
+  reattachConnectorId_ = -1;
+
+  // 全オブジェクトの更新と再構築
+  UpdateModObjects();
+}
