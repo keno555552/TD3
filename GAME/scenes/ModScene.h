@@ -230,6 +230,10 @@ private:
   // UIのリセットボタン
   std::unique_ptr<DetailButton> resetButton_;
 
+  // UIのUndo/Redoボタン
+  std::unique_ptr<DetailButton> undoButton_;
+  std::unique_ptr<DetailButton> redoButton_;
+
   // 操作方法UI
   UiIconButton howToUi_{};
   int howToTextureHandle_ = 0;
@@ -1054,4 +1058,21 @@ private:
   /// </summary>
   void SyncAfterAssemblyChanged();
   /*------------------------------------------*/
+
+private:
+  // --- 履歴管理 ---
+  struct ModSceneStateSnapshot {
+    ModAssemblyGraph assembly;
+    std::unordered_map<int, ModBodyPartParam> partParams;
+    std::unordered_map<int, std::vector<ModControlPoint>> controlPoints;
+    std::vector<TorsoControlPoint> torsoControlPoints;
+  };
+  std::vector<ModSceneStateSnapshot> historyStack_;
+  int historyIndex_ = -1;
+
+  void PushHistory();
+  void Undo();
+  void Redo();
+  void RestoreFromSnapshot(const ModSceneStateSnapshot& snapshot);
+
 };
