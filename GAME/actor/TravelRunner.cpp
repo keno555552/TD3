@@ -812,25 +812,35 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     float leftShinScaleY = 1.0f;
     float rightThighScaleY = 1.0f;
     float rightShinScaleY = 1.0f;
+    Vector3 leftThighRotate = {0.0f, 0.0f, 0.0f};
+    Vector3 leftShinRotate = {0.0f, 0.0f, 0.0f};
+    Vector3 rightThighRotate = {0.0f, 0.0f, 0.0f};
+    Vector3 rightShinRotate = {0.0f, 0.0f, 0.0f};
     if (customizeData_) {
       for (const auto &inst : customizeData_->partInstances) {
-        if (inst.partType == ModBodyPart::LeftThigh)
+        if (inst.partType == ModBodyPart::LeftThigh) {
           leftThighScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::LeftShin)
+          leftThighRotate = inst.localTransform.rotate;
+        }
+        if (inst.partType == ModBodyPart::LeftShin) {
           leftShinScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::RightThigh)
+          leftShinRotate = inst.localTransform.rotate;
+        }
+        if (inst.partType == ModBodyPart::RightThigh) {
           rightThighScaleY = inst.param.scale.y * inst.param.length;
-        if (inst.partType == ModBodyPart::RightShin)
+          rightThighRotate = inst.localTransform.rotate;
+        }
+        if (inst.partType == ModBodyPart::RightShin) {
           rightShinScaleY = inst.param.scale.y * inst.param.length;
+          rightShinRotate = inst.localTransform.rotate;
+        }
       }
     }
 
     leftThighLength *= leftThighScaleY;
 
-    Vector3 leftThighDir = NormalizeSafe(leftThighVec);
-
-    float leftThighAngleZ = std::atan2(leftThighDir.x, -leftThighDir.y);
-    float leftThighBaseX = -std::asin(std::clamp(leftThighDir.z, -1.0f, 1.0f));
+    float leftThighAngleZ = leftThighRotate.z;
+    float leftThighBaseX = leftThighRotate.x;
     float leftThighAnimX = -leftLegBend_ * thighSwingScale;
     float leftThighAngleX = leftThighBaseX + leftThighAnimX + bodyTilt_;
 
@@ -843,8 +853,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     leftShinLength *= leftShinScaleY;
     Vector3 leftShinDir = NormalizeSafe(leftShinVec);
 
-    float leftShinAngleZ = std::atan2(leftShinDir.x, -leftShinDir.y);
-    float leftShinBaseX = -std::asin(std::clamp(leftShinDir.z, -1.0f, 1.0f));
+    float leftShinAngleZ = leftThighRotate.z + leftShinRotate.z;
+    float leftShinBaseX = leftThighRotate.x + leftShinRotate.x;
 
     float leftThighSwing = -leftLegBend_ * thighSwingScale;
     float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
@@ -875,11 +885,9 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       rightThighLength = 0.0001f;
     }
     rightThighLength *= rightThighScaleY;
-    Vector3 rightThighDir = NormalizeSafe(rightThighVec);
 
-    float rightThighAngleZ = std::atan2(rightThighDir.x, -rightThighDir.y);
-    float rightThighBaseX =
-        -std::asin(std::clamp(rightThighDir.z, -1.0f, 1.0f));
+    float rightThighAngleZ = rightThighRotate.z;
+    float rightThighBaseX = rightThighRotate.x;
     float rightThighAnimX = -rightLegBend_ * thighSwingScale;
     float rightThighAngleX = rightThighBaseX + rightThighAnimX + bodyTilt_;
 
@@ -892,8 +900,8 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     rightShinLength *= rightShinScaleY;
     Vector3 rightShinDir = NormalizeSafe(rightShinVec);
 
-    float rightShinAngleZ = std::atan2(rightShinDir.x, -rightShinDir.y);
-    float rightShinBaseX = -std::asin(std::clamp(rightShinDir.z, -1.0f, 1.0f));
+    float rightShinAngleZ = rightThighRotate.z + rightShinRotate.z;
+    float rightShinBaseX = rightThighRotate.x + rightShinRotate.x;
 
     float rightThighSwing = -rightLegBend_ * thighSwingScale;
     float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
@@ -1649,6 +1657,8 @@ void TravelRunner::ApplyVisualState() {
     float baseAngleX = instance.localTransform.rotate.x;
     float baseAngleY = instance.localTransform.rotate.y;
     float baseAngleZ = instance.localTransform.rotate.z;
+    /*
+    // 改造シーンの localTransform.rotate をそのまま採用するため、再計算による上書きを無効化
     if (instance.partType != ModBodyPart::ChestBody &&
         instance.partType != ModBodyPart::StomachBody) {
 
@@ -1678,6 +1688,7 @@ void TravelRunner::ApplyVisualState() {
       baseAngleX = absBaseX - parentAbsX;
       baseAngleZ = absBaseZ - parentAbsZ;
     }
+    */
 
     // Animation Rotation
     bool isGroupA = true;
