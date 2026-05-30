@@ -140,7 +140,7 @@ private:
   float orbitRotateSpeed_ = 0.01f;
   float orbitZoomSpeed_ = 0.8f;
   float orbitMinDistance_ = 2.5f;
-  float orbitMaxDistance_ = 40.0f;
+  float orbitMaxDistance_ = 80.0f;
   float manualOrbitZoomRatio_ = 1.0f;  // B案: ユーザーの手動ズーム倍率を保持する
 
   void UpdateOrbitCamera();
@@ -201,6 +201,8 @@ private:
 
   ModAssemblyDragState assemblyDrag_; // 部位付け替えドラッグの状態管理
 
+  bool hasMovedControlPoint_ = false; // 操作点が実際に移動したか
+
   float assemblyAttachSearchRadius_ = 1.35f; // 接続有効範囲
   float assemblyAttachSnapRadius_ = 0.55f;   // 接続時スナップ距離
 
@@ -216,6 +218,7 @@ private:
 
   // UIの部位削除ボタン
   UiIconButton trashButton_{};
+  std::unique_ptr<DetailButton> trashDetailButton_;
   // マウスが削除ボタンの上にあるかどうか
   bool isHoverTrash_ = false;
 
@@ -223,6 +226,9 @@ private:
   float shakeTimer_ = 0.0f;
   float warningTimer_ = 0.0f;
   std::string warningMessage_ = "";
+
+  // ホイール拡縮の履歴保存用タイマー
+  float wheelScalingTimer_ = 0.0f;
 
   // UIの次シーンボタン
   std::unique_ptr<DetailButton> nextSceneButton_;

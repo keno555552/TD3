@@ -997,7 +997,7 @@ ModScene::ModScene(kEngine *system) {
   stageObject_->mainPosition.transform = CreateDefaultTransform();
   stageObject_->mainPosition.transform.translate = {0.0f, -2.5f, 0.0f};
 
-  int studioModelHandle = system_->SetModelObj("GAME/resources/studio/studio.obj");
+  int studioModelHandle = system_->SetModelObj("GAME/resources/ModScene/studio/studio.obj");
   studioObject_ = std::make_unique<Object>();
   studioObject_->IntObject(system_);
   studioObject_->CreateModelData(studioModelHandle);
@@ -1169,6 +1169,16 @@ void ModScene::Update() {
 
   // 画面UIの状態を更新する
   UpdateScreenUi();
+
+  // ホイール拡縮履歴保存タイマーの更新
+  if (wheelScalingTimer_ > 0.0f) {
+    const float deltaTime = static_cast<float>(system_->GetDeltaTime());
+    wheelScalingTimer_ -= deltaTime;
+    if (wheelScalingTimer_ <= 0.0f) {
+      wheelScalingTimer_ = 0.0f;
+      PushHistory();
+    }
+  }
 
   //===============================
   // チュートリアル入力待ち
@@ -1573,6 +1583,12 @@ Vector3 ModScene::ComputeOrbitTarget() const {
     // 何も選択していない（全体表示）の時は、注視点が低くなりすぎないよう
     // 計算された中心点の高さをそのまま使う（原点フォールバックをしない）
     return center;
+  }
+
+  // ドラッグ中であり、かつすべてのパーツが除外された（例: 胴体ドラッグ時）場合、
+  // 現在の注視点を維持することで、カメラが土台に固定されたままになるようにする
+  if (assemblyDrag_.isDragging) {
+    return orbitTarget_;
   }
 
   // 万が一操作点が一つも取れなかった場合の安全弁
@@ -2700,6 +2716,8 @@ void ModScene::UpdateControlPointEditing() {
     // まず操作点を優先
     if (PickControlPointFromMouseRay(mouseRay)) {
       isDraggingControlPoint_ = true;
+      hasMovedControlPoint_ = false;
+      mouseTriggerPos_ = system_->GetMousePosVector2();
       return;
     }
 
@@ -2731,15 +2749,29 @@ void ModScene::UpdateControlPointEditing() {
 
   // 操作点ドラッグ中
   if (isDraggingControlPoint_ && IsMouseLeftPressedNow()) {
-    MoveSelectedControlPointFromMouseRay(mouseRay);
+    if (!hasMovedControlPoint_) {
+      const Vector2 currentPos = system_->GetMousePosVector2();
+      const float dx = currentPos.x - mouseTriggerPos_.x;
+      const float dy = currentPos.y - mouseTriggerPos_.y;
+      if (dx * dx + dy * dy > 8.0f * 8.0f) {
+        hasMovedControlPoint_ = true;
+      }
+    }
+
+    if (hasMovedControlPoint_) {
+      MoveSelectedControlPointFromMouseRay(mouseRay);
+    }
   }
 
   // 左ボタンを離したら各種ドラッグ・待機を終了
   if (IsMouseLeftReleasedNow()) {
     if (isDraggingControlPoint_) {
-      PushHistory();
+      if (hasMovedControlPoint_) {
+        PushHistory();
+      }
     }
     isDraggingControlPoint_ = false;
+    hasMovedControlPoint_ = false;
     isPendingAssemblyDrag_ = false;
   }
 }
@@ -3702,6 +3734,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     if (selectedControlPartId_ == -2) {
       ScaleTorsoControlPoint(static_cast<size_t>(selectedControlPointIndex_),
                              scaleFactor);
+      wheelScalingTimer_ = 0.5f;
       return;
     }
 
@@ -3709,6 +3742,7 @@ void ModScene::UpdateControlPointWheelScaling() {
         modBodies_.count(selectedControlPartId_) > 0) {
       modBodies_[selectedControlPartId_].ScaleControlPoint(
           static_cast<size_t>(selectedControlPointIndex_), scaleFactor);
+      wheelScalingTimer_ = 0.5f;
       return;
     }
   }
@@ -3766,6 +3800,7 @@ void ModScene::UpdateControlPointWheelScaling() {
       selectedPartId_ = visiblePartId;
       ScaleTorsoControlPoint(static_cast<size_t>(nearestPointIndex),
                              scaleFactor);
+      wheelScalingTimer_ = 0.5f;
     }
 
     return;
@@ -3829,6 +3864,7 @@ void ModScene::UpdateControlPointWheelScaling() {
     selectedPartId_ = visiblePartId;
 
     body.ScaleControlPoint(static_cast<size_t>(nearestPointIndex), scaleFactor);
+    wheelScalingTimer_ = 0.5f;
   }
 }
 
@@ -5036,16 +5072,17 @@ bool ModScene::IsPartInDraggingAssembly(int partId) const {
                          ModAssemblyType::Body);
 
   if (isBodyDrag) {
-    // 胴体ドラッグ時は、全胴体パーツのいずれかの下にあれば true
-    std::vector<int> allIds = assembly_.GetNodeIdsSorted();
-    for (int id : allIds) {
-      const PartNode *node = assembly_.FindNode(id);
-      if (node != nullptr && ModAssemblyUtil::GetAssemblyType(node->part) ==
-                                 ModAssemblyType::Body) {
-        if (ModAssemblyResolver::BelongsToAssemblyRoot(assembly_, id, partId)) {
-          return true;
-        }
+    // 胴体ドラッグ時は、対象パーツの祖先に「胴体パーツ」があればドラッグ対象とみなす。
+    int currentId = partId;
+    while (currentId >= 0) {
+      const PartNode *node = assembly_.FindNode(currentId);
+      if (node == nullptr) {
+        break;
       }
+      if (ModAssemblyUtil::GetAssemblyType(node->part) == ModAssemblyType::Body) {
+        return true;
+      }
+      currentId = node->parentId;
     }
     return false;
   }
@@ -7195,7 +7232,10 @@ void ModScene::InitializeScreenUi() {
     plusSprite_->mainPosition.transform.scale = {1.0f, 1.0f, 1.0f};
   }
 
-  SetupUiSprite(trashButton_, {890.0f, 640.0f}, {100.0f, 100.0f},
+  trashDetailButton_ = std::make_unique<DetailButton>(system_);
+  trashDetailButton_->SetButton({890.0f, 640.0f}, 120.0f, 100.0f);
+
+  SetupUiSprite(trashButton_, {890.0f, 640.0f - 10.0f}, {50.0f, 50.0f},
                 trashTextureHandle_);
   trashButton_.label = "ごみばこ";
 
@@ -7529,6 +7569,21 @@ void ModScene::DrawScreenUi() {
     }
   }
 
+  if (trashDetailButton_) {
+    const Vector4 normalColorBtn = {0.22f, 0.28f, 0.36f, 1.0f};
+    const Vector4 hoverColorBtn = {0.30f, 0.45f, 0.85f, 1.0f};
+    if (isHoverTrash_) {
+      trashDetailButton_->SetNormalColor(hoverColorBtn);
+      trashDetailButton_->SetSelectColor(hoverColorBtn);
+      trashDetailButton_->SetPressColor(hoverColorBtn);
+    } else {
+      trashDetailButton_->SetNormalColor(normalColorBtn);
+      trashDetailButton_->SetSelectColor(normalColorBtn);
+      trashDetailButton_->SetPressColor(normalColorBtn);
+    }
+    trashDetailButton_->Render();
+  }
+
   if (trashButton_.visible && trashButton_.sprite != nullptr) {
     trashButton_.sprite->Draw();
   }
@@ -7617,13 +7672,10 @@ void ModScene::DrawScreenUi() {
   }
 
   if (trashButton_.visible) {
-    const float left = trashButton_.center.x - trashButton_.size.x * 0.5f;
-    const float top =
-        trashButton_.center.y + trashButton_.size.y * 0.5f - 10.0f;
-
-    bitmapFont_.RenderText("ごみばこ", {left - 8.0f, top}, 20.0f,
-                           BitmapFont::Align::Left, 5.0f,
-                           {1.0f, 1.0f, 1.0f, 1.0f});
+    Vector4 textColor = isHoverTrash_ ? Vector4{1.0f, 1.0f, 0.2f, 1.0f}
+                                      : Vector4{1.0f, 1.0f, 1.0f, 1.0f};
+    bitmapFont_.RenderText("ごみばこ", {890.0f, 640.0f + 25.0f}, 20.0f,
+                           BitmapFont::Align::Center, 5.0f, textColor);
   }
 
   if (resetButton_) {
@@ -7955,55 +8007,67 @@ float ModScene::ComputeIdealOrbitDistance() const {
   // 2. 未選択状態（selectedPartId_ == -1）の場合は、改造体全体のAABBを計測
   if (!hasPoints) {
     std::vector<int> allIds = assembly_.GetNodeIdsSorted();
-    bool torsoProcessed = false;
-    for (int pid : allIds) {
-      if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
-        continue;
+    
+    auto calcBounds = [&](bool ignoreDragged) {
+      bool localHasPoints = false;
+      bool torsoProcessed = false;
+      for (int pid : allIds) {
+        if (modObjects_.count(pid) == 0 || modBodies_.count(pid) == 0)
+          continue;
 
-      // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
-      if (assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
-        continue;
+        // 接続先変更のためのドラッグ中の部位はフォーカス対象から外す
+        if (ignoreDragged && assemblyDrag_.isDragging && IsPartInDraggingAssembly(pid))
+          continue;
 
-      if (IsTorsoVisiblePartId(pid)) {
-        if (!torsoProcessed) {
-          torsoProcessed = true;
-          for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
-            if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
-            Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
-            float r = torsoControlPoints_[i].radius * 3.0f;
+        if (IsTorsoVisiblePartId(pid)) {
+          if (!torsoProcessed) {
+            torsoProcessed = true;
+            for (size_t i = 0; i < torsoControlPoints_.size(); ++i) {
+              if (!(torsoControlPoints_[i].movable || torsoControlPoints_[i].isConnectionPoint)) continue;
+              Vector3 worldPos = GetTorsoControlPointWorldPosition(torsoControlPoints_[i].role);
+              float r = torsoControlPoints_[i].radius * 3.0f;
 
-            if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
-            if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
-            if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+              if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+              if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+              if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
 
-            if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
-            if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
-            if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+              if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+              if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+              if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
 
-            hasPoints = true;
+              localHasPoints = true;
+            }
           }
+          continue;
         }
-        continue;
+
+        const Object *obj = modObjects_.at(pid).get();
+        const ModBody &body = modBodies_.at(pid);
+        const auto &points = body.GetControlPoints();
+
+        for (size_t i = 0; i < points.size(); ++i) {
+          Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
+          float r = points[i].radius * 3.0f;
+
+          if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
+          if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
+          if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
+
+          if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
+          if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
+          if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
+
+          localHasPoints = true;
+        }
       }
+      return localHasPoints;
+    };
 
-      const Object *obj = modObjects_.at(pid).get();
-      const ModBody &body = modBodies_.at(pid);
-      const auto &points = body.GetControlPoints();
-
-      for (size_t i = 0; i < points.size(); ++i) {
-        Vector3 worldPos = body.GetControlPointWorldPosition(obj, i);
-        float r = points[i].radius * 3.0f;
-
-        if (worldPos.x - r < minBounds.x) minBounds.x = worldPos.x - r;
-        if (worldPos.y - r < minBounds.y) minBounds.y = worldPos.y - r;
-        if (worldPos.z - r < minBounds.z) minBounds.z = worldPos.z - r;
-
-        if (worldPos.x + r > maxBounds.x) maxBounds.x = worldPos.x + r;
-        if (worldPos.y + r > maxBounds.y) maxBounds.y = worldPos.y + r;
-        if (worldPos.z + r > maxBounds.z) maxBounds.z = worldPos.z + r;
-
-        hasPoints = true;
-      }
+    hasPoints = calcBounds(true);
+    if (!hasPoints && assemblyDrag_.isDragging) {
+      // 全パーツがドラッグ中と判定された場合は、除外を無視して全身のAABBを計算する
+      // （ドラッグ中も全身のサイズは変わらないため、安定したズーム距離が得られる）
+      hasPoints = calcBounds(false);
     }
   }
 
@@ -8108,4 +8172,4 @@ void ModScene::RestoreFromSnapshot(const ModSceneStateSnapshot& snapshot) {
 
   // 全オブジェクトの更新と再構築
   UpdateModObjects();
-}
+}
