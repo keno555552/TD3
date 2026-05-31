@@ -290,8 +290,8 @@ void SuspensePart::Update() {
 		currentTarget.y = winTarget.y + (playerTarget.y - winTarget.y) * easeT;
 		currentTarget.z = winTarget.z + (playerTarget.z - winTarget.z) * easeT;
 		
-		// 移動しながらプレイヤーの顔にしっかり寄るが、審査員（z=-2.0）よりは前に出る（-2.5f から -1.5f へ）
-		currentZOffset = -2.5f + ((-1.5f) - (-2.5f)) * easeT;
+		// 移動しながらプレイヤーの顔にしっかり寄るが、審査員（z=-2.0）よりは前に出る（-2.5f から -1.3f へ）
+		currentZOffset = -2.5f + ((-1.3f) - (-2.5f)) * easeT;
 	}
 	
 	float shakeX = 0.0f;
@@ -300,8 +300,9 @@ void SuspensePart::Update() {
 		shakeX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.15f;
 		shakeY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.15f;
 	}
-	cameraTransform_.position = { currentTarget.x + shakeX, currentTarget.y + shakeY, currentTarget.z + currentZOffset };
-	cameraTransform_.rotation = { 0.0f, 0.0f, 0.0f };
+	// 少し見下ろすハイアングルにするため、Yを少し上げ、X回転（下向き）をつける
+	cameraTransform_.position = { currentTarget.x + shakeX, currentTarget.y + 0.4f + shakeY, currentTarget.z + currentZOffset };
+	cameraTransform_.rotation = { 0.20f, 0.0f, 0.0f };
 
 	// 紙吹雪
 	if (!hasSpawnedConfetti_ && afterRevealTimer_ > 0.05f) {

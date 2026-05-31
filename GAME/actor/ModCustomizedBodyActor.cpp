@@ -1318,6 +1318,19 @@ void ModCustomizedBodyActor::ApplyJoyPose(float blendWeight) {
           }
       }
 
+      int rootIdx = body.FindControlPointIndex(ModControlPointRole::Root);
+      float scaleFactor = 1.0f;
+      if (rootIdx >= 0 && endIdx >= 0) {
+          Vector3 rPos = baseControlPointsCache_[partId][rootIdx].localPosition;
+          Vector3 ePos = baseControlPointsCache_[partId][endIdx].localPosition;
+          float dist = std::sqrt((ePos.x - rPos.x)*(ePos.x - rPos.x) + (ePos.y - rPos.y)*(ePos.y - rPos.y) + (ePos.z - rPos.z)*(ePos.z - rPos.z));
+          // 標準の腕の長さを1.5と仮定し、長さに応じて移動幅をスケール
+          scaleFactor = std::clamp(dist / 1.5f, 0.2f, 5.0f);
+      }
+      localOffset.x *= scaleFactor;
+      localOffset.y *= scaleFactor;
+      localOffset.z *= scaleFactor;
+
       if (endIdx >= 0) {
         Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
         Vector3 newPos = {basePos.x + localOffset.x * blendWeight, basePos.y + localOffset.y * blendWeight, basePos.z + localOffset.z * blendWeight};
@@ -1371,6 +1384,19 @@ void ModCustomizedBodyActor::ApplyJoyPose(float blendWeight) {
               localOffset = {localDir.x * originalLen, localDir.y * originalLen, localDir.z * originalLen};
           }
       }
+
+      int rootIdx = body.FindControlPointIndex(ModControlPointRole::Root);
+      float scaleFactor = 1.0f;
+      if (rootIdx >= 0 && endIdx >= 0) {
+          Vector3 rPos = baseControlPointsCache_[partId][rootIdx].localPosition;
+          Vector3 ePos = baseControlPointsCache_[partId][endIdx].localPosition;
+          float dist = std::sqrt((ePos.x - rPos.x)*(ePos.x - rPos.x) + (ePos.y - rPos.y)*(ePos.y - rPos.y) + (ePos.z - rPos.z)*(ePos.z - rPos.z));
+          // 標準の足の長さを1.0と仮定し、長さに応じて移動幅をスケール
+          scaleFactor = std::clamp(dist / 1.0f, 0.2f, 5.0f);
+      }
+      localOffset.x *= scaleFactor;
+      localOffset.y *= scaleFactor;
+      localOffset.z *= scaleFactor;
 
       if (endIdx >= 0) {
         Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
