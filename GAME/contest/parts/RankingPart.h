@@ -15,7 +15,8 @@ struct ContestRankEntry {
 class RankingPart : public IContestPart {
 public:
     RankingPart(kEngine* system, BitmapFont* font,
-        const std::vector<ContestRankEntry>& entries);
+        const std::vector<ContestRankEntry>& entries,
+        Vector3 playerTarget);
     ~RankingPart() override = default;
 
     void Update() override;

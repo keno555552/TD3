@@ -243,4 +243,6 @@ private:
   void UpdateFailureMenuInputTravel();
   void DrawFailureMenuTravel();
   void DecideFailureMenuTravel();
+
+  Vector2 prevMousePos_ = {0.0f, 0.0f};
 };

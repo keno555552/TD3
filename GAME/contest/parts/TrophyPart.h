@@ -1,15 +1,15 @@
 #pragma once
+#include "GAME/Object/DetailButton/DetailButton.h"
 #include "IContestPart.h"
-#include"GAME/Object/DetailButton/DetailButton.h"
 
 /// <summary>
 /// トロフィーパートでの選択結果
 /// </summary>
 enum class TrophyChoice {
-	None,       /// まだ選択していない
-	NextTheme,  /// 次のお題へ（SPACE）
-	Retry,      /// 同じお題でリトライ（R）
-	Title,      /// タイトルへ戻る（1）
+  None,      /// まだ選択していない
+  NextTheme, /// 次のお題へ（SPACE）
+  Retry,     /// 同じお題でリトライ（R）
+  Title,     /// タイトルへ戻る（1）
 };
 
 /// <summary>
@@ -18,27 +18,30 @@ enum class TrophyChoice {
 /// </summary>
 class TrophyPart : public IContestPart {
 public:
-	TrophyPart(kEngine* system, BitmapFont* font);
-	~TrophyPart() override = default;
+  TrophyPart(kEngine *system, BitmapFont *font, Vector3 playerTarget);
+  ~TrophyPart() override = default;
 
-	void Update() override;
-	void Draw() override;
-	bool IsFinished() const override;
+  void Update() override;
+  void Draw() override;
+  bool IsFinished() const override;
 
-	/// <summary>
-	/// プレイヤーの選択結果を取得
-	/// </summary>
-	TrophyChoice GetChoice() const;
+  /// <summary>
+  /// プレイヤーの選択結果を取得
+  /// </summary>
+  TrophyChoice GetChoice() const;
 
 private:
+  std::unique_ptr<DetailButton> titleButton_;
+  std::unique_ptr<DetailButton> sameThemeButton_;
+  std::unique_ptr<DetailButton> nextThemeButton_;
+  std::unique_ptr<bool> isGoTitle_;
+  PartCameraTransform GetCameraTransform() const override;
 
-	std::unique_ptr<DetailButton>titleButton_;
-	std::unique_ptr<DetailButton>sameThemeButton_;
-	std::unique_ptr<DetailButton>nextThemeButton_;
-	std::unique_ptr<bool>isGoTitle_;
-	PartCameraTransform GetCameraTransform() const override;
+  PartCameraTransform cameraTransform_;
 
-	PartCameraTransform cameraTransform_;
+  TrophyChoice choice_ = TrophyChoice::None;
 
-	TrophyChoice choice_ = TrophyChoice::None;
+  TrophyChoice menuSelection_ = TrophyChoice::NextTheme;
+  float menuInputCooldown_ = 0.0f;
+  Vector2 prevMousePos_ = {0.0f, 0.0f};
 };

@@ -8,7 +8,7 @@
 
 class AdvicePart : public IContestPart {
 public:
-    AdvicePart(kEngine* system, BitmapFont* font);
+    AdvicePart(kEngine* system, BitmapFont* font, Vector3 playerTarget);
     ~AdvicePart() override = default;
 
     void Update() override;

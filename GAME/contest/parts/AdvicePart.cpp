@@ -7,9 +7,9 @@
 #include <cmath>
 #include <map>
 
-AdvicePart::AdvicePart(kEngine* system, BitmapFont* font)
+AdvicePart::AdvicePart(kEngine* system, BitmapFont* font, Vector3 playerTarget)
     : IContestPart(system, font) {
-    cameraTransform_ = { { 0.0f, 0.9f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
+    cameraTransform_ = { { playerTarget.x, playerTarget.y, playerTarget.z - 1.5f }, { 0.0f, 0.0f, 0.0f } };
 
     nextButton_ = std::make_unique<DetailButton>(system);
     nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);

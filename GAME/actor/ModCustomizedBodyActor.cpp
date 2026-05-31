@@ -114,6 +114,8 @@ void ModCustomizedBodyActor::BuildFromCustomizeData(
   if (autoGroundEnabled_) {
     SnapToGround();
   }
+  
+  SaveBasePose();
 }
 
 void ModCustomizedBodyActor::UpdateAndDraw(Camera *camera) {
@@ -126,6 +128,22 @@ void ModCustomizedBodyActor::UpdateAndDraw(Camera *camera) {
   } else {
     ApplyAssemblyToSceneHierarchy();
     ApplyModBodies();
+  }
+
+  // 自動アニメーションの更新
+  if (isJoyAnimating_ || isFrustrationAnimating_) {
+    animTimer_ += 1.0f / 60.0f; // 約60FPSを想定したタイマー加算
+    
+    if (isJoyAnimating_) {
+      float jumpY = std::sin(animTimer_ * 6.0f) * 0.2f;
+      if (jumpY < 0.0f) jumpY = 0.0f;
+      float joyWeight = jumpY / 0.2f;
+      ApplyJoyPose(joyWeight);
+      if (autoGroundEnabled_) SetGroundOffsetY(jumpY);
+    } else if (isFrustrationAnimating_) {
+      float sway = (std::sin(animTimer_ * 3.0f) + 1.0f) * 0.5f; // 0.0 ~ 1.0
+      ApplyFrustrationPose(sway);
+    }
   }
 
   for (size_t i = 0; i < orderedPartIds_.size(); ++i) {
@@ -146,6 +164,27 @@ void ModCustomizedBodyActor::UpdateAndDraw(Camera *camera) {
 
 bool ModCustomizedBodyActor::IsRootPartNode(const PartNode &node) const {
   return node.parentId < 0;
+}
+
+Vector3 ModCustomizedBodyActor::GetHeadWorldPosition() const {
+  Vector3 world = actorTransform_.translate;
+  world.y += 0.6f; // fallback
+  TryGetPartWorldPosition(ModBodyPart::Head, world);
+  return world;
+}
+
+bool ModCustomizedBodyActor::TryGetPartWorldPosition(ModBodyPart part, Vector3 &outWorld) const {
+  for (int partId : orderedPartIds_) {
+    auto bodyIt = modBodies_.find(partId);
+    if (bodyIt != modBodies_.end() && bodyIt->second.GetPart() == part) {
+      auto objIt = modObjects_.find(partId);
+      if (objIt != modObjects_.end() && objIt->second) {
+        outWorld = ModObjectUtil::TransformLocalPointToWorld(objIt->second.get(), {0.0f, 0.0f, 0.0f});
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 bool ModCustomizedBodyActor::TryGetFootEndWorldPosition(
@@ -1208,4 +1247,342 @@ Vector3 ModCustomizedBodyActor::ResolveChildSelfAttachOffset(
   const float extraLength = (std::max)(0.0f, currentLength - defaultLength);
 
   return Multiply(extraRadius + extraLength, outward);
+}
+
+void ModCustomizedBodyActor::SaveBasePose() {
+  baseControlPointsCache_.clear();
+  baseObjectRotateCache_.clear();
+  for (auto& pair : modBodies_) {
+    baseControlPointsCache_[pair.first] = pair.second.GetControlPoints();
+  }
+  for (auto& pair : modObjects_) {
+    baseObjectRotateCache_[pair.first] = pair.second->mainPosition.transform.rotate;
+  }
+}
+
+void ModCustomizedBodyActor::RestoreBasePose() {
+  for (auto& pair : modBodies_) {
+    auto it = baseControlPointsCache_.find(pair.first);
+    if (it != baseControlPointsCache_.end()) {
+      pair.second.SetControlPoints(it->second);
+    }
+  }
+  for (auto& pair : modObjects_) {
+    auto it = baseObjectRotateCache_.find(pair.first);
+    if (it != baseObjectRotateCache_.end()) {
+      pair.second->mainPosition.transform.rotate = it->second;
+    }
+  }
+}
+
+void ModCustomizedBodyActor::ApplyJoyPose(float blendWeight) {
+  RestoreBasePose();
+  if (blendWeight <= 0.0f) return;
+  
+  for (auto& pair : modBodies_) {
+    int partId = pair.first;
+    ModBody& body = pair.second;
+    ModBodyPart part = body.GetPart();
+    
+    // バンザイ（大の字の手）
+    if (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm || 
+        part == ModBodyPart::RightUpperArm || part == ModBodyPart::RightForeArm) {
+      int endIdx = body.FindControlPointIndex(ModControlPointRole::End);
+      int bendIdx = body.FindControlPointIndex(ModControlPointRole::Bend);
+      
+      Object* armObj = modObjects_.count(partId) ? modObjects_.at(partId).get() : nullptr;
+      
+      bool hasForeArm = false;
+      for (const auto& childPair : modObjects_) {
+        const PartNode* childNode = assembly_.FindNode(childPair.first);
+        if (childNode && childNode->parentId == partId && 
+            (childNode->part == ModBodyPart::LeftForeArm || childNode->part == ModBodyPart::RightForeArm)) {
+          hasForeArm = true;
+          break;
+        }
+      }
+
+      Vector3 actorDir = (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm) 
+                       ? Vector3{-1.5f, 1.5f, 0.0f} : Vector3{1.5f, 1.5f, 0.0f};
+      Matrix4x4 actorRotMatrix = MakeAffineMatrix({1.0f, 1.0f, 1.0f}, actorTransform_.rotate, {0.0f, 0.0f, 0.0f});
+      Vector3 worldDir = ModObjectUtil::TransformVector(actorRotMatrix, actorDir);
+      
+      Vector3 localOffset = worldDir;
+      if (armObj) {
+          Vector3 localDir = ModObjectUtil::TransformWorldVectorToLocal(armObj, worldDir);
+          float len = Length(localDir);
+          if (len > 0.0001f) {
+              localDir = {localDir.x / len, localDir.y / len, localDir.z / len};
+              float originalLen = Length(worldDir);
+              localOffset = {localDir.x * originalLen, localDir.y * originalLen, localDir.z * originalLen};
+          }
+      }
+
+      if (endIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
+        Vector3 newPos = {basePos.x + localOffset.x * blendWeight, basePos.y + localOffset.y * blendWeight, basePos.z + localOffset.z * blendWeight};
+        body.MoveControlPoint(endIdx, newPos);
+      }
+      
+      if (bendIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][bendIdx].localPosition;
+        if (!hasForeArm) {
+            // 前腕がない場合は肘を末端として大きく動かす
+            Vector3 newPos = {basePos.x + localOffset.x * blendWeight, basePos.y + localOffset.y * blendWeight, basePos.z + localOffset.z * blendWeight};
+            body.MoveControlPoint(bendIdx, newPos);
+        } else {
+            // 通常の肘は半分だけ動かす
+            Vector3 newPos = {basePos.x + localOffset.x * blendWeight * 0.5f, basePos.y + localOffset.y * blendWeight * 0.5f, basePos.z + localOffset.z * blendWeight * 0.5f};
+            body.MoveControlPoint(bendIdx, newPos);
+        }
+      }
+    }
+    
+    // 足を開く（大の字の足）
+    if (part == ModBodyPart::LeftThigh || part == ModBodyPart::LeftShin || 
+        part == ModBodyPart::RightThigh || part == ModBodyPart::RightShin) {
+      int endIdx = body.FindControlPointIndex(ModControlPointRole::End);
+      int bendIdx = body.FindControlPointIndex(ModControlPointRole::Bend);
+      
+      Object* legObj = modObjects_.count(partId) ? modObjects_.at(partId).get() : nullptr;
+      
+      bool hasShin = false;
+      for (const auto& childPair : modObjects_) {
+        const PartNode* childNode = assembly_.FindNode(childPair.first);
+        if (childNode && childNode->parentId == partId && 
+            (childNode->part == ModBodyPart::LeftShin || childNode->part == ModBodyPart::RightShin)) {
+          hasShin = true;
+          break;
+        }
+      }
+
+      Vector3 actorDir = (part == ModBodyPart::LeftThigh || part == ModBodyPart::LeftShin) 
+                       ? Vector3{-0.8f, 0.0f, 0.0f} : Vector3{0.8f, 0.0f, 0.0f};
+      Matrix4x4 actorRotMatrix = MakeAffineMatrix({1.0f, 1.0f, 1.0f}, actorTransform_.rotate, {0.0f, 0.0f, 0.0f});
+      Vector3 worldDir = ModObjectUtil::TransformVector(actorRotMatrix, actorDir);
+      
+      Vector3 localOffset = worldDir;
+      if (legObj) {
+          Vector3 localDir = ModObjectUtil::TransformWorldVectorToLocal(legObj, worldDir);
+          float len = Length(localDir);
+          if (len > 0.0001f) {
+              localDir = {localDir.x / len, localDir.y / len, localDir.z / len};
+              float originalLen = Length(worldDir);
+              localOffset = {localDir.x * originalLen, localDir.y * originalLen, localDir.z * originalLen};
+          }
+      }
+
+      if (endIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
+        Vector3 newPos = {basePos.x + localOffset.x * blendWeight, basePos.y + localOffset.y * blendWeight, basePos.z + localOffset.z * blendWeight};
+        body.MoveControlPoint(endIdx, newPos);
+      }
+      
+      if (bendIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][bendIdx].localPosition;
+        if (!hasShin) {
+            Vector3 newPos = {basePos.x + localOffset.x * blendWeight, basePos.y + localOffset.y * blendWeight, basePos.z + localOffset.z * blendWeight};
+            body.MoveControlPoint(bendIdx, newPos);
+        } else {
+            Vector3 newPos = {basePos.x + localOffset.x * blendWeight * 0.5f, basePos.y + localOffset.y * blendWeight * 0.5f, basePos.z + localOffset.z * blendWeight * 0.5f};
+            body.MoveControlPoint(bendIdx, newPos);
+        }
+      }
+    }
+  }
+}
+
+void ModCustomizedBodyActor::ApplyFrustrationPose(float blendWeight) {
+  RestoreBasePose();
+  if (blendWeight <= 0.0f) return;
+  
+  Object* headObj = nullptr;
+  for (auto& pair : modObjects_) {
+    if (modBodies_.count(pair.first) && modBodies_[pair.first].GetPart() == ModBodyPart::Head) {
+      headObj = pair.second.get();
+      break;
+    }
+  }
+
+  Vector3 leftHandTargetWorld = GetHeadWorldPosition();
+  Vector3 rightHandTargetWorld = GetHeadWorldPosition();
+  if (headObj) {
+    // 物理的な頭のメッシュは、この後「首を前に倒す処理」によってローカル空間で {0.0, -0.5, 0.6} 移動する。
+    Vector3 deformOffset = { 0.0f, -0.5f * blendWeight, 0.6f * blendWeight };
+
+    // 手の基本位置に変形量を足す
+    Vector3 leftTargetLocal = { 0.35f + deformOffset.x, 0.15f + deformOffset.y, 0.35f + deformOffset.z };
+    Vector3 rightTargetLocal = { -0.35f + deformOffset.x, 0.15f + deformOffset.y, 0.35f + deformOffset.z };
+
+    leftHandTargetWorld = ModObjectUtil::TransformLocalPointToWorld(headObj, leftTargetLocal);
+    rightHandTargetWorld = ModObjectUtil::TransformLocalPointToWorld(headObj, rightTargetLocal);
+  }
+
+  // すべての頭を、自身の首の向き（Bend -> End）を軸にして振る
+  float shakeAngle = std::sin(animTimer_ * 20.0f) * 0.5f * blendWeight;
+
+  for (auto& pair : modObjects_) {
+    int partId = pair.first;
+    if (modBodies_.count(partId) && modBodies_[partId].GetPart() == ModBodyPart::Head) {
+      Object* currentHeadObj = pair.second.get();
+      if (currentHeadObj) {
+        
+        // 頭の回転軸となる「実際の首の向き」を計算
+        Vector3 neckDir = {0.0f, 1.0f, 0.0f}; // デフォルトは上
+        const int ownerId = ResolveControlOwnerPartId(assembly_, partId);
+        if (ownerId >= 0 && modBodies_.count(ownerId)) {
+          const ModBody& ownerBody = modBodies_[ownerId];
+          int bendIdx = ownerBody.FindControlPointIndex(ModControlPointRole::Bend);
+          int endIdx = ownerBody.FindControlPointIndex(ModControlPointRole::End);
+          if (bendIdx >= 0 && endIdx >= 0) {
+            Vector3 bendPos = ownerBody.GetControlPoints()[bendIdx].localPosition;
+            Vector3 endPos = ownerBody.GetControlPoints()[endIdx].localPosition;
+            Vector3 dir = Subtract(endPos, bendPos);
+            if (Length(dir) > 0.0001f) {
+              neckDir = NormalizeSafeLocal(dir, {0.0f, 1.0f, 0.0f});
+            }
+          }
+        }
+        
+        // 実際の首の向きを軸とした回転行列を生成
+        float c = std::cos(shakeAngle);
+        float s = std::sin(shakeAngle);
+        float t = 1.0f - c;
+        Matrix4x4 shakeRot = Identity();
+        shakeRot.m[0][0] = t * neckDir.x * neckDir.x + c;
+        shakeRot.m[0][1] = t * neckDir.x * neckDir.y + s * neckDir.z;
+        shakeRot.m[0][2] = t * neckDir.x * neckDir.z - s * neckDir.y;
+        shakeRot.m[1][0] = t * neckDir.x * neckDir.y - s * neckDir.z;
+        shakeRot.m[1][1] = t * neckDir.y * neckDir.y + c;
+        shakeRot.m[1][2] = t * neckDir.y * neckDir.z + s * neckDir.x;
+        shakeRot.m[2][0] = t * neckDir.x * neckDir.z + s * neckDir.y;
+        shakeRot.m[2][1] = t * neckDir.y * neckDir.z - s * neckDir.x;
+        shakeRot.m[2][2] = t * neckDir.z * neckDir.z + c;
+
+        // 現在のローカル回転行列と合成し、新しいオイラー角を抽出する
+        Matrix4x4 origRot = MakeRotateMatrix4x4(currentHeadObj->mainPosition.transform.rotate);
+        Matrix4x4 finalRot = shakeRot * origRot;
+        currentHeadObj->mainPosition.transform.rotate = ExtractRotate(finalRot);
+      }
+    }
+  }
+  
+  for (auto& pair : modBodies_) {
+    int partId = pair.first;
+    ModBody& body = pair.second;
+    ModBodyPart part = body.GetPart();
+    
+    // 頭を抱える（手は頭へ、肘は外側へ張り出す）
+    if (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm || 
+        part == ModBodyPart::RightUpperArm || part == ModBodyPart::RightForeArm) {
+      int endIdx = body.FindControlPointIndex(ModControlPointRole::End);
+      int bendIdx = body.FindControlPointIndex(ModControlPointRole::Bend);
+      
+      Object* armObj = modObjects_.count(partId) ? modObjects_.at(partId).get() : nullptr;
+      
+      bool hasForeArm = false;
+      for (const auto& childPair : modObjects_) {
+        const PartNode* childNode = assembly_.FindNode(childPair.first);
+        if (childNode && childNode->parentId == partId && 
+            (childNode->part == ModBodyPart::LeftForeArm || childNode->part == ModBodyPart::RightForeArm)) {
+          hasForeArm = true;
+          break;
+        }
+      }
+
+      // ワールド空間での肘の張り出し方向（キャラクターの向きを考慮）
+      Vector3 actorBendDir = (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm) 
+                       ? Vector3{-0.8f, 0.7f, 0.4f} : Vector3{0.8f, 0.7f, 0.4f};
+      Matrix4x4 actorRotMatrix = MakeAffineMatrix({1.0f, 1.0f, 1.0f}, actorTransform_.rotate, {0.0f, 0.0f, 0.0f});
+      Vector3 worldBendDir = ModObjectUtil::TransformVector(actorRotMatrix, actorBendDir);
+      
+      Vector3 localBendOffset = worldBendDir;
+      if (armObj) {
+          Vector3 localDir = ModObjectUtil::TransformWorldVectorToLocal(armObj, worldBendDir);
+          float len = Length(localDir);
+          if (len > 0.0001f) {
+              localDir = {localDir.x / len, localDir.y / len, localDir.z / len};
+              float originalLen = Length(worldBendDir);
+              localBendOffset = {localDir.x * originalLen, localDir.y * originalLen, localDir.z * originalLen};
+          }
+      }
+
+      if (endIdx >= 0 && armObj && headObj) {
+        Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
+        float armLength = Length(basePos);
+        
+        Vector3 targetWorld = (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm) ? leftHandTargetWorld : rightHandTargetWorld;
+        Vector3 targetLocal = ModObjectUtil::TransformWorldPointToLocal(armObj, targetWorld);
+        
+        // Tレックス対応：腕が元の長さより伸びないように制限する
+        float targetLength = Length(targetLocal);
+        if (targetLength > armLength && targetLength > 0.0001f) {
+            targetLocal.x = targetLocal.x * (armLength / targetLength);
+            targetLocal.y = targetLocal.y * (armLength / targetLength);
+            targetLocal.z = targetLocal.z * (armLength / targetLength);
+        }
+        
+        Vector3 newPos = {
+            basePos.x + (targetLocal.x - basePos.x) * blendWeight,
+            basePos.y + (targetLocal.y - basePos.y) * blendWeight,
+            basePos.z + (targetLocal.z - basePos.z) * blendWeight
+        };
+        body.MoveControlPoint(endIdx, newPos);
+      }
+      
+      if (bendIdx >= 0 && armObj) {
+        Vector3 basePos = baseControlPointsCache_[partId][bendIdx].localPosition;
+        float bendLength = Length(basePos);
+        
+        if (!hasForeArm && headObj) {
+            // 前腕がない場合、肘（Bend）が手の役割を果たすので、頭へ向かわせる
+            Vector3 targetWorld = (part == ModBodyPart::LeftUpperArm || part == ModBodyPart::LeftForeArm) ? leftHandTargetWorld : rightHandTargetWorld;
+            Vector3 targetLocal = ModObjectUtil::TransformWorldPointToLocal(armObj, targetWorld);
+            float targetLength = Length(targetLocal);
+            if (targetLength > bendLength && targetLength > 0.0001f) {
+                targetLocal.x = targetLocal.x * (bendLength / targetLength);
+                targetLocal.y = targetLocal.y * (bendLength / targetLength);
+                targetLocal.z = targetLocal.z * (bendLength / targetLength);
+            }
+            Vector3 newPos = {
+                basePos.x + (targetLocal.x - basePos.x) * blendWeight,
+                basePos.y + (targetLocal.y - basePos.y) * blendWeight,
+                basePos.z + (targetLocal.z - basePos.z) * blendWeight
+            };
+            body.MoveControlPoint(bendIdx, newPos);
+        } else {
+            // 通常の肘の曲げ
+            float scale = bendLength / 1.2f; // 通常の腕の長さに合わせたスケール
+            Vector3 newPos = {
+                basePos.x + localBendOffset.x * scale * blendWeight,
+                basePos.y + localBendOffset.y * scale * blendWeight,
+                basePos.z + localBendOffset.z * scale * blendWeight
+            };
+            body.MoveControlPoint(bendIdx, newPos);
+        }
+      }
+    }
+    
+    // 首を前に倒す（横移動は削除し、回転のみに任せる）
+    if (part == ModBodyPart::Neck || part == ModBodyPart::Head) {
+      int endIdx = body.FindControlPointIndex(ModControlPointRole::End);
+      int bendIdx = body.FindControlPointIndex(ModControlPointRole::Bend);
+      Vector3 offset = {0.0f, -0.5f, 0.6f};
+
+      if (endIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][endIdx].localPosition;
+        Vector3 newPos = {basePos.x + offset.x * blendWeight, 
+                          basePos.y + offset.y * blendWeight, 
+                          basePos.z + offset.z * blendWeight};
+        body.MoveControlPoint(endIdx, newPos);
+      }
+      if (bendIdx >= 0) {
+        Vector3 basePos = baseControlPointsCache_[partId][bendIdx].localPosition;
+        Vector3 newPos = {basePos.x + offset.x * blendWeight * 0.5f, 
+                          basePos.y + offset.y * blendWeight * 0.5f, 
+                          basePos.z + offset.z * blendWeight * 0.5f};
+        body.MoveControlPoint(bendIdx, newPos);
+      }
+    }
+  }
 }
