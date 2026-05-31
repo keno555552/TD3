@@ -26,6 +26,22 @@ private:
   std::unique_ptr<DetailButton> tutorialPrevButton_;
   std::unique_ptr<DetailButton> tutorialCloseButton_;
 
+  enum class TitleChoice {
+    Start,
+    Tutorial
+  };
+  TitleChoice titleChoice_ = TitleChoice::Start;
+
+  enum class TutorialChoice {
+    Next,
+    Prev,
+    Close
+  };
+  TutorialChoice tutorialChoice_ = TutorialChoice::Next;
+  float menuInputCooldown_ = 0.0f;
+  Vector2 prevMousePos_ = {0.0f, 0.0f};
+
+
   bool isTutorialMode_ = false;
   int tutorialPage_ = 0;
   int nextTutorialPage_ = 0;
