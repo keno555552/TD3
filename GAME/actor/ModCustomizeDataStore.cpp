@@ -359,39 +359,6 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
   }
 
   case NpcPresetType::BigTorso:
-   // scalePart(ModBodyPart::ChestBody, 2.0f, 2.0f, 2.0f);
-   // scalePart(ModBodyPart::StomachBody, 2.0f, 2.0f, 2.0f);
-    //for (auto& inst : data->partInstances) {
-    // if (inst.partType == ModBodyPart::ChestBody ||
-    //     inst.partType == ModBodyPart::StomachBody) {
-    //   inst.param.scale.x *= 2.0f;
-    //   inst.param.scale.y *= 2.0f;
-    //   inst.param.scale.z *= 2.0f;
-    // }
-    //  if (inst.partType == ModBodyPart::LeftUpperArm) {
-    //    inst.localTransform.translate.x -= 0.8f;
-    //    inst.resolvedLocalTranslate.x -= 0.8f;
-    //  } else if (inst.partType == ModBodyPart::RightUpperArm) {
-    //    inst.localTransform.translate.x += 0.8f;
-    //    inst.resolvedLocalTranslate.x += 0.8f;
-    //  }
-    //}
-    //for (auto& snap : data->controlPointSnapshots) {
-    //  ModBodyPart partType = ModBodyPart::Count;
-    //  for (const auto& inst : data->partInstances) {
-    //    if (inst.partId == snap.ownerPartId) {
-    //      partType = inst.partType;
-    //      break;
-    //    }
-    //  }
-    //  if (partType == ModBodyPart::LeftUpperArm) {
-    //    snap.localPosition.x -= 0.8f;
-    //  } else if (partType == ModBodyPart::RightUpperArm) {
-    //    snap.localPosition.x += 0.8f;
-    //  }
-    //}
-    //break;
-
     for (auto &inst : data->partInstances) {
       if (inst.partType == ModBodyPart::ChestBody ||
           inst.partType == ModBodyPart::StomachBody) {
@@ -409,34 +376,18 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
         }
       }
 
-      // 腕の配置位置（元の最終座標 x = ±4.10, y = 2.30）
-      if (inst.partType == ModBodyPart::LeftUpperArm) {
-        inst.localTransform.translate.x = -4.10f;
-        inst.localTransform.translate.y = 2.30f;
-        inst.resolvedLocalTranslate.x = -4.10f;
-        inst.resolvedLocalTranslate.y = 2.30f;
-      } else if (inst.partType == ModBodyPart::RightUpperArm) {
-        inst.localTransform.translate.x = 4.10f;
-        inst.localTransform.translate.y = 2.30f;
-        inst.resolvedLocalTranslate.x = 4.10f;
-        inst.resolvedLocalTranslate.y = 2.30f;
-      }
-      // 首の配置位置（元の最終座標 y = 2.5592）
-      else if (inst.partType == ModBodyPart::Neck) {
-        inst.localTransform.translate.y = 2.5592f;
-        inst.resolvedLocalTranslate.y = 2.5592f;
-      }
-      // 両脚の配置位置（元の最終座標 x = ±1.00, y = -3.36）
-      else if (inst.partType == ModBodyPart::LeftThigh) {
-        inst.localTransform.translate.x = -1.00f;
-        inst.localTransform.translate.y = -3.36f;
-        inst.resolvedLocalTranslate.x = -1.00f;
-        inst.resolvedLocalTranslate.y = -3.36f;
-      } else if (inst.partType == ModBodyPart::RightThigh) {
-        inst.localTransform.translate.x = 1.00f;
-        inst.localTransform.translate.y = -3.36f;
-        inst.resolvedLocalTranslate.x = 1.00f;
-        inst.resolvedLocalTranslate.y = -3.36f;
+      // 腕や脚の配置位置を胴体(2倍)に合わせて2倍にする
+      if (inst.partType == ModBodyPart::LeftUpperArm ||
+          inst.partType == ModBodyPart::RightUpperArm ||
+          inst.partType == ModBodyPart::LeftThigh ||
+          inst.partType == ModBodyPart::RightThigh ||
+          inst.partType == ModBodyPart::Neck) {
+        inst.localTransform.translate.x *= 2.0f;
+        inst.localTransform.translate.y *= 2.0f;
+        inst.localTransform.translate.z *= 2.0f;
+        inst.resolvedLocalTranslate.x *= 2.0f;
+        inst.resolvedLocalTranslate.y *= 2.0f;
+        inst.resolvedLocalTranslate.z *= 2.0f;
       }
     }
 
@@ -752,19 +703,15 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
   case NpcPresetType::WideShoulder:
     // 肩幅をさらに広げ、腕の太さも追加して「肩幅おばけ」にする
     for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::ChestBody) {
+        inst.param.scale.x *= 1.6f;
+      }
       if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
         inst.param.scale.x *= 1.8f;
         inst.param.scale.z *= 1.8f;
-      }
-      if (inst.partType == ModBodyPart::LeftUpperArm) {
-        inst.localTransform.translate.x -= 1.2f;
+        inst.localTransform.translate.x *= 1.6f;
         inst.localTransform.translate.y += 0.1f;
-        inst.resolvedLocalTranslate.x -= 1.2f;
-        inst.resolvedLocalTranslate.y += 0.1f;
-      } else if (inst.partType == ModBodyPart::RightUpperArm) {
-        inst.localTransform.translate.x += 1.2f;
-        inst.localTransform.translate.y += 0.1f;
-        inst.resolvedLocalTranslate.x += 1.2f;
+        inst.resolvedLocalTranslate.x *= 1.6f;
         inst.resolvedLocalTranslate.y += 0.1f;
       }
     }
@@ -776,13 +723,12 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
           break;
         }
       }
-      if (partType == ModBodyPart::LeftUpperArm) {
-        snap.localPosition.x -= 1.2f; // さらに外へ
+      if (partType == ModBodyPart::ChestBody) {
+        snap.radius *= 1.6f;
+        snap.localPosition.x *= 1.6f;
+      } else if (partType == ModBodyPart::LeftUpperArm || partType == ModBodyPart::RightUpperArm) {
+        snap.localPosition.x *= 1.6f;
         snap.localPosition.y += 0.1f; // 少し上へ
-        snap.radius *= 1.8f;
-      } else if (partType == ModBodyPart::RightUpperArm) {
-        snap.localPosition.x += 1.2f;
-        snap.localPosition.y += 0.1f;
         snap.radius *= 1.8f;
       } else if (partType == ModBodyPart::LeftForeArm || partType == ModBodyPart::RightForeArm) {
         // 前腕（ForeArm）のCPのradiusも1.8倍にスケーリングし、評価に腕全体の太さ変化を100%同期させる（描画の太さは現状維持）
@@ -794,16 +740,14 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
   case NpcPresetType::WideHip:
     // 腰をさらに広くし、太ももを太くして「下半身どっしり型」にする
     for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::StomachBody) {
+        inst.param.scale.x *= 1.6f;
+      }
       if (inst.partType == ModBodyPart::LeftThigh || inst.partType == ModBodyPart::RightThigh) {
         inst.param.scale.x *= 1.8f;
         inst.param.scale.z *= 1.8f;
-      }
-      if (inst.partType == ModBodyPart::LeftThigh) {
-        inst.localTransform.translate.x -= 2.2f;
-        inst.resolvedLocalTranslate.x -= 2.2f;
-      } else if (inst.partType == ModBodyPart::RightThigh) {
-        inst.localTransform.translate.x += 2.2f;
-        inst.resolvedLocalTranslate.x += 2.2f;
+        inst.localTransform.translate.x *= 1.6f;
+        inst.resolvedLocalTranslate.x *= 1.6f;
       }
     }
     for (auto& snap : data->controlPointSnapshots) {
@@ -814,11 +758,11 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
           break;
         }
       }
-      if (partType == ModBodyPart::LeftThigh) {
-        snap.localPosition.x -= 2.2f; // さらに外へ
-        snap.radius *= 1.8f;
-      } else if (partType == ModBodyPart::RightThigh) {
-        snap.localPosition.x += 2.2f;
+      if (partType == ModBodyPart::StomachBody) {
+        snap.radius *= 1.6f;
+        snap.localPosition.x *= 1.6f;
+      } else if (partType == ModBodyPart::LeftThigh || partType == ModBodyPart::RightThigh) {
+        snap.localPosition.x *= 1.6f; // 1.6倍に広げた腰に合わせる
         snap.radius *= 1.8f;
       } else if (partType == ModBodyPart::LeftShin || partType == ModBodyPart::RightShin) {
         // 下腿（Shin）のCPのradiusも1.8倍にスケーリングし、評価に脚全体の太さ変化を100%同期させる（描画の太さは現状維持）
@@ -829,118 +773,63 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
 
   case NpcPresetType::MutantAsura:
   {
-    // 胴体・腕の描画用スケール (inst.param.scale) は親子重複による異常変形や接続崩れを防ぐため 1.0f (変更なし) に維持し、
-    // すべて CP (controlPointSnapshots) のスケーリングによってモデル描画と評価の両方を綺麗に変形・同期させます。
-    for (auto& inst : data->partInstances) {
-      // 胴体の scale は 1.0f に維持
-      if (inst.partType == ModBodyPart::ChestBody || inst.partType == ModBodyPart::StomachBody) {
-        inst.param.scale.x = 1.0f;
-        inst.param.scale.y = 1.0f;
-        inst.param.scale.z = 1.0f;
-      }
-      // 腕の scale も 1.0f に維持
-      else if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm ||
-               inst.partType == ModBodyPart::LeftForeArm || inst.partType == ModBodyPart::RightForeArm) {
-        inst.param.scale.x = 1.0f;
-        inst.param.scale.y = 1.0f;
-        inst.param.scale.z = 1.0f;
-      }
+    // 胴体は通常のサイズのまま維持し、腕だけを太く・長くする
+    scalePart(ModBodyPart::LeftUpperArm, 1.3f, 1.5f, 1.3f);
+    scalePart(ModBodyPart::RightUpperArm, 1.3f, 1.5f, 1.3f);
+    scalePart(ModBodyPart::LeftForeArm, 1.3f, 1.5f, 1.3f);
+    scalePart(ModBodyPart::RightForeArm, 1.3f, 1.5f, 1.3f);
 
-      // --- 胴体巨大化 (1.5倍) に合わせた、各関節の接続位置 (translate) の手動オフセット調整 ---
-      // 元の上腕 (UpperArm) の配置位置 (デフォルト x = ±2.05, y = 1.15 を 1.5倍にし、さらに 4本腕用に y += 0.5f)
-      if (inst.partType == ModBodyPart::LeftUpperArm) {
-        inst.localTransform.translate.x = -3.075f;
-        inst.localTransform.translate.y = 2.225f;
-        inst.resolvedLocalTranslate.x = -3.075f;
-        inst.resolvedLocalTranslate.y = 2.225f;
-      } else if (inst.partType == ModBodyPart::RightUpperArm) {
-        inst.localTransform.translate.x = 3.075f;
-        inst.localTransform.translate.y = 2.225f;
-        inst.resolvedLocalTranslate.x = 3.075f;
-        inst.resolvedLocalTranslate.y = 2.225f;
-      }
-      // 首の配置位置 (デフォルト y = 1.2796 を 1.5倍)
-      else if (inst.partType == ModBodyPart::Neck) {
-        inst.localTransform.translate.y = 1.9194f;
-        inst.resolvedLocalTranslate.y = 1.9194f;
-      }
-      // 両脚の配置位置 (デフォルト x = ±0.50, y = -1.68 を 1.5倍)
-      else if (inst.partType == ModBodyPart::LeftThigh) {
-        inst.localTransform.translate.x = -0.75f;
-        inst.localTransform.translate.y = -2.52f;
-        inst.resolvedLocalTranslate.x = -0.75f;
-        inst.resolvedLocalTranslate.y = -2.52f;
-      } else if (inst.partType == ModBodyPart::RightThigh) {
-        inst.localTransform.translate.x = 0.75f;
-        inst.localTransform.translate.y = -2.52f;
-        inst.resolvedLocalTranslate.x = 0.75f;
-        inst.resolvedLocalTranslate.y = -2.52f;
-      }
-    }
-
-    // 元の上腕のCPスナップショットの配置位置を調整 (y += 0.5f)
-    for (auto& snap : data->controlPointSnapshots) {
-      ModBodyPart partType = ModBodyPart::Count;
-      for (const auto& inst : data->partInstances) {
-        if (inst.partId == snap.ownerPartId) {
-          partType = inst.partType;
-          break;
-        }
-      }
-      if (partType == ModBodyPart::LeftUpperArm || partType == ModBodyPart::RightUpperArm) {
-        snap.localPosition.y += 0.5f;
-      }
-    }
-
-    // --- 追加の腕 (下側の2本) の生成処理 ---
-    std::vector<ModPartInstanceData> newArms;
-    std::vector<ModControlPointSnapshot> newSnaps;
     int chestId = -1;
     for (const auto& inst : data->partInstances) {
       if (inst.partType == ModBodyPart::ChestBody) chestId = inst.partId;
     }
 
+    // 元の上腕（1本目）をデフォルトの接続位置（肩）に維持したまま、上向き45度（デフォルトの下向きから135度）へ傾ける
+    for (auto& inst : data->partInstances) {
+      if (inst.partType == ModBodyPart::LeftUpperArm) {
+        inst.localTransform.rotate.z = -2.35619f; // -135度（上向き45度）
+      } else if (inst.partType == ModBodyPart::RightUpperArm) {
+        inst.localTransform.rotate.z = 2.35619f; // 135度（上向き45度）
+      }
+    }
+
+    // --- 追加の腕 (下側の2本目) の生成処理 ---
+    std::vector<ModPartInstanceData> newArms;
+    std::vector<ModControlPointSnapshot> newSnaps;
+    
     int nextId = 100;
     for (int armType = static_cast<int>(ModBodyPart::LeftUpperArm); armType <= static_cast<int>(ModBodyPart::RightForeArm); ++armType) {
       for (const auto& inst : data->partInstances) {
         if (static_cast<int>(inst.partType) == armType) {
           ModPartInstanceData extraArm = inst;
           extraArm.partId = nextId;
+          
           if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
-             extraArm.parentId = chestId; // attach to chest
-             // 胴体 1.5倍基準の位置 (x = ±3.075, y = 1.725) から y -= 1.0f, x ±= 0.6f に配置
-             extraArm.localTransform.translate.y = 0.725f;
-             extraArm.resolvedLocalTranslate.y = 0.725f;
+             extraArm.parentId = chestId; 
+             // 位置は元の上腕から下へずらす
+             extraArm.localTransform.translate.y -= 1.0f;
+             extraArm.resolvedLocalTranslate.y -= 1.0f;
+             // 胴体に埋まりすぎないよう、わずかに外へ
+             // 下の腕は下向き30度に設定
              if (inst.partType == ModBodyPart::LeftUpperArm) {
-               extraArm.localTransform.translate.x = -3.675f;
-               extraArm.resolvedLocalTranslate.x = -3.675f;
+                 extraArm.localTransform.translate.x -= 0.1f;
+                 extraArm.resolvedLocalTranslate.x -= 0.1f;
+                 extraArm.localTransform.rotate.z = -0.5236f; // -30度
              } else {
-               extraArm.localTransform.translate.x = 3.675f;
-               extraArm.resolvedLocalTranslate.x = 3.675f;
+                 extraArm.localTransform.translate.x += 0.1f;
+                 extraArm.resolvedLocalTranslate.x += 0.1f;
+                 extraArm.localTransform.rotate.z = 0.5236f; // 30度
              }
           } else {
-             extraArm.parentId = nextId - 1;
+             extraArm.parentId = nextId - 1; // 前腕は新しい上腕に接続
           }
-          // 追加アームのスケールも 1.0f に維持 (CP変形で太さ・長さを調整するため)
-          extraArm.param.scale.x = 1.0f;
-          extraArm.param.scale.y = 1.0f;
-          extraArm.param.scale.z = 1.0f;
-
           newArms.push_back(extraArm);
 
           for (const auto& snap : data->controlPointSnapshots) {
             if (snap.ownerPartId == inst.partId) {
               ModControlPointSnapshot extraSnap = snap;
               extraSnap.ownerPartId = extraArm.partId;
-              if (inst.partType == ModBodyPart::LeftUpperArm || inst.partType == ModBodyPart::RightUpperArm) {
-                 // 胴体 1.5倍基準の位置 (y = 1.725) から y -= 1.0f, x ±= 0.6f にCPもオフセット
-                 extraSnap.localPosition.y -= 1.0f;
-                 if (inst.partType == ModBodyPart::LeftUpperArm) {
-                   extraSnap.localPosition.x -= 0.6f;
-                 } else {
-                   extraSnap.localPosition.x += 0.6f;
-                 }
-              }
+              // 相対的な位置(localPosition)はそのままでOK。親のtranslateが動いているため自動で追従する。
               newSnaps.push_back(extraSnap);
             }
           }
@@ -952,34 +841,6 @@ std::unique_ptr<ModBodyCustomizeData> ModCustomizeDataStore::CreateNpcPreset(Npc
 
     data->partInstances.insert(data->partInstances.end(), newArms.begin(), newArms.end());
     data->controlPointSnapshots.insert(data->controlPointSnapshots.end(), newSnaps.begin(), newSnaps.end());
-
-    // --- CP評価・描画同期スケーリング (ここで全ての変形サイズを一元適用します) ---
-    for (auto& snap : data->controlPointSnapshots) {
-      ModBodyPart partType = ModBodyPart::Count;
-      for (const auto& inst : data->partInstances) {
-        if (inst.partId == snap.ownerPartId) {
-          partType = inst.partType;
-          break;
-        }
-      }
-
-      // 胴体 (ChestBody / StomachBody) のCP: 太さ・長さ・奥行きすべて 1.5倍 にスケール
-      if (partType == ModBodyPart::ChestBody || partType == ModBodyPart::StomachBody) {
-        snap.radius *= 1.5f;
-        snap.localPosition.x *= 1.5f;
-        snap.localPosition.y *= 1.5f;
-        snap.localPosition.z *= 1.5f;
-      }
-      // 腕 (元の腕および追加された4本すべての腕) のCP: 太さを 1.3倍、長さを 1.5倍 にスケール
-      else if (partType == ModBodyPart::LeftUpperArm || partType == ModBodyPart::RightUpperArm ||
-               partType == ModBodyPart::LeftForeArm || partType == ModBodyPart::RightForeArm) {
-        snap.radius *= 1.3f;
-        snap.localPosition.x *= 1.3f;
-        snap.localPosition.y *= 1.5f;
-        snap.localPosition.z *= 1.3f;
-      }
-    }
-    // -----------------------------------------------------------------------------------------
     break;
   }
 
