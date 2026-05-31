@@ -35,6 +35,11 @@ RankingPart::RankingPart(kEngine* system, BitmapFont* font,
 
     nextButton_ = std::make_unique<DetailButton>(system);
     nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+    decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
+}
+
+RankingPart::~RankingPart() {
 }
 
 void RankingPart::Update() {
@@ -43,6 +48,9 @@ void RankingPart::Update() {
     nextButton_->Update();
 
     if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsRelease()) {
+        if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+            system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+        }
         isFinished_ = true;
     }
 }

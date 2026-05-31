@@ -16,6 +16,11 @@ JudgingPart::JudgingPart(kEngine* system, BitmapFont* font,
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
+}
+
+JudgingPart::~JudgingPart() {
 }
 
 void JudgingPart::Update() {
@@ -25,6 +30,9 @@ void JudgingPart::Update() {
 
 	// SPACEで次の審査員へ
 	if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsRelease()) {
+		if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+			system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+		}
 		currentJudgeIndex_++;
 		if (currentJudgeIndex_ >= 3) {
 			isFinished_ = true;

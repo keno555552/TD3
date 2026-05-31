@@ -14,7 +14,7 @@ public:
 	JudgingPart(kEngine* system, BitmapFont* font,
 		const ScoreResult& scoreResult,
 		const std::vector<JudgeCommentResult>& judgeCommentResults);
-	~JudgingPart() override = default;
+	~JudgingPart() override;
 
 	void Update() override;
 	void Draw() override;
@@ -30,6 +30,8 @@ private:
 
 	int currentJudgeIndex_ = 0;
 	bool isFinished_ = false;
+
+	int decideSoundHandle_ = -1;
 
 	PartCameraTransform cameraTransforms_[3]; // 審査員ごとのカメラ
 

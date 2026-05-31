@@ -74,6 +74,7 @@ private:
 	int heartbeatHandle_ = -1;
 	int spotlightSeHandle_ = -1;
 	int cheersHandle_ = -1;
+	int decideSoundHandle_ = -1;
 	float easeTimer_ = 0.0f; // Dolly zoom用
 
 	ModCustomizedBodyActor* actors_[3] = { nullptr, nullptr, nullptr };

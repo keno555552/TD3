@@ -17,6 +17,11 @@ ShowOffPart::ShowOffPart(kEngine* system, BitmapFont* font,
 
 	nextButton_ = std::make_unique<DetailButton>(system);
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
+
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
+}
+
+ShowOffPart::~ShowOffPart() {
 }
 
 void ShowOffPart::Update() {
@@ -75,11 +80,10 @@ void ShowOffPart::Update() {
 	switch (step_) {
 	case ShowOffStep::StageView:
 		// SPACEで審査員側へカメラ移動
-		if (system_->GetTriggerOn(DIK_SPACE)) {
-			step_ = ShowOffStep::TurnToJudges;
-		}
-
-		if(nextButton_->GetIsRelease()){
+		if (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsRelease()) {
+			if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+				system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+			}
 			step_ = ShowOffStep::TurnToJudges;
 		}
 		break;

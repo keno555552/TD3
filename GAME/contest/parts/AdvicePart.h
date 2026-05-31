@@ -9,7 +9,7 @@
 class AdvicePart : public IContestPart {
 public:
     AdvicePart(kEngine* system, BitmapFont* font, Vector3 playerTarget);
-    ~AdvicePart() override = default;
+    ~AdvicePart() override;
 
     void Update() override;
     void Draw() override;
@@ -22,6 +22,8 @@ private:
     PartCameraTransform cameraTransform_;
 
     std::vector<std::string> adviceTexts_;
+
+    int decideSoundHandle_ = -1;
 
     void GenerateAdvice();
     std::string GetPartNameJapanese(ModBodyPart part) const;

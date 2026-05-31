@@ -422,6 +422,8 @@ TravelScene::TravelScene(kEngine *system) {
       system_->SoundLoadSE("GAME/resources/sounds/Balloon-Pop01-2(Dry).mp3");
 
   bgmSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/Tailshaft.mp3");
+  selectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/select.mp3");
+  decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
   if (bgmSoundHandle_ != -1) {
     system_->SoundPlayBGM(bgmSoundHandle_, 0.3f);
   }
@@ -499,6 +501,12 @@ TravelScene::~TravelScene() {
 
   if (heartbeatSoundHandle_ != -1) {
     system_->SoundStop(heartbeatSoundHandle_);
+    if (selectSoundHandle_ != -1) {
+      system_->SoundStop(selectSoundHandle_);
+    }
+    if (decideSoundHandle_ != -1) {
+      system_->SoundStop(decideSoundHandle_);
+    }
   }
   if (doorOpenSoundHandle_ != -1) {
     system_->SoundStop(doorOpenSoundHandle_);
@@ -1760,8 +1768,10 @@ void TravelScene::UpdateFailureMenuInputTravel() {
     if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
       if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod) {
         selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       } else if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel) {
         selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       }
       failureMenuInputCooldown_ = 0.12f;
     }
@@ -1769,8 +1779,10 @@ void TravelScene::UpdateFailureMenuInputTravel() {
     if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
       if (selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt) {
         selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       } else if (selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod) {
         selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       }
       failureMenuInputCooldown_ = 0.12f;
     }
@@ -1780,6 +1792,9 @@ void TravelScene::UpdateFailureMenuInputTravel() {
 
     if (promptButton_->GetIsClicked() || retryModButton_->GetIsClicked() ||
         retryTravelButton_->GetIsClicked() || keyConfirm) {
+      if (keyConfirm) {
+        if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+      }
       DecideFailureMenuTravel();
     }
   }

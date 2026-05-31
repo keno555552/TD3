@@ -51,6 +51,9 @@ TitleScene::TitleScene(kEngine* system) {
 		system_->SoundPlayBGM(bgmSoundHandle_, 0.5f);
 	}
 
+	selectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/select.mp3");
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
+
 	// 背景オブジェクト初期化
 	BGObjectHandle_ = system_->SetModelObj("GAME/resources/TitleScene/titleBG.obj");
 	BGObject_ = std::make_unique<Object>();
@@ -223,6 +226,12 @@ TitleScene::~TitleScene() {
 
 	if (bgmSoundHandle_ != -1) {
 		system_->SoundStop(bgmSoundHandle_);
+	}
+	if (selectSoundHandle_ != -1) {
+		system_->SoundStop(selectSoundHandle_);
+	}
+	if (decideSoundHandle_ != -1) {
+		system_->SoundStop(decideSoundHandle_);
 	}
 }
 
@@ -608,6 +617,9 @@ void TitleScene::Update() {
 					nextTutorialPage_ = 1;
 					tutorialChoice_ = TutorialChoice::Close; // 次のページのデフォルト
 					menuInputCooldown_ = 0.15f;
+					if (system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN)) {
+						if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+					}
 				}
 			} else {
 				tutorialPrevButton_->Update();
@@ -623,11 +635,17 @@ void TitleScene::Update() {
 
 				if (menuInputCooldown_ <= 0.0f) {
 					if (system_->GetTriggerOn(DIK_A) || system_->GetTriggerOn(DIK_LEFT)) {
-						if (tutorialChoice_ == TutorialChoice::Close) tutorialChoice_ = TutorialChoice::Prev;
+						if (tutorialChoice_ == TutorialChoice::Close) {
+							tutorialChoice_ = TutorialChoice::Prev;
+							if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+						}
 						menuInputCooldown_ = 0.12f;
 					}
 					if (system_->GetTriggerOn(DIK_D) || system_->GetTriggerOn(DIK_RIGHT)) {
-						if (tutorialChoice_ == TutorialChoice::Prev) tutorialChoice_ = TutorialChoice::Close;
+						if (tutorialChoice_ == TutorialChoice::Prev) {
+							tutorialChoice_ = TutorialChoice::Close;
+							if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+						}
 						menuInputCooldown_ = 0.12f;
 					}
 				}
@@ -642,9 +660,11 @@ void TitleScene::Update() {
 					nextTutorialPage_ = 0;
 					tutorialChoice_ = TutorialChoice::Next;
 					menuInputCooldown_ = 0.15f;
+					if (decide) if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
 				} else if (tutorialCloseButton_->GetIsClicked() || (decide && tutorialChoice_ == TutorialChoice::Close)) {
 					isTutorialClosing_ = true; // チュートリアル終了へ
 					menuInputCooldown_ = 0.15f;
+					if (decide) if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
 				}
 			}
 		}
@@ -675,11 +695,17 @@ void TitleScene::Update() {
 
 			if (menuInputCooldown_ <= 0.0f) {
 				if (system_->GetTriggerOn(DIK_W) || system_->GetTriggerOn(DIK_UP)) {
-					if (titleChoice_ == TitleChoice::Tutorial) titleChoice_ = TitleChoice::Start;
+					if (titleChoice_ == TitleChoice::Tutorial) {
+						titleChoice_ = TitleChoice::Start;
+						if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+					}
 					menuInputCooldown_ = 0.12f;
 				}
 				if (system_->GetTriggerOn(DIK_S) || system_->GetTriggerOn(DIK_DOWN)) {
-					if (titleChoice_ == TitleChoice::Start) titleChoice_ = TitleChoice::Tutorial;
+					if (titleChoice_ == TitleChoice::Start) {
+						titleChoice_ = TitleChoice::Tutorial;
+						if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+					}
 					menuInputCooldown_ = 0.12f;
 				}
 			}
@@ -700,9 +726,11 @@ void TitleScene::Update() {
 				tutorialPage_ = 0;
 				tutorialChoice_ = TutorialChoice::Next;
 				menuInputCooldown_ = 0.15f;
+				if (decide) if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
 			} else if (nextButton_->GetIsClicked() || (decide && titleChoice_ == TitleChoice::Start)) {
 				fade_.StartFadeOut();
 				isStartTransition_ = true;
+				if (decide) if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
 			}
 		}
 	}

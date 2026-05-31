@@ -17,7 +17,7 @@ public:
     RankingPart(kEngine* system, BitmapFont* font,
         const std::vector<ContestRankEntry>& entries,
         Vector3 playerTarget);
-    ~RankingPart() override = default;
+    ~RankingPart() override;
 
     void Update() override;
     void Draw() override;
@@ -28,5 +28,6 @@ private:
     std::unique_ptr<DetailButton> nextButton_;
     std::vector<ContestRankEntry> entries_; // ソート済み
     bool isFinished_ = false;
+    int decideSoundHandle_ = -1;
     PartCameraTransform cameraTransform_;
 };

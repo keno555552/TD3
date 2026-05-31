@@ -42,6 +42,7 @@ ResultPart::ResultPart(kEngine* system, BitmapFont* font,
 	nextButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
 
 	drumrollEndHandle_ = system_->SoundLoadSE("GAME/resources/sounds/drumroll_end.mp3");
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
 }
 
 ResultPart::~ResultPart() {
@@ -57,6 +58,9 @@ void ResultPart::Update() {
 
 	// SPACEで次のステップへ
 	if (system_->GetTriggerOn(DIK_SPACE)||nextButton_->GetIsRelease()) {
+		if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+			system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+		}
 		switch (step_) {
 		case ResultStep::StarsAndChart:
 			step_ = ResultStep::RankAndNickname;

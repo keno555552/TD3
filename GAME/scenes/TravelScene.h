@@ -145,6 +145,8 @@ private:
   bool isDangerMode_ = false;
   float dangerAnimTimer_ = 0.0f;
   int heartbeatSoundHandle_ = -1;
+  int selectSoundHandle_ = -1;
+  int decideSoundHandle_ = -1;
   int bgmSoundHandle_ = -1;
   int doorOpenSoundHandle_ = -1;
   int balloonPopSoundHandle_ = -1;

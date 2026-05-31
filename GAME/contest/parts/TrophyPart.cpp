@@ -15,6 +15,12 @@ TrophyPart::TrophyPart(kEngine* system, BitmapFont* font, Vector3 playerTarget)
 
 	titleButton_ = std::make_unique<DetailButton>(system);
 	titleButton_->SetButton({ 640.0f, 540.0f }, 400.0f, 80.0f);
+
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
+	selectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/select.mp3");
+}
+
+TrophyPart::~TrophyPart() {
 }
 
 void TrophyPart::Update() {
@@ -48,6 +54,9 @@ void TrophyPart::Update() {
 
         if (menuInputCooldown_ <= 0.0f) {
           if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
+            if (selectSoundHandle_ != -1) {
+              system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+            }
             if (menuSelection_ == TrophyChoice::Retry) {
               menuSelection_ = TrophyChoice::NextTheme;
             } else if (menuSelection_ == TrophyChoice::Title) {
@@ -58,6 +67,9 @@ void TrophyPart::Update() {
             menuInputCooldown_ = 0.12f;
           }
           if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
+            if (selectSoundHandle_ != -1) {
+              system_->SoundPlaySE(selectSoundHandle_, 0.5f);
+            }
             if (menuSelection_ == TrophyChoice::NextTheme) {
               menuSelection_ = TrophyChoice::Retry;
             } else if (menuSelection_ == TrophyChoice::Retry) {
@@ -80,14 +92,17 @@ void TrophyPart::Update() {
 
         if (nextThemeButton_->GetIsRelease() ||
             (decide && menuSelection_ == TrophyChoice::NextTheme)) {
+          if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
           choice_ = TrophyChoice::NextTheme;
         } else if (sameThemeButton_->GetIsRelease() ||
                    system_->GetTriggerOn(DIK_R) ||
                    (decide && menuSelection_ == TrophyChoice::Retry)) {
+          if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
           choice_ = TrophyChoice::Retry;
         } else if (titleButton_->GetIsRelease() ||
                    system_->GetTriggerOn(DIK_1) ||
                    (decide && menuSelection_ == TrophyChoice::Title)) {
+          if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
           choice_ = TrophyChoice::Title;
         }
 }

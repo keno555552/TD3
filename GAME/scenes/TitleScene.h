@@ -92,6 +92,8 @@ private:
   bool isStartTransition_ = false;
 
   int bgmSoundHandle_ = -1;
+  int selectSoundHandle_ = -1;
+  int decideSoundHandle_ = -1;
 
   // 背景NPC演出
   std::unique_ptr<TravelRunner> titleNpcPlayer_;
