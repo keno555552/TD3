@@ -46,6 +46,11 @@ public:
 	/// </summary>
 	virtual PartCameraTransform GetCameraTransform() const = 0;
 
+	/// <summary>
+	/// パート側で直接カメラを動かすか（trueならContestScene側の自動補間を行わない）
+	/// </summary>
+	virtual bool UseCustomCameraControl() const { return false; }
+
 protected:
 	kEngine* system_ = nullptr;
 	BitmapFont* font_ = nullptr;

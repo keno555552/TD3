@@ -824,17 +824,19 @@ std::unique_ptr<IContestPart> ContestScene::CreatePart(ContestPhase phase) {
 			}
 		}
 		if (winners.empty()) winners.push_back(0);
-		return std::make_unique<SuspensePart>(system_, &bitmapFont_, lights, targets, winners);
+		
+		ModCustomizedBodyActor* actors[3] = { &customizedBodyActor_, &npcBodyActors_[0], &npcBodyActors_[1] };
+		return std::make_unique<SuspensePart>(system_, &bitmapFont_, lights, targets, winners, actors, light1_, usingCamera_);
 	}
 
 	case ContestPhase::Ranking:
-		return std::make_unique<RankingPart>(system_, &bitmapFont_, contestRanking_);
+		return std::make_unique<RankingPart>(system_, &bitmapFont_, contestRanking_, customizedBodyActor_.GetHeadWorldPosition());
 
 	case ContestPhase::Advice:
-		return std::make_unique<AdvicePart>(system_, &bitmapFont_);
+		return std::make_unique<AdvicePart>(system_, &bitmapFont_, customizedBodyActor_.GetHeadWorldPosition());
 
 	case ContestPhase::Trophy:
-		return std::make_unique<TrophyPart>(system_, &bitmapFont_);
+		return std::make_unique<TrophyPart>(system_, &bitmapFont_, customizedBodyActor_.GetHeadWorldPosition());
 
 	default:
 		return nullptr;
@@ -891,8 +893,14 @@ void ContestScene::CameraPart() {
 				target.rotation.z != cameraTarget_.rotation.z) {
 
 				cameraTarget_ = target;
-				cameraLerpTimer_ = 0.0f;
-				isCameraLerping_ = true;
+				
+				if (currentPart_->UseCustomCameraControl()) {
+					cameraCurrent_ = target;
+					isCameraLerping_ = false;
+				} else {
+					cameraLerpTimer_ = 0.0f;
+					isCameraLerping_ = true;
+				}
 			}
 
 			if (isCameraLerping_) {

@@ -6,14 +6,18 @@
 
 SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	Light* lights[3], const Vector3 targetPositions[3],
-	const std::vector<int>& winnerIndices)
-	: IContestPart(system, font), winnerIndices_(winnerIndices) {
+	const std::vector<int>& winnerIndices,
+	ModCustomizedBodyActor* actors[3],
+	Light* envLight,
+	Camera* camera)
+	: IContestPart(system, font), winnerIndices_(winnerIndices), envLight_(envLight), camera_(camera) {
 
 	cameraTransform_ = { { 0.0f, 0.9f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
 
 	for (int i = 0; i < 3; ++i) {
 		lights_[i] = lights[i];
 		targetPositions_[i] = targetPositions[i];
+		actors_[i] = actors[i];
 		if (lights_[i]) {
 			lightOriginalDir_[i] = lights_[i]->direction;
 			lightOriginalColor_[i] = lights_[i]->color;
@@ -25,29 +29,14 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 		if (w >= 0 && w < 3) isWinner_[w] = true;
 	}
 
-	// 演出パターンをランダム抽選し、Feint用の非当選キャラを決定
-	{
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<int> distPattern(0, 2);
-		revealPattern_ = static_cast<RevealPattern>(distPattern(gen));
-
-		// 非当選インデックスを集めて1つ選ぶ
-		std::vector<int> nonWinners;
-		for (int i = 0; i < 3; ++i) {
-			if (!isWinner_[i]) nonWinners.push_back(i);
-		}
-		if (!nonWinners.empty()) {
-			std::uniform_int_distribution<int> distDecoy(0, static_cast<int>(nonWinners.size()) - 1);
-			decoyIdx_ = nonWinners[distDecoy(gen)];
-		} else {
-			// 全員当選など非当選者がいない場合はFeint不可 → Slowに劣化
-			decoyIdx_ = -1;
-			if (revealPattern_ == RevealPattern::Feint) {
-				revealPattern_ = RevealPattern::Slow;
-			}
-		}
+	if (envLight_) {
+		envLightOriginalIntensity_ = envLight_->intensity;
+		envLight_->intensity = envLightOriginalIntensity_ * 0.1f; // 暗転
 	}
+	
+	confetti_ = std::make_unique<ConfettiParticle>(system_);
+
+
 
 	drawButton_ = std::make_unique<DetailButton>(system);
 	drawButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
@@ -69,6 +58,10 @@ SuspensePart::~SuspensePart() {
 	// 鳴りっぱなしを防ぐためループ系SEは停止
 	if (drumrollHandle_ != -1) system_->SoundStop(drumrollHandle_);
 	if (heartbeatHandle_ != -1) system_->SoundStop(heartbeatHandle_);
+	
+	if (envLight_) {
+		envLight_->intensity = envLightOriginalIntensity_; // 復元
+	}
 }
 
 void SuspensePart::Update() {
@@ -76,6 +69,35 @@ void SuspensePart::Update() {
 
 	if (state_ == State::Suspense) {
 		drawButton_->Update();
+
+		// Camera Switching
+		cutTimer_ += 1.0f / 60.0f;
+		if (cutTimer_ >= nextCutTime_) {
+			cutTimer_ = 0.0f;
+			currentCutIndex_++;
+			if (currentCutIndex_ > 3) currentCutIndex_ = 0;
+
+			if (currentCutIndex_ < 3) {
+				Vector3 target = targetPositions_[currentCutIndex_];
+				if (actors_[currentCutIndex_]) {
+					target = actors_[currentCutIndex_]->GetHeadWorldPosition();
+				}
+				cameraTransform_.position = { target.x, target.y, target.z - 1.4f };
+				cameraTransform_.rotation = { 0.0f, 0.0f, 0.0f };
+			} else {
+				// 中央からの全体ヒキ絵の時は、適当な平均的高さとして 0.6f 程度を維持
+				cameraTransform_.position = { 0.0f, 0.6f, -3.0f };
+				cameraTransform_.rotation = { 0.0f, 0.0f, 0.0f };
+			}
+		}
+
+		// アクターの息づかい（Y軸スケールを揺らす）
+		for (int i = 0; i < 3; ++i) {
+			if (actors_[i]) {
+				float breath = 1.0f + std::sin(timer_ * 5.0f + i) * 0.02f;
+				actors_[i]->SetActorScale({ 0.03f, 0.03f * breath, 0.03f });
+			}
+		}
 
 		// 各ライトの向きをXZ軸で揺らす（位置は不変）
 		// 各ライトに位相オフセットを与え個別に揺れさせる
@@ -107,8 +129,25 @@ void SuspensePart::Update() {
 
 	if (state_ == State::Revealing) {
 		revealTimer_ += 1.0f / 60.0f;
+		
+		// スペースキーで演出を即スキップ
+		if (system_->GetTriggerOn(DIK_SPACE)) {
+			revealTimer_ = revealDuration_;
+		}
+
 		float t = revealTimer_ / revealDuration_;
 		if (t >= 1.0f) t = 1.0f;
+
+		// ゆっくりズームする演出を廃止し、全体を映したまま固定
+		cameraTransform_.position = { 0.0f, 0.6f, -3.0f };
+		cameraTransform_.rotation = { 0.0f, 0.0f, 0.0f };
+
+		// アクターのスケールを戻す
+		for (int i = 0; i < 3; ++i) {
+			if (actors_[i]) {
+				actors_[i]->SetActorScale({ 0.03f, 0.03f, 0.03f });
+			}
+		}
 
 		bool soloWinner = (winnerIndices_.size() == 1);
 		int soloIdx = soloWinner ? winnerIndices_[0] : -1;
@@ -132,43 +171,16 @@ void SuspensePart::Update() {
 			}
 
 			if (aimIdx >= 0) {
-				Vector3 lp = lights_[i]->position;
-				Vector3 toWinner = AimDir(lp, targetPositions_[aimIdx]);
-				Vector3 start = revealStartDir_[i];
-
+				Vector3 toWinner = AimDir(lights_[i]->position, targetPositions_[aimIdx]);
 				Vector3 cur;
-				switch (revealPattern_) {
-				case RevealPattern::Slow:
-				default:
-					// 全区間ゆっくり当選者へ（従来）
-					cur = LerpDir(start, toWinner, t);
-					break;
 
-				case RevealPattern::Snap:
-					// snapStart_ までは揺らし続けて待ち、以降で一気に当選者へ
-					if (t < snapStart_) {
-						cur = SwayDir(i);
-					} else {
-						float st = (t - snapStart_) / (1.0f - snapStart_);
-						cur = LerpDir(SwayDir(i), toWinner, st);
-					}
-					break;
-
-				case RevealPattern::Feint: {
-					// 一旦非当選者へ向かい、溜めてからパッと当選者へ
-					Vector3 toDecoy = (decoyIdx_ >= 0)
-						? AimDir(lp, targetPositions_[decoyIdx_])
-						: toWinner;
-					if (t < feintAimEnd_) {
-						cur = LerpDir(start, toDecoy, t / feintAimEnd_);
-					} else if (t < feintHoldEnd_) {
-						cur = toDecoy;
-					} else {
-						float ft = (t - feintHoldEnd_) / (1.0f - feintHoldEnd_);
-						cur = LerpDir(toDecoy, toWinner, ft);
-					}
-					break;
-				}
+				if (t < snapStart_) {
+					cur = SwayDir(i); // 揺れ続ける
+				} else {
+					// 最後の0.3秒で急激に勝者へ向く
+					float st = (t - snapStart_) / (1.0f - snapStart_);
+					float easeT = EaseOutExpo(st);
+					cur = LerpDir(SwayDir(i), toWinner, easeT);
 				}
 
 				lights_[i]->direction = NormalizeSafe(cur);
@@ -196,12 +208,108 @@ void SuspensePart::Update() {
 			if (heartbeatHandle_ != -1) system_->SoundStop(heartbeatHandle_);
 			if (spotlightSeHandle_ != -1) system_->SoundPlaySE(spotlightSeHandle_, 1.0f);
 			if (cheersHandle_ != -1) system_->SoundPlaySE(cheersHandle_, 1.0f);
+
+			// 環境光を戻す
+			if (envLight_) {
+				envLight_->intensity = envLightOriginalIntensity_;
+			}
+			isFlashing_ = true;
+			flashTimer_ = 0.0f;
+
+			// アニメーションを自動再生モードにする
+			for (int i = 0; i < 3; ++i) {
+				if (actors_[i]) {
+					if (isWinner_[i]) {
+						actors_[i]->SetJoyAnimationEnabled(true);
+					} else {
+						actors_[i]->SetFrustrationAnimationEnabled(true);
+					}
+				}
+			}
 		}
 		return;
 	}
 
 	// Done: 余韻
 	afterRevealTimer_ += 1.0f / 60.0f;
+	
+	for (int i = 0; i < 3; ++i) {
+		if (actors_[i]) {
+			if (isWinner_[i]) {
+				// 最初のジャンプ時のみ少し回転させる
+				float spin = (afterRevealTimer_ < 0.5f) ? afterRevealTimer_ * 12.0f : 0.0f; // 約1回転
+				if (spin > 6.28f) spin = 6.28f;
+				actors_[i]->SetActorRotate({ 0.0f, 3.1415f + spin, 0.0f });
+			}
+		}
+	}
+
+	// 発表直後は当選者にカメラを向ける
+	bool soloWinner = (winnerIndices_.size() == 1);
+	int winIdx = soloWinner ? winnerIndices_[0] : 0;
+	Vector3 winTarget = targetPositions_[winIdx];
+	if (actors_[winIdx]) {
+		winTarget = actors_[winIdx]->GetHeadWorldPosition();
+		// カメラがジャンプの上下運動に追従してガタガタ揺れるのを防ぐため、
+		// 現在のジャンプ高さ（GroundOffsetY）を差し引いた「本来の頭の高さ」を注視点にする
+		winTarget.y -= actors_[winIdx]->GetGroundOffsetY();
+	}
+	
+	// プレイヤー（主人公）の座標
+	Vector3 playerTarget = targetPositions_[0];
+	if (actors_[0]) {
+		playerTarget = actors_[0]->GetHeadWorldPosition();
+		playerTarget.y -= actors_[0]->GetGroundOffsetY();
+	}
+
+	// 2.0秒以降はプレイヤーへ滑らかにカメラを移動させ、さらに少し寄る（ズーム）
+	Vector3 currentTarget = winTarget;
+	// さらに引きの画角にするため、-1.8f から -2.5f に変更
+	float currentZOffset = -2.5f;
+
+	if (afterRevealTimer_ > 2.0f) {
+		float lerpT = (afterRevealTimer_ - 2.0f) / 1.0f; // 1秒かけて移動
+		if (lerpT > 1.0f) lerpT = 1.0f;
+		
+		// イージング（SmoothStep）
+		float easeT = lerpT * lerpT * (3.0f - 2.0f * lerpT);
+
+		currentTarget.x = winTarget.x + (playerTarget.x - winTarget.x) * easeT;
+		currentTarget.y = winTarget.y + (playerTarget.y - winTarget.y) * easeT;
+		currentTarget.z = winTarget.z + (playerTarget.z - winTarget.z) * easeT;
+		
+		// 移動しながらプレイヤーの顔にしっかり寄るが、審査員（z=-2.0）よりは前に出る（-2.5f から -1.5f へ）
+		currentZOffset = -2.5f + ((-1.5f) - (-2.5f)) * easeT;
+	}
+	
+	float shakeX = 0.0f;
+	float shakeY = 0.0f;
+	if (afterRevealTimer_ < 0.5f) {
+		shakeX = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.15f;
+		shakeY = (static_cast<float>(rand()) / RAND_MAX - 0.5f) * 0.15f;
+	}
+	cameraTransform_.position = { currentTarget.x + shakeX, currentTarget.y + shakeY, currentTarget.z + currentZOffset };
+	cameraTransform_.rotation = { 0.0f, 0.0f, 0.0f };
+
+	// 紙吹雪
+	if (!hasSpawnedConfetti_ && afterRevealTimer_ > 0.05f) {
+		hasSpawnedConfetti_ = true;
+		if (confetti_) {
+			confetti_->Spawn({ winTarget.x, winTarget.y + 3.0f, winTarget.z }, 2.0f);
+		}
+	}
+
+	if (confetti_) {
+		confetti_->Update(camera_);
+	}
+	
+	// Flash
+	if (isFlashing_) {
+		flashTimer_ += 1.0f / 60.0f;
+		if (flashTimer_ >= flashDuration_) {
+			isFlashing_ = false;
+		}
+	}
 }
 
 void SuspensePart::Draw() {
@@ -217,6 +325,23 @@ void SuspensePart::Draw() {
 	} else {
 		font_->RenderText("一位はこいつだ!", { 640.0f, 100.0f }, 72.0f,
 			BitmapFont::Align::Center, 5, { 1.0f, 0.9f, 0.2f, 1.0f });
+	}
+
+	if (confetti_) {
+		confetti_->Draw();
+	}
+
+	if (isFlashing_) {
+		float alpha = 1.0f - (flashTimer_ / flashDuration_);
+		if (alpha < 0.0f) alpha = 0.0f;
+		
+		// 簡易フラッシュ: 白い四角を画面全体に描画
+		// BitmapFontの代わりに、Sprite等があれば使うのがよいですが、
+		// もし無ければRenderTextで巨大な全角スペース（■）等を描画するか、
+		// 既存のフェード処理をここで呼ぶのが理想です。
+		// ここではとりあえず巨大な文字で画面を白く覆います（緊急手段）
+		font_->RenderText("■■■■■■■■■", { 640.0f, 360.0f }, 800.0f,
+			BitmapFont::Align::Center, 10.0f, { 1.0f, 1.0f, 1.0f, alpha });
 	}
 }
 
@@ -269,4 +394,8 @@ Vector3 SuspensePart::HsvToRgb(float h, float s, float v) {
 	case 5: r = v; g = p; b = q; break;
 	}
 	return { r, g, b };
+}
+
+float SuspensePart::EaseOutExpo(float t) {
+	return t == 1.0f ? 1.0f : 1.0f - std::pow(2.0f, -10.0f * t);
 }

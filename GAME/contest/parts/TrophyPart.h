@@ -18,7 +18,7 @@ enum class TrophyChoice {
 /// </summary>
 class TrophyPart : public IContestPart {
 public:
-	TrophyPart(kEngine* system, BitmapFont* font);
+	TrophyPart(kEngine* system, BitmapFont* font, Vector3 playerTarget);
 	~TrophyPart() override = default;
 
 	void Update() override;

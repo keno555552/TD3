@@ -25,12 +25,26 @@ public:
 
   const Transform &GetActorTransform() const { return actorTransform_; }
 
+  Vector3 GetHeadWorldPosition() const;
+  bool TryGetPartWorldPosition(ModBodyPart part, Vector3 &outWorld) const;
+
   void SetGroundY(float y) { groundY_ = y; }
   void SetGroundOffsetY(float y) { groundOffsetY_ = y; }
+  float GetGroundOffsetY() const { return groundOffsetY_; }
 
   void SetAutoGroundEnabled(bool enabled) { autoGroundEnabled_ = enabled; }
 
   void SnapToGround();
+
+  // ポーズアニメーション用
+  void SaveBasePose();
+  void RestoreBasePose();
+  void ApplyJoyPose(float blendWeight);
+  void ApplyFrustrationPose(float blendWeight);
+
+  // 自動アニメーション用
+  void SetJoyAnimationEnabled(bool enabled) { isJoyAnimating_ = enabled; }
+  void SetFrustrationAnimationEnabled(bool enabled) { isFrustrationAnimating_ = enabled; }
 
 private:
   static std::string ModelPath(ModBodyPart part);
@@ -96,4 +110,11 @@ private:
   bool autoGroundEnabled_ = false;
   float groundY_ = 0.0f;
   float groundOffsetY_ = 0.0f;
+
+  // ポーズリセット用のキャッシュ
+  std::unordered_map<int, std::vector<ModControlPoint>> baseControlPointsCache_;
+
+  bool isJoyAnimating_ = false;
+  bool isFrustrationAnimating_ = false;
+  float animTimer_ = 0.0f;
 };

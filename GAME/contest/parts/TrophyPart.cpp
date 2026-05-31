@@ -2,10 +2,10 @@
 #include "kEngine.h"
 #include "GAME/font/BitmapFont.h"
 
-TrophyPart::TrophyPart(kEngine* system, BitmapFont* font)
+TrophyPart::TrophyPart(kEngine* system, BitmapFont* font, Vector3 playerTarget)
 	: IContestPart(system, font) 
 {
-	cameraTransform_ = { { 0.0f, 0.9f, -3.0f }, { 0.12f, 0.0f, 0.0f } };
+	cameraTransform_ = { { playerTarget.x, playerTarget.y, playerTarget.z - 1.5f }, { 0.0f, 0.0f, 0.0f } };
 
 	nextThemeButton_ = std::make_unique<DetailButton>(system);
 	nextThemeButton_->SetButton({ 640.0f, 180.0f }, 400.0f, 80.0f);
