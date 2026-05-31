@@ -306,8 +306,9 @@ ContestScene::ContestScene(kEngine* system) {
 	if (!contestRanking_.empty()) {
 		contestRanking_[0].rank = 1;
 		for (size_t i = 1; i < contestRanking_.size(); ++i) {
-			bool sameScore = (contestRanking_[i].totalStars == contestRanking_[i - 1].totalStars)
-				&& (std::abs(contestRanking_[i].finalScore - contestRanking_[i - 1].finalScore) < 0.01f);
+			// finalScoreは画面非表示かつ0.1刻みで★合計より細かいため、順位判定には使わない。
+			// 表示スコア（★合計）が同じなら同順位にして、表示と順位を一致させる。
+			bool sameScore = (contestRanking_[i].totalStars == contestRanking_[i - 1].totalStars);
 			if (sameScore) {
 				// 前と同じスコアなら同じ順位
 				contestRanking_[i].rank = contestRanking_[i - 1].rank;
