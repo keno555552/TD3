@@ -757,20 +757,33 @@ void ContestScene::AdvancePhase() {
 	switch (phase_) {
 	case ContestPhase::ShowOff:
 		phase_ = ContestPhase::Judging;
-		// 観客SE停止
+		// 審査中は歓声を少し小さくする
+		if (audienceSoundHandle_ != -1) {
+			system_->SoundSetVolume(audienceSoundHandle_, 0.2f);
+		}
+		break;
+	case ContestPhase::Judging:
+		phase_ = ContestPhase::Result;
+		// リザルト画面で歓声を少し戻す
+		if (audienceSoundHandle_ != -1) {
+			system_->SoundSetVolume(audienceSoundHandle_, 0.4f);
+		}
+		break;
+	case ContestPhase::Result:
+		phase_ = ContestPhase::Suspense;
+		// サスペンス演出（ドラムロール等）が始まるため歓声をストップ
 		if (!audienceStopped_ && audienceSoundHandle_ != -1) {
 			system_->SoundStop(audienceSoundHandle_);
 			audienceStopped_ = true;
 		}
 		break;
-	case ContestPhase::Judging:
-		phase_ = ContestPhase::Result;
-		break;
-	case ContestPhase::Result:
-		phase_ = ContestPhase::Suspense;
-		break;
 	case ContestPhase::Suspense:
 		phase_ = ContestPhase::Ranking;
+		// ランキング発表以降は再び歓声を鳴らす
+		if (audienceStopped_ && audienceSoundHandle_ != -1) {
+			system_->SoundPlayBGM(audienceSoundHandle_, 0.6f);
+			audienceStopped_ = false;
+		}
 		break;
 	case ContestPhase::Ranking:
 		phase_ = ContestPhase::Advice;
