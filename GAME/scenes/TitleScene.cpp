@@ -584,41 +584,126 @@ void TitleScene::Update() {
 
 		// マウスクリックかスペースキーでページ送り (アニメーション完了後のみ受付)
 		if (!fade_.IsBusy() && imgT >= 1.0f && !isTutorialClosing_ && !isTutorialSwitching_) {
+			// クールダウン更新
+			if (menuInputCooldown_ > 0.0f) {
+				menuInputCooldown_ -= dt;
+				if (menuInputCooldown_ < 0.0f) menuInputCooldown_ = 0.0f;
+			}
+
+			Vector2 mouse = system_->GetMousePosVector2();
+			bool isMouseMoved = (mouse.x != prevMousePos_.x || mouse.y != prevMousePos_.y);
+			prevMousePos_ = mouse;
+
 			if (tutorialPage_ == 0) {
 				tutorialNextButton_->Update();
-				if (system_->GetTriggerOn(DIK_SPACE) || tutorialNextButton_->GetIsPress()) {
+				if (isMouseMoved && tutorialNextButton_->GetIsSelect(mouse, 1, 1)) {
+					tutorialChoice_ = TutorialChoice::Next;
+				}
+				tutorialNextButton_->ForceSelectState(tutorialChoice_ == TutorialChoice::Next);
+
+				bool decide = system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN) || tutorialNextButton_->GetIsClicked();
+				if (decide) {
 					isTutorialSwitching_ = true;
 					tutorialImageAnimTimer_ = 0.0f;
 					nextTutorialPage_ = 1;
+					tutorialChoice_ = TutorialChoice::Close; // 次のページのデフォルト
+					menuInputCooldown_ = 0.15f;
 				}
 			} else {
 				tutorialPrevButton_->Update();
 				tutorialCloseButton_->Update();
-				if (tutorialPrevButton_->GetIsPress()) {
+
+				if (isMouseMoved) {
+					if (tutorialPrevButton_->GetIsSelect(mouse, 1, 1)) {
+						tutorialChoice_ = TutorialChoice::Prev;
+					} else if (tutorialCloseButton_->GetIsSelect(mouse, 1, 1)) {
+						tutorialChoice_ = TutorialChoice::Close;
+					}
+				}
+
+				if (menuInputCooldown_ <= 0.0f) {
+					if (system_->GetTriggerOn(DIK_A) || system_->GetTriggerOn(DIK_LEFT)) {
+						if (tutorialChoice_ == TutorialChoice::Close) tutorialChoice_ = TutorialChoice::Prev;
+						menuInputCooldown_ = 0.12f;
+					}
+					if (system_->GetTriggerOn(DIK_D) || system_->GetTriggerOn(DIK_RIGHT)) {
+						if (tutorialChoice_ == TutorialChoice::Prev) tutorialChoice_ = TutorialChoice::Close;
+						menuInputCooldown_ = 0.12f;
+					}
+				}
+
+				tutorialPrevButton_->ForceSelectState(tutorialChoice_ == TutorialChoice::Prev);
+				tutorialCloseButton_->ForceSelectState(tutorialChoice_ == TutorialChoice::Close);
+
+				bool decide = system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN);
+				if (tutorialPrevButton_->GetIsClicked() || (decide && tutorialChoice_ == TutorialChoice::Prev)) {
 					isTutorialSwitching_ = true;
 					tutorialImageAnimTimer_ = 0.0f;
 					nextTutorialPage_ = 0;
-				} else if (system_->GetTriggerOn(DIK_SPACE) || tutorialCloseButton_->GetIsPress()) {
+					tutorialChoice_ = TutorialChoice::Next;
+					menuInputCooldown_ = 0.15f;
+				} else if (tutorialCloseButton_->GetIsClicked() || (decide && tutorialChoice_ == TutorialChoice::Close)) {
 					isTutorialClosing_ = true; // チュートリアル終了へ
+					menuInputCooldown_ = 0.15f;
 				}
 			}
 		}
 		return;
 	} else {
 		if (!fade_.IsBusy()) {
+			if (menuInputCooldown_ > 0.0f) {
+				menuInputCooldown_ -= dt;
+				if (menuInputCooldown_ < 0.0f) menuInputCooldown_ = 0.0f;
+			}
+
 			nextButton_->Update();
 			if (tutorialButton_) {
 				tutorialButton_->Update();
-			
-			if (tutorialButton_->GetIsPress()) {
+			}
+
+			Vector2 mouse = system_->GetMousePosVector2();
+			bool isMouseMoved = (mouse.x != prevMousePos_.x || mouse.y != prevMousePos_.y);
+			prevMousePos_ = mouse;
+
+			if (isMouseMoved) {
+				if (nextButton_->GetIsSelect(mouse, 1, 1)) {
+					titleChoice_ = TitleChoice::Start;
+				} else if (tutorialButton_ && tutorialButton_->GetIsSelect(mouse, 1, 1)) {
+					titleChoice_ = TitleChoice::Tutorial;
+				}
+			}
+
+			if (menuInputCooldown_ <= 0.0f) {
+				if (system_->GetTriggerOn(DIK_W) || system_->GetTriggerOn(DIK_UP)) {
+					if (titleChoice_ == TitleChoice::Tutorial) titleChoice_ = TitleChoice::Start;
+					menuInputCooldown_ = 0.12f;
+				}
+				if (system_->GetTriggerOn(DIK_S) || system_->GetTriggerOn(DIK_DOWN)) {
+					if (titleChoice_ == TitleChoice::Start) titleChoice_ = TitleChoice::Tutorial;
+					menuInputCooldown_ = 0.12f;
+				}
+			}
+
+			nextButton_->ForceSelectState(titleChoice_ == TitleChoice::Start);
+			if (tutorialButton_) {
+				tutorialButton_->ForceSelectState(titleChoice_ == TitleChoice::Tutorial);
+			}
+
+			bool decide = system_->GetTriggerOn(DIK_SPACE) || system_->GetTriggerOn(DIK_RETURN);
+
+			if (tutorialButton_ && (tutorialButton_->GetIsClicked() || (decide && titleChoice_ == TitleChoice::Tutorial))) {
 				isTutorialMode_ = true;
 				isTutorialClosing_ = false;
 				isTutorialSwitching_ = false;
 				tutorialAnimTimer_ = 0.0f;
 				tutorialImageAnimTimer_ = 0.0f;
 				tutorialPage_ = 0;
+				tutorialChoice_ = TutorialChoice::Next;
+				menuInputCooldown_ = 0.15f;
+			} else if (nextButton_->GetIsClicked() || (decide && titleChoice_ == TitleChoice::Start)) {
+				fade_.StartFadeOut();
+				isStartTransition_ = true;
 			}
-		}
 		}
 	}
 
@@ -633,12 +718,6 @@ void TitleScene::Update() {
 				ResetTitleNpc(i);
 			}
 		}
-	}
-
-	// スペースキーでお題発表シーンへ
-	if (!isTutorialMode_ && !fade_.IsBusy() && (system_->GetTriggerOn(DIK_SPACE) || nextButton_->GetIsPress())) {
-		fade_.StartFadeOut();
-		isStartTransition_ = true;
 	}
 
 	// フェード更新

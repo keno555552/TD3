@@ -512,6 +512,9 @@ void DefaultMenu::CheckClick() {
 void DefaultMenu::CheckMouse() {
 
 	Vector2 mousePos = system_->GetMousePosVector2();
+	bool isMouseMoved = (mousePos.x != prevMousePos_.x || mousePos.y != prevMousePos_.y);
+	prevMousePos_ = mousePos;
+
 	bool isTrickingBar =
 		isSelectedBMenuSE_
 		|| isSelectedBMenuBGM_
@@ -519,7 +522,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuClose->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::Close) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::Close) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::Close;
 				buttonTimer_->Reset0();
@@ -532,7 +535,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuRetry->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::Retry) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::Retry) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::Retry;
 				buttonTimer_->Reset0();
@@ -545,7 +548,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuBack->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::Back) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::Back) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::Back;
 				buttonTimer_->Reset0();
@@ -558,7 +561,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuBGM->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeBGM) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::VolumeBGM) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::VolumeBGM;
 				buttonTimer_->Reset0();
@@ -580,7 +583,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuMASTER->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeMASTER) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::VolumeMASTER) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::VolumeMASTER;
 				buttonTimer_->Reset0();
@@ -602,7 +605,7 @@ void DefaultMenu::CheckMouse() {
 
 	if (!isTrickingBar) {
 		if (bMenuSE->GetIsSelect(mousePos, 1.0f, 1.0f)) {
-			if (selectedMenuIndex_ != (int)ButtonIndex::VolumeSE) {
+			if (isMouseMoved && selectedMenuIndex_ != (int)ButtonIndex::VolumeSE) {
 				lastSelectedMenuIndex_ = selectedMenuIndex_;
 				selectedMenuIndex_ = (int)ButtonIndex::VolumeSE;
 				buttonTimer_->Reset0();

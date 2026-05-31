@@ -146,6 +146,7 @@ private:
 	bool isAnimation_ = false;
 
 	Transform startTransform_{};
+	Vector2 prevMousePos_ = {0.0f, 0.0f};
 
 	int selectedMenuIndex_ = (int)ButtonIndex::Close;
 	int lastSelectedMenuIndex_ = (int)ButtonIndex::Retry;

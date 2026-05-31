@@ -243,6 +243,8 @@ private:
   // 操作方法UI
   UiIconButton howToUi_{};
   int howToTextureHandle_ = 0;
+  
+  Vector2 prevMousePos_ = {0.0f, 0.0f};
 
   // UIの部位追加ボタンと削除ボタンのテクスチャハンドル
   int addLeftArmTextureHandle_ = 0;

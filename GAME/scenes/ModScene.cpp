@@ -6988,11 +6988,15 @@ void ModScene::UpdateFailureMenuInputMod() {
   }
 
   const Vector2 mouse = system_->GetMousePosVector2();
+  bool isMouseMoved = (mouse.x != prevMousePos_.x || mouse.y != prevMousePos_.y);
+  prevMousePos_ = mouse;
 
-  if (promptButton_->GetIsSelect(mouse, 1, 1)) {
-    selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
-  } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
-    selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+  if (isMouseMoved) {
+    if (promptButton_->GetIsSelect(mouse, 1, 1)) {
+      selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+    } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
+      selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+    }
   }
 
   promptButton_->ForceSelectState(selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt);
@@ -7183,25 +7187,25 @@ void ModScene::InitializeScreenUi() {
       "あたま";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)],
-                {centerX + offsetX, topY + offsetY_arm}, {width, height},
+                {centerX - offsetX, topY + offsetY_arm}, {width, height},
                 addRightArmTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddRightArm)].label =
       "みぎうで";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)],
-                {centerX - offsetX, topY + offsetY_arm}, {width, height},
+                {centerX + offsetX, topY + offsetY_arm}, {width, height},
                 addLeftArmTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftArm)].label =
       "ひだりうで";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)],
-                {centerX + offsetX, topY + offsetY_leg}, {width, height},
+                {centerX - offsetX, topY + offsetY_leg}, {width, height},
                 addRightLegTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddRightLeg)].label =
       "みぎあし";
 
   SetupUiSprite(addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)],
-                {centerX - offsetX, topY + offsetY_leg}, {width, height},
+                {centerX + offsetX, topY + offsetY_leg}, {width, height},
                 addLeftLegTextureHandle_);
   addButtons_[static_cast<size_t>(UiAddButtonType::AddLeftLeg)].label =
       "ひだりあし";
