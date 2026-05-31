@@ -1090,6 +1090,8 @@ ModScene::ModScene(kEngine *system) {
 
   // パーティクルの初期化
   modPartParticle_ = std::make_unique<ModPartParticle>(system);
+  selectSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/select.mp3");
+  decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
 
   // チュートリアル
   isTutorialMode_ = !s_hasSeenModTutorial;
@@ -1153,6 +1155,12 @@ ModScene::~ModScene() {
   
   if (bgmSoundHandle_ != -1) {
     system_->SoundStop(bgmSoundHandle_);
+  }
+  if (selectSoundHandle_ != -1) {
+    system_->SoundStop(selectSoundHandle_);
+  }
+  if (decideSoundHandle_ != -1) {
+    system_->SoundStop(decideSoundHandle_);
   }
 
   // 使用していないマテリアルをクリーンアップする
@@ -1219,6 +1227,7 @@ void ModScene::Update() {
     }
 
     if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
+      if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
       fade_.StartFadeOut();
       isStartTransition_ = true;
     }
@@ -1275,6 +1284,7 @@ void ModScene::Update() {
 
   // Space 入力で次シーンへのフェードアウトを開始する
   if (!fade_.IsBusy() && system_->GetTriggerOn(DIK_SPACE)) {
+    if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
     fade_.StartFadeOut();
     isStartTransition_ = true;
   }
@@ -7006,6 +7016,7 @@ void ModScene::UpdateFailureMenuInputMod() {
     if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
       if (selectedRetryChoiceMod_ == RetryChoiceMod::RetryMod) {
         selectedRetryChoiceMod_ = RetryChoiceMod::BackToPrompt;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       }
       failureMenuInputCooldown_ = 0.12f;
     }
@@ -7013,6 +7024,7 @@ void ModScene::UpdateFailureMenuInputMod() {
     if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
       if (selectedRetryChoiceMod_ == RetryChoiceMod::BackToPrompt) {
         selectedRetryChoiceMod_ = RetryChoiceMod::RetryMod;
+        if (selectSoundHandle_ != -1) system_->SoundPlaySE(selectSoundHandle_, 0.5f);
       }
       failureMenuInputCooldown_ = 0.12f;
     }
@@ -7021,6 +7033,9 @@ void ModScene::UpdateFailureMenuInputMod() {
         system_->GetTriggerOn(DIK_RETURN) || system_->GetTriggerOn(DIK_SPACE);
 
     if (promptButton_->GetIsClicked() || retryModButton_->GetIsClicked() || keyConfirm) {
+      if (keyConfirm) {
+        if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+      }
       DecideFailureMenuMod();
     }
   }
@@ -7407,6 +7422,7 @@ bool ModScene::TryHandleAddButtonInteraction() {
 
   if ((nextSceneButton_ && nextSceneButton_->GetIsClicked()) || system_->GetTriggerOn(DIK_SPACE)) {
     if (!fade_.IsBusy()) {
+      if (system_->GetTriggerOn(DIK_SPACE)) if (decideSoundHandle_ != -1) system_->SoundPlaySE(decideSoundHandle_, 0.5f);
       fade_.StartFadeOut();
       isStartTransition_ = true;
     }

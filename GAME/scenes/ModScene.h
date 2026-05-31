@@ -82,6 +82,8 @@ private:
   int deleteSoundHandle_ = -1;
   int notificationSoundHandle_ = -1;
   int warningSoundHandle_ = -1;
+  int selectSoundHandle_ = -1;
+  int decideSoundHandle_ = -1;
 
   /// 操作点の情報をまとめる構造体
   struct TorsoControlPoint {

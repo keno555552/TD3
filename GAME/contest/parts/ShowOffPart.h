@@ -39,7 +39,7 @@ class ShowOffPart : public IContestPart {
 public:
 	ShowOffPart(kEngine* system, BitmapFont* font,
 		const AudienceResult& audienceResult);
-	~ShowOffPart() override = default;
+	~ShowOffPart() override;
 
 	void Update() override;
 	void Draw() override;
@@ -51,6 +51,7 @@ private:
 	const AudienceResult& audienceResult_;
 	ShowOffStep step_ = ShowOffStep::StageView;
 	bool isFinished_ = false;
+	int decideSoundHandle_ = -1;
 
 	/// スクロールコメントとざわの初期化
 	void GenerateEffects();

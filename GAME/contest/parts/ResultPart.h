@@ -36,6 +36,7 @@ private:
 	const EarnedNickname& earnedNickname_;
 
 	int drumrollEndHandle_ = -1;
+	int decideSoundHandle_ = -1;
 
 	ResultStep step_ = ResultStep::StarsAndChart;
 	bool isFinished_ = false;

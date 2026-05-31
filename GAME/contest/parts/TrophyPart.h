@@ -19,7 +19,7 @@ enum class TrophyChoice {
 class TrophyPart : public IContestPart {
 public:
   TrophyPart(kEngine *system, BitmapFont *font, Vector3 playerTarget);
-  ~TrophyPart() override = default;
+  ~TrophyPart() override;
 
   void Update() override;
   void Draw() override;
@@ -44,4 +44,7 @@ private:
   TrophyChoice menuSelection_ = TrophyChoice::NextTheme;
   float menuInputCooldown_ = 0.0f;
   Vector2 prevMousePos_ = {0.0f, 0.0f};
+
+  int decideSoundHandle_ = -1;
+  int selectSoundHandle_ = -1;
 };

@@ -102,6 +102,7 @@ PromptScene::PromptScene(kEngine *system) {
   // ドラムロールの締め（決定時）の音のロード
   drumrollEndSoundHandle_ =
       system_->SoundLoadSE("GAME/resources/sounds/drumroll_end.mp3");
+  decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
 
   // フェード
   fade_.Initialize(system_);
@@ -114,6 +115,9 @@ PromptScene::~PromptScene() {
   }
   if (drumrollEndSoundHandle_ != -1) {
     system_->SoundStop(drumrollEndSoundHandle_);
+  }
+  if (decideSoundHandle_ != -1) {
+    system_->SoundStop(decideSoundHandle_);
   }
 
   system_->DestroyCamera(camera_);
@@ -204,6 +208,9 @@ void PromptScene::UpdatePromptRoll() {
     // 入力ロック解除後にスペースキーでお題決定
     if (stopInputLockCounter_ >= stopInputLockFrame_) {
       if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsClicked()) {
+        if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+          system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+        }
         DecidePrompt();
       }
     }
@@ -225,6 +232,9 @@ void PromptScene::UpdatePromptRoll() {
 
       // スペースキーで次のシーンへ
       if (system_->GetTriggerOn(DIK_SPACE) || themeButton_->GetIsClicked()) {
+        if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+          system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+        }
         fade_.StartFadeOut();
         isStartTransition_ = true;
         rollState_ = PromptRollState::FadeOut;

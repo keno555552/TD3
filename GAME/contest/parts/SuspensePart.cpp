@@ -63,6 +63,8 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	if (drumrollHandle_ != -1) {
 		system_->SoundPlayBGM(drumrollHandle_, 0.8f);
 	}
+
+	decideSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/decide.mp3");
 }
 
 SuspensePart::~SuspensePart() {
@@ -124,6 +126,9 @@ void SuspensePart::Update() {
 		}
 
 		if (system_->GetTriggerOn(DIK_SPACE) || drawButton_->GetIsRelease()) {
+			if (system_->GetTriggerOn(DIK_SPACE) && decideSoundHandle_ != -1) {
+				system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+			}
 			// 当選者へ向ける開始
 			state_ = State::Revealing;
 			revealTimer_ = 0.0f;
@@ -144,6 +149,9 @@ void SuspensePart::Update() {
 		
 		// スペースキーで演出を即スキップ
 		if (system_->GetTriggerOn(DIK_SPACE)) {
+			if (decideSoundHandle_ != -1) {
+				system_->SoundPlaySE(decideSoundHandle_, 0.5f);
+			}
 			revealTimer_ = revealDuration_;
 		}
 

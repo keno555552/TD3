@@ -59,6 +59,7 @@ private:
 	// 音声
 	int drumrollSoundHandle_ = -1;
 	int drumrollEndSoundHandle_ = -1;
+	int decideSoundHandle_ = -1;
 	bool isEndSoundPlayed_ = false;
 
 	// お題演出
