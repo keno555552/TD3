@@ -421,8 +421,7 @@ TravelScene::TravelScene(kEngine *system) {
   balloonPopSoundHandle_ =
       system_->SoundLoadSE("GAME/resources/sounds/Balloon-Pop01-2(Dry).mp3");
 
-  bgmSoundHandle_ =
-      system_->SoundLoadSE("GAME/resources/sounds/Tailshaft.mp3");
+  bgmSoundHandle_ = system_->SoundLoadSE("GAME/resources/sounds/Tailshaft.mp3");
   if (bgmSoundHandle_ != -1) {
     system_->SoundPlayBGM(bgmSoundHandle_, 0.3f);
   }
@@ -1735,17 +1734,27 @@ void TravelScene::UpdateFailureMenuInputTravel() {
 
   // Mouse hover overrides current selection
   const Vector2 mouse = system_->GetMousePosVector2();
-  if (promptButton_->GetIsSelect(mouse, 1, 1)) {
-    selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
-  } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
-    selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
-  } else if (retryTravelButton_->GetIsSelect(mouse, 1, 1)) {
-    selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+
+  bool isMouseMoved =
+      (mouse.x != prevMousePos_.x || mouse.y != prevMousePos_.y);
+  prevMousePos_ = mouse;
+
+  if (isMouseMoved) {
+    if (promptButton_->GetIsSelect(mouse, 1, 1)) {
+      selectedRetryChoiceTravel_ = RetryChoiceTravel::BackToPrompt;
+    } else if (retryModButton_->GetIsSelect(mouse, 1, 1)) {
+      selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryMod;
+    } else if (retryTravelButton_->GetIsSelect(mouse, 1, 1)) {
+      selectedRetryChoiceTravel_ = RetryChoiceTravel::RetryTravel;
+    }
   }
 
-  promptButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::BackToPrompt);
-  retryModButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryMod);
-  retryTravelButton_->ForceSelectState(selectedRetryChoiceTravel_ == RetryChoiceTravel::RetryTravel);
+  promptButton_->ForceSelectState(selectedRetryChoiceTravel_ ==
+                                  RetryChoiceTravel::BackToPrompt);
+  retryModButton_->ForceSelectState(selectedRetryChoiceTravel_ ==
+                                    RetryChoiceTravel::RetryMod);
+  retryTravelButton_->ForceSelectState(selectedRetryChoiceTravel_ ==
+                                       RetryChoiceTravel::RetryTravel);
 
   if (failureMenuInputCooldown_ <= 0.0f) {
     if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {

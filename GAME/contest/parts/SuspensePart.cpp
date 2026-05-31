@@ -41,11 +41,23 @@ SuspensePart::SuspensePart(kEngine* system, BitmapFont* font,
 	drawButton_ = std::make_unique<DetailButton>(system);
 	drawButton_->SetButton({ 640.0f, 650.0f }, 400.0f, 80.0f);
 
-	// サウンドロード
-	drumrollHandle_ = system_->SoundLoadSE("GAME/resources/sounds/drumroll.wav");
-	heartbeatHandle_ = system_->SoundLoadSE("GAME/resources/sounds/心臓の鼓動1.mp3");
-	spotlightSeHandle_ = system_->SoundLoadSE("GAME/resources/sounds/SpotLight.mp3");
-	cheersHandle_ = system_->SoundLoadSE("GAME/resources/sounds/Cheers.mp3");
+	// サウンドロード（メモリリーク防止のため静的キャッシュ）
+	static int s_drumrollHandle = -1;
+	static int s_heartbeatHandle = -1;
+	static int s_spotlightSeHandle = -1;
+	static int s_cheersHandle = -1;
+
+	if (s_drumrollHandle == -1) {
+		s_drumrollHandle = system_->SoundLoadSE("GAME/resources/sounds/drumroll.wav");
+		s_heartbeatHandle = system_->SoundLoadSE("GAME/resources/sounds/心臓の鼓動1.mp3");
+		s_spotlightSeHandle = system_->SoundLoadSE("GAME/resources/sounds/SpotLight.mp3");
+		s_cheersHandle = system_->SoundLoadSE("GAME/resources/sounds/Cheers.mp3");
+	}
+
+	drumrollHandle_ = s_drumrollHandle;
+	heartbeatHandle_ = s_heartbeatHandle;
+	spotlightSeHandle_ = s_spotlightSeHandle;
+	cheersHandle_ = s_cheersHandle;
 
 	// Suspense開始でドラムロール
 	if (drumrollHandle_ != -1) {

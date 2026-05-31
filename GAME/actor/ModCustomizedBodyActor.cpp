@@ -1251,8 +1251,12 @@ Vector3 ModCustomizedBodyActor::ResolveChildSelfAttachOffset(
 
 void ModCustomizedBodyActor::SaveBasePose() {
   baseControlPointsCache_.clear();
+  baseObjectRotateCache_.clear();
   for (auto& pair : modBodies_) {
     baseControlPointsCache_[pair.first] = pair.second.GetControlPoints();
+  }
+  for (auto& pair : modObjects_) {
+    baseObjectRotateCache_[pair.first] = pair.second->mainPosition.transform.rotate;
   }
 }
 
@@ -1261,6 +1265,12 @@ void ModCustomizedBodyActor::RestoreBasePose() {
     auto it = baseControlPointsCache_.find(pair.first);
     if (it != baseControlPointsCache_.end()) {
       pair.second.SetControlPoints(it->second);
+    }
+  }
+  for (auto& pair : modObjects_) {
+    auto it = baseObjectRotateCache_.find(pair.first);
+    if (it != baseObjectRotateCache_.end()) {
+      pair.second->mainPosition.transform.rotate = it->second;
     }
   }
 }

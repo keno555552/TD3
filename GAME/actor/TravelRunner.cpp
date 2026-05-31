@@ -839,8 +839,12 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
 
     leftThighLength *= leftThighScaleY;
 
-    float leftThighAngleZ = leftThighRotate.z;
-    float leftThighBaseX = leftThighRotate.x;
+    Vector3 leftThighDir = NormalizeSafe(leftThighVec);
+    float extraLeftThighAngleZ = std::atan2(leftThighDir.x, -leftThighDir.y);
+    float extraLeftThighBaseX = -std::asin(std::clamp(leftThighDir.z, -1.0f, 1.0f));
+
+    float leftThighAngleZ = leftThighRotate.z + extraLeftThighAngleZ;
+    float leftThighBaseX = leftThighRotate.x + extraLeftThighBaseX;
     float leftThighAnimX = -leftLegBend_ * thighSwingScale;
     float leftThighAngleX = leftThighBaseX + leftThighAnimX + bodyTilt_;
 
@@ -851,10 +855,13 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       leftShinLength = 0.0001f;
     }
     leftShinLength *= leftShinScaleY;
+    
     Vector3 leftShinDir = NormalizeSafe(leftShinVec);
+    float extraLeftShinAngleZ = std::atan2(leftShinDir.x, -leftShinDir.y);
+    float extraLeftShinBaseX = -std::asin(std::clamp(leftShinDir.z, -1.0f, 1.0f));
 
-    float leftShinAngleZ = leftThighRotate.z + leftShinRotate.z;
-    float leftShinBaseX = leftThighRotate.x + leftShinRotate.x;
+    float leftShinAngleZ = leftThighRotate.z + leftShinRotate.z + extraLeftShinAngleZ;
+    float leftShinBaseX = leftThighRotate.x + leftShinRotate.x + extraLeftShinBaseX;
 
     float leftThighSwing = -leftLegBend_ * thighSwingScale;
     float leftKneeFold = std::clamp((leftLegBend_ - legKickAngle_) /
@@ -886,8 +893,12 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
     }
     rightThighLength *= rightThighScaleY;
 
-    float rightThighAngleZ = rightThighRotate.z;
-    float rightThighBaseX = rightThighRotate.x;
+    Vector3 rightThighDir = NormalizeSafe(rightThighVec);
+    float extraRightThighAngleZ = std::atan2(rightThighDir.x, -rightThighDir.y);
+    float extraRightThighBaseX = -std::asin(std::clamp(rightThighDir.z, -1.0f, 1.0f));
+
+    float rightThighAngleZ = rightThighRotate.z + extraRightThighAngleZ;
+    float rightThighBaseX = rightThighRotate.x + extraRightThighBaseX;
     float rightThighAnimX = -rightLegBend_ * thighSwingScale;
     float rightThighAngleX = rightThighBaseX + rightThighAnimX + bodyTilt_;
 
@@ -898,10 +909,13 @@ void TravelRunner::UpdateMovementState(bool leftNowInput, bool rightNowInput) {
       rightShinLength = 0.0001f;
     }
     rightShinLength *= rightShinScaleY;
+    
     Vector3 rightShinDir = NormalizeSafe(rightShinVec);
+    float extraRightShinAngleZ = std::atan2(rightShinDir.x, -rightShinDir.y);
+    float extraRightShinBaseX = -std::asin(std::clamp(rightShinDir.z, -1.0f, 1.0f));
 
-    float rightShinAngleZ = rightThighRotate.z + rightShinRotate.z;
-    float rightShinBaseX = rightThighRotate.x + rightShinRotate.x;
+    float rightShinAngleZ = rightThighRotate.z + rightShinRotate.z + extraRightShinAngleZ;
+    float rightShinBaseX = rightThighRotate.x + rightShinRotate.x + extraRightShinBaseX;
 
     float rightThighSwing = -rightLegBend_ * thighSwingScale;
     float rightKneeFold = std::clamp((rightLegBend_ - legKickAngle_) /
@@ -1657,8 +1671,8 @@ void TravelRunner::ApplyVisualState() {
     float baseAngleX = instance.localTransform.rotate.x;
     float baseAngleY = instance.localTransform.rotate.y;
     float baseAngleZ = instance.localTransform.rotate.z;
-    /*
-    // 改造シーンの localTransform.rotate をそのまま採用するため、再計算による上書きを無効化
+
+    // 改造シーンでの自動回転（Rigid Bodyの回転）と、操作点（コントロールポイント）による手動曲げを足し合わせる
     if (instance.partType != ModBodyPart::ChestBody &&
         instance.partType != ModBodyPart::StomachBody) {
 
@@ -1685,10 +1699,9 @@ void TravelRunner::ApplyVisualState() {
         }
       }
 
-      baseAngleX = absBaseX - parentAbsX;
-      baseAngleZ = absBaseZ - parentAbsZ;
+      baseAngleX += absBaseX - parentAbsX;
+      baseAngleZ += absBaseZ - parentAbsZ;
     }
-    */
 
     // Animation Rotation
     bool isGroupA = true;

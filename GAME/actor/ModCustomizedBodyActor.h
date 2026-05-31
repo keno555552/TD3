@@ -113,6 +113,7 @@ private:
 
   // ポーズリセット用のキャッシュ
   std::unordered_map<int, std::vector<ModControlPoint>> baseControlPointsCache_;
+  std::unordered_map<int, Vector3> baseObjectRotateCache_;
 
   bool isJoyAnimating_ = false;
   bool isFrustrationAnimating_ = false;

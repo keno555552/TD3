@@ -24,31 +24,74 @@ void TrophyPart::Update() {
 	sameThemeButton_->Update();
 	titleButton_->Update();
 
-	// SPACE: 次のお題へ
-	if (system_->GetTriggerOn(DIK_SPACE)) {
-		choice_ = TrophyChoice::NextTheme;
-	}
-	// R: 同じお題でリトライ
-	else if (system_->GetTriggerOn(DIK_R)) {
-		choice_ = TrophyChoice::Retry;
-	}
-	// 1: タイトルへ戻る
-	else if (system_->GetTriggerOn(DIK_1)) {
-		choice_ = TrophyChoice::Title;
-	}
+	float dt = system_->GetDeltaTime();
+        if (menuInputCooldown_ > 0.0f) {
+          menuInputCooldown_ -= dt;
+          if (menuInputCooldown_ < 0.0f)
+            menuInputCooldown_ = 0.0f;
+        }
 
-	if (nextThemeButton_->GetIsRelease()) {
-		choice_ = TrophyChoice::NextTheme;
-	}
+        Vector2 mouse = system_->GetMousePosVector2();
+        bool isMouseMoved =
+            (mouse.x != prevMousePos_.x || mouse.y != prevMousePos_.y);
+        prevMousePos_ = mouse;
 
-	if (sameThemeButton_->GetIsRelease()) {
-		choice_ = TrophyChoice::Retry;
-	}
+        if (isMouseMoved) {
+          if (nextThemeButton_->GetIsSelect(mouse, 1, 1)) {
+            menuSelection_ = TrophyChoice::NextTheme;
+          } else if (sameThemeButton_->GetIsSelect(mouse, 1, 1)) {
+            menuSelection_ = TrophyChoice::Retry;
+          } else if (titleButton_->GetIsSelect(mouse, 1, 1)) {
+            menuSelection_ = TrophyChoice::Title;
+          }
+        }
 
-	if (titleButton_->GetIsRelease()){
-		choice_ = TrophyChoice::Title;
-	}
+        if (menuInputCooldown_ <= 0.0f) {
+          if (system_->GetTriggerOn(DIK_UP) || system_->GetTriggerOn(DIK_W)) {
+            if (menuSelection_ == TrophyChoice::Retry) {
+              menuSelection_ = TrophyChoice::NextTheme;
+            } else if (menuSelection_ == TrophyChoice::Title) {
+              menuSelection_ = TrophyChoice::Retry;
+            } else if (menuSelection_ == TrophyChoice::NextTheme) {
+              menuSelection_ = TrophyChoice::Title; // ループする
+            }
+            menuInputCooldown_ = 0.12f;
+          }
+          if (system_->GetTriggerOn(DIK_DOWN) || system_->GetTriggerOn(DIK_S)) {
+            if (menuSelection_ == TrophyChoice::NextTheme) {
+              menuSelection_ = TrophyChoice::Retry;
+            } else if (menuSelection_ == TrophyChoice::Retry) {
+              menuSelection_ = TrophyChoice::Title;
+            } else if (menuSelection_ == TrophyChoice::Title) {
+              menuSelection_ = TrophyChoice::NextTheme; // ループする
+            }
+            menuInputCooldown_ = 0.12f;
+          }
+        }
+
+        nextThemeButton_->ForceSelectState(menuSelection_ ==
+                                           TrophyChoice::NextTheme);
+        sameThemeButton_->ForceSelectState(menuSelection_ ==
+                                           TrophyChoice::Retry);
+        titleButton_->ForceSelectState(menuSelection_ == TrophyChoice::Title);
+
+        bool decide = system_->GetTriggerOn(DIK_SPACE) ||
+                      system_->GetTriggerOn(DIK_RETURN);
+
+        if (nextThemeButton_->GetIsRelease() ||
+            (decide && menuSelection_ == TrophyChoice::NextTheme)) {
+          choice_ = TrophyChoice::NextTheme;
+        } else if (sameThemeButton_->GetIsRelease() ||
+                   system_->GetTriggerOn(DIK_R) ||
+                   (decide && menuSelection_ == TrophyChoice::Retry)) {
+          choice_ = TrophyChoice::Retry;
+        } else if (titleButton_->GetIsRelease() ||
+                   system_->GetTriggerOn(DIK_1) ||
+                   (decide && menuSelection_ == TrophyChoice::Title)) {
+          choice_ = TrophyChoice::Title;
+        }
 }
+
 
 void TrophyPart::Draw() {
 
